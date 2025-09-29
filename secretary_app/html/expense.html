@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>収支管理</title>
+  <link rel="stylesheet" href="../css/finance.css"/>
+</head>
+<body>
+  <!-- すべてのコンテンツを .container にまとめる -->
+  <div class="container">
+
+    <!-- ヘッダー（右上にボタン2つ） -->
+    <div class="header">
+      <h1>収支管理</h1>
+      <div class="header-actions">
+        <a href="main.html" class="link-btn">メインへ戻る</a>
+        <a href="categories.html" class="link-btn">種類の情報変更へ</a>
+      </div>
+    </div>
+
+    <!-- 現在の状況 -->
+    <section class="card status">
+      <h2>現在の状況</h2>
+      <div class="status">
+        <p>現在の残高：<b class="num" id="balance">0</b> 円</p>
+        <p>今月の使用額：<b class="num" id="monthly">0</b> 円</p>
+        <p>今日の使用額：<b class="num" id="daily">0</b> 円</p>
+      </div>
+    </section>
+
+    <!-- 記録フォーム -->
+    <section class="card">
+      <h2>支出を記録</h2>
+
+      <div class="form-group">
+        <label for="amount">金額（必須）</label>
+        <input id="amount" class="input" type="number" min="0" placeholder="金額を入力" inputmode="numeric">
+      </div>
+
+      <div class="form-group">
+        <label>種類（必須）</label>
+        <div id="chip-box" class="chips"></div>
+        <div id="no-cat" class="empty" style="display:none">
+          種類が未設定です。<a class="link-btn" href="categories.html" style="margin-left:8px">種類の情報変更へ</a>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="purpose">使用目的（任意）</label>
+        <input id="purpose" class="input" placeholder="例：ランチ、電車賃">
+      </div>
+
+      <button id="save" class="btn" type="button">データを送信</button>
+    </section>
+
+  </div><!-- /.container -->
+
+  <script src="../js/expense.js"></script>
+</body>
+</html>

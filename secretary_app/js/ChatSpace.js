@@ -14,6 +14,8 @@ const genAI = new GoogleGenerativeAI(apiKey);
 // 使用するモデルを指定
 const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
+console.log("ChatSpace.jsがロードされました。")
+
 // テキストの入力を受け取る
 document.addEventListener('DOMContentLoaded', function() {
   // フォーム要素を取得
@@ -25,7 +27,7 @@ document.addEventListener('DOMContentLoaded', function() {
     event.preventDefault();
     const inputElement = event.target.elements.query; 
     const inputValue = inputElement.value;
-    console.info("フォームへの入力を検知しました。入力内容:"+inputValue)
+    console.log("フォームへの入力を検知しました。入力内容:"+inputValue)
 
     //目的の特定
     const add_text = "Analyze the purpose of the following text and reply with only the corresponding single letter: T:Time, C:Calendar, I:Income/Expense, E:Other."
