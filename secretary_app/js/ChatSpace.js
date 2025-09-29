@@ -25,8 +25,15 @@ document.addEventListener('DOMContentLoaded', function() {
   form.addEventListener('submit',async function(event) {
     // フォームのデフォルトの送信動作を阻止
     event.preventDefault();
-    const inputElement = event.target.elements.query; 
+    // ID 'searchbox' を使って要素を直接取得します
+    const inputElement = document.getElementById('searchbox'); 
+    // inputElementがnullでないことを確認してからvalueを読み取ります（念のため）
+    if (!inputElement) {
+      console.error("ID 'searchbox' の要素が見つかりませんでした。");
+      return; 
+    }
     const inputValue = inputElement.value;
+
     console.log("フォームへの入力を検知しました。入力内容:"+inputValue)
 
     //目的の特定
