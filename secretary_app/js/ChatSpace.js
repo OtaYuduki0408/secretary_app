@@ -16,46 +16,38 @@ const model = genAI.getGenerativeModel({model: "gemini-2.5-flash"});
 
 console.log("ChatSpace.jsがロードされました。")
 
-// テキストの入力を受け取る
-document.addEventListener('DOMContentLoaded', function() {
-  // フォーム要素を取得
-  const form = document.getElementById('search');
 
-  // フォームの送信イベントを監視
-  form.addEventListener('submit',async function(event) {
-    // フォームのデフォルトの送信動作を阻止
-    event.preventDefault();
-    // ID 'searchbox' を使って要素を直接取得します
-    const inputElement = document.getElementById('searchbox'); 
-    // inputElementがnullでないことを確認してからvalueを読み取ります（念のため）
-    if (!inputElement) {
-      console.error("ID 'searchbox' の要素が見つかりませんでした。");
-      return; 
-    }
-    const inputValue = inputElement.value;
-    if (!inputValue){
-      
-    }
+//チャット内容を取得
+const input = document.getElementById('searchbox');
+const inputValue = ""
+input.addEventListener('keydown', (e) => {
+  if (e.key !== 'Enter') return;
+  const raw = (input.value||'').trim();
+  if (!raw) return;
+  inputValue = raw.toLowerCase();
+  input.value = '';
+})
+console.log("フォームへの入力を検知しました。入力内容:"+inputValue)
 
-    console.log("フォームへの入力を検知しました。入力内容:"+inputValue)
+//目的の特定
+const add_text = "Analyze the purpose of the following text and reply with only the corresponding single letter: T:Time, C:Calendar, I:Income/Expense, E:Other."
+const request_text = add_text + inputValue
+// 目的の関数を呼び出し
+const purpose = await gemini_request(request_text)
+if(purpose == "T"){
+  console.log("ユーザーの目的は'時刻'です。")
+  alert("このユーザーは時刻に関する質問をしています。")
+}else if(purpose == "C"){
+  console.log("ユーザーの目的は'カレンダー'です。")
+  alert("このユーザーはカレンダーに関する質問をしています。")
+}else if(purpose == "I"){
+  console.log("ユーザーの目的は'収支管理'です。")
+  alert("このユーザーは収支管理に関する質問をしています。")
+}else{
+  console.log("ユーザーの目的は'その他'です。")
+  alert("このユーザーはその他の質問をしています。")
+}
 
-    //目的の特定
-    const add_text = "Analyze the purpose of the following text and reply with only the corresponding single letter: T:Time, C:Calendar, I:Income/Expense, E:Other."
-    const request_text = add_text + inputValue
-    // 目的の関数を呼び出し
-    const purpose = await gemini_request(request_text)
-    if(purpose == "T"){
-      alert("このユーザーは時刻に関する質問をしています。")
-    }else if(purpose == "C"){
-      alert("このユーザーはカレンダーに関する質問をしています。")
-    }else if(purpose == "I"){
-      alert("このユーザーは収支管理に関する質問をしています。")
-    }else{
-      alert("このユーザーはその他の質問をしています。")
-    }
-    alert(purpose)
-  });
-});
 
 // Gemini APIにリクエストを送信し、結果をアラートで表示する
 async function gemini_request(text) {
