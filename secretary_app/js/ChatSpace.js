@@ -12,7 +12,7 @@ if (!apiKey) {
 const genAI = new GoogleGenerativeAI(apiKey);
 
 // 使用するモデルを指定
-const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+const model = genAI.getGenerativeModel({model: "gemini-2.5-flash"});
 
 console.log("ChatSpace.jsがロードされました。")
 
@@ -33,6 +33,9 @@ document.addEventListener('DOMContentLoaded', function() {
       return; 
     }
     const inputValue = inputElement.value;
+    if (!inputValue){
+      
+    }
 
     console.log("フォームへの入力を検知しました。入力内容:"+inputValue)
 
