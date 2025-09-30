@@ -67,7 +67,6 @@ import {check_chat_Space} from './ChatSpace.js'
     if (isBTD(raw))        { startReverseTransform(); return; }
     if (isORA(raw))        { startOraOra(); return; }
     check_chat_Space(v) //チャット解析に遷移させる。
-
   });
 
   /* ガラス落下：次テーマへ */

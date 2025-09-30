@@ -22,33 +22,44 @@ const model = genAI.getGenerativeModel({model: "gemini-2.5-flash"});
 */
 export async function check_chat_Space(inputValue){
     console.log("フォームへの入力を検知しました。入力内容:"+inputValue)
+    console.time("チャット解析処理、総所要時間")
+    console.time("チャット解析処理、第一解析時間")
 
     //目的の特定
-    const add_text = "Analyze the purpose of the following text and reply with only the corresponding single letter: T:Time, C:Calendar, I:Income/Expense, E:Other."
+    const add_text = "Analyze the purpose of the following text and reply with only the corresponding single letter: T:Time, C:Calendar(Add), R:Calendar(Remove), G:Calendar(Get), M:Calendar(Change), I:Income/Expense, E:Other."
     const request_text = add_text + inputValue
     // 目的の関数を呼び出し
     const purpose = await gemini_request(request_text)
+    console.timeEnd("チャット解析処理、第一解析時間")
     if(purpose == "T"){
-      alert("このユーザーは時刻に関する質問をしています。")
+      console.log("チャットの第一解析結果:時間取得関係(T)")
     }else if(purpose == "C"){
-      alert("このユーザーはカレンダーに関する質問をしています。")
+      console.log("チャットの第一解析結果:カレンダー追加(C)")
+    }else if(purpose == "R"){
+      console.log("チャットの第一解析結果:カレンダー削除(R)")
+    }else if(purpose == "G"){
+      console.log("チャットの第一解析結果:カレンダー取得(G)")
+    }else if(purpose == "M"){
+      console.log("チャットの第一解析結果:カレンダー変更(M)")
     }else if(purpose == "I"){
-      alert("このユーザーは収支管理に関する質問をしています。")
+      console.log("チャットの第一解析結果:収支管理(I)")
     }else{
       alert("このユーザーはその他の質問をしています。")
     }
-    alert(purpose)
+    console.timeEnd("チャット解析処理、総所要時間")
   };
 
 // Gemini APIにリクエストを送信し、結果をアラートで表示する
 async function gemini_request(text) {
   console.info("gemini関数がテキストを受け取りました。")
+  console.time("geminiリクエスト、経過時間")
   try {
     // テキストを生成
     const result = await model.generateContent(text);
     const response = await result.response;
     const responce_text = response.text()
     console.log("gemini responce:",responce_text)
+    console.timeEnd("geminiリクエスト、経過時間")
     return responce_text;
     
   } catch (error) {
@@ -57,3 +68,6 @@ async function gemini_request(text) {
   }
 }
 
+function time_question(text){
+  
+}

@@ -37,12 +37,12 @@
         </button>
       </div>
       <!--JSで下記のformのid="search"を使って読み込んでいます。idをけさないでください。(太田)-->
-      <form id="search" class="search glass" role="search" aria-label="検索フォーム" >
+      <form id="search" class="search glass" role="search" aria-label="検索フォーム" onsubmit="return false;">
         <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
           <circle cx="11" cy="11" r="7" stroke="#e7edf5" stroke-width="1.7"/>
           <path d="M20 20l-3.6-3.6" stroke="#e7edf5" stroke-width="1.7" stroke-linecap="round"/>
         </svg>
-        <!--以下のinputのid="searchbox"の部分を変更しないで。jsで監視してます。(太田)-->
+        <!--以下のinputのname="search"の部分を変更しないで。jsで監視してます。(太田)-->
         <input id="searchbox" type="text" inputmode="search" name="search" placeholder="入力" aria-label="入力" />
       </form>
     </section>
@@ -90,6 +90,6 @@
   <div id="shatter" aria-hidden="true"></div>
 
   <!--以下2行、JSの呼び出し部分です。変更しないでください。(太田)-->
-  <script src="..\js\Parallax_and_Theme_rotation.js"></script> <!--ヒビとテーマの回転のJS-->
+  <script src="..\js\Parallax_and_Theme_rotation.js" type="module"></script> <!--ヒビとテーマの回転のJS-->
 </body>
 </html>
