@@ -12,10 +12,12 @@ const REEL_STRIP = [
   "cherry.png","bell.png","seven.png","lemon.png","sai.png","cherry.png",
 ];
 
-const CELL_H = 86;          // CSS --cell と一致
-const PAY_LINES = 5;        // 1 / 3 / 5
+const CELL_H   = 86;          // CSS --cell と一致
+const PAY_LINES= 5;           // 1 / 3 / 5
 const SNAP_EPS = 0.0001;
-//変数宣言
+const DEBUG_HUD = false;      // ← true にすると各リールの [top/mid/bot] を表示
+
+// DOM
 const creditEl = document.getElementById("credit");
 const countEl  = document.getElementById("count");
 const payoutEl = document.getElementById("payout");
@@ -29,66 +31,95 @@ const lampReplay = document.getElementById("lamp-replay");
 const lampWait   = document.getElementById("lamp-wait");
 const yakuEl     = document.getElementById("yaku");
 
+// meters
 let credit = 30, count = 0, payout = 0;
-updateMeters(); //メータを更新する
+updateMeters();
 function setLamp(el, on){ el.style.background = on ? "var(--dot-on)" : "var(--dot-off)" }
 setLamp(lampWait, true);
 
-// 画像プリロード
+// preload
 const preload = SYMBOLS.map(name => new Promise(res=>{
   const img = new Image(); img.onload=res; img.onerror=res; img.src=IMG_PATH+name;
 }));
 
+/* =========================================================
+   Reel（リサイクル式スクロール）
+   - 配列(REEL_STRIP)は不変、topIndex と DOMセル再利用で循環
+   - 下へ流し、1セルぶん進んだら先頭セルを末尾へ回す
+   - 停止は offsetPx を最近傍セルへスナップ（easeOut）
+   ========================================================= */
 class Reel {
-  //初期化
   constructor(root, strip, idx){
-    this.root = root;
+    this.root  = root;
     this.strip = strip;
-    this.idx = idx;
+    this.idx   = idx;
 
-    this.y = 0;
-    this.speed = 0;
-    this.spinning = false;
+    this.speed     = 0;        // px/sec
+    this.spinning  = false;
 
+    // スナップ
     this.snapping = false;
     this.snapFrom = 0;
     this.snapTo   = 0;
     this.snapT    = 0;
     this.snapDur  = 0.12;
 
+    // ビュー
     this.track = document.createElement("div");
-    Object.assign(this.track.style,{position:"absolute",left:0,right:0,top:0,willChange:"transform"});
+    Object.assign(this.track.style,{ position:"absolute", left:0, right:0, top:0, willChange:"transform" });
     this.root.appendChild(this.track);
 
+    // セル群（strip長 + 可視3 + バッファ）
     this.cells = [];
-    const repeat = 3;
+    const VISIBLE = 3;
+    const BUF = 2;
+    this.cellCount = strip.length + VISIBLE + BUF;
+    this.topIndex  = 0;      // strip の先頭を指す index
+    this.offsetPx  = 0;      // 先頭セルの上端からのスクロール量（0..CELL_H）
 
+    // 見た目微調整
     const Y_TWEAK = { "cherry.png":4, "bell.png":1, "lemon.png":1, "bar.png":0, "seven.png":0, "sai.png":0 };
-    const OVERFILL = 12;
+    const OVERFILL = 8;                                  // ← 少なめ推奨（はみ出し誤認防止）
     const IMG_H = CELL_H + OVERFILL;
     const BASE_TOP = -Math.floor(OVERFILL/2);
 
-    for(let r=0; r<repeat; r++){
-      for(const s of this.strip){
-        const cell = document.createElement("div");
-        cell.className = "symbol";
-        const img = document.createElement("img");
-        img.className = "sym";
-        img.src = IMG_PATH + s;
-        img.alt = s;
-        img.style.height = IMG_H + "px";
-        img.style.top    = (BASE_TOP + (Y_TWEAK[s]||0)) + "px";
-        cell.appendChild(img);
-        this.track.appendChild(cell);
-        this.cells.push(cell);
-      }
+    for(let i=0;i<this.cellCount;i++){
+      const cell = document.createElement("div");
+      cell.className = "symbol";
+      cell.style.position = "absolute";
+      cell.style.left = "0"; cell.style.right = "0";
+      cell.style.top  = (i * CELL_H) + "px";
+
+      const img = document.createElement("img");
+      img.className = "sym";
+      img.style.height = IMG_H + "px";
+      img.style.top    = BASE_TOP + "px";
+      img.alt = "";
+      cell.appendChild(img);
+
+      this.track.appendChild(cell);
+      this.cells.push(cell);
     }
 
-    this.total  = this.strip.length * repeat;
-    this.height = this.total * CELL_H;
-
-    this.y = Math.round(Math.random()*this.height/CELL_H)*CELL_H % this.height;
+    // 初期位置：ランダムな topIndex に完全境界で合わせる
+    this.topIndex = (Math.random() * strip.length)|0;
+    this.offsetPx = 0;
+    this.refreshAllCells();
     this.applyTransform();
+  }
+
+  // 現在の topIndex 基準で全セルに画像を張る
+  refreshAllCells(){
+    const L = this.strip.length;
+    for(let i=0;i<this.cellCount;i++){
+      const sym = this.strip[(this.topIndex + i) % L];
+      this.setCellImage(this.cells[i], sym);
+    }
+  }
+  setCellImage(cell, sym){
+    const img = cell.firstChild;
+    img.src = IMG_PATH + sym;
+    img.alt = sym;
   }
 
   start(speed){
@@ -99,61 +130,88 @@ class Reel {
 
   requestStop(){
     if(!this.spinning) return;
-    const nearest = Math.round(this.y / CELL_H) * CELL_H;
-    const norm = v => ((v % this.height) + this.height) % this.height;
-    this.snapFrom = this.y;
-    this.snapTo   = norm(nearest);
+    // 先頭セルの上端基準 offsetPx を最近傍セルに吸着
+    const nearest = Math.round(this.offsetPx / CELL_H) * CELL_H;
+    this.snapFrom = this.offsetPx;
+    this.snapTo   = nearest;
     this.snapT    = 0;
     this.snapping = true;
-    this.speed    = 0;
+    this.spinning = false;
   }
 
   update(dt){
-    if(this.snapping){
-      this.snapT = Math.min(1, this.snapT + dt/this.snapDur);
-      const t = 1 - Math.pow(1 - this.snapT, 3);
-
-      let delta = this.snapTo - this.snapFrom;
-      if(delta >  this.height/2) delta -= this.height;
-      if(delta < -this.height/2) delta += this.height;
-
-      this.y = ((this.snapFrom + delta * t) % this.height + this.height) % this.height;
-
-      if(this.snapT >= 1){
-        this.y = Math.round(this.y / CELL_H) * CELL_H;
-        this.y = ((this.y % this.height) + this.height) % this.height;
-        this.snapping = false;
-        this.spinning = false;
-      }
+    if(this.spinning){
+      this.offsetPx += this.speed * dt;
+      this.recycleDownward();
       this.applyTransform();
+      if (DEBUG_HUD) this.hud();
       return;
     }
+    if(this.snapping){
+      this.snapT = Math.min(1, this.snapT + dt / this.snapDur);
+      const t = 1 - Math.pow(1 - this.snapT, 3);
+      this.offsetPx = this.snapFrom + (this.snapTo - this.snapFrom) * t;
+      this.recycleDownward();
+      this.applyTransform();
+      if (this.snapT >= 1){
+        this.offsetPx = Math.round(this.offsetPx / CELL_H) * CELL_H;
+        this.recycleDownward();
+        this.applyTransform();
+        this.snapping = false;
+      }
+      if (DEBUG_HUD) this.hud();
+    }
+  }
 
-    if(!this.spinning) return;
-    this.y += this.speed * dt;
-    if(this.y >= this.height) this.y -= this.height;
-    this.applyTransform();
+  // 1セル以上進んだら：offset を戻し、先頭セルを末尾へ、画像を次に
+  recycleDownward(){
+    const L = this.strip.length;
+    while(this.offsetPx >= CELL_H){
+      this.offsetPx -= CELL_H;
+
+      // 先頭セルを末尾へ
+      const first = this.cells.shift();
+      this.cells.push(first);
+
+      // 末尾の表示位置へ移動
+      const lastIdx = this.cells.length - 1;
+      first.style.top = (lastIdx * CELL_H) + "px";
+
+      // 次の先頭へ
+      this.topIndex = (this.topIndex + 1) % L;
+
+      // 末尾セルに貼るべき絵柄（topIndex から lastIdx 先）
+      const sym = this.strip[(this.topIndex + lastIdx) % L];
+      this.setCellImage(first, sym);
+    }
   }
 
   applyTransform(){
-    this.track.style.transform = `translateY(${-Math.round(this.y)}px) translateZ(0)`;
+    this.track.style.transform = `translateY(${-Math.round(this.offsetPx)}px) translateZ(0)`;
   }
 
-  /** 可視 [top, mid, bottom]（中央段＝base+1 を絶対基準） */
+  /** 可視 [top, mid, bottom] を返す（topIndex 基準で連続） */
   getVisible3(){
     const L = this.strip.length;
-    const offset = Math.round(this.y / CELL_H);
-    const base   = (offset % L + L) % L;
     return [
-      this.strip[(base + 0) % L],  // top
-      this.strip[(base + 1) % L],  // mid
-      this.strip[(base + 2) % L],  // bottom
+      this.strip[(this.topIndex + 0) % L],
+      this.strip[(this.topIndex + 1) % L],
+      this.strip[(this.topIndex + 2) % L],
     ];
   }
 
   isIdle(){ return !this.spinning && !this.snapping; }
+
+  // デバッグHUD（現在見えている3段を data-* に出す）
+  hud(){
+    const v = this.getVisible3();
+    this.root.dataset.top = v[0];
+    this.root.dataset.mid = v[1];
+    this.root.dataset.bot = v[2];
+  }
 }
 
+/* ========== 起動 ========== */
 Promise.all(preload).then(()=>{
   const reelNodes = Array.from(document.querySelectorAll(".reel"));
   window.reels = reelNodes.map((el,i)=> new Reel(el, REEL_STRIP, i));
@@ -183,9 +241,9 @@ function setupLoopAndUI(){
     reels.forEach((r,i)=> r.start(speeds[i]));
   }
 
-  async function waitUntilAllIdle(timeoutMs=1200){
-    const startT = performance.now();
-    while(performance.now()-startT < timeoutMs){
+  async function waitUntilAllIdle(timeoutMs=1500){
+    const t0 = performance.now();
+    while(performance.now()-t0 < timeoutMs){
       if(allIdle()) return true;
       await new Promise(r=>setTimeout(r, 30));
     }
@@ -196,13 +254,12 @@ function setupLoopAndUI(){
     const r = reels[which]; if(!r) return;
     r.requestStop();
 
-    // ★ 全リール停止を厳密に待つ
     const ok = await waitUntilAllIdle();
     if(!ok) return;
 
     setLamp(lampStart,false); setLamp(lampWait,true);
 
-    const vis = reels.map(r => r.getVisible3()); // [[T,M,B], ...]
+    const vis = reels.map(r => r.getVisible3()); // [[T,M,B], ... 3列]
     const lines = [];
 
     if (PAY_LINES === 1) {
@@ -236,7 +293,6 @@ function setupLoopAndUI(){
     if(yakuEl) yakuEl.textContent = "役：" + (hitNames.length ? hitNames.join(" / ") : "なし");
   }
 
-  // UI
   spinBtn.addEventListener("click", start);
   btnL.addEventListener("click", ()=>tryStop(0));
   btnM.addEventListener("click", ()=>tryStop(1));
@@ -263,7 +319,6 @@ function judge3only(line){
   if (v==="cherry.png" || v==="lemon.png") return 3; // ぶどう=lemon.png
   return 0;
 }
-
 function handName3only(line){
   const v = line[0];
   if (line[1]!==v || line[2]!==v) return "なし";
