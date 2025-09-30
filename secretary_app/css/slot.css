@@ -97,3 +97,28 @@ html,body{margin:0;background:#101010;font-family:Inter,system-ui,"Segoe UI",Rob
 }
 
 
+/* 右側ランプ列（Start/Replay/Wait）を相対基準にする */
+.side.right{ position: relative; }  /* ← これが無いと左上に飛びます */
+
+/* GOGO：Waitの下あたりに固定、点灯時だけ激しく点滅 */
+#lamp-gogo{
+  position:absolute;
+  left: -8px;        /* 微調整 */
+  bottom: -6px;      /* 「Wait」の下に来るように */
+  width: 120px;
+  height: auto;
+  opacity: 0;
+  pointer-events: none;
+  z-index: 5;
+  filter: drop-shadow(0 0 6px rgba(255,255,255,.6));
+}
+#lamp-gogo.on{
+  opacity: 1;
+  animation: gogoFlash .08s steps(2,end) infinite;
+}
+@keyframes gogoFlash{
+  0%   { filter:brightness(1)   contrast(1)   drop-shadow(0 0 6px rgba(255,255,255,.6)); }
+  50%  { filter:brightness(2.4) contrast(1.8) drop-shadow(0 0 12px rgba(255,255,255,.9)); }
+  100% { filter:brightness(1)   contrast(1)   drop-shadow(0 0 6px rgba(255,255,255,.6)); }
+}
+
