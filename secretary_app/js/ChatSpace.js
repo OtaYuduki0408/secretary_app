@@ -1,5 +1,6 @@
 // Google Generative AI SDKをインポート
 import { GoogleGenerativeAI } from 'https://cdn.jsdelivr.net/npm/@google/generative-ai@0.14.1/dist/index.mjs';
+console.log("ChatSpace.jsがロードされました。")
 
 // APIキーを直接記述 (本番環境では非推奨)
 const apiKey = "AIzaSyCoyPKhnAhlZrekrnOyljxtl4zpo3hTEtc";
@@ -14,40 +15,30 @@ const genAI = new GoogleGenerativeAI(apiKey);
 // 使用するモデルを指定
 const model = genAI.getGenerativeModel({model: "gemini-2.5-flash"});
 
-console.log("ChatSpace.jsがロードされました。")
 
+/**
+*  チャットスペースに入力された内容を解析する関数
+*  @param inputValue - 解析する内容
+*/
+export async function check_chat_Space(inputValue){
+    console.log("フォームへの入力を検知しました。入力内容:"+inputValue)
 
-//チャット内容を取得
-const input = document.getElementById('searchbox');
-const inputValue = ""
-input.addEventListener('keydown', (e) => {
-  if (e.key !== 'Enter') return;
-  const raw = (input.value||'').trim();
-  if (!raw) return;
-  inputValue = raw.toLowerCase();
-  input.value = '';
-})
-console.log("フォームへの入力を検知しました。入力内容:"+inputValue)
-
-//目的の特定
-const add_text = "Analyze the purpose of the following text and reply with only the corresponding single letter: T:Time, C:Calendar, I:Income/Expense, E:Other."
-const request_text = add_text + inputValue
-// 目的の関数を呼び出し
-const purpose = await gemini_request(request_text)
-if(purpose == "T"){
-  console.log("ユーザーの目的は'時刻'です。")
-  alert("このユーザーは時刻に関する質問をしています。")
-}else if(purpose == "C"){
-  console.log("ユーザーの目的は'カレンダー'です。")
-  alert("このユーザーはカレンダーに関する質問をしています。")
-}else if(purpose == "I"){
-  console.log("ユーザーの目的は'収支管理'です。")
-  alert("このユーザーは収支管理に関する質問をしています。")
-}else{
-  console.log("ユーザーの目的は'その他'です。")
-  alert("このユーザーはその他の質問をしています。")
-}
-
+    //目的の特定
+    const add_text = "Analyze the purpose of the following text and reply with only the corresponding single letter: T:Time, C:Calendar, I:Income/Expense, E:Other."
+    const request_text = add_text + inputValue
+    // 目的の関数を呼び出し
+    const purpose = await gemini_request(request_text)
+    if(purpose == "T"){
+      alert("このユーザーは時刻に関する質問をしています。")
+    }else if(purpose == "C"){
+      alert("このユーザーはカレンダーに関する質問をしています。")
+    }else if(purpose == "I"){
+      alert("このユーザーは収支管理に関する質問をしています。")
+    }else{
+      alert("このユーザーはその他の質問をしています。")
+    }
+    alert(purpose)
+  };
 
 // Gemini APIにリクエストを送信し、結果をアラートで表示する
 async function gemini_request(text) {
