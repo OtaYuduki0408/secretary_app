@@ -35,6 +35,7 @@ export async function check_chat_Space(inputValue){
       console.log("チャットの第一解析結果:時間取得関係(T)")
     }else if(purpose == "C"){
       console.log("チャットの第一解析結果:カレンダー追加(C)")
+      add_calendar(inputValue)
     }else if(purpose == "R"){
       console.log("チャットの第一解析結果:カレンダー削除(R)")
     }else if(purpose == "G"){
@@ -51,7 +52,8 @@ export async function check_chat_Space(inputValue){
 
 // Gemini APIにリクエストを送信し、結果をアラートで表示する
 async function gemini_request(text) {
-  console.info("gemini関数がテキストを受け取りました。")
+  console.info("gemini関数がテキストを受け取りました。",text)
+  console.log("文章のトークン数:",GenerativeModel.count_tokens(text))
   console.time("geminiリクエスト、経過時間")
   try {
     // テキストを生成
@@ -68,6 +70,9 @@ async function gemini_request(text) {
   }
 }
 
-function time_question(text){
-  
+/**
+ * カレンダーに追加する処理を統括管理する関数
+ * @param {string} text ユーザーによるテキスト
+ */
+function add_calendar(text){
 }
