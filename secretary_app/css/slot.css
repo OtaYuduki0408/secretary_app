@@ -52,7 +52,7 @@ html,body{margin:0;background:#101010;font-family:Inter,system-ui,"Segoe UI",Rob
 .num span{font-weight:900;font-size:30px;color:#ffe56b;text-shadow:0 2px 0 #000,0 0 8px rgba(255,200,0,.7)}
 
 /* 右側インジケータ */
-.side.right{display:flex;flex-direction:column;justify-content:center;gap:12px}
+.side.right{display:flex;flex-direction:column;justify-content:center;gap:12px; position: relative; }
 .indicator{display:flex;align-items:center;gap:10px}
 .dot{width:14px;height:14px;border-radius:50%;background:var(--dot-off);box-shadow:0 0 0 2px #000 inset,0 0 10px rgba(0,0,0,.6)}
 .indicator span{font-weight:700;text-shadow:0 1px 0 #000}
@@ -96,29 +96,27 @@ html,body{margin:0;background:#101010;font-family:Inter,system-ui,"Segoe UI",Rob
   :root{ --cabinet-w: 94vw; }
 }
 
-
-/* 右側ランプ列（Start/Replay/Wait）を相対基準にする */
-.side.right{ position: relative; }  /* ← これが無いと左上に飛びます */
-
 /* GOGO：Waitの下あたりに固定、点灯時だけ激しく点滅 */
 #lamp-gogo{
   position:absolute;
-  left: -8px;        /* 微調整 */
-  bottom: -6px;      /* 「Wait」の下に来るように */
-  width: 120px;
-  height: auto;
-  opacity: 0;
-  pointer-events: none;
-  z-index: 5;
-  filter: drop-shadow(0 0 6px rgba(255,255,255,.6));
+  left:-8px;
+  bottom:-6px;      /* 「Wait」の下に来るように */
+  width:120px;
+  height:auto;
+  opacity:0;
+  pointer-events:none;
+  z-index:5;
+  filter:drop-shadow(0 0 6px rgba(255,255,255,.6));
 }
 #lamp-gogo.on{
-  opacity: 1;
-  animation: gogoFlash .08s steps(2,end) infinite;
+  opacity:1;
+  animation:gogoFlash .08s steps(2,end) infinite;
 }
 @keyframes gogoFlash{
-  0%   { filter:brightness(1)   contrast(1)   drop-shadow(0 0 6px rgba(255,255,255,.6)); }
-  50%  { filter:brightness(2.4) contrast(1.8) drop-shadow(0 0 12px rgba(255,255,255,.9)); }
-  100% { filter:brightness(1)   contrast(1)   drop-shadow(0 0 6px rgba(255,255,255,.6)); }
+  0%{ filter:brightness(1) contrast(1) drop-shadow(0 0 6px rgba(255,255,255,.6)); }
+  50%{ filter:brightness(2.4) contrast(1.8) drop-shadow(0 0 12px rgba(255,255,255,.9)); }
+  100%{ filter:brightness(1) contrast(1) drop-shadow(0 0 6px rgba(255,255,255,.6)); }
 }
 
+/* 画像のインライン隙間対策（既に display:block なら不要） */
+.reel img { display:block; }
