@@ -26,10 +26,10 @@ export async function check_chat_Space(inputValue){
     console.time("チャット解析処理、第一解析時間")
 
     //目的の特定
-    const add_text = "Analyze the purpose of the following text and reply with only the corresponding single letter: T:Time, C:Calendar(Add), R:Calendar(Remove), G:Calendar(Get), M:Calendar(Change), I:Income/Expense, E:Other."
+    const add_text = "以下のテキストの目的を分析し、対応する一文字のみで返答してください：T:時間、C:カレンダー（追加）、R:カレンダー（削除）、G:カレンダー（取得）、M:カレンダー（変更）、I:収入/支出、E:その他"
     const request_text = add_text + inputValue
     // 目的の関数を呼び出し
-    const purpose = await gemini_request(request_text)
+    let purpose = await gemini_request(request_text)
     console.timeEnd("チャット解析処理、第一解析時間")
     if(purpose == "T"){
       console.log("チャットの第一解析結果:時間取得関係(T)")
@@ -48,12 +48,21 @@ export async function check_chat_Space(inputValue){
       alert("このユーザーはその他の質問をしています。")
     }
     console.timeEnd("チャット解析処理、総所要時間")
+    alert("処理終了")
   };
 
 // Gemini APIにリクエストを送信し、結果をアラートで表示する
 async function gemini_request(text) {
-  console.info("gemini関数がテキストを受け取りました。",text)
-  console.log("文章のトークン数:",GenerativeModel.count_tokens(text))
+  console.info("gemini関数がテキストを受け取りました。")
+  // トークンカウントの処理を修正
+  try {
+    // countTokensの引数を、APIリクエストと同様の contents 形式にする
+    const token_response = await model.countTokens({contents: [{role: "user", parts: [{text: text}]}]});
+    console.log("文章のトークン数:", token_response.totalTokens);
+  } catch (e) {
+    // トークンカウントのエラーは無視し、警告のみを表示
+    console.warn("トークン数のカウントに失敗しました:", e);
+  }
   console.time("geminiリクエスト、経過時間")
   try {
     // テキストを生成
