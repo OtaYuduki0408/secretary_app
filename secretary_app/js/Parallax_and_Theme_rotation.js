@@ -1,9 +1,9 @@
 import {check_chat_Space} from './ChatSpace.js'
 /* =======================
-   Parallax + Theme rotation
+   Parallax + Theme rotation + ORA jackpot with audio
    ======================= */
 (() => {
-  /* Parallax */
+  /* ===== Parallax ===== */
   const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
   if (!reduceMotion) {
     const MAX_SHIFT = Math.min(60, Math.max(24, Math.round(Math.min(innerWidth, innerHeight) * 0.06)));
@@ -25,7 +25,7 @@ import {check_chat_Space} from './ChatSpace.js'
     },{passive:true});
   }
 
-  /* Theme persistence */
+  /* ===== Theme persistence ===== */
   const THEME_KEY = 'vs_theme_idx';
   const THEMES = ['dark','light','purple','blue','orange'];
 
@@ -40,22 +40,20 @@ import {check_chat_Space} from './ChatSpace.js'
     localStorage.setItem(THEME_KEY, String(i));
     currentIdx = i;
   }
-
-  // 初期反映
   let currentIdx = parseInt(localStorage.getItem(THEME_KEY) || '0', 10);
   if (Number.isNaN(currentIdx)) currentIdx = 0;
   applyThemeByIdx(currentIdx);
 
-  /* Commands */
+  /* ===== Commands (Enter) ===== */
   const input = document.getElementById('searchbox');
   const BTD_WORDS = ['ヴァイツァダスト','ヴァイツァ・ダスト','バイツァダスト','バイツァ・ダスト','bites the dust','btd'];
-  const norm = s => (s||'').toString().trim().replace(/[・\s]/g,'').toLowerCase();
+  const norm  = s => (s||'').toString().trim().replace(/[・\s]/g,'').toLowerCase();
   const isBTD = v => BTD_WORDS.map(norm).includes(norm(v));
   const isORA = v => {
     const s = (v||'').toString().trim().replace(/[・\s]/g,'');
     return /^(?:オラ)+[!！ァぁー〜～]*$/u.test(s) || /^(?:ora)+[!！\-~～]*$/i.test(s);
   };
-
+  if (input) {
   input.addEventListener('keydown', (e) => {
     if (e.key !== 'Enter') return;
     const raw = (input.value||'').trim();
@@ -68,12 +66,12 @@ import {check_chat_Space} from './ChatSpace.js'
     if (isORA(raw))        { startOraOra(); return; }
     check_chat_Space(v) //チャット解析に遷移させる。
   });
+};
 
-  /* ガラス落下：次テーマへ */
+  /* ===== ガラス落下：次テーマへ ===== */
   function startTransform(){
     if (document.body.classList.contains('is-transforming')) return;
     document.body.classList.add('is-transforming');
-
     const host = document.getElementById('shatter');
     host.innerHTML = '';
     const cols = 10, rows = 6;
@@ -98,20 +96,18 @@ import {check_chat_Space} from './ChatSpace.js'
         });
       }
     }
-
     const nextIdx = (currentIdx + 1) % THEMES.length;
     setTimeout(()=> applyThemeByIdx(nextIdx), 250);
     setTimeout(()=>{ host.innerHTML = ''; document.body.classList.remove('is-transforming'); }, 2600);
   }
 
-  /* ガラス逆再生：前テーマへ（Bites the Dust） */
+  /* ===== ガラス逆再生：前テーマへ ===== */
   function startReverseTransform(){
     if (document.body.classList.contains('is-transforming')) return;
     document.body.classList.add('is-transforming');
 
     const overlay = document.getElementById('btd');
-    overlay.classList.add('show');
-    setTimeout(()=> overlay.classList.remove('show'), 2000);
+    if (overlay) { overlay.classList.add('show'); setTimeout(()=> overlay.classList.remove('show'), 2000); }
 
     const host = document.getElementById('shatter');
     host.innerHTML = '';
@@ -137,19 +133,118 @@ import {check_chat_Space} from './ChatSpace.js'
         });
       }
     }
-
     const prevIdx = (currentIdx - 1 + THEMES.length) % THEMES.length;
     setTimeout(()=> applyThemeByIdx(prevIdx), 300);
     setTimeout(()=>{ host.innerHTML = ''; document.body.classList.remove('is-transforming'); }, 2600);
   }
 
-  /* ======== オラオラ：SVGひび → 前テーマへ ======== */
+  /* ======= ORA：1% ジャックポット演出（音声に同期） ======= */
+  const JACKPOT_RATE = 1000; // 1%
+
+  // 画像（/html/ から見て1つ上の /img）
+  const CAMEO_IMAGES = [
+    '../img/videoframe_79969.png',
+    '../img/videoframe_86269.png'
+  ];
+
+  // 音声（/html/ から見て1つ上の /voice）
+  const CAMEO_AUD_SRC = [
+    '../voice/まずい.m4a',
+    '../voice/神避.m4a'
+  ];
+
+  // 先読み（画像）
+  CAMEO_IMAGES.forEach(src => { const im = new Image(); im.src = src; });
+
+  // オーディオ要素を作成
+  const audio1 = new Audio(encodeURI(CAMEO_AUD_SRC[0]));
+  const audio2 = new Audio(encodeURI(CAMEO_AUD_SRC[1]));
+  [audio1, audio2].forEach(a => { a.preload = 'auto'; a.crossOrigin = 'anonymous'; });
+
+  // ユーザー操作直後に“無音で一瞬再生→停止”して解錠
+  async function primeAudio() {
+    if (primeAudio._done) return;
+    try {
+      for (const a of [audio1, audio2]) {
+        a.muted = true; a.volume = 0;
+        await a.play().catch(()=>{});
+        a.pause(); a.currentTime = 0;
+        a.muted = false; a.volume = 1;
+      }
+    } finally {
+      primeAudio._done = true;
+    }
+  }
+
+  // ブロックされた場合のワンタップ解除UI
+  function showUnblockButton() {
+    return new Promise((resolve) => {
+      let btn = document.getElementById('audio-unblock-btn');
+      if (!btn) {
+        btn = document.createElement('button');
+        btn.id = 'audio-unblock-btn';
+        btn.textContent = '音声を再生';
+        btn.style.cssText =
+          'position:fixed;inset:auto 0 8vh 0;margin:auto;display:block;width:200px;height:56px;' +
+          'z-index:14000;border-radius:12px;border:0;background:#6c63ff;color:#fff;font-weight:800;' +
+          'box-shadow:0 12px 28px rgba(0,0,0,.45);cursor:pointer;';
+        document.body.appendChild(btn);
+      }
+      const onClick = () => { btn.removeEventListener('click', onClick); btn.remove(); resolve(); };
+      btn.addEventListener('click', onClick);
+    });
+  }
+
+  // 画像を順に見せつつ、audio1 → audio2 の終了を待ってから slot.html へ
+  async function flashFramesWithAudioThenGoSlot() {
+    // 黒背景のフレーム（再利用）
+    let wrap = document.getElementById('jackpot-flash');
+    if (!wrap) {
+      wrap = document.createElement('div');
+      wrap.id = 'jackpot-flash';
+      wrap.style.cssText =
+        'position:fixed;inset:0;z-index:12000;background:#000;display:grid;place-items:center;';
+      const img = document.createElement('img');
+      img.id = 'jackpot-flash-img';
+      img.alt = 'cameo';
+      img.style.cssText = 'width:100vw;height:100vh;object-fit:contain;user-select:none;pointer-events:none;';
+      wrap.appendChild(img);
+      document.body.appendChild(wrap);
+    }
+    const img = document.getElementById('jackpot-flash-img');
+
+    // 1枚目＋まずい.m4a
+    img.src = CAMEO_IMAGES[0];
+    let p = audio1.play();
+    if (p && typeof p.then === 'function') {
+      await p.catch(async () => {    // ブロック時
+        await showUnblockButton();
+        try { await audio1.play(); } catch {}
+      });
+    }
+    await new Promise(res => { audio1.onended = res; audio1.onerror = res; });
+
+    // 2枚目＋神避.m4a
+    img.src = CAMEO_IMAGES[1];
+    p = audio2.play();
+    if (p && typeof p.then === 'function') {
+      await p.catch(async () => {
+        await showUnblockButton();
+        try { await audio2.play(); } catch {}
+      });
+    }
+    await new Promise(res => { audio2.onended = res; audio2.onerror = res; });
+
+    // スロットへ
+    location.href = 'slot.html';
+  }
+
+  /* ===== ひびSVG ===== */
   function makeCrackSVG(size = 180){
     const S = size, cx = S/2, cy = S/2;
     const svg = document.createElementNS('http://www.w3.org/2000/svg','svg');
     svg.setAttribute('viewBox', `0 0 ${S} ${S}`);
 
-    // 放射状
     const spokes = 5 + Math.floor(Math.random()*5);
     for(let i=0;i<spokes;i++){
       const a = Math.random()*Math.PI*2;
@@ -159,8 +254,6 @@ import {check_chat_Space} from './ChatSpace.js'
       p.setAttribute('d', `M ${cx} ${cy} L ${x2} ${y2}`);
       svg.appendChild(p);
     }
-
-    // 同心弧
     const rings = 2 + Math.floor(Math.random()*3);
     for(let r=0;r<rings;r++){
       const radius = S*0.18 + r*S*0.10 + Math.random()*S*0.08;
@@ -173,13 +266,11 @@ import {check_chat_Space} from './ChatSpace.js'
         const xm = cx + Math.cos((a1+a2)/2)*radius*(0.98+Math.random()*0.04);
         const ym = cy + Math.sin((a1+a2)/2)*radius*(0.98+Math.random()*0.04);
         const x2 = cx + Math.cos(a2)*radius, y2 = cy + Math.sin(a2)*radius;
-
         const p = document.createElementNS('http://www.w3.org/2000/svg','path');
         p.setAttribute('d', `M ${x1} ${y1} Q ${xm} ${ym} ${x2} ${y2}`);
         svg.appendChild(p);
       }
     }
-
     svg.querySelectorAll('path').forEach((path, i)=>{
       const L = path.getTotalLength();
       path.style.strokeDasharray = L;
@@ -192,56 +283,60 @@ import {check_chat_Space} from './ChatSpace.js'
     return svg;
   }
 
+  /* ===== ORA：吹き出し → ひび乱発 →（1%で）音声付きカメオ → スロット ===== */
   function startOraOra(){
     if (document.body.classList.contains('is-transforming')) return;
     document.body.classList.add('is-transforming');
 
-    // 吹き出し 2秒
     const ora = document.getElementById('ora');
-    ora.classList.add('show');
-    setTimeout(()=> ora.classList.remove('show'), 2000);
+    if (ora) { ora.classList.add('show'); setTimeout(()=> ora.classList.remove('show'), 2000); }
 
     const cracksHost = document.getElementById('cracks');
     cracksHost.innerHTML = '';
 
-    // 2秒間、高速でひび生成（消さずに保持）
     const period = 60, lifetime = 2000;
     const t0 = performance.now();
+
+    // 今回、スロットに行くかを抽選
+    const goSlot = Math.random() < JACKPOT_RATE;
+
+    // ← ここで**解錠**（ユーザー操作の直後の間にやる）
+    if (goSlot) { primeAudio(); }
 
     (function spawn(){
       const now = performance.now();
       if (now - t0 > lifetime) return;
-
       const d = document.createElement('div');
       d.className = 'crack';
-
-      // 位置・サイズ・回転
       const w = 140 + Math.random()*200;
       d.style.setProperty('--w', w+'px');
       d.style.setProperty('--s', (0.85 + Math.random()*0.25).toFixed(2));
       d.style.setProperty('--r', ((Math.random()*360)|0)+'deg');
       d.style.left = (Math.random()*innerWidth) + 'px';
       d.style.top  = (Math.random()*innerHeight) + 'px';
-
       d.appendChild(makeCrackSVG(w));
       cracksHost.appendChild(d);
-
-      // ← ここで remove しない（保持）
       setTimeout(spawn, period);
     })();
 
-    // テーマを「1つ前」に戻すタイミングで、ひび全体をフェードアウト開始
-    const prevIdx = (currentIdx - 1 + THEMES.length) % THEMES.length;
-    setTimeout(()=> {
+    // 画面切り替え直前に分岐
+    setTimeout(async () => {
+      if (goSlot) {
+        await flashFramesWithAudioThenGoSlot();
+        return; // 以降は遷移するので実行されない
+      }
+      // 通常ルート：前テーマに戻す
+      const prevIdx = (currentIdx - 1 + THEMES.length) % THEMES.length;
       applyThemeByIdx(prevIdx);
-      cracksHost.classList.add('fade');
+      setTimeout(()=> {
+        cracksHost.innerHTML = '';
+        document.body.classList.remove('is-transforming');
+      }, 300);
     }, lifetime - 200);
-
-    // 後片付け（フェード完了後）
-    setTimeout(()=> {
-      cracksHost.classList.remove('fade');
-      cracksHost.innerHTML = '';
-      document.body.classList.remove('is-transforming');
-    }, lifetime + 500);
   }
+
+  // expose for debug (optional)
+  window.startOraOra = startOraOra;
+  window.startTransform = startTransform;
+  window.startReverseTransform = startReverseTransform;
 })();
