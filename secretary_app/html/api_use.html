@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>バイト予定管理</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>バイト予定管理</h1>
+            <p>音声入力または手動入力で予定を管理</p>
+        </header>
+
+        <!-- 音声入力セクション -->
+        <section class="card">
+            <h2>🎤 音声入力で操作</h2>
+            <div class="input-group">
+                <input type="text" id="voiceCommand" placeholder="例: 「明日10時から14時までバイト追加」">
+                <button onclick="processVoiceCommandFromHTML()">実行</button>
+            </div>
+            <div class="voice-controls">
+                <button id="startListening" onclick="startVoiceRecognition()">🎤 音声入力開始</button>
+                <span id="listeningStatus" class="status"></span>
+            </div>
+        </section>
+
+        <!-- クイック操作セクション -->
+        <section class="card">
+            <h2>⚡ クイック操作</h2>
+            <button onclick="getTodaysEvents()">今日の予定を確認</button>
+        </section>
+
+        <!-- 結果表示エリア -->
+        <section id="resultArea" class="card hidden">
+            <h2 id="resultTitle">結果</h2>
+            <div id="resultContent"></div>
+        </section>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
