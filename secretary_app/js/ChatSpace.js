@@ -26,7 +26,7 @@ export async function check_chat_Space(inputValue){
     console.time("チャット解析処理、第一解析時間")
 
     //目的の特定
-    const add_text = "以下のテキストの目的を分析し、対応する一文字のみで返答してください：T:時間、C:カレンダー（追加）、R:カレンダー（削除）、G:カレンダー（取得）、M:カレンダー（変更）、I:収入/支出、E:その他"
+    let add_text = "以下のテキストの目的を分析し、対応する一文字のみで返答してください：T:時間、C:カレンダー（追加）、R:カレンダー（削除）、G:カレンダー（取得）、M:カレンダー（変更）、I:収入/支出、E:その他"
     const request_text = add_text + inputValue
     // 目的の関数を呼び出し
     let purpose = await gemini_request(request_text)
@@ -47,8 +47,6 @@ export async function check_chat_Space(inputValue){
     }else{
       alert("このユーザーはその他の質問をしています。")
     }
-    console.timeEnd("チャット解析処理、総所要時間")
-    alert("処理終了")
   };
 
 // Gemini APIにリクエストを送信し、結果をアラートで表示する
@@ -83,5 +81,25 @@ async function gemini_request(text) {
  * カレンダーに追加する処理を統括管理する関数
  * @param {string} text ユーザーによるテキスト
  */
-function add_calendar(text){
+async function add_calendar(text){
+  console.time("チャット解析処理、第二解析時間：カレンダー追加")
+  const now = new Date();
+  let add_text = `
+  目標: カレンダー予定抽出
+  意図: 予定追加
+  抽出必須項目:
+  - name（予定名）
+  - start_time（未指定時は当日/推測時刻）
+  - end_time（未指定時は開始1H後）
+  timeはYYYY-MM-DD HH:MM:SS
+  出力はJSON配列のみ、他テキスト禁止。複数予定時はリスト化。
+  現在時刻は${now}
+  `;
+  const request_text = add_text + text
+  // 目的の関数を呼び出し
+  let purpose = await gemini_request(request_text)
+  console.log("第二解析(カレンダー追加処理)結果：",purpose)
+  console.timeEnd("チャット解析処理、第二解析時間：カレンダー追加")
+  console.timeEnd("チャット解析処理、総所要時間")
+  alert("処理終了")
 }
