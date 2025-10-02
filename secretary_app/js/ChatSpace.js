@@ -38,7 +38,7 @@ document.addEventListener('DOMContentLoaded', function() {
       alert("このユーザーは時刻に関する質問をしています。")
     }else if(purpose == "C"){
       alert("このユーザーはカレンダーに関する質問をしています。")
-      window.location.href = "";
+      window.location.href = "/html/api_use.html";
     }else if(purpose == "I"){
       alert("このユーザーは収支管理に関する質問をしています。")
     }else{
