@@ -1,60 +1,78 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Voice Secretary — Main</title>
-  <link rel="stylesheet" href="style.css">
+  <meta charset="UTF-8">
+  <title>ユーザー登録</title>
+  <!-- Supabaseライブラリを先に読み込む -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 400px; margin: 50px auto; }
+    input, button { display: block; margin: 10px 0; padding: 8px; width: 100%; }
+    button { background: #007bff; color: white; border: none; cursor: pointer; }
+    button:hover { background: #0056b3; }
+  </style>
 </head>
 <body>
-  <main class="shell">
-    <!-- 上段（スペーサ） --><div aria-hidden="true"></div>
+  <h2>ユーザー登録</h2>
+  <form id="register-form">
+    <input type="email" id="email" placeholder="メールアドレス" required />
+    <input type="password" id="password" placeholder="パスワード" required />
+    <input type="text" id="username" placeholder="ユーザー名" required />
+    <button type="submit">登録</button>
+  </form>
 
-    <!-- 中央コンテンツ -->
-    <section aria-label="メイン操作">
-      <div class="mic-wrap">
-        <button class="mic-btn" aria-label="音声入力を開始">
-          <div class="mic-surface" aria-hidden="true">
-            <!-- マイクアイコン -->
-            <svg width="54" height="54" viewBox="0 0 24 24" fill="none" role="img" aria-hidden="true">
-              <defs>
-                <linearGradient id="g1" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stop-color="#f7f8fa"/>
-                  <stop offset="100%" stop-color="#cdd5dd"/>
-                </linearGradient>
-              </defs>
-              <path d="M8 9a4 4 0 0 1 8 0v3a4 4 0 1 1-8 0V9Z" fill="url(#g1)"/>
-              <path d="M5 11.5a7 7 0 0 0 14 0" stroke="#9fb7d0" stroke-opacity=".9" stroke-width="1.5" stroke-linecap="round"/>
-              <path d="M12 18v3" stroke="#bcd0e6" stroke-width="1.5" stroke-linecap="round"/>
-            </svg>
-          </div>
-        </button>
-      </div>
+  <script>
+    // Supabase 接続情報（自分のプロジェクトに置き換えてください）
+    const SUPABASE_URL = "https://ifytzbbjtlwjanjbnpzj.supabase.co"; 
+    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlmeXR6YmJqdGx3amFuamJucHpqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkxOTE4MjYsImV4cCI6MjA3NDc2NzgyNn0.oL9XBqqWSCSUrJ79kYKugzfGacHmz70R4BIsv24pdpA";
 
-      <form class="search" role="search" aria-label="検索フォーム" onsubmit="return false;">
-        <!-- 検索アイコン -->
-        <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-          <circle cx="11" cy="11" r="7" stroke="#c8d2dc" stroke-width="1.6"/>
-          <path d="M20 20l-3.6-3.6" stroke="#c8d2dc" stroke-width="1.6" stroke-linecap="round"/>
-        </svg>
-        <input type="text" inputmode="search" placeholder="入力" aria-label="入力" />
-      </form>
-    </section>
+    // クライアント作成
+    const client = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-    <!-- 下段（スペーサ） --><div aria-hidden="true"></div>
+    const form = document.getElementById("register-form");
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
 
-    <!-- 独立カレンダーショートカット -->
-    <button class="calendar-btn" aria-label="カレンダーを開く">
-      <svg width="34" height="34" viewBox="0 0 24 24" fill="none" role="img" aria-hidden="true">
-        <rect x="3" y="5.5" width="18" height="15" rx="3" fill="#24303a" stroke="#a8b6c6" stroke-width="1.2"/>
-        <path d="M8 3v4M16 3v4" stroke="#a8b6c6" stroke-width="1.4" stroke-linecap="round"/>
-        <path d="M3 9.5h18" stroke="#a8b6c6" stroke-width="1.2"/>
-        <rect x="7" y="12" width="3" height="3" rx="0.8" fill="#7aa8ff"/>
-        <rect x="12" y="12" width="3" height="3" rx="0.8" fill="#7aa8ff" opacity=".85"/>
-        <rect x="7" y="16" width="3" height="3" rx="0.8" fill="#7aa8ff" opacity=".7"/>
-      </svg>
-      <span class="badge" aria-hidden="true">Today</span>
-    </button>
-  </main>
+      const email = document.getElementById("email").value;
+      const password = document.getElementById("password").value;
+      const username = document.getElementById("username").value;
+
+      if (password.length < 6) {
+        alert("パスワードは6文字以上にしてください。");
+        return;
+      }
+
+      // 1. Supabase Auth でユーザー作成
+      const { data, error } = await client.auth.signUp({
+        email: email,
+        password: password
+      });
+
+      if (error) {
+        alert("登録エラー: " + error.message);
+        return;
+      }
+
+      const user = data.user;
+      const userId = user.id;
+      const userEmail = user.email;
+
+      // 2. profiles テーブルにユーザー情報を保存
+      const { error: insertError } = await client
+        .from("profiles")
+        .insert([{
+          id: userId,
+          email: userEmail,
+          username: username
+        }]);
+
+      if (insertError) {
+        alert("プロフィール登録エラー: " + insertError.message);
+      } else {
+        alert("ユーザー登録成功！");
+        form.reset(); // 入力欄をリセット
+      }
+    });
+  </script>
 </body>
 </html>
