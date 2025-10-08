@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+
+<html lang="ja">
+
+<head>
+
+  <meta charset="UTF-8" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+
+  <title>収支管理</title>
+
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/finance.css') }}"/>
+
+</head>
+
+<body>
+
+
+
+  <div class="container">
+
+    <div class="header">
+
+      <h1>収支管理</h1>
+
+      <div class="header-actions">
+
+        <a id="to-main" href="{{ url_for('main') }}" class="link-btn">メインへ戻る</a>
+
+        <a href="{{ url_for('categories') }}" class="link-btn">種類の情報変更へ</a>
+
+      </div>
+
+    </div>
+
+
+
+    <section class="card status">
+
+      <h2>現在の状況</h2>
+
+      <div class="status">
+
+        <p>現在の残高：<b class="num" id="balance">0</b> 円</p>
+
+        <p>今月の使用額：<b class="num" id="monthly">0</b> 円</p>
+
+        <p>今日の使用額：<b class="num" id="daily">0</b> 円</p>
+
+      </div>
+
+    </section>
+
+
+
+    <section class="card">
+
+      <h2>支出を記録</h2>
+
+
+
+      <div class="form-group">
+
+        <label for="amount">金額（必須）</label>
+
+        <input id="amount" class="input" type="number" min="0" placeholder="金額を入力" inputmode="numeric">
+
+      </div>
+
+
+
+      <div class="form-group">
+
+        <label>種類（必須）</label>
+
+        <div id="chip-box" class="chips"></div>
+
+        <div id="no-cat" class="empty" style="display:none">
+
+          種類が未設定です。<a class="link-btn" href="{{ url_for('categories') }}" style="margin-left:8px">種類の情報変更へ</a>
+
+        </div>
+
+      </div>
+
+
+
+      <div class="form-group">
+
+        <label for="purpose">使用目的（任意）</label>
+
+        <input id="purpose" class="input" placeholder="例：ランチ、電車賃">
+
+      </div>
+
+
+
+      <button id="save" class="btn" type="button">データを送信</button>
+
+    </section>
+
+  </div>
+
+
+
+  <!-- 戻る確認オーバーレイ -->
+
+  <div id="return-overlay" class="return-overlay" aria-hidden="true">
+
+    <!-- Stage 1：告（1秒） -->
+
+    <div class="stage" data-stage="1" hidden>
+
+      <img id="img-stage1" src="{{ url_for('static', filename='img/OIP.webp') }}" alt="告" decoding="async">
+
+    </div>
+
+    <!-- Stage 2：本当に戻りますか？（3秒） -->
+
+    <div class="stage" data-stage="2" hidden>
+
+      <img id="img-stage2" src="{{ url_for('static', filename='img/3e135013-c18d-4785-bf21-0b85f97e4e4c.png') }}" alt="本当に戻りますか？" decoding="async">
+
+    </div>
+
+    <!-- Stage 3：YES or NO（ボタン化） -->
+
+    <div class="stage" data-stage="3" hidden>
+
+      <img id="img-stage3" src="{{ url_for('static', filename='img/03933b41-c0a7-48bc-942c-d30393830677.png') }}" alt="YES or NO" decoding="async">
+
+    </div>
+
+
+
+    <!-- 画像の“見えている範囲”に合わせて JS がサイズ/位置を当てる透明ボタン -->
+
+    <button id="yn-yes" class="yn-btn" aria-label="YES" hidden></button>
+
+    <button id="yn-no"  class="yn-btn" aria-label="NO"  hidden></button>
+
+  </div>
+
+
+
+  <script>
+
+    /* ===== 収支管理の既存ロジック ===== */
+
+    const LS_CATEGORIES = "fm_categories";
+
+    const LS_RECORDS = "fm_records";
+
+
+
+    let categories = JSON.parse(localStorage.getItem(LS_CATEGORIES) || "[]");
+
+    let records = JSON.parse(localStorage.getItem(LS_RECORDS) || "[]");
+
+    let selected = "";
+
+
+
+    const chipBox = document.getElementById('chip-box');
+
+    const noCat = document.getElementById('no-cat');
+
+
+
+    renderChips(); updateStatus();
+
+
+
+    function renderChips(){
+
+      chipBox.innerHTML = "";
+
+      if(categories.length===0){
+
+        noCat.style.display = "block";
+
+        document.getElementById('save').disabled = true;
+
+        return;
+
+      }
+
+      noCat.style.display = "none";
+
+      document.getElementById('save').disabled = false;
+
+
+
+      categories.forEach(name=>{
+
+        const chip = document.createElement('button');
+
+        chip.type = "button";
+
+        chip.className = "chip";
+
+        chip.textContent = name;
+
+        chip.addEventListener('click', ()=>{
+
+          selected = name;
+
+          chipBox.querySelectorAll('.chip').forEach(c=>c.classList.toggle('selected', c.textContent===name));
+
+        });
+
+        chipBox.appendChild(chip);
+
+      });
+
+    }
+
+
+
+    document.getElementById('save').addEventListener('click', ()=>{
+
+      const amount = Number(document.getElementById('amount').value);
+
+      const purpose = document.getElementById('purpose').value.trim();
+
+      if(!amount || !selected){ alert('金額と種類を入力してください。'); return; }
+
+
+
+      const now = new Date();
+
+      records.push({ amount, category:selected, purpose, ts:now.toISOString() });
+
+      localStorage.setItem(LS_RECORDS, JSON.stringify(records));
+
+      document.getElementById('amount').value = "";
+
+      document.getElementById('purpose').value = "";
+
+      updateStatus();
+
+      alert('保存しました。');
+
+    });
+
+
+
+    function updateStatus(){
+
+      const now = new Date();
+
+      const today = now.toISOString().slice(0,10);
+
+      const ym = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}`;
+
+
+
+      let bal = 0, mSpent = 0, dSpent = 0;
+
+      for(const r of records){
+
+        const d = new Date(r.ts);
+
+        const rYm = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;
+
+        const rDay = r.ts.slice(0,10);
+
+        const isIncome = (r.category === "収入");
+
+
+
+        if(isIncome) bal += r.amount;
+
+        else         bal -= r.amount;
+
+
+
+        if(!isIncome && rYm===ym) mSpent += r.amount;
+
+        if(!isIncome && rDay===today) dSpent += r.amount;
+
+      }
+
+      document.getElementById('balance').textContent = (bal|0).toLocaleString("ja-JP");
+
+      document.getElementById('monthly').textContent = (mSpent|0).toLocaleString("ja-JP");
+
+      document.getElementById('daily').textContent = (dSpent|0).toLocaleString("ja-JP");
+
+    }
+
+
+
+    window.addEventListener('focus', ()=>{
+
+      const latest = JSON.parse(localStorage.getItem(LS_CATEGORIES) || "[]");
+
+      if(JSON.stringify(latest) !== JSON.stringify(categories)){
+
+        categories = latest; selected = ""; renderChips();
+
+      }
+
+    });
+
+  </script>
+
+
+
+  <!-- ===== 戻る確認（告→確認→YES/NO）: スクリプトはこれ1本 ===== -->
+
+  <script>
+
+  (() => {
+
+    const backLink = document.getElementById('to-main');
+
+    const overlay  = document.getElementById('return-overlay');
+
+    const st1 = overlay.querySelector('[data-stage="1"]');
+
+    const st2 = overlay.querySelector('[data-stage="2"]');
+
+    const st3 = overlay.querySelector('[data-stage="3"]');
+
+    const img3 = document.getElementById('img-stage3');
+
+    const btnYes = document.getElementById('yn-yes');
+
+    const btnNo  = document.getElementById('yn-no');
+
+
+
+    // 先読み
+
+    ['OIP.webp','3e135013-c18d-4785-bf21-0b85f97e4e4c.png','03933b41-c0a7-48bc-942c-d30393830677.png']
+
+      .forEach(src => { const i=new Image(); i.src=src; });
+
+
+
+    const lockScroll = (on)=> document.body.classList.toggle('no-scroll', on);
+
+
+
+    function showStage(n){
+
+      [st1,st2,st3].forEach((el,i)=>{
+
+        const show = (i+1)===n;
+
+        el.hidden = !show;
+
+        el.style.opacity = show ? '1' : '0';
+
+      });
+
+      const showYN = (n===3);
+
+      btnYes.hidden = !showYN;
+
+      btnNo.hidden  = !showYN;
+
+      if (showYN) placeYesNoZones();
+
+    }
+
+
+
+    // YES/NOの当たり判定を表示中画像の可視矩形にフィット
+
+    function placeYesNoZones(){
+
+      const r = img3.getBoundingClientRect();
+
+      const pad = Math.round(Math.min(r.width, r.height) * 0.02);
+
+      const top    = { left:r.left+pad, top:r.top+pad, width:r.width-2*pad, height:r.height/2-pad };
+
+      const bottom = { left:r.left+pad, top:r.top+r.height/2, width:r.width-2*pad, height:r.height/2-pad };
+
+      Object.assign(btnYes.style, { left:top.left+'px', top:top.top+'px', width:top.width+'px', height:top.height+'px' });
+
+      Object.assign(btnNo .style, { left:bottom.left+'px', top:bottom.top+'px', width:bottom.width+'px', height:bottom.height+'px' });
+
+    }
+
+
+
+    addEventListener('resize', () => {
+
+      if (overlay.classList.contains('show')) placeYesNoZones();
+
+    });
+
+
+
+    backLink?.addEventListener('click', (e) => {
+
+      e.preventDefault();
+
+      overlay.classList.add('show');
+
+      overlay.setAttribute('aria-hidden','false');
+
+      lockScroll(true);
+
+      showStage(1);                          // 告（1秒）
+
+      setTimeout(()=> showStage(2), 1000);   // 本当に戻りますか？（2秒）
+
+      setTimeout(()=> showStage(3), 1000+2000); // YES/NO
+
+    });
+
+
+
+    btnYes.addEventListener('click', () => { lockScroll(false); location.href = backLink.href; });
+
+    btnNo .addEventListener('click', () => {
+
+      overlay.classList.remove('show');
+
+      overlay.setAttribute('aria-hidden','true');
+
+      lockScroll(false);
+
+    });
+
+
+
+    // キーボード: Enter=YES / Esc=NO
+
+    addEventListener('keydown', (e)=>{
+
+      if (!overlay.classList.contains('show')) return;
+
+      if (e.key === 'Enter') btnYes.click();
+
+      if (e.key === 'Escape') btnNo.click();
+
+    });
+
+  })();
+
+  </script>
+
+</body>
+
+</html>
