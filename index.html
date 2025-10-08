@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>ユーザー登録</title>
+  <!-- Supabaseライブラリを先に読み込む -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 400px; margin: 50px auto; }
+    input, button { display: block; margin: 10px 0; padding: 8px; width: 100%; }
+    button { background: #007bff; color: white; border: none; cursor: pointer; }
+    button:hover { background: #0056b3; }
+  </style>
+</head>
+<body>
+  <h2>ユーザー登録</h2>
+  <form id="register-form">
+    <input type="email" id="email" placeholder="メールアドレス" required />
+    <input type="password" id="password" placeholder="パスワード" required />
+    <input type="text" id="username" placeholder="ユーザー名" required />
+    <button type="submit">登録</button>
+  </form>
+
+  <script>
+    // Supabase 接続情報（自分のプロジェクトに置き換えてください）
+    const SUPABASE_URL = "https://ifytzbbjtlwjanjbnpzj.supabase.co"; 
+    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlmeXR6YmJqdGx3amFuamJucHpqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkxOTE4MjYsImV4cCI6MjA3NDc2NzgyNn0.oL9XBqqWSCSUrJ79kYKugzfGacHmz70R4BIsv24pdpA";
+
+    // クライアント作成
+    const client = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    const form = document.getElementById("register-form");
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+
+      const email = document.getElementById("email").value;
+      const password = document.getElementById("password").value;
+      const username = document.getElementById("username").value;
+
+      if (password.length < 6) {
+        alert("パスワードは6文字以上にしてください。");
+        return;
+      }
+
+      // 1. Supabase Auth でユーザー作成
+      const { data, error } = await client.auth.signUp({
+        email: email,
+        password: password
+      });
+
+      if (error) {
+        alert("登録エラー: " + error.message);
+        return;
+      }
+
+      const user = data.user;
+      const userId = user.id;
+      const userEmail = user.email;
+
+      // 2. profiles テーブルにユーザー情報を保存
+      const { error: insertError } = await client
+        .from("profiles")
+        .insert([{
+          id: userId,
+          email: userEmail,
+          username: username
+        }]);
+
+      if (insertError) {
+        alert("プロフィール登録エラー: " + insertError.message);
+      } else {
+        alert("ユーザー登録成功！");
+        form.reset(); // 入力欄をリセット
+      }
+    });
+  </script>
+</body>
+</html>
