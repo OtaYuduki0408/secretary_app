@@ -7,4 +7,4 @@ start /b python app.py
 
 start code "C:\Users\y_oota\Documents\Graduation_work"
 
-start chrome http://172.19.0.195:5000/
+start chrome https://127.0.0.1:5000

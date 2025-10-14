@@ -27,5 +27,9 @@ def slot():
     return render_template('slot.html')
 
 if __name__ == '__main__':
-    port = int(os.getenv('PORT', 5000))  # Cloud Run対応
-    app.run(host='0.0.0.0', port=port, debug=True)
+    app.run(
+        host='127.0.0.1', # ★ ローカルホストからのアクセスに限定
+        port=5000,
+        debug=True,       # ★ デバッグモードを有効にして、自動再起動とログ出力を有効にする
+        ssl_context='adhoc'
+    )
