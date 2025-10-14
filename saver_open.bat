@@ -1,9 +1,10 @@
 @echo off
 
-start "Python Server" cmd /k "cd /d C:\Users\y_oota\Documents\Graduation_work\secretary_app && python -m http.server 8000"
+cd "C:\Users\y_oota\Documents\Graduation_work\secretary_app.venv\Scripts"
+call activate.bat
+cd "C:\Users\y_oota\Documents\Graduation_work\secretary_app"
+start /b python app.py
 
-timeout /t 3 /nobreak > nul
-start "" "C:\Program Files\Google\Chrome\Application\chrome.exe" http://localhost:8000/html
+start code "C:\Users\y_oota\Documents\Graduation_work"
 
-code "C:\Users\y_oota\Documents\Graduation_work"
-exit
+start chrome http://172.19.0.195:5000/
