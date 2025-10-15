@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>Googleカレンダー管理</title>
+    <script src="https://apis.google.com/js/api.js"></script>
+    <script src="static/js/ScheduleManager2.js"></script>
+    <style>
+        body {
+            font-family: "Segoe UI", sans-serif;
+            margin: 30px;
+        }
+        input, button {
+            margin: 5px;
+            padding: 6px;
+        }
+        #log {
+            margin-top: 20px;
+            border: 1px solid #aaa;
+            padding: 10px;
+            height: 200px;
+            overflow-y: auto;
+            background: #f8f8f8;
+        }
+    </style>
+</head>
+<body>
+    <h1>Googleカレンダー管理</h1>
+    <button id="authorize-button">Googleログイン</button>
+
+    <h3>イベント追加</h3>
+    <input id="event-title" placeholder="タイトル">
+    <input id="event-desc" placeholder="説明">
+    <input id="event-start" type="datetime-local">
+    <input id="event-end" type="datetime-local">
+    <button id="add-event-button" disabled>追加</button>
+
+    <h3>イベント削除</h3>
+    <input id="event-id" placeholder="イベントID">
+    <button id="delete-event-button" disabled>削除</button>
+
+    <h3>イベント確認</h3>
+    <input id="check-start" type="date">
+    <input id="check-end" type="date">
+    <button id="check-event-button" disabled>確認</button>
+
+    <h3>ログ</h3>
+    <div id="log"></div>
+
+    <script>
+        const manager = new ScheduleManager();
+
+        const log = (msg) => {
+            const el = document.getElementById("log");
+            const time = new Date().toLocaleTimeString();
+            el.innerHTML += `[${time}] ${msg}<br>`;
+            el.scrollTop = el.scrollHeight;
+        };
+
+        document.getElementById("authorize-button").addEventListener("click", () => {
+            manager.handleAuthClick();
+        });
+
+        document.getElementById("add-event-button").addEventListener("click", async () => {
+            const title = document.getElementById("event-title").value || "無題のイベント";
+            const desc = document.getElementById("event-desc").value || "";
+            const start = document.getElementById("event-start").value;
+            const end = document.getElementById("event-end").value;
+            await manager.addEvent(title, desc, start, end, log);
+        });
+
+        document.getElementById("delete-event-button").addEventListener("click", async () => {
+            const id = document.getElementById("event-id").value;
+            if (id) await manager.deleteEvent(id, log);
+        });
+
+        document.getElementById("check-event-button").addEventListener("click", async () => {
+            const start = document.getElementById("check-start").value;
+            const end = document.getElementById("check-end").value;
+            await manager.listEvents(start, end, log);
+        });
+
+        // popup 認証完了後に callback.html から呼ばれる
+        window.receiveAccessToken = (token) => {
+            log("Google認証成功！");
+            manager.setAccessToken(token);
+            document.getElementById("add-event-button").disabled = false;
+            document.getElementById("delete-event-button").disabled = false;
+            document.getElementById("check-event-button").disabled = false;
+        };
+    </script>
+</body>
+</html>

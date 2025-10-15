@@ -26,6 +26,14 @@ def expense():
 def slot():
     return render_template('slot.html')
 
+@app.route('/index')
+def xin():
+    return render_template('index2.html')
+
+@app.route('/oauth-callback2')
+def gen():
+    return render_template('oauth-callback2.html')
+
 if __name__ == '__main__':
     app.run(
         host='127.0.0.1', # ★ ローカルホストからのアクセスに限定
