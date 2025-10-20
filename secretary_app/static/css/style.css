@@ -432,3 +432,33 @@ html.theme-light{ --crack-color: rgba(0,0,0,.55); }
   .slot-wrap{ padding:16px; }
   .reel{ height: 200px; }
 }
+
+/* ===== BTD overlay (YouTube) ===== */
+.btd-overlay[hidden]{display:none!important;}
+.btd-overlay{
+  position:fixed; inset:0; z-index:9999;
+  background:rgba(0,0,0,.92);
+  display:grid; place-items:center;
+  animation:btd-fade-in .2s ease-out both;
+}
+@keyframes btd-fade-in{from{opacity:0}to{opacity:1}}
+@keyframes btd-fade-out{to{opacity:0;visibility:hidden}}
+
+.btd-player-frame{
+  width:min(92vw,1200px);
+  aspect-ratio:16/9;
+  border-radius:14px; overflow:hidden; background:#000;
+  box-shadow:0 20px 60px rgba(0,0,0,.55);
+}
+#btd-player, #btd-player iframe{width:100%; height:100%; display:block;}
+
+.btd-skip{
+  position:absolute; right:clamp(12px,2vw,28px); top:clamp(12px,2vw,28px);
+  padding:.55rem .9rem; border-radius:999px;
+  border:1px solid rgba(255,255,255,.25);
+  background:rgba(255,255,255,.1);
+  color:#e8f1ff; font-weight:800; letter-spacing:.06em; cursor:pointer;
+  backdrop-filter:blur(6px);
+}
+.btd-skip:hover{ background:rgba(255,255,255,.18); }
+.btd-overlay.is-leaving{ animation:btd-fade-out .3s ease-in both; }
