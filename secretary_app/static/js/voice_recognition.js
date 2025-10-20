@@ -24,8 +24,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // 言語設定を日本語に
     recognition.lang = 'ja-JP';
-    // 認識結果が出た時点で終了せず、継続的に次の音声を待ち受ける (リアルタイム追記のため)
-    recognition.continuous = true;
+    // 【変更点】連続認識をOFFに設定。発話完了（一定の無音時間）で自動的に終了する。
+    recognition.continuous = false;
     // 中間的な結果 (in-flight text) も表示する
     recognition.interimResults = true;
 
@@ -57,24 +57,18 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         // searchboxの内容を更新
-        // 確定した部分があれば、それをベースに
-        // 確定した部分がなければ、現在のsearchboxの内容に中間結果を追記
-        // ※ここではシンプルに、確定結果 + 中間結果を全て表示します。
         searchBox.value = finalTranscript + interimTranscript;
     };
 
     /**
-     * 認識が終了した時 (continuous: true の場合は、一時停止やエラーで停止した時)
+     * 認識が終了した時 (continuous: false の場合は、発話完了または手動停止で停止した時)
      */
     recognition.onend = () => {
-        if (isRecognizing) {
-            // 連続認識がONの場合、意図せず終了したら再スタートする（安定性向上）
-            console.log("認識が終了しました。自動的に再起動します。");
-            recognition.start();
-        } else {
-            console.log("認識処理が停止しました。");
-            micButton.classList.remove('active');
-        }
+        // 【変更点】continuous = false のため、自動再起動のロジックを削除
+        isRecognizing = false;
+        console.log("認識処理が停止しました (発話完了または手動停止)。");
+        micButton.classList.remove('active');
+        searchBox.placeholder = "入力 (発話完了)"; // 終了がユーザーに分かるようにプレースホルダを変更
     };
 
     /**
