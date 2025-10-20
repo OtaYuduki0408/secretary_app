@@ -73,6 +73,56 @@
     </div>
   </main>
 
+  <!-- 解析インジケーター（非表示から開始） -->
+<div id="ai-indicator" aria-live="polite" style="position:fixed;right:14px;bottom:14px;z-index:14000;display:none;">
+  <div style="min-width:240px;background:#0f172a;border:1px solid #334155;border-radius:12px;padding:12px 14px;box-shadow:0 12px 40px rgba(0,0,0,.45);color:#e5e7eb">
+    <div id="aii-title" style="font-weight:700;margin-bottom:8px">解析中…</div>
+    <div id="aii-steps" style="display:flex;gap:6px;margin-bottom:8px">
+      <span style="flex:1;height:6px;background:#475569;border-radius:999px;opacity:.45"></span>
+      <span style="flex:1;height:6px;background:#475569;border-radius:999px;opacity:.45"></span>
+      <span style="flex:1;height:6px;background:#475569;border-radius:999px;opacity:.45"></span>
+    </div>
+    <div id="aii-label" style="font-size:.92rem;opacity:.85">準備中</div>
+  </div>
+</div>
+
+<script>
+(() => {
+  const box   = document.getElementById('ai-indicator');
+  const title = document.getElementById('aii-title');
+  const label = document.getElementById('aii-label');
+  const bars  = Array.from(document.querySelectorAll('#aii-steps span'));
+  let steps = ['目的判定','詳細抽出','結果反映'];
+
+  function setActive(n){
+    bars.forEach((b,i)=> b.style.background = i < n ? '#93c5fd' : '#475569');
+    bars.forEach((b,i)=> b.style.opacity = i < n ? '1' : '.45');
+    label.textContent = steps[Math.max(0, Math.min(n-1, steps.length-1))] || '処理中';
+  }
+
+  document.addEventListener('analysis:start', (e)=>{
+    steps = e.detail?.steps || steps;
+    title.textContent = '解析中…';
+    label.textContent = '準備中';
+    setActive(0);
+    box.style.display = 'block';
+  });
+
+  document.addEventListener('analysis:step', (e)=>{
+    const idx = (e.detail?.index|0);
+    if (e.detail?.label) steps[idx-1] = e.detail.label;
+    setActive(idx);
+  });
+
+  document.addEventListener('analysis:end', ()=>{
+    setActive(steps.length);
+    title.textContent = '完了';
+    setTimeout(()=> box.style.display = 'none', 700);
+  });
+})();
+</script>
+
+
   <!-- ★ JACKPOT：2枚カットイン -->
 <div id="jackpot-cameo" aria-hidden="true">
   <imd="cameo1" src="{{ url_for('static', filename='img/videoframe_79969.png') }}" alt="cameo-1" />
@@ -98,9 +148,15 @@
 
 
   <!-- Bites the Dust（2秒表示） -->
-  <div id="btd" aria-hidden="true">
-    <img src="{{ url_for('static', filename='img/btd.png') }}" alt="Bites the Dust">
+<!-- ★ Bites the Dust（YouTube動画版） -->
+<div id="btd" class="btd-overlay" aria-hidden="true" hidden>
+  <div class="btd-player-frame">
+    <div id="btd-player"></div>
   </div>
+  <!-- 任意のスキップ（不要なら削除OK） -->
+  <button id="btd-skip" class="btd-skip" aria-label="スキップ">SKIP</button>
+</div>
+
 
   <!-- オラオラ吹き出し（2秒） -->
   <div id="ora" aria-hidden="true">
@@ -114,6 +170,7 @@
   <div id="shatter" aria-hidden="true"></div>
 
   <!--以下2行、JSの呼び出し部分です。変更しないでください。-->
+  <script src="{{ url_for('static', filename='js/voice_recognition.js') }}"></script>
   <script src="{{ url_for('static', filename='js/Parallax_and_Theme_rotation.js') }}" type="module"></script> <!--ヒビとテーマの回転のJS-->
 </body>
 </html>

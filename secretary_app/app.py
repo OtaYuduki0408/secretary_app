@@ -1,25 +1,15 @@
-from flask import Flask, render_template, request, jsonify
-from dotenv import load_dotenv
-from supabase import create_client
+from flask import Flask, render_template, Response
 import os
+from dotenv import load_dotenv
 
-# .env の読み込み
+# .env の読み込み（存在すれば）
 load_dotenv()
 
 app = Flask(__name__,
             template_folder='templates',
             static_folder='static')
 
-app.secret_key = os.environ.get("SECRET_KEY", "your-secret-key")
-
-# Supabase初期化
-try:
-    app.supabase = create_client(os.getenv("SUPABASE_URL"), os.getenv("SUPABASE_KEY"))
-    print("✅ Supabase接続成功")
-except Exception as e:
-    print("❌ Supabase接続失敗:", e)
-
-# ---------- ルート ----------
+# ルーティング
 @app.route('/')
 def main():
     return render_template('main.html')
@@ -36,23 +26,18 @@ def expense():
 def slot():
     return render_template('slot.html')
 
-# ---------- API例 ----------
-@app.route("/api/categories", methods=["GET", "POST"])
-def categories_api():
-    supabase = app.supabase
-    if request.method == "GET":
-        res = supabase.table("categories").select("*").execute()
-        return jsonify(res.data)
-    else:
-        data = request.get_json()
-        name = data.get("name")
-        if not name:
-            return jsonify({"error": "nameが必要です"}), 400
-        res = supabase.table("categories").insert({"name": name}).execute()
-        return jsonify(res.data)
+@app.route('/index')
+def xin():
+    return render_template('index2.html')
 
-# ---------- Flask起動 ----------
+@app.route('/oauth-callback2')
+def gen():
+    return render_template('oauth-callback2.html')
+
 if __name__ == '__main__':
-    print("Flaskサーバー起動します...")
-    port = int(os.getenv('PORT', 5000))
-    app.run(host='0.0.0.0', port=port, debug=True)
+    app.run(
+        host='127.0.0.1', # ★ ローカルホストからのアクセスに限定
+        port=5000,
+        debug=True,       # ★ デバッグモードを有効にして、自動再起動とログ出力を有効にする
+        ssl_context='adhoc'
+    )
