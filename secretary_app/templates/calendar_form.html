@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>Googleカレンダー登録</title>
+</head>
+<body>
+  <h1>Googleカレンダーに予定を登録</h1>
+
+  <form id="eventForm">
+    <label>タイトル：</label>
+    <input type="text" id="summary" required><br><br>
+
+    <label>詳細：</label>
+    <textarea id="description"></textarea><br><br>
+
+    <label>開始日時：</label>
+    <input type="datetime-local" id="start_time" required><br><br>
+
+    <label>終了日時：</label>
+    <input type="datetime-local" id="end_time" required><br><br>
+
+    <button type="submit">登録</button>
+  </form>
+
+  <script>
+    document.getElementById("eventForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+
+      const data = {
+        summary: document.getElementById("summary").value,
+        description: document.getElementById("description").value,
+        start_time: document.getElementById("start_time").value,
+        end_time: document.getElementById("end_time").value
+      };
+
+      const res = await fetch("/api/add_event", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data)
+      });
+
+      const result = await res.json();
+      if (result.success) {
+        alert("✅ カレンダーに登録されました！\nURL: " + result.htmlLink);
+      } else {
+        alert("❌ エラー: " + result.error);
+      }
+    });
+  </script>
+</body>
+</html>

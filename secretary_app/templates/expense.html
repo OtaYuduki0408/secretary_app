@@ -145,166 +145,79 @@
 
 
   <script>
+  /* ===== Supabase対応版：収支管理ロジック ===== */
+  const LS_CATEGORIES = "fm_categories";
 
-    /* ===== 収支管理の既存ロジック ===== */
+  let categories = JSON.parse(localStorage.getItem(LS_CATEGORIES) || "[]");
+  let selected = "";
 
-    const LS_CATEGORIES = "fm_categories";
+  const chipBox = document.getElementById('chip-box');
+  const noCat = document.getElementById('no-cat');
 
-    const LS_RECORDS = "fm_records";
+  renderChips();
 
+  function renderChips(){
+    chipBox.innerHTML = "";
+    if(categories.length===0){
+      noCat.style.display = "block";
+      document.getElementById('save').disabled = true;
+      return;
+    }
+    noCat.style.display = "none";
+    document.getElementById('save').disabled = false;
 
-
-    let categories = JSON.parse(localStorage.getItem(LS_CATEGORIES) || "[]");
-
-    let records = JSON.parse(localStorage.getItem(LS_RECORDS) || "[]");
-
-    let selected = "";
-
-
-
-    const chipBox = document.getElementById('chip-box');
-
-    const noCat = document.getElementById('no-cat');
-
-
-
-    renderChips(); updateStatus();
-
-
-
-    function renderChips(){
-
-      chipBox.innerHTML = "";
-
-      if(categories.length===0){
-
-        noCat.style.display = "block";
-
-        document.getElementById('save').disabled = true;
-
-        return;
-
-      }
-
-      noCat.style.display = "none";
-
-      document.getElementById('save').disabled = false;
-
-
-
-      categories.forEach(name=>{
-
-        const chip = document.createElement('button');
-
-        chip.type = "button";
-
-        chip.className = "chip";
-
-        chip.textContent = name;
-
-        chip.addEventListener('click', ()=>{
-
-          selected = name;
-
-          chipBox.querySelectorAll('.chip').forEach(c=>c.classList.toggle('selected', c.textContent===name));
-
-        });
-
-        chipBox.appendChild(chip);
-
+    categories.forEach(name=>{
+      const chip = document.createElement('button');
+      chip.type = "button";
+      chip.className = "chip";
+      chip.textContent = name;
+      chip.addEventListener('click', ()=>{
+        selected = name;
+        chipBox.querySelectorAll('.chip').forEach(c=>c.classList.toggle('selected', c.textContent===name));
       });
-
-    }
-
-
-
-    document.getElementById('save').addEventListener('click', ()=>{
-
-      const amount = Number(document.getElementById('amount').value);
-
-      const purpose = document.getElementById('purpose').value.trim();
-
-      if(!amount || !selected){ alert('金額と種類を入力してください。'); return; }
-
-
-
-      const now = new Date();
-
-      records.push({ amount, category:selected, purpose, ts:now.toISOString() });
-
-      localStorage.setItem(LS_RECORDS, JSON.stringify(records));
-
-      document.getElementById('amount').value = "";
-
-      document.getElementById('purpose').value = "";
-
-      updateStatus();
-
-      alert('保存しました。');
-
+      chipBox.appendChild(chip);
     });
+  }
 
+  // ✅ Supabaseにデータ送信
+  document.getElementById('save').addEventListener('click', async () => {
+    const amount = Number(document.getElementById('amount').value);
+    const purpose = document.getElementById('purpose').value.trim();
+    if(!amount || !selected){ alert('金額と種類を入力してください。'); return; }
 
+    const now = new Date();
+    const record = { amount, category: selected, purpose, ts: now.toISOString() };
 
-    function updateStatus(){
-
-      const now = new Date();
-
-      const today = now.toISOString().slice(0,10);
-
-      const ym = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}`;
-
-
-
-      let bal = 0, mSpent = 0, dSpent = 0;
-
-      for(const r of records){
-
-        const d = new Date(r.ts);
-
-        const rYm = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;
-
-        const rDay = r.ts.slice(0,10);
-
-        const isIncome = (r.category === "収入");
-
-
-
-        if(isIncome) bal += r.amount;
-
-        else         bal -= r.amount;
-
-
-
-        if(!isIncome && rYm===ym) mSpent += r.amount;
-
-        if(!isIncome && rDay===today) dSpent += r.amount;
-
+    try {
+      const res = await fetch("/api/records", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(record)
+      });
+      const result = await res.json();
+      if(result.success){
+        alert("保存しました。");
+        document.getElementById('amount').value = "";
+        document.getElementById('purpose').value = "";
+      } else {
+        alert("保存に失敗しました。");
+        console.error(result);
       }
-
-      document.getElementById('balance').textContent = (bal|0).toLocaleString("ja-JP");
-
-      document.getElementById('monthly').textContent = (mSpent|0).toLocaleString("ja-JP");
-
-      document.getElementById('daily').textContent = (dSpent|0).toLocaleString("ja-JP");
-
+    } catch(e) {
+      alert("通信エラーが発生しました。");
+      console.error(e);
     }
+  });
 
+  // カテゴリ変更検出（別ページで更新された場合）
+  window.addEventListener('focus', ()=>{
+    const latest = JSON.parse(localStorage.getItem(LS_CATEGORIES) || "[]");
+    if(JSON.stringify(latest) !== JSON.stringify(categories)){
+      categories = latest; selected = ""; renderChips();
+    }
+  });
+</script>
 
-
-    window.addEventListener('focus', ()=>{
-
-      const latest = JSON.parse(localStorage.getItem(LS_CATEGORIES) || "[]");
-
-      if(JSON.stringify(latest) !== JSON.stringify(categories)){
-
-        categories = latest; selected = ""; renderChips();
-
-      }
-
-    });
-
-  </script>
 
 
 
