@@ -394,6 +394,7 @@ import { check_chat_Space } from '/static/js/ChatSpace.js';
 
     const cracksHost = document.getElementById('cracks');
     cracksHost.innerHTML = '';
+
     const period = 60, lifetime = 2000;
     const t0 = performance.now();
 

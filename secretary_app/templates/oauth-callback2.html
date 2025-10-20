@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>OAuth認証完了</title>
+</head>
+<body>
+    <h2>認証処理中...</h2>
+    <script>
+        const hash = window.location.hash.substring(1);
+        const params = new URLSearchParams(hash);
+        const token = params.get("access_token");
+
+        if (token && window.opener && window.opener.receiveAccessToken) {
+            window.opener.receiveAccessToken(token);
+            window.close();
+        } else {
+            document.body.innerHTML = "<p>認証に失敗しました。</p>";
+            console.error("アクセストークンが取得できませんでした。");
+        }
+    </script>
+</body>
+</html>

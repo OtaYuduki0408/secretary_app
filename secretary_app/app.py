@@ -26,6 +26,18 @@ def expense():
 def slot():
     return render_template('slot.html')
 
+@app.route('/index')
+def xin():
+    return render_template('index2.html')
+
+@app.route('/oauth-callback2')
+def gen():
+    return render_template('oauth-callback2.html')
+
 if __name__ == '__main__':
-    port = int(os.getenv('PORT', 5000))  # Cloud Run対応
-    app.run(host='0.0.0.0', port=port, debug=True)
+    app.run(
+        host='127.0.0.1', # ★ ローカルホストからのアクセスに限定
+        port=5000,
+        debug=True,       # ★ デバッグモードを有効にして、自動再起動とログ出力を有効にする
+        ssl_context='adhoc'
+    )
