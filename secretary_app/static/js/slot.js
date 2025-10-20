@@ -1,11 +1,14 @@
 /* =============================
-   実機風 3リール／ボーナス制御／リプレイ実装 完全版（ボナ中は各リール個別合わせ）
+   実機風 3リール／ボーナス制御／リプレイ実装
+   - GOGO中は目押し可（ヒット→ピン止め／ミス→早めハズレ）
+   - 内部BIG中は BAR77 を画面に出さないガード
+   - 揃いライン（上/中/下/斜め/逆斜め）を毎ゲーム抽選
 ============================= */
 
 const IMG_PATH = "static/img/reel/";
 const SYMBOLS  = ["bar.png","bell.png","cherry.png","lemon.png","sai.png","seven.png"];
 
-// 3レーン個別ストリップ（左のみ 7→BAR を1箇所だけ隣接）
+// 3リール個別ストリップ（左のみ 7↔BAR 隣接ありでもOK）
 const REEL_STRIPS = [
   // L
   [
@@ -34,7 +37,7 @@ const REEL_STRIPS = [
 ];
 
 const CELL_H    = 86;
-const PAY_LINES = 5;
+const PAY_LINES = 5;        // 上・中・下・斜め・逆斜め
 const DEBUG_HUD = false;
 const DIR_SIGN  = 1;
 
@@ -75,35 +78,59 @@ setLamp(lampWait, true); updateMeters();
 const BONUS_PROB = 1/10;
 const BIG_RATIO  = 0.5;
 
-let internalBonus = null;
-let notifyAt = 3;
+let internalBonus = null;   // "big" | "reg" | null
+let notifyAt = 3;           // 何本目停止で告知
 let stoppedThisSpin = 0;
 let gogoChance = false;
 
 /* ====== 告知・ボーナス ====== */
-let pendingBonus = null;   // GOGO点灯中の当たり
-let bonusTime   = null;    // "big"|"reg"|null
+let pendingBonus = null;    // "big" | "reg" | null（点灯中の当たり）
+let bonusTime   = null;     // "big" | "reg" | null（入賞後）
 let bonusEarned = 0;
 const BONUS_GOAL = { big:240, reg:100 };
 
 /* ====== リプレイ在庫 ====== */
 let replayStock = 0;
 
-/* ====== 通常時の“目押し不可”遅延 ====== */
-const NO_GOGO_DELAY_MIN = 180;
+/* ====== 目押しパラメータ ====== */
+const NO_GOGO_DELAY_MIN = 180;       // GOGO消灯時の“遅いハズレ止め”
 const NO_GOGO_DELAY_MAX = 360;
-const randDelay = () => NO_GOGO_DELAY_MIN + Math.random()*(NO_GOGO_DELAY_MAX-NO_GOGO_DELAY_MIN);
+
+const SKILL_WINDOW_MS        = 160;  // 通常時のヒット許容
+const SKILL_WINDOW_MS_GOGO   = 220;  // GOGO中のヒット許容（少し甘め）
+const BASE_LAG_MS_MIN = 55, BASE_LAG_MS_MAX = 110;
+
+const SPIN_SPEED = 1500;             // px/s とみなす
+const SPEED_PX_PER_S = SPIN_SPEED;
 
 /* ====== 出目プラン ====== */
 let currentPlan = null;
 
-/* ====== ヘルパー（停止位置検索） ====== */
+/* ====== ライン定義（row=0:上,1:中,2:下） ====== */
+const PAYLINE_ROWS = {
+  top:  [0,0,0],
+  mid:  [1,1,1],
+  bot:  [2,2,2],
+  diag: [0,1,2],
+  rdiag:[2,1,0],
+};
+const PAYLINE_KEYS = ["top","mid","bot","diag","rdiag"];
+
+/* ====== 停止アーム（index一致で止める） ====== */
+const indexArm = [
+  {active:false, col:0, targetIdx:0, row:1},
+  {active:false, col:1, targetIdx:0, row:1},
+  {active:false, col:2, targetIdx:0, row:1},
+];
+
+/* ====== ヘルパー ====== */
 function nextIndexFor(r, sym){
   const L=r.strip.length, nowTop=r.topIndex;
   let n=0; while(n<L && r.strip[(nowTop+n+1)%L]!==sym) n++;
   return (nowTop+n+1)%L;
 }
-function safeBarIndexFor(r){ // 7 隣接を避けた BAR
+function safeBarIndexFor(r){
+  // 7に隣接しない BAR（REG左の“BIG封殺”用）
   const L=r.strip.length, nowTop=r.topIndex;
   for(let k=0;k<L;k++){
     const idx=(nowTop+k+1)%L;
@@ -113,95 +140,129 @@ function safeBarIndexFor(r){ // 7 隣接を避けた BAR
   }
   return nextIndexFor(r,"bar.png");
 }
+const randDelay = () => NO_GOGO_DELAY_MIN + Math.random()*(NO_GOGO_DELAY_MAX-NO_GOGO_DELAY_MIN);
 
-/** プラン作成 */
+/* ====== プラン作成 ====== */
 function makePlanForThisSpin(){
-  if(pendingBonus==="big"){
-    // 全部7。合わせ先は各リールの“次の7”にする（後段で per-reel に算出）
-    return { type:"bonus-big", targets:["seven.png","seven.png","seven.png"], skill:true };
-  }
-  if(pendingBonus==="reg"){
-    // BARを置く列をランダムで1本
-    const barCol = Math.floor(Math.random()*3);
-    const targets = ["seven.png","seven.png","seven.png"]; targets[barCol]="bar.png";
-    // 各リールの合わせ index（REG はここで確定）
-    const align = [null,null,null];
-    for(let c=0;c<3;c++){
-      const r = reels[c];
-      align[c] = (c===barCol) ? safeBarIndexFor(r) : nextIndexFor(r,"seven.png");
-    }
-    return { type:"bonus-reg", targets, skill:true, align };
-  }
-  if(bonusTime==="big"){
-    const sym = Math.random()<0.5 ? "bell.png" : "cherry.png";
-    return { type:"bonus-time", targets:[sym,sym,sym], skill:false };
-  }
-  if(bonusTime==="reg"){
+  // 入賞中の消化（BIG/REGの子役固定揃え）
+  if(bonusTime==="big" || bonusTime==="reg"){
+    const isReg = bonusTime==="reg";
     const REG_REPLAY_RATE = 0.33;
-    const isReplay = Math.random()<REG_REPLAY_RATE;
-    const sym = isReplay ? "sai.png" : (Math.random()<0.5 ? "bell.png" : "cherry.png");
-    return { type:"bonus-time", targets:[sym,sym,sym], skill:false };
+
+    // ★ BIG中は ときどき ぶどう（lemon）を混ぜる
+    const BIG_GRAPE_RATE = 0.15; // 調整可
+
+    const sym = isReg
+      ? (Math.random() < REG_REPLAY_RATE
+          ? "sai.png"
+          : (Math.random() < 0.5 ? "bell.png" : "cherry.png"))
+      : (() => {
+          const r = Math.random();
+          if (r < BIG_GRAPE_RATE) return "lemon.png";              // ぶどう
+          return (r < BIG_GRAPE_RATE + 0.5) ? "bell.png" : "cherry.png";
+        })();
+
+    const line = PAYLINE_KEYS[(Math.random()*PAYLINE_KEYS.length)|0];
+    const rows = PAYLINE_ROWS[line];
+    return { type:"bonus-time", targets:[sym,sym,sym], rows, skill:false };
   }
+
+  // GOGO点灯中：BIG/REGの正解目をその回のラインに合わせる
+  if(pendingBonus==="big" || pendingBonus==="reg"){
+    const line = PAYLINE_KEYS[(Math.random()*PAYLINE_KEYS.length)|0];
+    const rows = PAYLINE_ROWS[line];
+    if(pendingBonus==="big"){
+      return { type:"bonus-big", targets:["seven.png","seven.png","seven.png"], rows, skill:true };
+    }else{
+      return { type:"bonus-reg", targets:["bar.png","seven.png","seven.png"], rows, skill:true };
+    }
+  }
+
+  // 通常時
   return null;
 }
 
-/* ==== 目押しの停止予約 ==== */
-const SKILL_WINDOW_MS        = 160;
-const SKILL_WINDOW_MS_GOGO   = 200;
-const BASE_LAG_MS_MIN = 55, BASE_LAG_MS_MAX = 110;
-const SPIN_SPEED = 1500;
-const SPEED_PX_PER_S = SPIN_SPEED;
-const scheduledTimer=[null,null,null], stopArmed=[false,false,false];
+/* ====== スケジュール停止 ====== */
+const scheduledTimer=[null,null,null];
 
-function scheduleStopToTarget(col, targetSym, row=1, skill=false, forcedIndex=null){
+function scheduleStopToTarget(col, targetSym, row=1, skill=false){
   const r = reels[col]; if(!r || r.isIdle()) return;
   if(scheduledTimer[col]){ clearTimeout(scheduledTimer[col]); scheduledTimer[col]=null; }
 
+  // 消灯中は7狙いをBARに置換（誤入賞防止）
+  if (!gogoChance && !bonusTime && targetSym === "seven.png") {
+    targetSym = "bar.png";
+  }
+  // REG点灯中は左列は必ず“安全なBAR”
+  if (pendingBonus === "reg" && col === 0) {
+    targetSym = "bar.png";
+  }
+
   const L=r.strip.length, nowTop=r.topIndex;
-  const curIndex=(nowTop+row)%L;
+  const idxForSym = (sym)=> (sym==="bar.png" && pendingBonus==="reg" && col===0)
+    ? safeBarIndexFor(r)
+    : nextIndexFor(r, sym);
 
-  const idxForSym = (sym)=> nextIndexFor(r, sym);
+  let targetIndex = idxForSym(targetSym);
 
-  // ★ ボーナス中は各リールで “そのリールの次の該当図柄” に個別合わせ
-  let targetIndex = (forcedIndex!=null) ? forcedIndex : idxForSym(targetSym);
-
-  const stepsTo = (destIdx)=> (destIdx - curIndex + L) % L;
+  const stepsTo = (destIdx)=> (destIdx - ((nowTop+row)%L) + L) % L;
   const computeMsToIndex = (destIdx)=>{
     const nSteps = stepsTo(destIdx);
     const off    = (r.offsetPx % CELL_H + CELL_H) % CELL_H;
     const tNext  = (CELL_H - off) / SPEED_PX_PER_S;
     const tStep  = CELL_H / SPEED_PX_PER_S;
-    const t      = (nSteps === 0) ? 0 : (tNext + (nSteps - 1) * tStep);
-    return t * 1000;
+    return (nSteps === 0 ? 0 : (tNext + (nSteps - 1) * tStep)) * 1000;
   };
 
+  // --------------- GOGO中：目押しOK ---------------
+  if (pendingBonus && (pendingBonus==="big" || pendingBonus==="reg")){
+    const effWindow = SKILL_WINDOW_MS_GOGO;
+    const msToHit   = computeMsToIndex(targetIndex);
+
+    if (msToHit <= effWindow) {
+      // ★ヒット：狙い図柄でピン止め
+      const total = Math.max(0, msToHit + BASE_LAG_MS_MIN);
+      scheduledTimer[col]=setTimeout(()=>{ scheduledTimer[col]=null; r.requestStop(); }, total);
+    } else {
+      // ★ミス：近場で“早めハズレ”停止
+      // 内部BIG中は BAR77が見えないように、ミス先を BAR 以外に回避
+      let missIdx = ( (nowTop + row + 1) % L );                 // 次の1コマで止めるイメージ
+      if (pendingBonus === "big"){
+        let guard=0;
+        while (r.strip[missIdx]==="bar.png" && guard<L){ missIdx=(missIdx+1)%L; guard++; }
+      }
+      // アームで index をロックして近場停止
+      indexArm[col].active   = true;
+      indexArm[col].targetIdx= missIdx;
+      indexArm[col].row      = row;
+    }
+    return;
+  }
+
+  // --------------- 通常時 ---------------
   if (skill){
-    const effWindow = gogoChance ? SKILL_WINDOW_MS_GOGO : SKILL_WINDOW_MS;
+    const effWindow = SKILL_WINDOW_MS;
     const msToOriginal = computeMsToIndex(targetIndex);
     if (msToOriginal > effWindow){
+      // 窓外 → ハズレ寄りのディレイ停止
       const add = BASE_LAG_MS_MIN + Math.random()*(BASE_LAG_MS_MAX-BASE_LAG_MS_MIN);
       scheduledTimer[col]=setTimeout(()=>{ scheduledTimer[col]=null; r.requestStop(); }, add);
       return;
     }
-    // 左リールだけ、目押し成功時のスライドを適用
-    if (col===0 && pendingBonus==="reg" && targetSym==="seven.png"){
-      targetIndex = (targetIndex + 1) % L;                   // 7ビタ→BARへ
-    }else if (col===0 && pendingBonus==="big" && targetSym==="bar.png"){
-      targetIndex = (targetIndex - 1 + L) % L;               // BARビタ→7へ
-    }
-    const total = Math.max(0, computeMsToIndex(targetIndex) + BASE_LAG_MS_MIN);
+    const total = Math.max(0, msToOriginal + BASE_LAG_MS_MIN);
     scheduledTimer[col]=setTimeout(()=>{ scheduledTimer[col]=null; r.requestStop(); }, total);
     return;
   }
 
-  // 強制狙い（ボーナス中の役制御など）
-  const msTo = computeMsToIndex(targetIndex);
-  scheduledTimer[col]=setTimeout(()=>{ scheduledTimer[col]=null; r.requestStop(); }, Math.max(0, msTo));
+  // アームで“ミス寄り”の自然停止
+  indexArm[col].active   = true;
+  indexArm[col].targetIdx= targetIndex;
+  indexArm[col].row      = row;
 }
 
 /* =========================================================
    Reel
-   ========================================================= */
+========================================================= */
 class Reel {
   constructor(root, strip, idx){
     this.root=root; this.strip=strip; this.idx=idx;
@@ -239,7 +300,10 @@ class Reel {
       this.cells[i].style.position="absolute"; this.cells[i].style.top=(i*CELL_H)+"px";
     }
   }
-  start(speed){ this.spinning=true; this.snapping=false; this.speed=speed; }
+  start(speed){
+    this.spinning=true; this.snapping=false; this.speed=speed;
+    indexArm[this.idx].active=false;
+  }
   requestStop(){
     if(!this.spinning) return;
     const nearest = Math.round(this.offsetPx / CELL_H) * CELL_H;
@@ -249,7 +313,19 @@ class Reel {
   update(dt){
     if(this.spinning){
       this.offsetPx += DIR_SIGN * this.speed * dt;
-      this.recycle(); this.applyTransform(); if(DEBUG_HUD) this.hud(); return;
+      this.recycle(); this.applyTransform();
+
+      // アーム監視（row位置で一致した瞬間に停止）
+      const arm = indexArm[this.idx];
+      if(arm.active){
+        const L=this.strip.length;
+        const curIndex=(this.topIndex + arm.row) % L;
+        if(curIndex === arm.targetIdx){
+          arm.active=false;
+          this.requestStop();
+        }
+      }
+      if(DEBUG_HUD) this.hud(); return;
     }
     if(this.snapping){
       this.snapT=Math.min(1,this.snapT+dt/this.snapDur);
@@ -318,7 +394,7 @@ function setupLoopAndUI(){
 
   const allIdle=()=>reels.every(r=>r.isIdle());
 
-  function lightGogo(){ if(gogoChance) return; gogoChance=true; lampGogo?.classList.add("on"); requestAnimationFrame(()=>{ try{ if(lampGogo && lampGogo.naturalWidth>0) playSE(se.gako);}catch(_){} }); }
+  function lightGogo(){ if(gogoChance) return; gogoChance=true; lampGogo?.classList.add("on"); try{ playSE(se.gako); }catch(_){ } }
   function offGogo(){ if(!gogoChance) return; gogoChance=false; lampGogo?.classList.remove("on"); }
 
   function maybeNotify(){
@@ -330,8 +406,10 @@ function setupLoopAndUI(){
   function start(){
     if(!allIdle() || (credit<=0 && replayStock<=0)) return;
 
-    stopArmed.fill(false);
-    for(let i=0;i<3;i++){ if(scheduledTimer[i]){ clearTimeout(scheduledTimer[i]); scheduledTimer[i]=null; } }
+    for(let i=0;i<3;i++){
+      if(scheduledTimer[i]){ clearTimeout(scheduledTimer[i]); scheduledTimer[i]=null; }
+      indexArm[i].active=false;
+    }
 
     if(replayStock>0) replayStock--; else credit--;
     count++; payout=0; updateMeters();
@@ -355,14 +433,16 @@ function setupLoopAndUI(){
 
   function internalStop(which, force=false){
     const r=reels[which]; if(!r || r.isIdle()) return;
-    if(stopArmed[which] && !force) return;
 
-    if(bonusTime && (!currentPlan || currentPlan.type!=="bonus-time")) currentPlan=makePlanForThisSpin();
+    if(!force) playSE(se.botan);
 
-    if(!force){ stopArmed[which]=true; playSE(se.botan); }
-
+    // ボーナス中は毎回プランを再作成
+    if (bonusTime && (!currentPlan || currentPlan.type!=="bonus-time")) {
+      currentPlan = makePlanForThisSpin();
+    }
     if(!currentPlan) currentPlan=makePlanForThisSpin();
 
+    // 消灯中かつプランなし → ランダム遅延停止
     if(!force && !gogoChance && !currentPlan){
       setTimeout(()=>internalStop(which,true), randDelay());
       armFinishWatcher(); return;
@@ -370,22 +450,13 @@ function setupLoopAndUI(){
 
     if(currentPlan){
       const tSym=currentPlan.targets[which];
+      const row=currentPlan.rows ? currentPlan.rows[which] : 1;
       const skill=!!currentPlan.skill;
-
-      // REG/BIG 告知時はプラン作成時に決めた index を優先
-      let align=null;
-      if((currentPlan.type==="bonus-reg"||currentPlan.type==="bonus-big") && currentPlan.align){
-        align=currentPlan.align[which];
-      }
-      // bonus-time は各リールごとに“次のその図柄”へ（ここで per-reel に算出）
-      if(currentPlan.type==="bonus-time"){
-        align=nextIndexFor(r, tSym);
-      }
-
-      scheduleStopToTarget(which, tSym, 1, skill, align);
+      scheduleStopToTarget(which, tSym, row, skill);
       armFinishWatcher(); return;
     }
 
+    // ここに来るのは force=true のとき（ランダム停止）
     r.requestStop();
     armFinishWatcher();
   }
@@ -433,12 +504,13 @@ function setupLoopAndUI(){
 
     for(const [label,line] of lines){
       if(isReplayLine(line)){ replayHit=true; hitNames.push(`${label}: リプレイ`); continue; }
-      const w=judge3only(line);
+      const w=judge3only(line); // 消灯中の7×3は0点
       if(w>0){ total+=w; hitNames.push(`${label}: ${handName3only(line)}（${w}枚）`); }
       if(canJudgeBonusIn && isBigLine(line)) bigHit=true;
       if(canJudgeBonusIn && isRegLine(line)) regHit=true;
     }
 
+    // 入賞処理（GOGO点灯時のみ可）
     if(pendingBonus==="big" && bigHit){
       playSE(se.big); bonusTime="big"; bonusEarned=0; pendingBonus=null; offGogo();
       currentPlan=makePlanForThisSpin();
@@ -484,17 +556,20 @@ function judge3only(line){
   const v=line[0];
   if(line[1]!==v || line[2]!==v) return 0;
 
-  // 告知中は 7/BAR の配当を無効化（再入賞防止の保険）
+  // 消灯中は 7×3 を常に無効
+  if(v==="seven.png" && !gogoChance && !bonusTime) return 0;
+
+  // 告知中は 7/BAR の配当を無効化（再入賞防止）
   if(pendingBonus && (v==="seven.png" || v==="bar.png")) return 0;
 
   // ボーナス中
   if(bonusTime){
-    if(v==="bell.png" || v==="cherry.png") return 15; // 15枚
-    if(v==="sai.png") return 0;                        // リプレイ
+    if(v==="bell.png" || v==="cherry.png" || v==="lemon.png") return 15; // ぶどうも15枚
+    if(v==="sai.png") return 0;                                          // リプレイ
     return 0;
   }
 
-  // 通常時（サイは常にリプレイ＝0枚）
+  // 通常時
   if(v==="sai.png") return 0;
   if(v==="seven.png") return 50;
   if(v==="bar.png")   return 20;
