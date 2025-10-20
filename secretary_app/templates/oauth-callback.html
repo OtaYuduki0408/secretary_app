@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>OAuth Callback</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      background-color: #f5f5f5;
+      color: #333;
+      padding-top: 100px;
+    }
+    .message {
+      background: white;
+      display: inline-block;
+      padding: 20px 40px;
+      border-radius: 12px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+    }
+  </style>
+</head>
+<body>
+  <div class="message">認証処理中...</div>
+
+  <script>
+    (function() {
+      const hash = window.location.hash.substring(1);
+      const params = new URLSearchParams(hash);
+      const token = {
+        access_token: params.get('access_token'),
+        token_type: params.get('token_type'),
+        expires_in: parseInt(params.get('expires_in')),
+        state: params.get('state')
+      };
+
+      if (token.access_token) {
+        window.opener.postMessage({
+          type: 'oauth2-success',
+          token: token
+        }, window.location.origin);
+      }
+
+      window.close();
+    })();
+  </script>
+</body>
+</html>

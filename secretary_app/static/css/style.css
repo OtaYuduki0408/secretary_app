@@ -221,6 +221,15 @@ html.theme-orange .mic-btn::before{
               radial-gradient(85% 85% at 50% 65%, rgba(244,63,94,.28), transparent 70%);
 }
 
+/* 音声認識中のボタンの状態 */
+.mic-btn.active .mic-surface {
+    /* 認識中は色を変化させるなど */
+    box-shadow: 0 0 15px rgba(122, 168, 255, 0.8), 0 0 30px rgba(122, 168, 255, 0.5);
+    transform: scale(1.05);
+    transition: all 0.2s ease-in-out;
+}
+/* その他、アクティブ時のアニメーションなどを追加すると分かりやすくなります */
+
 /* 検索バー */
 .search{ width:min(960px, 88vw); display:flex; align-items:center; gap:14px; border-radius: 999px; padding: 18px 22px; border: 1px solid rgba(255,255,255,.16); box-shadow: 0 10px 30px rgba(0,0,0,.35); }
 .search .icon{ width:28px; height:28px; flex:0 0 auto; opacity:.95; }
