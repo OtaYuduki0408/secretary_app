@@ -273,7 +273,7 @@ import { check_chat_Space } from '/static/js/ChatSpace.js';
   }
 
   /* ======= ORA（既存のまま） ======= */
-  const JACKPOT_RATE = 0.01;
+  const JACKPOT_RATE = 1;
   const CAMEO_IMAGES = ['static/img/videoframe_79969.png','static/img/videoframe_86269.png'];
   const CAMEO_AUD_SRC = ['static/voice/まずい.m4a','static/voice/神避.m4a'];
 
@@ -394,11 +394,10 @@ import { check_chat_Space } from '/static/js/ChatSpace.js';
 
     const cracksHost = document.getElementById('cracks');
     cracksHost.innerHTML = '';
-
     const period = 60, lifetime = 2000;
     const t0 = performance.now();
 
-    const goSlot = Math.random() < 0.01;
+    const goSlot = Math.random() < JACKPOT_RATE;
     if (goSlot) { primeAudio(); }
 
     (function spawn(){
