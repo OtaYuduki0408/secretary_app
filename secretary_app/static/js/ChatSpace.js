@@ -1,97 +1,99 @@
-// Google Generative AI SDKをインポート
+// ==============================
+// Google Generative AI SDK
+// ==============================
 import { GoogleGenerativeAI } from 'https://cdn.jsdelivr.net/npm/@google/generative-ai@0.14.1/dist/index.mjs';
-console.log("ChatSpace.jsがロードされました。")
+console.log("✅ ChatSpace.js ロード完了");
 
-// APIキーを直接記述 (本番環境では非推奨)
 const apiKey = "AIzaSyCoyPKhnAhlZrekrnOyljxtl4zpo3hTEtc";
+if (!apiKey) console.error("APIキーが設定されていません");
 
-if (!apiKey) {
-  console.error("APIキーが設定されていません",color="red")
-  }
-
-// APIクライアントを初期化
 const genAI = new GoogleGenerativeAI(apiKey);
+const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
-// 使用するモデルを指定
-const model = genAI.getGenerativeModel({model: "gemini-2.5-flash"});
+// ==============================
+// 解析メイン関数（唯一の定義）
+// ==============================
+export async function check_chat_Space(inputValue) {
+  fire('analysis:start', { steps: ['目的判定', '詳細抽出', '結果反映'] });
 
+  console.log("フォームへの入力を検知しました。入力内容:", inputValue);
+  console.time("チャット解析処理 総所要時間");
+  console.time("チャット解析処理 第一解析時間");
 
-/**
-*  チャットスペースに入力された内容を解析する関数
-*  @param inputValue - 解析する内容
-*/
-export async function check_chat_Space(inputValue){
-    console.log("フォームへの入力を検知しました。入力内容:"+inputValue)
-    console.time("チャット解析処理、総所要時間")
-    console.time("チャット解析処理、第一解析時間")
+  // 目的分類
+  const add_text = "以下のテキストの目的を分析し、対応する一文字のみで返答してください：C:カレンダー（追加）、R:カレンダー（削除）、G:カレンダー（取得）、M:カレンダー（変更）、I:収入/支出、E:その他";
+  const request_text = add_text + inputValue;
+  const purpose = await gemini_request(request_text);
 
-    //目的の特定
-    let add_text = "以下のテキストの目的を分析し、対応する一文字のみで返答してください：T:今の時間を聞いている 、C:カレンダー（追加）、R:カレンダー（削除）、G:カレンダー（取得）、M:カレンダー（変更）、I:収入/支出、E:その他"
-    const request_text = add_text + inputValue
-    // 目的の関数を呼び出し
-    let purpose = await gemini_request(request_text)
-    console.timeEnd("チャット解析処理、第一解析時間")
-    if(purpose == "T"){
-      console.log("チャットの第一解析結果:時間取得関係(T)")
-    }else if(purpose == "C"){
-      console.log("チャットの第一解析結果:カレンダー追加(C)")
-      add_calendar(inputValue)
+  console.timeEnd("チャット解析処理 第一解析時間");
 
-    }else if(purpose == "R"){
-      console.log("チャットの第一解析結果:カレンダー削除(R)")
-      remove_calendar(inputValue)
+  // ==============================
+  // 分岐処理
+  // ==============================
+  if (purpose == "C") {
+    console.log("解析結果: カレンダー追加 (C)");
+    fire('analysis:step', { index: 1, label: '目的判定' });
+    await add_calendar(inputValue);
+    fire('analysis:step', { index: 3, label: '結果反映' });
 
-    }else if(purpose == "G"){
-      console.log("チャットの第一解析結果:カレンダー取得(G)")
-      get_calender(inputValue)
+  } else if (purpose == "R") {
+    console.log("解析結果: カレンダー削除 (R)");
+     remove_calendar(inputValue)
 
-    }else if(purpose == "M"){
-      console.log("チャットの第一解析結果:カレンダー変更(M)")
-      change_calendar(inputValue)
-    }else if(purpose == "I"){
-      console.log("チャットの第一解析結果:収支管理(I)")
-      
-    }else{
-      alert("このユーザーはその他の質問をしています。")
-    }
-  };
+  } else if (purpose == "G") {
+    console.log("解析結果: カレンダー取得 (G)");
+    get_calender(inputValue)
 
-// Gemini APIにリクエストを送信し、結果をアラートで表示する
-async function gemini_request(text) {
-  console.info("gemini関数がテキストを受け取りました。")
-  // トークンカウントの処理を修正
-  try {
-    // countTokensの引数を、APIリクエストと同様の contents 形式にする
-    const token_response = await model.countTokens({contents: [{role: "user", parts: [{text: text}]}]});
-    console.log("文章のトークン数:", token_response.totalTokens);
-  } catch (e) {
-    // トークンカウントのエラーは無視し、警告のみを表示
-    console.warn("トークン数のカウントに失敗しました:", e);
+  } else if (purpose == "M") {
+    console.log("解析結果: カレンダー変更 (M)");
+    change_calendar(inputValue)
+
+  } else if (purpose == "I") {
+    console.log("解析結果: 収支管理 (I)");
+
+  } else {
+    alert("このユーザーはその他の質問をしています。");
   }
-  console.time("geminiリクエスト、経過時間")
+
+  console.timeEnd("チャット解析処理 総所要時間");
+  fire('analysis:end');
+}
+
+// ==============================
+// Gemini API 呼び出し
+// ==============================
+async function gemini_request(text) {
+  console.info("gemini_request 呼び出し:", text);
   try {
-    // テキストを生成
+    const token_response = await model.countTokens({
+      contents: [{ role: "user", parts: [{ text }] }]
+    });
+    console.log("トークン数:", token_response.totalTokens);
+  } catch (e) {
+    console.warn("トークン数のカウントに失敗:", e);
+  }
+
+  console.time("geminiリクエスト 経過時間");
+  try {
     const result = await model.generateContent(text);
     const response = await result.response;
-    const responce_text = response.text()
-    console.log("gemini responce:",responce_text)
-    console.timeEnd("geminiリクエスト、経過時間")
-    return responce_text;
-    
+    const response_text = response.text();
+    console.log("gemini response:", response_text);
+    console.timeEnd("geminiリクエスト 経過時間");
+    return response_text;
   } catch (error) {
     console.error('テキスト生成中にエラーが発生しました:', error);
     alert('テキスト生成中にエラーが発生しました。詳細はコンソールを確認してください。');
   }
 }
 
-/**
- * カレンダーに追加する処理を統括管理する関数
- * @param {string} text ユーザーによるテキスト
- */
-async function add_calendar(text){
-  console.time("チャット解析処理、第二解析時間：カレンダー追加")
+// ==============================
+// カレンダー追加処理
+// ==============================
+async function add_calendar(text) {
+  console.time("チャット解析処理 第二解析時間：カレンダー追加");
   const now = new Date();
-  let add_text = `
+  const add_text = `
   目標: カレンダー予定抽出
   意図: 予定追加
   抽出必須項目:
@@ -306,4 +308,11 @@ async function change_calendar(text) {
   console.timeEnd("チャット解析処理、第三解析時間：カレンダー変更")
   console.timeEnd("チャット解析処理、総所要時間")
   alert("処理終了 \n解析結果:カレンダー変更処理\n",purpose)
+}
+
+// ==============================
+// インジケーターイベント
+// ==============================
+function fire(name, detail) {
+  document.dispatchEvent(new CustomEvent(name, { detail }));
 }
