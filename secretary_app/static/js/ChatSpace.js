@@ -24,6 +24,7 @@ export async function check_chat_Space(inputValue) {
   const add_text = "以下のテキストの目的を分析し、対応する一文字のみで返答してください：C:カレンダー（追加）、R:カレンダー（削除）、G:カレンダー（取得）、M:カレンダー（変更）、I:収入/支出、E:その他";
   const request_text = add_text + inputValue;
   const purpose = await gemini_request(request_text);
+  fire('analysis:step', { index: 1, label: '目的判定' });
 
   console.timeEnd("チャット解析処理 第一解析時間");
 
@@ -32,28 +33,25 @@ export async function check_chat_Space(inputValue) {
   // ==============================
   if (purpose == "C") {
     console.log("解析結果: カレンダー追加 (C)");
-    fire('analysis:step', { index: 1, label: '目的判定' });
     await add_calendar(inputValue);
-    fire('analysis:step', { index: 3, label: '結果反映' });
 
   } else if (purpose == "R") {
     console.log("解析結果: カレンダー削除 (R)");
-     remove_calendar(inputValue)
+    await remove_calendar(inputValue)
 
   } else if (purpose == "G") {
     console.log("解析結果: カレンダー取得 (G)");
-    get_calender(inputValue)
+    await get_calender(inputValue)
 
   } else if (purpose == "M") {
     console.log("解析結果: カレンダー変更 (M)");
-    change_calendar(inputValue)
+    await change_calendar(inputValue)
 
   } else if (purpose == "I") {
-    console.log("解析結果: 収支管理 (I)");
+    await console.log("解析結果: 収支管理 (I)");
 
-  } else {
-    alert("このユーザーはその他の質問をしています。");
-  }
+  } 
+  fire('analysis:step', { index: 3, label: '結果反映' });
 
   console.timeEnd("チャット解析処理 総所要時間");
   fire('analysis:end');
@@ -110,7 +108,6 @@ async function add_calendar(text) {
   console.log("第二解析(カレンダー追加処理)結果：",purpose)
   console.timeEnd("チャット解析処理、第二解析時間：カレンダー追加")
   console.timeEnd("チャット解析処理、総所要時間")
-  alert("処理終了 \n解析結果:カレンダー追加処理\n",purpose)
 }
 
 async function get_calender(text) {
@@ -131,74 +128,73 @@ async function get_calender(text) {
   console.log("第二解析(カレンダー取得処理)結果：",purpose)
   console.timeEnd("チャット解析処理、第二解析時間：カレンダー取得")
   console.timeEnd("チャット解析処理、総所要時間")
-  alert("処理終了 \n解析結果:カレンダー取得処理\n",purpose)
   return purpose
 }
 
 async function remove_calendar(text) {
   let task_list = await get_calender(text);
-  task_list = `[
-    {
-      "name": "起床",
-      "start_time": "2025-10-15 06:10:00",
-      "end_time": "2025-10-15 06:20:00"
-    },
-    {
-      "name": "身支度・朝の準備",
-      "start_time": "2025-10-15 06:20:00",
-      "end_time": "2025-10-15 07:00:00"
-    },
-    {
-      "name": "朝食",
-      "start_time": "2025-10-15 07:00:00",
-      "end_time": "2025-10-15 07:30:00"
-    },
-    {
-      "name": "出勤・登校準備/出発",
-      "start_time": "2025-10-15 07:30:00",
-      "end_time": "2025-10-15 08:30:00"
-    },
-    {
-      "name": "午前中の作業/活動",
-      "start_time": "2025-10-15 09:00:00",
-      "end_time": "2025-10-15 12:00:00"
-    },
-    {
-      "name": "昼食・休憩",
-      "start_time": "2025-10-15 12:00:00",
-      "end_time": "2025-10-15 13:00:00"
-    },
-    {
-      "name": "午後の作業/活動",
-      "start_time": "2025-10-15 13:00:00",
-      "end_time": "2025-10-15 18:00:00"
-    },
-    {
-      "name": "帰宅・夕食の準備",
-      "start_time": "2025-10-15 18:00:00",
-      "end_time": "2025-10-15 19:00:00"
-    },
-    {
-      "name": "夕食",
-      "start_time": "2025-10-15 19:00:00",
-      "end_time": "2025-10-15 20:00:00"
-    },
-    {
-      "name": "自由時間・リラックス",
-      "start_time": "2025-10-15 20:00:00",
-      "end_time": "2025-10-15 22:00:00"
-    },
-    {
-      "name": "就寝準備",
-      "start_time": "2025-10-15 22:00:00",
-      "end_time": "2025-10-15 23:00:00"
-    },
-    {
-      "name": "就寝",
-      "start_time": "2025-10-15 23:00:00",
-      "end_time": "2025-10-15 24:00:00"
-    }
-  ]`
+  task_list = [
+  {
+    "name": "起床",
+    "start_time": "2025-10-21 06:10:00",
+    "end_time": "2025-10-21 06:20:00"
+  },
+  {
+    "name": "身支度・朝の準備",
+    "start_time": "2025-10-21 06:20:00",
+    "end_time": "2025-10-21 07:00:00"
+  },
+  {
+    "name": "朝食",
+    "start_time": "2025-10-21 07:00:00",
+    "end_time": "2025-10-21 07:30:00"
+  },
+  {
+    "name": "出勤・登校準備/出発",
+    "start_time": "2025-10-21 07:30:00",
+    "end_time": "2025-10-21 08:30:00"
+  },
+  {
+    "name": "午前中の作業/活動",
+    "start_time": "2025-10-21 09:00:00",
+    "end_time": "2025-10-21 12:00:00"
+  },
+  {
+    "name": "昼食・休憩",
+    "start_time": "2025-10-21 12:00:00",
+    "end_time": "2025-10-21 13:00:00"
+  },
+  {
+    "name": "午後の作業/活動",
+    "start_time": "2025-10-21 13:00:00",
+    "end_time": "2025-10-21 18:00:00"
+  },
+  {
+    "name": "帰宅・夕食の準備",
+    "start_time": "2025-10-21 18:00:00",
+    "end_time": "2025-10-21 19:00:00"
+  },
+  {
+    "name": "夕食",
+    "start_time": "2025-10-21 19:00:00",
+    "end_time": "2025-10-21 20:00:00"
+  },
+  {
+    "name": "自由時間・リラックス",
+    "start_time": "2025-10-21 20:00:00",
+    "end_time": "2025-10-21 22:00:00"
+  },
+  {
+    "name": "就寝準備",
+    "start_time": "2025-10-21 22:00:00",
+    "end_time": "2025-10-21 23:00:00"
+  },
+  {
+    "name": "就寝",
+    "start_time": "2025-10-21 23:00:00",
+    "end_time": "2025-10-21 24:00:00"
+  }
+]
   console.time("チャット解析処理、第三解析時間：カレンダー削除")
   const now = new Date();
   let add_text = `
@@ -218,7 +214,6 @@ async function remove_calendar(text) {
   console.log("第三解析(カレンダー削除処理)結果：",purpose)
   console.timeEnd("チャット解析処理、第三解析時間：カレンダー削除")
   console.timeEnd("チャット解析処理、総所要時間")
-  alert("処理終了 \n解析結果:カレンダー削除処理\n",purpose)
 }
 
 async function change_calendar(text) {
@@ -307,7 +302,6 @@ async function change_calendar(text) {
   console.log("第三解析(カレンダー変更処理)結果：",purpose)
   console.timeEnd("チャット解析処理、第三解析時間：カレンダー変更")
   console.timeEnd("チャット解析処理、総所要時間")
-  alert("処理終了 \n解析結果:カレンダー変更処理\n",purpose)
 }
 
 // ==============================
