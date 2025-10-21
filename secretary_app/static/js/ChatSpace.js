@@ -1,11 +1,15 @@
 // ==============================
-// Google Generative AI SDK
+// ChatSpace.js（完全版 / トースト対応・重複修正）
 // ==============================
+
+// Google Generative AI SDK（ESM）
 import { GoogleGenerativeAI } from 'https://cdn.jsdelivr.net/npm/@google/generative-ai@0.14.1/dist/index.mjs';
 import {TextToSpeechReader} from "/static/js/TextToSpeechReader.js"
 console.log("✅ ChatSpace.js ロード完了");
 
-const apiKey = "AIzaSyCoyPKhnAhlZrekrnOyljxtl4zpo3hTEtc";
+// ※ APIキーは安全な場所から供給してください（例: window.GEMINI_API_KEY）
+//   ここでは既存コード互換のため直接定義もサポートします。
+const apiKey = window.GEMINI_API_KEY || "AIzaSyCoyPKhnAhlZrekrnOyljxtl4zpo3hTEtc";
 if (!apiKey) console.error("APIキーが設定されていません");
 
 const genAI = new GoogleGenerativeAI(apiKey);
@@ -14,7 +18,7 @@ const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 const reader = new TextToSpeechReader(); //音声読み上げクラス
 
 // ==============================
-// 解析メイン関数（唯一の定義）
+// 解析メイン関数（唯一の公開エクスポート）
 // ==============================
 export async function check_chat_Space(inputValue) {
   fire('analysis:start', { steps: ['目的判定', '詳細抽出', '結果反映'] });
@@ -32,7 +36,7 @@ export async function check_chat_Space(inputValue) {
                   上記に当てはまらない命令の場合、自然な回答になるように返答してください。なお、現在時刻は${now}
                   ユーザーの入力:`;
   const request_text = add_text + inputValue;
-  const purpose = await gemini_request(request_text);
+  const purpose = (await gemini_request(request_text) || "").trim();
   fire('analysis:step', { index: 1, label: '目的判定' });
 
   console.timeEnd("チャット解析処理 第一解析時間");
@@ -40,19 +44,19 @@ export async function check_chat_Space(inputValue) {
   // ==============================
   // 分岐処理
   // ==============================
-  if (purpose == "C") {
+  if (purpose === "C") {
     console.log("解析結果: カレンダー追加 (C)");
     await add_calendar(inputValue);
 
-  } else if (purpose == "R") {
+  } else if (purpose === "R") {
     console.log("解析結果: カレンダー削除 (R)");
-    await remove_calendar(inputValue)
+    await remove_calendar(inputValue);
 
-  } else if (purpose == "G") {
+  } else if (purpose === "G") {
     console.log("解析結果: カレンダー取得 (G)");
-    await get_calender(inputValue)
+    await get_calender(inputValue);
 
-  } else if (purpose == "M") {
+  } else if (purpose === "M") {
     console.log("解析結果: カレンダー変更 (M)");
     await change_calendar(inputValue)
 
@@ -60,7 +64,7 @@ export async function check_chat_Space(inputValue) {
     await console.log("解析結果: 収支管理 (I)");
 
   } else{
-    console.log(purpose)
+    console.log(purpose);
     reader.speak(purpose);
   }
   fire('analysis:step', { index: 3, label: '結果反映' });
@@ -93,11 +97,12 @@ async function gemini_request(text) {
   } catch (error) {
     console.error('テキスト生成中にエラーが発生しました:', error);
     alert('テキスト生成中にエラーが発生しました。詳細はコンソールを確認してください。');
+    return "";
   }
 }
 
 // ==============================
-// カレンダー追加処理
+// カレンダー追加処理（トースト発火対応版）
 // ==============================
 async function add_calendar(text) {
   console.time("チャット解析処理 第二解析時間：カレンダー追加");
@@ -156,67 +161,19 @@ async function get_calender(text) {
 async function remove_calendar(text) {
   let task_list = await get_calender(text);
   task_list = [
-  {
-    "name": "起床",
-    "start_time": "2025-10-21 06:10:00",
-    "end_time": "2025-10-21 06:20:00"
-  },
-  {
-    "name": "身支度・朝の準備",
-    "start_time": "2025-10-21 06:20:00",
-    "end_time": "2025-10-21 07:00:00"
-  },
-  {
-    "name": "朝食",
-    "start_time": "2025-10-21 07:00:00",
-    "end_time": "2025-10-21 07:30:00"
-  },
-  {
-    "name": "出勤・登校準備/出発",
-    "start_time": "2025-10-21 07:30:00",
-    "end_time": "2025-10-21 08:30:00"
-  },
-  {
-    "name": "午前中の作業/活動",
-    "start_time": "2025-10-21 09:00:00",
-    "end_time": "2025-10-21 12:00:00"
-  },
-  {
-    "name": "昼食・休憩",
-    "start_time": "2025-10-21 12:00:00",
-    "end_time": "2025-10-21 13:00:00"
-  },
-  {
-    "name": "午後の作業/活動",
-    "start_time": "2025-10-21 13:00:00",
-    "end_time": "2025-10-21 18:00:00"
-  },
-  {
-    "name": "帰宅・夕食の準備",
-    "start_time": "2025-10-21 18:00:00",
-    "end_time": "2025-10-21 19:00:00"
-  },
-  {
-    "name": "夕食",
-    "start_time": "2025-10-21 19:00:00",
-    "end_time": "2025-10-21 20:00:00"
-  },
-  {
-    "name": "自由時間・リラックス",
-    "start_time": "2025-10-21 20:00:00",
-    "end_time": "2025-10-21 22:00:00"
-  },
-  {
-    "name": "就寝準備",
-    "start_time": "2025-10-21 22:00:00",
-    "end_time": "2025-10-21 23:00:00"
-  },
-  {
-    "name": "就寝",
-    "start_time": "2025-10-21 23:00:00",
-    "end_time": "2025-10-21 24:00:00"
-  }
-]
+    { "name": "起床", "start_time": "2025-10-21 06:10:00", "end_time": "2025-10-21 06:20:00" },
+    { "name": "身支度・朝の準備", "start_time": "2025-10-21 06:20:00", "end_time": "2025-10-21 07:00:00" },
+    { "name": "朝食", "start_time": "2025-10-21 07:00:00", "end_time": "2025-10-21 07:30:00" },
+    { "name": "出勤・登校準備/出発", "start_time": "2025-10-21 07:30:00", "end_time": "2025-10-21 08:30:00" },
+    { "name": "午前中の作業/活動", "start_time": "2025-10-21 09:00:00", "end_time": "2025-10-21 12:00:00" },
+    { "name": "昼食・休憩", "start_time": "2025-10-21 12:00:00", "end_time": "2025-10-21 13:00:00" },
+    { "name": "午後の作業/活動", "start_time": "2025-10-21 13:00:00", "end_time": "2025-10-21 18:00:00" },
+    { "name": "帰宅・夕食の準備", "start_time": "2025-10-21 18:00:00", "end_time": "2025-10-21 19:00:00" },
+    { "name": "夕食", "start_time": "2025-10-21 19:00:00", "end_time": "2025-10-21 20:00:00" },
+    { "name": "自由時間・リラックス", "start_time": "2025-10-21 20:00:00", "end_time": "2025-10-21 22:00:00" },
+    { "name": "就寝準備", "start_time": "2025-10-21 22:00:00", "end_time": "2025-10-21 23:00:00" },
+    { "name": "就寝", "start_time": "2025-10-21 23:00:00", "end_time": "2025-10-21 24:00:00" }
+  ];
   console.time("チャット解析処理、第三解析時間：カレンダー削除")
   const now = new Date();
   let add_text = `
@@ -247,67 +204,19 @@ async function remove_calendar(text) {
 async function change_calendar(text) {
   let task_list = await get_calender(text);
   task_list = `[
-    {
-      "name": "起床",
-      "start_time": "2025-10-15 06:10:00",
-      "end_time": "2025-10-15 06:20:00"
-    },
-    {
-      "name": "身支度・朝の準備",
-      "start_time": "2025-10-15 06:20:00",
-      "end_time": "2025-10-15 07:00:00"
-    },
-    {
-      "name": "朝食",
-      "start_time": "2025-10-15 07:00:00",
-      "end_time": "2025-10-15 07:30:00"
-    },
-    {
-      "name": "出勤・登校準備/出発",
-      "start_time": "2025-10-15 07:30:00",
-      "end_time": "2025-10-15 08:30:00"
-    },
-    {
-      "name": "午前中の作業/活動",
-      "start_time": "2025-10-15 09:00:00",
-      "end_time": "2025-10-15 12:00:00"
-    },
-    {
-      "name": "昼食・休憩",
-      "start_time": "2025-10-15 12:00:00",
-      "end_time": "2025-10-15 13:00:00"
-    },
-    {
-      "name": "午後の作業/活動",
-      "start_time": "2025-10-15 13:00:00",
-      "end_time": "2025-10-15 18:00:00"
-    },
-    {
-      "name": "帰宅・夕食の準備",
-      "start_time": "2025-10-15 18:00:00",
-      "end_time": "2025-10-15 19:00:00"
-    },
-    {
-      "name": "夕食",
-      "start_time": "2025-10-15 19:00:00",
-      "end_time": "2025-10-15 20:00:00"
-    },
-    {
-      "name": "自由時間・リラックス",
-      "start_time": "2025-10-15 20:00:00",
-      "end_time": "2025-10-15 22:00:00"
-    },
-    {
-      "name": "就寝準備",
-      "start_time": "2025-10-15 22:00:00",
-      "end_time": "2025-10-15 23:00:00"
-    },
-    {
-      "name": "就寝",
-      "start_time": "2025-10-15 23:00:00",
-      "end_time": "2025-10-15 24:00:00"
-    }
-  ]`
+    {"name":"起床","start_time":"2025-10-15 06:10:00","end_time":"2025-10-15 06:20:00"},
+    {"name":"身支度・朝の準備","start_time":"2025-10-15 06:20:00","end_time":"2025-10-15 07:00:00"},
+    {"name":"朝食","start_time":"2025-10-15 07:00:00","end_time":"2025-10-15 07:30:00"},
+    {"name":"出勤・登校準備/出発","start_time":"2025-10-15 07:30:00","end_time":"2025-10-15 08:30:00"},
+    {"name":"午前中の作業/活動","start_time":"2025-10-15 09:00:00","end_time":"2025-10-15 12:00:00"},
+    {"name":"昼食・休憩","start_time":"2025-10-15 12:00:00","end_time":"2025-10-15 13:00:00"},
+    {"name":"午後の作業/活動","start_time":"2025-10-15 13:00:00","end_time":"2025-10-15 18:00:00"},
+    {"name":"帰宅・夕食の準備","start_time":"2025-10-15 18:00:00","end_time":"2025-10-15 19:00:00"},
+    {"name":"夕食","start_time":"2025-10-15 19:00:00","end_time":"2025-10-15 20:00:00"},
+    {"name":"自由時間・リラックス","start_time":"2025-10-15 20:00:00","end_time":"2025-10-15 22:00:00"},
+    {"name":"就寝準備","start_time":"2025-10-15 22:00:00","end_time":"2025-10-15 23:00:00"},
+    {"name":"就寝","start_time":"2025-10-15 23:00:00","end_time":"2025-10-15 24:00:00"}
+  ]`;
   console.time("チャット解析処理、第三解析時間：カレンダー変更")
   const now = new Date();
   let add_text = `
