@@ -4,51 +4,73 @@
     <meta charset="UTF-8">
     <title>Googleカレンダー管理</title>
     <script src="https://apis.google.com/js/api.js"></script>
-    <script src="static/js/ScheduleManager2.js"></script>
-    <style>
-       body {
-        font-family: "Segoe UI", sans-serif;
-        margin: 30px;
-        }
-        input, button {
-        margin: 5px;
-        padding: 6px;
-        }
-        #log {
-        margin-top: 20px;
-        border: 1px solid #aaa;
-        padding: 10px;
-        height: 200px;
-        overflow-y: auto;
-        background: #f8f8f8;
-        }
-    </style>
+    <script src="static/js/ScheduleManager.js"></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/api.css') }}">
 </head>
 <body>
-    <h1>Googleカレンダー管理</h1>
-    <button id="authorize-button">Googleログイン</button>
+    <div class="container">
+        <header>
+            <h1>Googleカレンダー管理</h1>
+        </header>
 
-    <h3>イベント追加</h3>
-    <input id="event-title" placeholder="タイトル">
-    <input id="event-desc" placeholder="説明">
-    <input id="event-start" type="datetime-local">
-    <input id="event-end" type="datetime-local">
-    <button id="add-event-button" disabled>追加</button>
+        <button id="authorize-button" class="btn btn-success">Googleログイン</button>
+        
+        <div class="app-container">
+            <div>
+                <div class="card">
+                    <h3>イベント追加</h3>
+                    <div class="form-group">
+                        <input id="event-title" placeholder="タイトル">
+                    </div>
+                    <div class="form-group">
+                        <input id="event-desc" placeholder="説明">
+                    </div>
+                    <div class="form-group">
+                        <input id="event-start" type="datetime-local">
+                    </div>
+                    <div class="form-group">
+                        <input id="event-end" type="datetime-local">
+                    </div>
+                    <button id="add-event-button" class="btn" disabled>追加</button>
+                </div>
 
-    <h3>イベント削除</h3>
-    <input id="event-id" placeholder="イベントID">
-    <button id="delete-event-button" disabled>削除</button>
+                <div class="card">
+                    <h3>イベント削除</h3>
+                    <div class="form-group">
+                        <input id="event-id" placeholder="イベントID">
+                    </div>                   
+                    <button id="delete-event-button" class="btn" disabled>削除</button>
+                </div>
 
-    <h3>イベント確認</h3>
-    <input id="check-start" type="date">
-    <input id="check-end" type="date">
-    <button id="check-event-button" disabled>確認</button>
+                <div class="card">
+                    <h3>イベント確認</h3>
+                    <div class="form-group">
+                        <input id="check-start" type="date">
+                    </div>
+                    <div class="form-group">
+                        <input id="check-end" type="date">
+                    </div>
+                    <button id="check-event-button" class="btn" disabled>確認</button>
+                </div>
+            </div>
 
-    <h3>ログ</h3>
-    <div id="log"></div>
+            <div class="card">
+                <h2>操作ログ</h2>
+                <div class="log-container" id="log">
+                    <div class="log-item">
+                        <span class="log-timestamp">[システム]</span> 
+                        <span class="log-info">Googleカレンダー管理システムを起動しました</span>
+                    </div>
+                    <div class="log-item">
+                        <span class="log-timestamp">[システム]</span> 
+                        <span class="log-info">左側の操作パネルから各種操作を行ってください</span>
+                    </div>
+                </div>
+            </div>
+        </div>
 
     <script>
-        // ScheduleManager2.js で定義されたクラスのインスタンスを生成
+        // ScheduleManager.js で定義されたクラスのインスタンスを生成
         const manager = new ScheduleManager();
 
         // ログメッセージを画面の #log 要素に追加し、スクロール位置を最下部に移動させる関数
