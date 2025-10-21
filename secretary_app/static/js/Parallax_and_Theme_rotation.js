@@ -57,7 +57,6 @@ const isORA = v => {
 function startBTDSequence(e) { console.log('BTDシーケンスを開始', e); }
 function startTransform() { console.log('Transformを開始'); }
 function startOraOra() { console.log('オラオラを開始'); }
-function check_chat_Space(v) { console.log('通常検索/チャットを確認:', v); }
 
 if (input) {
   // ----------------------------------------------------
@@ -81,9 +80,9 @@ if (input) {
     const v = raw.toLowerCase();
     input.value = ''; // 入力欄をクリア（確定処理後）
     console.log("入力確定を検知")
-    if (isBTD(raw))        { startBTDSequence(e); return; }
-    if (v === 'transform') { startTransform(); return; }
-    if (isORA(raw))        { startOraOra(); return; }
+    if (isBTD(raw))        { startBTDSequence(e); console.log("isBTDを実行"); return; }
+    if (v === 'transform') { startTransform(); console.log("transformを実行"); return; }
+    if (isORA(raw))        { startOraOra(); console.log("isORAを実行"); return; }
     console.log("チャットスペースへ渡す")
     check_chat_Space(v);
   });
