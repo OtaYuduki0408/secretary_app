@@ -32,6 +32,15 @@ class ScheduleManager {
         });
     }
 
+    /**
+     * 
+     * @param {str} title タイトル 
+     * @param {str} description 説明
+     * @param {str} start 開始時間
+     * @param {str} end 終了時間
+     * @param {str} log 登録
+     * @returns 
+     */
     async addEvent(title, description, start, end, log) {
         if (!this.accessToken) return alert("Google認証を行ってください。");
         await gapi.client.load("calendar", "v3");
