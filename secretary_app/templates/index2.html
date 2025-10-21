@@ -74,6 +74,7 @@
         const manager = new ScheduleManager();
 
         // ログメッセージを画面の #log 要素に追加し、スクロール位置を最下部に移動させる関数
+        // ログメッセージを画面の #log 要素に追加し、スクロール位置を最下部に移動させる関数
         const log = (msg) => {
             const el = document.getElementById("log");
             const time = new Date().toLocaleTimeString();
@@ -82,45 +83,60 @@
         };
 
         // 「Googleログイン」ボタンにクリックイベントリスナーを設定
+        // 「Googleログイン」ボタンにクリックイベントリスナーを設定
         document.getElementById("authorize-button").addEventListener("click", () => {
+            // ScheduleManager クラスの認証処理メソッドを呼び出し
             // ScheduleManager クラスの認証処理メソッドを呼び出し
             manager.handleAuthClick();
         });
 
         // 「追加」ボタンにクリックイベントリスナーを設定
+        // 「追加」ボタンにクリックイベントリスナーを設定
         document.getElementById("add-event-button").addEventListener("click", async () => {
+            // 入力フィールドからイベント情報を取得。タイトルと説明にはデフォルト値を設定
             // 入力フィールドからイベント情報を取得。タイトルと説明にはデフォルト値を設定
             const title = document.getElementById("event-title").value || "無題のイベント";
             const desc = document.getElementById("event-desc").value || "";
             const start = document.getElementById("event-start").value;
             const end = document.getElementById("event-end").value;
             // ScheduleManager クラスのイベント追加メソッドを呼び出し
+            // ScheduleManager クラスのイベント追加メソッドを呼び出し
             await manager.addEvent(title, desc, start, end, log);
         });
 
         // 「削除」ボタンにクリックイベントリスナーを設定
+        // 「削除」ボタンにクリックイベントリスナーを設定
         document.getElementById("delete-event-button").addEventListener("click", async () => {
             // イベントIDを取得
+            // イベントIDを取得
             const id = document.getElementById("event-id").value;
+            // IDが存在する場合にのみ、ScheduleManager クラスのイベント削除メソッドを呼び出し
             // IDが存在する場合にのみ、ScheduleManager クラスのイベント削除メソッドを呼び出し
             if (id) await manager.deleteEvent(id, log);
         });
 
         // 「確認」ボタンにクリックイベントリスナーを設定
+        // 「確認」ボタンにクリックイベントリスナーを設定
         document.getElementById("check-event-button").addEventListener("click", async () => {
+            // 期間の開始日と終了日を取得
             // 期間の開始日と終了日を取得
             const start = document.getElementById("check-start").value;
             const end = document.getElementById("check-end").value;
+            // ScheduleManager クラスのイベント一覧取得メソッドを呼び出し
             // ScheduleManager クラスのイベント一覧取得メソッドを呼び出し
             await manager.listEvents(start, end, log);
         });
 
         // ポップアップ（またはリダイレクト先）からの認証完了時に、アクセストークンを受け取るためのグローバル関数
         // callback.html などから呼び出されることを想定
+        // ポップアップ（またはリダイレクト先）からの認証完了時に、アクセストークンを受け取るためのグローバル関数
+        // callback.html などから呼び出されることを想定
         window.receiveAccessToken = (token) => {
             log("Google認証成功！");
             // ScheduleManager にアクセストークンをセット
+            // ScheduleManager にアクセストークンをセット
             manager.setAccessToken(token);
+            // 認証成功後、イベント操作ボタンを有効化
             // 認証成功後、イベント操作ボタンを有効化
             document.getElementById("add-event-button").disabled = false;
             document.getElementById("delete-event-button").disabled = false;
