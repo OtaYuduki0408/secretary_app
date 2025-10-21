@@ -2,7 +2,7 @@ const clientId = "964406409299-dd8g3vumtmeuaht9tmq9f5l21otetfn7.apps.googleuserc
 const apiKey = "AIzaSyDUqgdhLHjWeTqrwYLr2LItsU3C7GYYCDI";
 const redirectUri = "https://127.0.0.1:5000/oauth-callback";
 
-class ScheduleManager {
+export class ScheduleManager {
     constructor() {
         this.accessToken = null;
     }
@@ -32,8 +32,16 @@ class ScheduleManager {
         });
     }
 
+    /**
+     * 
+     * @param {str} title タイトル 
+     * @param {str} description 説明
+     * @param {str} start 開始時間
+     * @param {str} end 終了時間
+     * @param {str} log 登録
+     * @returns 
+     */
     async addEvent(title, description, start, end, log) {
-        if (!this.accessToken) return alert("Google認証を行ってください。");
         await gapi.client.load("calendar", "v3");
 
         const startTime = start ? new Date(start).toISOString() : new Date().toISOString();
@@ -54,7 +62,7 @@ class ScheduleManager {
     }
 
     async deleteEvent(eventId, log) {
-        if (!this.accessToken) return alert("Google認証を行ってください。");
+        if (!this.accessToken) return alert("Google認証を行ってください。66");
         await gapi.client.load("calendar", "v3");
         await gapi.client.calendar.events.delete({
             calendarId: "primary",
@@ -64,7 +72,7 @@ class ScheduleManager {
     }
 
     async listEvents(start, end, log) {
-        if (!this.accessToken) return alert("Google認証を行ってください。");
+        if (!this.accessToken) return alert("Google認証を行ってください。76");
         await gapi.client.load("calendar", "v3");
 
         const startDate = new Date(start).toISOString();
