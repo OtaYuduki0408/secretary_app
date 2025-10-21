@@ -2,6 +2,7 @@
 // Google Generative AI SDK
 // ==============================
 import { GoogleGenerativeAI } from 'https://cdn.jsdelivr.net/npm/@google/generative-ai@0.14.1/dist/index.mjs';
+import {TextToSpeechReader} from "/static/js/TextToSpeechReader.js"
 console.log("✅ ChatSpace.js ロード完了");
 
 const apiKey = "AIzaSyCoyPKhnAhlZrekrnOyljxtl4zpo3hTEtc";
@@ -10,18 +11,26 @@ if (!apiKey) console.error("APIキーが設定されていません");
 const genAI = new GoogleGenerativeAI(apiKey);
 const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
+const reader = new TextToSpeechReader(); //音声読み上げクラス
+
 // ==============================
 // 解析メイン関数（唯一の定義）
 // ==============================
 export async function check_chat_Space(inputValue) {
   fire('analysis:start', { steps: ['目的判定', '詳細抽出', '結果反映'] });
+  reader.speak("かしこまりました。文章の解析を行います。");
+
 
   console.log("フォームへの入力を検知しました。入力内容:", inputValue);
   console.time("チャット解析処理 総所要時間");
   console.time("チャット解析処理 第一解析時間");
 
   // 目的分類
-  const add_text = "以下のテキストの目的を分析し、対応する一文字のみで返答してください：C:カレンダー（追加）、R:カレンダー（削除）、G:カレンダー（取得）、M:カレンダー（変更）、I:収入/支出、E:その他";
+  const now = new Date();
+  const add_text = `以下のテキストの目的を分析し、対応する一文字のみで返答してください：
+                  C:カレンダー（追加）、R:カレンダー（削除）、G:カレンダー（取得）、M:カレンダー（変更）、I:収入/支出
+                  上記に当てはまらない命令の場合、自然な回答になるように返答してください。なお、現在時刻は${now}
+                  ユーザーの入力:`;
   const request_text = add_text + inputValue;
   const purpose = await gemini_request(request_text);
   fire('analysis:step', { index: 1, label: '目的判定' });
@@ -50,9 +59,11 @@ export async function check_chat_Space(inputValue) {
   } else if (purpose == "I") {
     await console.log("解析結果: 収支管理 (I)");
 
-  } 
+  } else{
+    console.log(purpose)
+    reader.speak(purpose);
+  }
   fire('analysis:step', { index: 3, label: '結果反映' });
-
   console.timeEnd("チャット解析処理 総所要時間");
   fire('analysis:end');
 }
@@ -101,6 +112,7 @@ async function add_calendar(text) {
   timeはYYYY-MM-DD HH:MM:SS
   出力はJSON配列のみ、他テキスト禁止。複数予定時はリスト化。
   現在時刻は${now}
+  ユーザー入力:
   `;
   const request_text = add_text + text
   /*
