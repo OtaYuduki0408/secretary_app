@@ -57,7 +57,6 @@ const isORA = v => {
 function startBTDSequence(e) { console.log('BTDシーケンスを開始', e); }
 function startTransform() { console.log('Transformを開始'); }
 function startOraOra() { console.log('オラオラを開始'); }
-function check_chat_Space(v) { console.log('通常検索/チャットを確認:', v); }
 
 if (input) {
   // ----------------------------------------------------

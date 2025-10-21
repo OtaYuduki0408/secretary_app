@@ -88,7 +88,22 @@ async function gemini_request(text) {
 // ==============================
 // カレンダー追加処理
 // ==============================
+import { ScheduleManager } from "/static/js/ScheduleManager.js"; 
+const SM = new ScheduleManager(); // インスタンス化
+
 async function add_calendar(text) {
+
+  if (!window.manager || !window.manager.accessToken) {
+    const confirmLogin = confirm("Googleカレンダーにログインしていません。ログインしますか？");
+    if (confirmLogin) {
+        window.manager.handleAuthClick();
+        alert("ログインが完了したら再度操作してください。");
+        return;
+    } else {
+        console.warn("ユーザーがログインをキャンセルしました。");
+        return;
+    }
+}
   console.time("チャット解析処理 第二解析時間：カレンダー追加");
   const now = new Date();
   const add_text = `
@@ -103,6 +118,9 @@ async function add_calendar(text) {
   現在時刻は${now}
   `;
   const request_text = add_text + text
+  let purpose = await gemini_request(request_text);
+
+
   /*
    目的の関数を呼び出し
    ここでカレンダーに追加　
@@ -110,8 +128,34 @@ async function add_calendar(text) {
    返す情報【成功したか失敗したか。失敗の場合エラーログをください。どのログがどういう意味なのかのメモを関数に書いておいてください】
    やること【渡す情報の予定をカレンダーに追加する】
   */
-  let purpose = await gemini_request(request_text)
-  console.log("第二解析(カレンダー追加処理)結果：",purpose)
+  console.log("予定追加用JSON:", purpose);
+  let events = [];
+  try {
+  let cleanedText = purpose
+    .replace(/```json\s*/g, '')  // 移除开头的 ```json
+    .replace(/```\s*$/g, '')     // 移除结尾的 ```
+    .trim();
+    events = JSON.parse(cleanedText);
+  }catch (err) {
+    console.error("JSON解析エラー:", err);
+    console.timeEnd("チャット解析処理、第二解析時間：カレンダー追加")
+    console.timeEnd("チャット解析処理、総所要時間")
+    return;
+  }
+  for (const event of events) {
+    const { name, start_time, end_time } = event;
+    try {
+      await SM.addEvent(
+        name,
+         "自動追加された予定です",
+          start_time,
+          end_time,
+          msg => console.log(msg)
+      );
+    } catch (error) {
+      console.error("予定追加エラー:", error);
+    }
+  }
   console.timeEnd("チャット解析処理、第二解析時間：カレンダー追加")
   console.timeEnd("チャット解析処理、総所要時間")
 }
@@ -129,12 +173,13 @@ async function get_calender(text) {
   現在時刻は${now}
   `;
   const request_text = add_text + text
+  let purpose = await gemini_request(request_text)  
   /* 目的の関数を呼び出し 
   ここでカレンダーから取得　
   渡す情報【開始時刻、終了時刻】　
   返す情報【開始時刻から終了時刻の間にある全ての予定が入ったjson。形式は137行目のtask_listを参照。】
   */
-  let purpose = await gemini_request(request_text)
+
   console.log("第二解析(カレンダー取得処理)結果：",purpose)
   console.timeEnd("チャット解析処理、第二解析時間：カレンダー取得")
   console.timeEnd("チャット解析処理、総所要時間")
@@ -220,13 +265,13 @@ async function remove_calendar(text) {
   ユーザー入力:
   `;
   const request_text = add_text + text
+  let purpose = await gemini_request(request_text)
   /* 目的の関数を呼び出し 
   ここでカレンダーから削除　
   渡す情報【タイトル、開始時刻、終了時刻が入った"リスト"(2次元リストなので気を付けて。複数選択されてる可能性あり)】　
   返す情報【成功したか、失敗したか、エラーログ】　
   やること【渡す情報に一致する予定を削除する】
   */　
-  let purpose = await gemini_request(request_text)
   console.log("第三解析(カレンダー削除処理)結果：",purpose)
   console.timeEnd("チャット解析処理、第三解析時間：カレンダー削除")
   console.timeEnd("チャット解析処理、総所要時間")

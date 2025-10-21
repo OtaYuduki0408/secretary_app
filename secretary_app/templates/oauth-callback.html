@@ -7,6 +7,7 @@
 <body>
     <h2>認証処理中...</h2>
     <script>
+        console.log("OAuthコールバック処理を開始します。");
         const hash = window.location.hash.substring(1);
         const params = new URLSearchParams(hash);
         const token = params.get("access_token");
