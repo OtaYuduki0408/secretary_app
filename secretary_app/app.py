@@ -30,9 +30,9 @@ def slot():
 def xin():
     return render_template('index2.html')
 
-@app.route('/oauth-callback2')
+@app.route('/oauth-callback')
 def gen():
-    return render_template('oauth-callback2.html')
+    return render_template('oauth-callback.html')
 
 if __name__ == '__main__':
     app.run(
