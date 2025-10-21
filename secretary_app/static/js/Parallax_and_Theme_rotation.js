@@ -43,29 +43,69 @@ import { check_chat_Space } from '/static/js/ChatSpace.js';
   if (Number.isNaN(currentIdx)) currentIdx = 0;
   applyThemeByIdx(currentIdx);
 
-  /* ===== Commands (Enter) ===== */
-  const input = document.getElementById('searchbox');
-  const BTD_WORDS = ['ヴァイツァダスト','ヴァイツァ・ダスト','バイツァダスト','バイツァ・ダスト','bites the dust','btd'];
-  const norm  = s => (s||'').toString().trim().replace(/[・\s]/g,'').toLowerCase();
-  const isBTD = v => BTD_WORDS.map(norm).includes(norm(v));
-  const isORA = v => {
-    const s = (v||'').toString().trim().replace(/[・\s]/g,'');
-    return /^(?:オラ)+[!！ァぁー〜～]*$/u.test(s) || /^(?:ora)+[!！\-~～]*$/i.test(s);
-  };
-  if (input) {
-    input.addEventListener('keydown', (e) => {
-      if (e.key !== 'Enter') return;
-      const raw = (input.value||'').trim();
-      if (!raw) return;
-      const v = raw.toLowerCase();
-      input.value = '';
+/* ===== Commands (Input / Voice Command) ===== */
+const input = document.getElementById('searchbox');
 
-      if (isBTD(raw))        { startBTDSequence(e); return; } // ← ユーザー操作イベントを渡す
-      if (v === 'transform') { startTransform(); return; }
-      if (isORA(raw))        { startOraOra(); return; }
-      check_chat_Space(v);
-    });
-  }
+// 【定義部分】
+const BTD_WORDS = ['ヴァイツァダスト','ヴァイツァ・ダスト','バイツァダスト','バイツァ・ダスト','bites the dust','btd'];
+const norm  = s => (s||'').toString().trim().replace(/[・\s]/g,'').toLowerCase();
+const isBTD = v => BTD_WORDS.map(norm).includes(norm(v));
+const isORA = v => {
+  const s = (v||'').toString().trim().replace(/[・\s]/g,'');
+  return /^(?:オラ)+[!！ァぁー〜～]*$/u.test(s) || /^(?:ora)+[!！\-~～]*$/i.test(s);
+};
+function startBTDSequence(e) { console.log('BTDシーケンスを開始', e); }
+function startTransform() { console.log('Transformを開始'); }
+function startOraOra() { console.log('オラオラを開始'); }
+function check_chat_Space(v) { console.log('通常検索/チャットを確認:', v); }
+
+if (input) {
+  // ----------------------------------------------------
+  // inputイベントを監視 (値の変更を検出)
+  // ----------------------------------------------------
+  input.addEventListener('input', (e) => {
+    console.log("値変更イベント e=", e); 
+    // 入力値を取得し、前後の空白を削除
+    let raw = (input.value||'').trim();
+    if (!raw) return;
+    const isConfirmed = raw.endsWith(';');
+    // 確定フラグがない場合（入力途中）は、一旦処理を中断
+    if (!isConfirmed) return; 
+    // 確定フラグがある場合、末尾の ; を取り除く
+    raw = raw.slice(0, -1).trim(); 
+    if (!raw) {
+        // もし ; だけが入力された場合は、ここで入力欄をクリアして終了
+        input.value = '';
+        return;
+    }
+    const v = raw.toLowerCase();
+    input.value = ''; // 入力欄をクリア（確定処理後）
+    console.log("入力確定を検知")
+    if (isBTD(raw))        { startBTDSequence(e); return; }
+    if (v === 'transform') { startTransform(); return; }
+    if (isORA(raw))        { startOraOra(); return; }
+    console.log("チャットスペースへ渡す")
+    check_chat_Space(v);
+  });
+
+
+  input.addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter') return;
+      
+      let raw = (input.value || '').trim();
+      if (!raw) return;
+      input.value = '';
+      
+      const v = raw.toLowerCase();
+      // ... コマンド実行ロジック ...
+      if (isBTD(raw)) { startBTDSequence(e); return; } 
+       if (v === 'transform') { startTransform(); return; }
+      if (isORA(raw))        { startOraOra(); return; }
+      
+      // 上記の特殊コマンドに該当しない場合、通常処理へ
+      check_chat_Space(v);
+  });
+}
 
   /* =========================================
      背景BTD（Canvasクロマキー：メイン画面背面→前面表示）

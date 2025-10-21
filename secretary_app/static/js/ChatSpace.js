@@ -103,7 +103,13 @@ async function add_calendar(text) {
   現在時刻は${now}
   `;
   const request_text = add_text + text
-  // 目的の関数を呼び出し
+  /*
+   目的の関数を呼び出し
+   ここでカレンダーに追加　
+   渡す情報【タイトル、開始時刻、終了時刻】 
+   返す情報【成功したか失敗したか。失敗の場合エラーログをください。どのログがどういう意味なのかのメモを関数に書いておいてください】
+   やること【渡す情報の予定をカレンダーに追加する】
+  */
   let purpose = await gemini_request(request_text)
   console.log("第二解析(カレンダー追加処理)結果：",purpose)
   console.timeEnd("チャット解析処理、第二解析時間：カレンダー追加")
@@ -123,7 +129,11 @@ async function get_calender(text) {
   現在時刻は${now}
   `;
   const request_text = add_text + text
-  // 目的の関数を呼び出し
+  /* 目的の関数を呼び出し 
+  ここでカレンダーから取得　
+  渡す情報【開始時刻、終了時刻】　
+  返す情報【開始時刻から終了時刻の間にある全ての予定が入ったjson。形式は137行目のtask_listを参照。】
+  */
   let purpose = await gemini_request(request_text)
   console.log("第二解析(カレンダー取得処理)結果：",purpose)
   console.timeEnd("チャット解析処理、第二解析時間：カレンダー取得")
@@ -204,12 +214,18 @@ async function remove_calendar(text) {
   - start_time（未指定時は当日/推測時刻）
   - end_time（未指定時は開始1日後）
   timeはYYYY-MM-DD HH:MM:SS
-  出力はJSON配列のみ、他テキスト禁止。
+  出力はJSON配列のみ、他テキスト禁止。複数項目があろうが無かろうが2次元リストで返す。
   現在時刻は${now}
   予定一覧:${task_list}
+  ユーザー入力:
   `;
   const request_text = add_text + text
-  // 目的の関数を呼び出し
+  /* 目的の関数を呼び出し 
+  ここでカレンダーから削除　
+  渡す情報【タイトル、開始時刻、終了時刻が入った"リスト"(2次元リストなので気を付けて。複数選択されてる可能性あり)】　
+  返す情報【成功したか、失敗したか、エラーログ】　
+  やること【渡す情報に一致する予定を削除する】
+  */　
   let purpose = await gemini_request(request_text)
   console.log("第三解析(カレンダー削除処理)結果：",purpose)
   console.timeEnd("チャット解析処理、第三解析時間：カレンダー削除")
@@ -292,12 +308,17 @@ async function change_calendar(text) {
   - after_start_time 
   - after_end_time
   timeはYYYY-MM-DD HH:MM:SS
-  出力はJSON配列のみ、他テキスト禁止。
+  出力はJSON配列のみ、他テキスト禁止。単独でも複数あっても２次元リストで返す
   現在時刻は${now}
   予定一覧:${task_list}
   `;
   const request_text = add_text + text
-  // 目的の関数を呼び出し
+  /* 目的の関数を呼び出し 
+  ここでカレンダーの内容を変更　
+  渡す情報【元のタイトル、元の開始時間、元の終了時間、変更するタイトル、変更する開始時刻、変更する終了時刻】　
+  返す情報【成功したか、失敗したか、エラーログ】
+  やること【渡す情報に一致する予定を削除する】
+  */　
   let purpose = await gemini_request(request_text)
   console.log("第三解析(カレンダー変更処理)結果：",purpose)
   console.timeEnd("チャット解析処理、第三解析時間：カレンダー変更")
