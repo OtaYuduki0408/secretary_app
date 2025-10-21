@@ -1,17 +1,21 @@
 // ==============================
-// Google Generative AI SDK
+// ChatSpace.js（完全版 / トースト対応・重複修正）
 // ==============================
+
+// Google Generative AI SDK（ESM）
 import { GoogleGenerativeAI } from 'https://cdn.jsdelivr.net/npm/@google/generative-ai@0.14.1/dist/index.mjs';
 console.log("✅ ChatSpace.js ロード完了");
 
-const apiKey = "AIzaSyCoyPKhnAhlZrekrnOyljxtl4zpo3hTEtc";
+// ※ APIキーは安全な場所から供給してください（例: window.GEMINI_API_KEY）
+//   ここでは既存コード互換のため直接定義もサポートします。
+const apiKey = window.GEMINI_API_KEY || "AIzaSyCoyPKhnAhlZrekrnOyljxtl4zpo3hTEtc";
 if (!apiKey) console.error("APIキーが設定されていません");
 
 const genAI = new GoogleGenerativeAI(apiKey);
 const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
 // ==============================
-// 解析メイン関数（唯一の定義）
+// 解析メイン関数（唯一の公開エクスポート）
 // ==============================
 export async function check_chat_Space(inputValue) {
   fire('analysis:start', { steps: ['目的判定', '詳細抽出', '結果反映'] });
@@ -23,7 +27,7 @@ export async function check_chat_Space(inputValue) {
   // 目的分類
   const add_text = "以下のテキストの目的を分析し、対応する一文字のみで返答してください：C:カレンダー（追加）、R:カレンダー（削除）、G:カレンダー（取得）、M:カレンダー（変更）、I:収入/支出、E:その他";
   const request_text = add_text + inputValue;
-  const purpose = await gemini_request(request_text);
+  const purpose = (await gemini_request(request_text) || "").trim();
   fire('analysis:step', { index: 1, label: '目的判定' });
 
   console.timeEnd("チャット解析処理 第一解析時間");
@@ -31,28 +35,27 @@ export async function check_chat_Space(inputValue) {
   // ==============================
   // 分岐処理
   // ==============================
-  if (purpose == "C") {
+  if (purpose === "C") {
     console.log("解析結果: カレンダー追加 (C)");
     await add_calendar(inputValue);
 
-  } else if (purpose == "R") {
+  } else if (purpose === "R") {
     console.log("解析結果: カレンダー削除 (R)");
-    await remove_calendar(inputValue)
+    await remove_calendar(inputValue);
 
-  } else if (purpose == "G") {
+  } else if (purpose === "G") {
     console.log("解析結果: カレンダー取得 (G)");
-    await get_calender(inputValue)
+    await get_calender(inputValue);
 
-  } else if (purpose == "M") {
+  } else if (purpose === "M") {
     console.log("解析結果: カレンダー変更 (M)");
-    await change_calendar(inputValue)
+    await change_calendar(inputValue);
 
-  } else if (purpose == "I") {
-    await console.log("解析結果: 収支管理 (I)");
+  } else if (purpose === "I") {
+    console.log("解析結果: 収支管理 (I)");
+  }
 
-  } 
   fire('analysis:step', { index: 3, label: '結果反映' });
-
   console.timeEnd("チャット解析処理 総所要時間");
   fire('analysis:end');
 }
@@ -82,11 +85,12 @@ async function gemini_request(text) {
   } catch (error) {
     console.error('テキスト生成中にエラーが発生しました:', error);
     alert('テキスト生成中にエラーが発生しました。詳細はコンソールを確認してください。');
+    return "";
   }
 }
 
 // ==============================
-// カレンダー追加処理
+// カレンダー追加処理（トースト発火対応版）
 // ==============================
 async function add_calendar(text) {
   console.time("チャット解析処理 第二解析時間：カレンダー追加");
@@ -102,19 +106,36 @@ async function add_calendar(text) {
   出力はJSON配列のみ、他テキスト禁止。複数予定時はリスト化。
   現在時刻は${now}
   `;
-  const request_text = add_text + text
-  // 目的の関数を呼び出し
-  let purpose = await gemini_request(request_text)
-  console.log("第二解析(カレンダー追加処理)結果：",purpose)
-  console.timeEnd("チャット解析処理、第二解析時間：カレンダー追加")
-  console.timeEnd("チャット解析処理、総所要時間")
+  const request_text = add_text + text;
+
+  // LLM呼び出し
+  let raw = await gemini_request(request_text);
+  console.log("第二解析(カレンダー追加処理)結果：", raw);
+
+  // 応答文字列 → 配列JSONへ
+  const list = parseCalendarList(raw);
+
+  if (!list.length) {
+    console.warn("予定が抽出できませんでした（parse失敗）:", raw);
+  } else {
+    // ✅ トースト発火（calendar_toast.js が受け取る）
+    window.dispatchEvent(new CustomEvent('calendar:added', { detail: list }));
+
+    // 互換ログ（[CAL]で拾う別の仕組みがあれば）
+    console.log('[CAL]', list);
+  }
+
+  console.timeEnd("チャット解析処理 第二解析時間：カレンダー追加");
 }
 
+// ==============================
+// 予定取得（LLMで期間抽出）
+// ==============================
 async function get_calender(text) {
-  console.time("チャット解析処理、第二解析時間：カレンダー取得")
+  console.time("チャット解析処理、第二解析時間：カレンダー取得");
   const now = new Date();
   let add_text = `
-  目標: ユーザーはカレンダーのstart_timeからend_timeまでに存在する全ての予定を把握しようとしています。start_timeとend_timeを特定してください。削除を求めらえている場合は、削除に必要な情報収集が目的です。ある程度広い範囲(1日程度)を指定してください。
+  目標: ユーザーはカレンダーのstart_timeからend_timeまでに存在する全ての予定を把握しようとしています。start_timeとend_timeを特定してください。削除を求められている場合は、削除に必要な情報収集が目的です。ある程度広い範囲(1日程度)を指定してください。
   抽出必須項目:
   - start_time（未指定時は当日/推測時刻）
   - end_time（未指定時は開始1日後）
@@ -122,80 +143,38 @@ async function get_calender(text) {
   出力はJSON配列のみ、他テキスト禁止。
   現在時刻は${now}
   `;
-  const request_text = add_text + text
-  // 目的の関数を呼び出し
-  let purpose = await gemini_request(request_text)
-  console.log("第二解析(カレンダー取得処理)結果：",purpose)
-  console.timeEnd("チャット解析処理、第二解析時間：カレンダー取得")
-  console.timeEnd("チャット解析処理、総所要時間")
-  return purpose
+  const request_text = add_text + text;
+
+  let purpose = await gemini_request(request_text);
+  console.log("第二解析(カレンダー取得処理)結果：", purpose);
+  console.timeEnd("チャット解析処理、第二解析時間：カレンダー取得");
+  console.timeEnd("チャット解析処理、総所要時間");
+  return purpose;
 }
 
+// ==============================
+// 予定削除（デモ用ダミーリスト入り）
+// ==============================
 async function remove_calendar(text) {
   let task_list = await get_calender(text);
+
+  // デモ用固定データ（必要に応じて実データへ差し替え）
   task_list = [
-  {
-    "name": "起床",
-    "start_time": "2025-10-21 06:10:00",
-    "end_time": "2025-10-21 06:20:00"
-  },
-  {
-    "name": "身支度・朝の準備",
-    "start_time": "2025-10-21 06:20:00",
-    "end_time": "2025-10-21 07:00:00"
-  },
-  {
-    "name": "朝食",
-    "start_time": "2025-10-21 07:00:00",
-    "end_time": "2025-10-21 07:30:00"
-  },
-  {
-    "name": "出勤・登校準備/出発",
-    "start_time": "2025-10-21 07:30:00",
-    "end_time": "2025-10-21 08:30:00"
-  },
-  {
-    "name": "午前中の作業/活動",
-    "start_time": "2025-10-21 09:00:00",
-    "end_time": "2025-10-21 12:00:00"
-  },
-  {
-    "name": "昼食・休憩",
-    "start_time": "2025-10-21 12:00:00",
-    "end_time": "2025-10-21 13:00:00"
-  },
-  {
-    "name": "午後の作業/活動",
-    "start_time": "2025-10-21 13:00:00",
-    "end_time": "2025-10-21 18:00:00"
-  },
-  {
-    "name": "帰宅・夕食の準備",
-    "start_time": "2025-10-21 18:00:00",
-    "end_time": "2025-10-21 19:00:00"
-  },
-  {
-    "name": "夕食",
-    "start_time": "2025-10-21 19:00:00",
-    "end_time": "2025-10-21 20:00:00"
-  },
-  {
-    "name": "自由時間・リラックス",
-    "start_time": "2025-10-21 20:00:00",
-    "end_time": "2025-10-21 22:00:00"
-  },
-  {
-    "name": "就寝準備",
-    "start_time": "2025-10-21 22:00:00",
-    "end_time": "2025-10-21 23:00:00"
-  },
-  {
-    "name": "就寝",
-    "start_time": "2025-10-21 23:00:00",
-    "end_time": "2025-10-21 24:00:00"
-  }
-]
-  console.time("チャット解析処理、第三解析時間：カレンダー削除")
+    { "name": "起床", "start_time": "2025-10-21 06:10:00", "end_time": "2025-10-21 06:20:00" },
+    { "name": "身支度・朝の準備", "start_time": "2025-10-21 06:20:00", "end_time": "2025-10-21 07:00:00" },
+    { "name": "朝食", "start_time": "2025-10-21 07:00:00", "end_time": "2025-10-21 07:30:00" },
+    { "name": "出勤・登校準備/出発", "start_time": "2025-10-21 07:30:00", "end_time": "2025-10-21 08:30:00" },
+    { "name": "午前中の作業/活動", "start_time": "2025-10-21 09:00:00", "end_time": "2025-10-21 12:00:00" },
+    { "name": "昼食・休憩", "start_time": "2025-10-21 12:00:00", "end_time": "2025-10-21 13:00:00" },
+    { "name": "午後の作業/活動", "start_time": "2025-10-21 13:00:00", "end_time": "2025-10-21 18:00:00" },
+    { "name": "帰宅・夕食の準備", "start_time": "2025-10-21 18:00:00", "end_time": "2025-10-21 19:00:00" },
+    { "name": "夕食", "start_time": "2025-10-21 19:00:00", "end_time": "2025-10-21 20:00:00" },
+    { "name": "自由時間・リラックス", "start_time": "2025-10-21 20:00:00", "end_time": "2025-10-21 22:00:00" },
+    { "name": "就寝準備", "start_time": "2025-10-21 22:00:00", "end_time": "2025-10-21 23:00:00" },
+    { "name": "就寝", "start_time": "2025-10-21 23:00:00", "end_time": "2025-10-21 24:00:00" }
+  ];
+
+  console.time("チャット解析処理、第三解析時間：カレンダー削除");
   const now = new Date();
   let add_text = `
   目標: ユーザーはカレンダーから予定を削除しようとしています。以下の「予定一覧」から、ユーザーが削除しようとしている予定を抽出してください。
@@ -206,81 +185,39 @@ async function remove_calendar(text) {
   timeはYYYY-MM-DD HH:MM:SS
   出力はJSON配列のみ、他テキスト禁止。
   現在時刻は${now}
-  予定一覧:${task_list}
+  予定一覧:${JSON.stringify(task_list)}
   `;
-  const request_text = add_text + text
-  // 目的の関数を呼び出し
-  let purpose = await gemini_request(request_text)
-  console.log("第三解析(カレンダー削除処理)結果：",purpose)
-  console.timeEnd("チャット解析処理、第三解析時間：カレンダー削除")
-  console.timeEnd("チャット解析処理、総所要時間")
+  const request_text = add_text + text;
+
+  let purpose = await gemini_request(request_text);
+  console.log("第三解析(カレンダー削除処理)結果：", purpose);
+  console.timeEnd("チャット解析処理、第三解析時間：カレンダー削除");
+  console.timeEnd("チャット解析処理、総所要時間");
 }
 
+// ==============================
+// 予定変更（デモ用ダミーリスト入り）
+// ==============================
 async function change_calendar(text) {
   let task_list = await get_calender(text);
+
+  // デモ用固定データ（文字列JSON）
   task_list = `[
-    {
-      "name": "起床",
-      "start_time": "2025-10-15 06:10:00",
-      "end_time": "2025-10-15 06:20:00"
-    },
-    {
-      "name": "身支度・朝の準備",
-      "start_time": "2025-10-15 06:20:00",
-      "end_time": "2025-10-15 07:00:00"
-    },
-    {
-      "name": "朝食",
-      "start_time": "2025-10-15 07:00:00",
-      "end_time": "2025-10-15 07:30:00"
-    },
-    {
-      "name": "出勤・登校準備/出発",
-      "start_time": "2025-10-15 07:30:00",
-      "end_time": "2025-10-15 08:30:00"
-    },
-    {
-      "name": "午前中の作業/活動",
-      "start_time": "2025-10-15 09:00:00",
-      "end_time": "2025-10-15 12:00:00"
-    },
-    {
-      "name": "昼食・休憩",
-      "start_time": "2025-10-15 12:00:00",
-      "end_time": "2025-10-15 13:00:00"
-    },
-    {
-      "name": "午後の作業/活動",
-      "start_time": "2025-10-15 13:00:00",
-      "end_time": "2025-10-15 18:00:00"
-    },
-    {
-      "name": "帰宅・夕食の準備",
-      "start_time": "2025-10-15 18:00:00",
-      "end_time": "2025-10-15 19:00:00"
-    },
-    {
-      "name": "夕食",
-      "start_time": "2025-10-15 19:00:00",
-      "end_time": "2025-10-15 20:00:00"
-    },
-    {
-      "name": "自由時間・リラックス",
-      "start_time": "2025-10-15 20:00:00",
-      "end_time": "2025-10-15 22:00:00"
-    },
-    {
-      "name": "就寝準備",
-      "start_time": "2025-10-15 22:00:00",
-      "end_time": "2025-10-15 23:00:00"
-    },
-    {
-      "name": "就寝",
-      "start_time": "2025-10-15 23:00:00",
-      "end_time": "2025-10-15 24:00:00"
-    }
-  ]`
-  console.time("チャット解析処理、第三解析時間：カレンダー変更")
+    {"name":"起床","start_time":"2025-10-15 06:10:00","end_time":"2025-10-15 06:20:00"},
+    {"name":"身支度・朝の準備","start_time":"2025-10-15 06:20:00","end_time":"2025-10-15 07:00:00"},
+    {"name":"朝食","start_time":"2025-10-15 07:00:00","end_time":"2025-10-15 07:30:00"},
+    {"name":"出勤・登校準備/出発","start_time":"2025-10-15 07:30:00","end_time":"2025-10-15 08:30:00"},
+    {"name":"午前中の作業/活動","start_time":"2025-10-15 09:00:00","end_time":"2025-10-15 12:00:00"},
+    {"name":"昼食・休憩","start_time":"2025-10-15 12:00:00","end_time":"2025-10-15 13:00:00"},
+    {"name":"午後の作業/活動","start_time":"2025-10-15 13:00:00","end_time":"2025-10-15 18:00:00"},
+    {"name":"帰宅・夕食の準備","start_time":"2025-10-15 18:00:00","end_time":"2025-10-15 19:00:00"},
+    {"name":"夕食","start_time":"2025-10-15 19:00:00","end_time":"2025-10-15 20:00:00"},
+    {"name":"自由時間・リラックス","start_time":"2025-10-15 20:00:00","end_time":"2025-10-15 22:00:00"},
+    {"name":"就寝準備","start_time":"2025-10-15 22:00:00","end_time":"2025-10-15 23:00:00"},
+    {"name":"就寝","start_time":"2025-10-15 23:00:00","end_time":"2025-10-15 24:00:00"}
+  ]`;
+
+  console.time("チャット解析処理、第三解析時間：カレンダー変更");
   const now = new Date();
   let add_text = `
   目標: ユーザーはカレンダーから予定を変更しようとしています。以下の「予定一覧」から、ユーザーが変更しようとしている予定を抽出してください。
@@ -296,12 +233,47 @@ async function change_calendar(text) {
   現在時刻は${now}
   予定一覧:${task_list}
   `;
-  const request_text = add_text + text
-  // 目的の関数を呼び出し
-  let purpose = await gemini_request(request_text)
-  console.log("第三解析(カレンダー変更処理)結果：",purpose)
-  console.timeEnd("チャット解析処理、第三解析時間：カレンダー変更")
-  console.timeEnd("チャット解析処理、総所要時間")
+  const request_text = add_text + text;
+
+  let purpose = await gemini_request(request_text);
+  console.log("第三解析(カレンダー変更処理)結果：", purpose);
+  console.timeEnd("チャット解析処理、第三解析時間：カレンダー変更");
+  console.timeEnd("チャット解析処理、総所要時間");
+}
+
+// ==============================
+// ヘルパー：LLM応答の JSON 抽出 → 配列化（唯一の定義）
+// ==============================
+function parseCalendarList(text) {
+  if (!text) return [];
+
+  // ```json ... ``` ブロック優先
+  const block = text.match(/```json\s*([\s\S]*?)\s*```/i);
+  let s = block ? block[1] : text;
+
+  // 末尾の配列 / オブジェクト抽出（説明文混入対策）
+  const arr = s.match(/\[[\s\S]*\]/);
+  const obj = s.match(/\{[\s\S]*\}/);
+
+  let data = null;
+  try {
+    if (arr) data = JSON.parse(arr[0]);
+    else if (obj) data = JSON.parse(obj[0]);
+    else data = JSON.parse(s);  // 純JSON
+  } catch {
+    return [];
+  }
+
+  const list = Array.isArray(data) ? data : [data];
+
+  // name/start_time/end_time を最低限マップ（欠けは除外）
+  return list
+    .map(x => ({
+      name: x.name ?? x.title ?? x.event ?? '',
+      start_time: x.start_time ?? x.start ?? x.begin ?? x.date ?? '',
+      end_time: x.end_time ?? x.end ?? x.finish ?? x.start_time ?? ''
+    }))
+    .filter(x => x.start_time);
 }
 
 // ==============================

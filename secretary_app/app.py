@@ -34,6 +34,10 @@ def xin():
 def gen():
     return render_template('oauth-callback2.html')
 
+@app.route("/finance")
+def finance():
+    return render_template("finance.html")
+
 if __name__ == '__main__':
     app.run(
         host='127.0.0.1', # ★ ローカルホストからのアクセスに限定
