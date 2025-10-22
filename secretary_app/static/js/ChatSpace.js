@@ -120,6 +120,8 @@ async function add_calendar(text) {
   ユーザー入力:
   `;
   const request_text = add_text + text
+  let raw = await gemini_request(request_text);
+  console.log("第二解析(カレンダー追加処理)結果：", raw);
   /*
    目的の関数を呼び出し
    ここでカレンダーに追加　
@@ -127,8 +129,16 @@ async function add_calendar(text) {
    返す情報【成功したか失敗したか。失敗の場合エラーログをください。どのログがどういう意味なのかのメモを関数に書いておいてください】
    やること【渡す情報の予定をカレンダーに追加する】
   */
-  let purpose = await gemini_request(request_text)
-  console.log("第二解析(カレンダー追加処理)結果：",purpose)
+  const list = parseCalendarList(raw);
+  if (!list.length) {
+    console.warn("予定が抽出できませんでした（parse失敗）:", raw);
+  } else {
+    // ✅ トースト発火（calendar_toast.js が受け取る）
+    window.dispatchEvent(new CustomEvent('calendar:added', { detail: list }));
+
+    // 互換ログ（[CAL]で拾う別の仕組みがあれば）
+    console.log('[CAL]', list);
+  }
   console.timeEnd("チャット解析処理、第二解析時間：カレンダー追加")
   console.timeEnd("チャット解析処理、総所要時間")
 }
