@@ -1,14 +1,17 @@
-from flask import Flask, render_template, jsonify, request
+from flask import Flask, render_template, jsonify, request, redirect, url_for, session
 from services.user_service import (
-    get_all_users, get_user_by_email, add_user, update_user, delete_user
-)
+    get_all_users, get_user_by_email, add_user, update_user, delete_user)
 from services.category_service import (
-    get_all_categories, add_category, delete_category, clear_all_categories
-)
+    get_all_categories, add_category, delete_category, clear_all_categories)
+from services.auth_service import register_user, login_user
+import os
+
 
 app = Flask(__name__,
             template_folder='templates',
             static_folder='static')
+
+app.secret_key = os.getenv("SECRET_KEY", "devsecret")  # セッション用
 
 # --------------------
 # ページルーティング
@@ -36,6 +39,40 @@ def xin():
 @app.route('/oauth-callback2')
 def gen():
     return render_template('oauth-callback2.html')
+
+# 登録ページ
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    if request.method == 'POST':
+        name = request.form['name']
+        email = request.form['email']
+        password = request.form['password']
+        result = register_user(name, email, password)
+        if "error" in result:
+            return render_template('register.html', error=result["error"])
+        return redirect(url_for('login'))
+    return render_template('register.html')
+
+
+# ログインページ
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        email = request.form['email']
+        password = request.form['password']
+        result = login_user(email, password)
+        if "error" in result:
+            return render_template('login.html', error=result["error"])
+        session['user'] = result["user"]
+        return redirect(url_for('main'))
+    return render_template('login.html')
+
+
+# ログアウト
+@app.route('/logout')
+def logout():
+    session.pop('user', None)
+    return redirect(url_for('login'))
 
 # --------------------
 # APIルーティング
