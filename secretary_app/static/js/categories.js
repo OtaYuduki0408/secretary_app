@@ -13,7 +13,7 @@ function escapeHtml(s) {
   }[c]));
 }
 
-// ✅ 1. カテゴリ一覧を取得（Supabaseから）
+// 1. カテゴリ一覧を取得（Supabaseから）
 async function render() {
   const res = await fetch("/api/categories");
   const data = await res.json();
@@ -41,7 +41,7 @@ async function render() {
   });
 }
 
-// ✅ 2. 追加処理（SupabaseへPOST）
+// 2. 追加処理（SupabaseへPOST）
 async function add() {
   const name = (inputEl.value || "").trim();
   if (!name) return;
@@ -63,12 +63,12 @@ async function add() {
   render();
 }
 
-// ✅ 3. 削除処理（個別削除）
+// 3. 削除処理（個別削除）
 async function deleteCategory(id) {
   await fetch(`/api/categories/${id}`, { method: "DELETE" });
 }
 
-// ✅ 4. 全削除処理
+// 4. 全削除処理
 async function clearAll() {
   const res = await fetch("/api/categories");
   const cats = await res.json();
