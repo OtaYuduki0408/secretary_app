@@ -80,9 +80,9 @@ if (input) {
     const v = raw.toLowerCase();
     input.value = ''; // 入力欄をクリア（確定処理後）
     console.log("入力確定を検知")
-    if (isBTD(raw))        { startBTDSequence(e); return; }
-    if (v === 'transform') { startTransform(); return; }
-    if (isORA(raw))        { startOraOra(); return; }
+    if (isBTD(raw))        { startBTDSequence(e); console.log("isBTDを実行"); return; }
+    if (v === 'transform') { startTransform(); console.log("transformを実行"); return; }
+    if (isORA(raw))        { startOraOra(); console.log("isORAを実行"); return; }
     console.log("チャットスペースへ渡す")
     check_chat_Space(v);
   });
@@ -231,6 +231,53 @@ if (input) {
 
     return { playOnceWithGesture, stop };
   })();
+
+  // ===== ヴァイツァダスト全体の流れ =====
+  function startBTDSequence(userEvent){
+    if (document.body.classList.contains('is-transforming')) return;
+    document.body.classList.add('is-transforming');
+
+    const onEnd = () => {
+      document.removeEventListener('btd:end', onEnd);
+      reverseTransformToPrevTheme();
+    };
+    document.addEventListener('btd:end', onEnd, { once:true });
+
+    // ★ ここが肝：Enter キー（ユーザー操作）の同期中に呼ぶ
+    BTD_BG.playOnceWithGesture();
+  }
+
+  // ===== 逆変身アニメ（下→上にガラスが戻る）＋テーマ巻き戻し =====
+  function reverseTransformToPrevTheme(){
+    const host = document.getElementById('shatter');
+    host.innerHTML = '';
+    const cols = 10, rows = 6;
+    for (let y=0; y<rows; y++){
+      for (let x=0; x<cols; x++){
+        const x0=x/cols*100, x1=(x+1)/cols*100, y0=y/rows*100, y1=(y+1)/rows*100;
+        const flip = (x+y)%2===0;
+        const tris = [
+          [[x0,y0],[x1,y0],[flip?x0:x1,y1]],
+          [[x1,y1],[x0,y1],[flip?x1:x0,y0]]
+        ];
+        tris.forEach((pts)=>{
+          const d = document.createElement('div');
+          d.className = 'shard rise';
+          d.style.clipPath = `polygon(${pts.map(p=>p[0]+'% '+p[1]+'%').join(',')})`;
+          d.style.setProperty('--dx', ((Math.random()-0.5)*160)+'px');
+          d.style.setProperty('--dy', (260+Math.random()*420)+'px');
+          d.style.setProperty('--rot', ((Math.random()-0.5)*120)+'deg');
+          d.style.animationDelay = (Math.random()*220)+'ms';
+          d.style.animationDuration = (900+Math.random()*700)+'ms';
+          host.appendChild(d);
+        });
+      }
+    }
+    const prevIdx = (currentIdx - 1 + THEMES.length) % THEMES.length;
+    setTimeout(()=> applyThemeByIdx(prevIdx), 300);
+    setTimeout(()=>{ host.innerHTML = ''; document.body.classList.remove('is-transforming'); }, 2600);
+  }
+
 
   // ===== ヴァイツァダスト全体の流れ =====
   function startBTDSequence(userEvent){

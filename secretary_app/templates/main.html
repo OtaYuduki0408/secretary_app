@@ -8,18 +8,18 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
-
+ 
   <div class="parallax" aria-hidden="true">
     <div id="plx-back"  class="plx-layer back"></div>
     <div id="plx-mid"   class="plx-layer mid"></div>
     <div id="plx-front" class="plx-layer front"></div>
   </div>
-
+ 
   <div class="ui-backdrop" aria-hidden="true"></div>
-
+ 
   <main class="shell">
     <div aria-hidden="true"></div>
-
+ 
     <section aria-label="メイン操作" class="ui-stack">
       <div class="mic-wrap">
         <button class="mic-btn glass" aria-label="音声入力を開始">
@@ -43,11 +43,11 @@
         <input id="searchbox" type="text" inputmode="search" name="search" placeholder="入力" aria-label="入力" />
       </form>
     </section>
-
+ 
     <div aria-hidden="true"></div>
-
+ 
     <button id="authorize-button" class="btn btn-success">Googleログイン</button>
-
+ 
     <div class="fab-group">
       <a class="finance-btn fab" href="/expense" aria-label="収支管理を開く" title="収支管理">
         <svg width="34" height="34" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -56,7 +56,15 @@
           <path d="M9 13h6M9 15h6M12 11v6" stroke="#7aa8ff" stroke-width="1.4" stroke-linecap="round"/>
         </svg>
       </a>
-
+      
+      <a class="stats-btn fab" href="{{ url_for('finance') }}" aria-label="統計ダッシュボードを開く" title="統計">
+        <svg width="34" height="34" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <circle cx="12" cy="12" r="9" fill="#1f2a33" stroke="#a8b6c6" stroke-width="1.2" />
+          <path d="M12 12V6a6 6 0 0 1 6 6h-6Z" fill="#7aa8ff" opacity="0.95" />
+          <path d="M12 12H6a6 6 0 0 0 6 6v-6Z" fill="#7aa8ff" opacity="0.65" />
+        </svg>
+      </a>
+ 
       <button class="calendar-btn fab" aria-label="カレンダーを開く" title="カレンダー">
         <svg width="34" height="34" viewBox="0 0 24 24" fill="none" aria-hidden="true">
           <rect x="3" y="5.5" width="18" height="15" rx="3" fill="#24303a" stroke="#a8b6c6" stroke-width="1.2"/>
@@ -71,54 +79,57 @@
     </div>
   </main>
 
+  <a href="{{ url_for('register') }}">ユーザー登録</a>
+ 
   <div id="ai-indicator" aria-live="polite" style="position:fixed;right:14px;bottom:14px;z-index:14000;display:none;">
-  <div style="min-width:240px;background:#0f172a;border:1px solid #334155;border-radius:12px;padding:12px 14px;box-shadow:0 12px 40px rgba(0,0,0,.45);color:#e5e7eb">
-    <div id="aii-title" style="font-weight:700;margin-bottom:8px">解析中…</div>
-    <div id="aii-steps" style="display:flex;gap:6px;margin-bottom:8px">
-      <span style="flex:1;height:6px;background:#475569;border-radius:999px;opacity:.45"></span>
-      <span style="flex:1;height:6px;background:#475569;border-radius:999px;opacity:.45"></span>
-      <span style="flex:1;height:6px;background:#475569;border-radius:999px;opacity:.45"></span>
+    <div style="min-width:240px;background:#0f172a;border:1px solid #334155;border-radius:12px;padding:12px 14px;box-shadow:0 12px 40px rgba(0,0,0,.45);color:#e5e7eb">
+      <div id="aii-title" style="font-weight:700;margin-bottom:8px">解析中…</div>
+      <div id="aii-steps" style="display:flex;gap:6px;margin-bottom:8px">
+        <span style="flex:1;height:6px;background:#475569;border-radius:999px;opacity:.45"></span>
+        <span style="flex:1;height:6px;background:#475569;border-radius:999px;opacity:.45"></span>
+        <span style="flex:1;height:6px;background:#475569;border-radius:999px;opacity:.45"></span>
+      </div>
+      <div id="aii-label" style="font-size:.92rem;opacity:.85">準備中</div>
     </div>
-    <div id="aii-label" style="font-size:.92rem;opacity:.85">準備中</div>
   </div>
-</div>
-
+ 
 <script type="module">
   // ScheduleManager を明示的にインポートする
   import { ScheduleManager } from './static/js/ScheduleManager.js';
-
+ 
   // 创建全局实例，让其他脚本可以访问
   window.manager = new ScheduleManager();
-
+ 
   const log = (msg) => {
     console.log(msg);
   };
-
+ 
   document.getElementById("authorize-button").addEventListener("click", () => {
     window.manager.handleAuthClick();
   });
-
+ 
   window.receiveAccessToken = (token) => {
     log("Google認証成功!");
     window.manager.setAccessToken(token);
-    
-    // 认证完成后可以在这里添加一些反馈
+   
+    // 認証完了後のフィードバック
     alert("Googleカレンダーにログインしました！");
   };
-
+ 
+// AIインジケータ制御スクリプト (両方に存在)
 (() => {
   const box   = document.getElementById('ai-indicator');
   const title = document.getElementById('aii-title');
   const label = document.getElementById('aii-label');
   const bars  = Array.from(document.querySelectorAll('#aii-steps span'));
   let steps = ['目的判定','詳細抽出','結果反映'];
-
+ 
   function setActive(n){
     bars.forEach((b,i)=> b.style.background = i < n ? '#93c5fd' : '#475569');
     bars.forEach((b,i)=> b.style.opacity = i < n ? '1' : '.45');
     label.textContent = steps[Math.max(0, Math.min(n-1, steps.length-1))] || '処理中';
   }
-
+ 
   document.addEventListener('analysis:start', (e)=>{
     steps = e.detail?.steps || steps;
     title.textContent = '解析中…';
@@ -126,13 +137,13 @@
     setActive(0);
     box.style.display = 'block';
   });
-
+ 
   document.addEventListener('analysis:step', (e)=>{
     const idx = (e.detail?.index|0);
     if (e.detail?.label) steps[idx-1] = e.detail.label;
     setActive(idx);
   });
-
+ 
   document.addEventListener('analysis:end', ()=>{
     setActive(steps.length);
     title.textContent = '完了';
@@ -140,13 +151,12 @@
   });
 })();
 </script>
-
-
-  <div id="jackpot-cameo" aria-hidden="true">
+ 
+<div id="jackpot-cameo" aria-hidden="true">
   <imd="cameo1" src="{{ url_for('static', filename='img/videoframe_79969.png') }}" alt="cameo-1" />
-  <img id="cameo2" src="{{ url_for('static', filename='img/videoframe_86269') }}" alt="cameo-2" />
+  <img id="cameo2" src="{{ url_for('static', filename='img/videoframe_86269.png') }}" alt="cameo-2" />
 </div>
-
+ 
 <div id="slot-overlay" aria-hidden="true">
   <div class="slot-wrap">
     <button id="slot-close" aria-label="閉じる">×</button>
@@ -162,24 +172,26 @@
     <p id="slot-msg" style="min-height:1.6em;margin:.6rem 0 0;color:#cde4ff;"></p>
   </div>
 </div>
-
-
-  <div id="btd" class="btd-overlay" aria-hidden="true" hidden>
+ 
+<div id="btd" class="btd-overlay" aria-hidden="true" hidden>
   <div class="btd-player-frame">
     <div id="btd-player"></div>
   </div>
   <button id="btd-skip" class="btd-skip" aria-label="スキップ">SKIP</button>
 </div>
+ 
+<div id="ora" aria-hidden="true">
+  <img src="{{ url_for('static', filename='img/ora.png') }}" alt="オラオラ！">
+</div>
+ 
+<div id="cracks" aria-hidden="true"></div>
+ 
+<div id="shatter" aria-hidden="true"></div>
 
-
-  <div id="ora" aria-hidden="true">
-    <img src="{{ url_for('static', filename='img/ora.png') }}" alt="オラオラ！">
-  </div>
-
-  <div id="cracks" aria-hidden="true"></div>
-
-  <div id="shatter" aria-hidden="true"></div>
-
-  <script src="{{ url_for('static', filename='js/voice_recognition.js') }}"></script>
-  <script src="{{ url_for('static', filename='js/Parallax_and_Theme_rotation.js') }}" type="module"></script> </body>
+<div id="toast-stack" aria-live="polite" aria-atomic="true"></div>
+ 
+<script src="{{ url_for('static', filename='js/voice_recognition.js') }}"></script>
+<script src="{{ url_for('static', filename='js/Parallax_and_Theme_rotation.js') }}" type="module"></script>
+<script src="{{ url_for('static', filename='js/calendar_toast.js') }}" defer></script>
+</body>
 </html>
