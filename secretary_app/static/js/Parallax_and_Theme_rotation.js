@@ -43,29 +43,68 @@ import { check_chat_Space } from '/static/js/ChatSpace.js';
   if (Number.isNaN(currentIdx)) currentIdx = 0;
   applyThemeByIdx(currentIdx);
 
-  /* ===== Commands (Enter) ===== */
-  const input = document.getElementById('searchbox');
-  const BTD_WORDS = ['ヴァイツァダスト','ヴァイツァ・ダスト','バイツァダスト','バイツァ・ダスト','bites the dust','btd'];
-  const norm  = s => (s||'').toString().trim().replace(/[・\s]/g,'').toLowerCase();
-  const isBTD = v => BTD_WORDS.map(norm).includes(norm(v));
-  const isORA = v => {
-    const s = (v||'').toString().trim().replace(/[・\s]/g,'');
-    return /^(?:オラ)+[!！ァぁー〜～]*$/u.test(s) || /^(?:ora)+[!！\-~～]*$/i.test(s);
-  };
-  if (input) {
-    input.addEventListener('keydown', (e) => {
-      if (e.key !== 'Enter') return;
-      const raw = (input.value||'').trim();
-      if (!raw) return;
-      const v = raw.toLowerCase();
-      input.value = '';
+/* ===== Commands (Input / Voice Command) ===== */
+const input = document.getElementById('searchbox');
 
-      if (isBTD(raw))        { startBTDSequence(e); return; } // ← ユーザー操作イベントを渡す
-      if (v === 'transform') { startTransform(); return; }
-      if (isORA(raw))        { startOraOra(); return; }
-      check_chat_Space(v);
-    });
-  }
+// 【定義部分】
+const BTD_WORDS = ['ヴァイツァダスト','ヴァイツァ・ダスト','バイツァダスト','バイツァ・ダスト','bites the dust','btd'];
+const norm  = s => (s||'').toString().trim().replace(/[・\s]/g,'').toLowerCase();
+const isBTD = v => BTD_WORDS.map(norm).includes(norm(v));
+const isORA = v => {
+  const s = (v||'').toString().trim().replace(/[・\s]/g,'');
+  return /^(?:オラ)+[!！ァぁー〜～]*$/u.test(s) || /^(?:ora)+[!！\-~～]*$/i.test(s);
+};
+function startBTDSequence(e) { console.log('BTDシーケンスを開始', e); }
+function startTransform() { console.log('Transformを開始'); }
+function startOraOra() { console.log('オラオラを開始'); }
+
+if (input) {
+  // ----------------------------------------------------
+  // inputイベントを監視 (値の変更を検出)
+  // ----------------------------------------------------
+  input.addEventListener('input', (e) => {
+    console.log("値変更イベント e=", e); 
+    // 入力値を取得し、前後の空白を削除
+    let raw = (input.value||'').trim();
+    if (!raw) return;
+    const isConfirmed = raw.endsWith(';');
+    // 確定フラグがない場合（入力途中）は、一旦処理を中断
+    if (!isConfirmed) return; 
+    // 確定フラグがある場合、末尾の ; を取り除く
+    raw = raw.slice(0, -1).trim(); 
+    if (!raw) {
+        // もし ; だけが入力された場合は、ここで入力欄をクリアして終了
+        input.value = '';
+        return;
+    }
+    const v = raw.toLowerCase();
+    input.value = ''; // 入力欄をクリア（確定処理後）
+    console.log("入力確定を検知")
+    if (isBTD(raw))        { startBTDSequence(e); console.log("isBTDを実行"); return; }
+    if (v === 'transform') { startTransform(); console.log("transformを実行"); return; }
+    if (isORA(raw))        { startOraOra(); console.log("isORAを実行"); return; }
+    console.log("チャットスペースへ渡す")
+    check_chat_Space(v);
+  });
+
+
+  input.addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter') return;
+      
+      let raw = (input.value || '').trim();
+      if (!raw) return;
+      input.value = '';
+      
+      const v = raw.toLowerCase();
+      // ... コマンド実行ロジック ...
+      if (isBTD(raw)) { startBTDSequence(e); return; } 
+       if (v === 'transform') { startTransform(); return; }
+      if (isORA(raw))        { startOraOra(); return; }
+      
+      // 上記の特殊コマンドに該当しない場合、通常処理へ
+      check_chat_Space(v);
+  });
+}
 
   /* =========================================
      背景BTD（Canvasクロマキー：メイン画面背面→前面表示）
@@ -192,6 +231,53 @@ import { check_chat_Space } from '/static/js/ChatSpace.js';
 
     return { playOnceWithGesture, stop };
   })();
+
+  // ===== ヴァイツァダスト全体の流れ =====
+  function startBTDSequence(userEvent){
+    if (document.body.classList.contains('is-transforming')) return;
+    document.body.classList.add('is-transforming');
+
+    const onEnd = () => {
+      document.removeEventListener('btd:end', onEnd);
+      reverseTransformToPrevTheme();
+    };
+    document.addEventListener('btd:end', onEnd, { once:true });
+
+    // ★ ここが肝：Enter キー（ユーザー操作）の同期中に呼ぶ
+    BTD_BG.playOnceWithGesture();
+  }
+
+  // ===== 逆変身アニメ（下→上にガラスが戻る）＋テーマ巻き戻し =====
+  function reverseTransformToPrevTheme(){
+    const host = document.getElementById('shatter');
+    host.innerHTML = '';
+    const cols = 10, rows = 6;
+    for (let y=0; y<rows; y++){
+      for (let x=0; x<cols; x++){
+        const x0=x/cols*100, x1=(x+1)/cols*100, y0=y/rows*100, y1=(y+1)/rows*100;
+        const flip = (x+y)%2===0;
+        const tris = [
+          [[x0,y0],[x1,y0],[flip?x0:x1,y1]],
+          [[x1,y1],[x0,y1],[flip?x1:x0,y0]]
+        ];
+        tris.forEach((pts)=>{
+          const d = document.createElement('div');
+          d.className = 'shard rise';
+          d.style.clipPath = `polygon(${pts.map(p=>p[0]+'% '+p[1]+'%').join(',')})`;
+          d.style.setProperty('--dx', ((Math.random()-0.5)*160)+'px');
+          d.style.setProperty('--dy', (260+Math.random()*420)+'px');
+          d.style.setProperty('--rot', ((Math.random()-0.5)*120)+'deg');
+          d.style.animationDelay = (Math.random()*220)+'ms';
+          d.style.animationDuration = (900+Math.random()*700)+'ms';
+          host.appendChild(d);
+        });
+      }
+    }
+    const prevIdx = (currentIdx - 1 + THEMES.length) % THEMES.length;
+    setTimeout(()=> applyThemeByIdx(prevIdx), 300);
+    setTimeout(()=>{ host.innerHTML = ''; document.body.classList.remove('is-transforming'); }, 2600);
+  }
+
 
   // ===== ヴァイツァダスト全体の流れ =====
   function startBTDSequence(userEvent){
