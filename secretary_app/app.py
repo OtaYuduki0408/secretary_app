@@ -4,6 +4,7 @@ from services.user_service import (
 from services.category_service import (
     get_all_categories, add_category, delete_category, clear_all_categories)
 from services.auth_service import register_user, login_user
+from services.finance_service import get_finance_summary
 import os
 
 
@@ -32,13 +33,37 @@ def expense():
 def slot():
     return render_template('slot.html')
 
+# **修正済み**：xin の重複解消
 @app.route('/index')
-def xin():
+def index_page():
     return render_template('index2.html')
 
+# **修正済み**：gen の重複解消
 @app.route('/oauth-callback2')
-def gen():
+def oauth_callback2():
     return render_template('oauth-callback2.html')
+
+# **修正済み**：xin の重複解消
+@app.route('/calender')
+def calender_page():
+    return render_template('calender.html')
+
+# **修正済み**：gen の重複解消
+@app.route('/oauth-callback')
+def oauth_callback():
+    return render_template('oauth-callback.html')
+
+@app.route("/finance")
+def finance():
+    # services層から集計済データを取得
+    income_stats, expense_stats = get_finance_summary()
+
+    # テンプレートに渡す
+    return render_template(
+        "finance.html",
+        income_stats=income_stats,
+        expense_stats=expense_stats
+    )
 
 # 登録ページ
 @app.route('/register', methods=['GET', 'POST'])
