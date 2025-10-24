@@ -8,7 +8,11 @@ if defined _OLD_CODEPAGE (
     "%SystemRoot%\System32\chcp.com" 65001 > nul
 )
 
+<<<<<<<< HEAD:secretary_app/.venv/Scripts/activate.bat
 set VIRTUAL_ENV=C:\Users\y_oota\Documents\Graduation_work\secretary_app\.venv
+========
+set VIRTUAL_ENV=C:\secretary_app\secretary_app\venv
+>>>>>>>> main/NAOYA:secretary_app/venv/Scripts/activate.bat
 
 if not defined PROMPT set PROMPT=$P$G
 
