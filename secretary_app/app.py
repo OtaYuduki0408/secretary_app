@@ -26,13 +26,13 @@ def expense():
 def slot():
     return render_template('slot.html')
 
-@app.route('/index')
+@app.route('/calender')
 def xin():
-    return render_template('index2.html')
+    return render_template('calender.html')
 
-@app.route('/oauth-callback2')
+@app.route('/oauth-callback')
 def gen():
-    return render_template('oauth-callback2.html')
+    return render_template('oauth-callback.html')
 
 @app.route("/finance")
 def finance():
