@@ -946,8 +946,6 @@
 }
 .btd-skip:hover{ background:rgba(255,255,255,.18); }
 .btd-overlay.is-leaving{ animation:btd-fade-out .3s ease-in both; }
-<<<<<<< HEAD
-=======
 
 
 /* ======= Mobile (main screen) ======= */
@@ -1021,4 +1019,3 @@
   height: 20px;
   background: url("https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg") no-repeat center/contain;
 }
->>>>>>> main/let'-go-1910
