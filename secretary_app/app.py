@@ -32,20 +32,24 @@ def expense():
 def slot():
     return render_template('slot.html')
 
+# **修正済み**：xin の重複解消
 @app.route('/index')
-def xin():
+def index_page():
     return render_template('index2.html')
 
+# **修正済み**：gen の重複解消
 @app.route('/oauth-callback2')
-def gen():
+def oauth_callback2():
     return render_template('oauth-callback2.html')
 
+# **修正済み**：xin の重複解消
 @app.route('/calender')
-def xin():
+def calender_page():
     return render_template('calender.html')
 
+# **修正済み**：gen の重複解消
 @app.route('/oauth-callback')
-def gen():
+def oauth_callback():
     return render_template('oauth-callback.html')
 
 @app.route("/finance")
@@ -138,4 +142,3 @@ if __name__ == '__main__':
         debug=True,
         ssl_context='adhoc'
     )
-
