@@ -4,6 +4,7 @@ from services.user_service import (
 from services.category_service import (
     get_all_categories, add_category, delete_category, clear_all_categories)
 from services.auth_service import register_user, login_user
+from services.finance_service import get_finance_summary
 import os
 
 
@@ -54,8 +55,15 @@ def oauth_callback():
 
 @app.route("/finance")
 def finance():
-    return render_template("finance.html")
+    # services層から集計済データを取得
+    income_stats, expense_stats = get_finance_summary()
 
+    # テンプレートに渡す
+    return render_template(
+        "finance.html",
+        income_stats=income_stats,
+        expense_stats=expense_stats
+    )
 
 # 登録ページ
 @app.route('/register', methods=['GET', 'POST'])
