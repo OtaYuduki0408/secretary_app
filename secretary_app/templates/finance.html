@@ -1,11 +1,9 @@
-<!-- templates/finance.html -->
 <!DOCTYPE html>
 <html lang="ja">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>収支管理統計</title>
-  <!-- 既存の finance.css を読み込む -->
   <link rel="stylesheet" href="{{ url_for('static', filename='css/finance.css') }}">
 </head>
 <body>
@@ -58,11 +56,14 @@
     <!-- グラフ -->
     <section class="fd-section">
       <h2 class="fd-title">グラフ</h2>
-      <div class="fd-charts">
-        <canvas id="pieChart" class="fd-chart"></canvas>
-        <canvas id="lineChart" class="fd-chart"></canvas>
-        <canvas id="cumulativeChart" class="fd-chart"></canvas>
+      <div 
+        id="finance-data"
+        data-income='{{ income_stats | tojson | safe }}'
+        data-expense='{{ expense_stats | tojson | safe }}'>
       </div>
+
+      <canvas id="incomeChart" width="400" height="200"></canvas>
+      <canvas id="expenseChart" width="400" height="200"></canvas>
     </section>
 
     <!-- アチーブメント -->
@@ -94,8 +95,7 @@
     </section>
   </div>
 
-  <!-- JS は </body> の直前で読み込む -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="{{ url_for('static', filename='js/finance.js') }}" defer></script>
+  <!-- 外部JS -->
+  <script src="{{ url_for('static', filename='js/finance.js') }}"></script>
 </body>
 </html>
