@@ -299,7 +299,7 @@ async function get_calender(text, isSilent = false) {
   - start_time
   - end_time
   timeはYYYY-MM-DD HH:MM:SS
-  出力はJSON配列のみ、1日単位、他テキスト禁止。
+  出力はJSON配列のみ、最小範囲は1日、最大範囲は半年で、一つの辞書で渡して。他テキスト禁止。
   現在時刻は${now}
   ユーザー入力:
   `;
