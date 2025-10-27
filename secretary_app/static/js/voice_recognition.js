@@ -17,7 +17,6 @@ document.addEventListener('DOMContentLoaded', () => {
         return; // サポートされていない場合は以降の処理を中断
     }
 
-    
     // ----------------------------------------------------------------------
     // 2. 音声認識オブジェクトの初期化
     // ----------------------------------------------------------------------
@@ -25,7 +24,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // 言語設定を日本語に
     recognition.lang = 'ja-JP';
-    // 【変更点】連続認識をOFFに設定。発話完了（一定の無音時間）で自動的に終了する。
+    // 連続認識をOFFに設定。発話完了（一定の無音時間）で自動的に終了する。
     recognition.continuous = false;
     // 中間的な結果 (in-flight text) も表示する
     recognition.interimResults = true;
@@ -44,13 +43,16 @@ document.addEventListener('DOMContentLoaded', () => {
     recognition.onresult = (event) => {
         let interimTranscript = ''; // 中間的な認識結果
         let finalTranscript = '';   // 確定した認識結果
+        let hasFinalResult = false; // 確定結果があったかどうかのフラグ
 
         // イベント結果をループして、中間結果と確定結果を分ける
         for (let i = event.resultIndex; i < event.results.length; i++) {
             const transcript = event.results[i][0].transcript;
             if (event.results[i].isFinal) {
                 // 確定した結果 (句読点や最終的な単語の修正後)
-                finalTranscript += transcript;
+                // 【✅ 修正点1】確定結果の末尾に確定シグナルの「;」を付与します。
+                finalTranscript += transcript + ';'; 
+                hasFinalResult = true;
             } else {
                 // 中間的な結果 (まだ変化する可能性のあるテキスト)
                 interimTranscript += transcript;
@@ -58,14 +60,24 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         // searchboxの内容を更新
-        searchBox.value = finalTranscript + interimTranscript;
+        // 確定結果があればそれを優先し、なければ中間結果を表示
+        searchBox.value = finalTranscript + interimTranscript; 
+
+        // 【✅ 修正点2】スクリプトによる値の変更後、手動で input イベントを発火させる
+        // これにより、外部のコマンド処理リスナーが触発されます。
+        searchBox.dispatchEvent(new Event('input', { bubbles: true }));
+
+        // 確定結果が挿入された場合、認識を停止します (continuous: false のため onend が発火)
+        if (hasFinalResult) {
+            recognition.stop();
+        }
     };
 
     /**
      * 認識が終了した時 (continuous: false の場合は、発話完了または手動停止で停止した時)
      */
     recognition.onend = () => {
-        // 【変更点】continuous = false のため、自動再起動のロジックを削除
+        // continuous = false のため、自動再起動のロジックを削除
         isRecognizing = false;
         console.log("認識処理が停止しました (発話完了または手動停止)。");
         micButton.classList.remove('active');

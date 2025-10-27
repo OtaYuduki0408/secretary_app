@@ -442,3 +442,42 @@ body.no-scroll{ overflow:hidden; }
   .fd-badges  { grid-template-columns: 1fr 1fr; }
   #settingsForm.fd-form { grid-template-columns: 1fr; }
 }
+
+/* ======= Mobile (finance dashboard) ======= */
+
+/* 共通押しやすさ */
+@media (max-width: 900px){
+  .fd-input, .fd-select, #settingsForm.fd-form button { min-height: 44px; font-size: 16px; }
+}
+
+/* タブレット以下：段組み調整 */
+@media (max-width: 920px){
+  .fd-wrap{ padding: 0 16px; margin: 24px auto; }
+  .fd-summary{ grid-template-columns: 1fr; }
+  .fd-charts{ grid-template-columns: 1fr; }
+  .fd-badges{ grid-template-columns: 1fr 1fr; }
+  #settingsForm.fd-form{ grid-template-columns: 1fr; }
+}
+
+/* スマホ：ヘッダー戻るボタン・テーブル・カードサイズ */
+@media (max-width: 680px){
+  .fd-title{ font-size: 1.1rem; }
+
+  /* テーブルは横スクロール可能に */
+  #financeTable{ display:block; overflow-x:auto; -webkit-overflow-scrolling: touch; }
+  #financeTable table{ width: 720px; } /* 列が折れず横スクロール */
+
+  .fd-kpi{ padding: 14px; }
+  .fd-kpi .fd-num{ font-size: 1.6rem; }
+
+  .fd-chart{ height: 240px; }
+
+  /* 検索UIは1列で */
+  .fd-controls{ gap: 8px; }
+  .fd-input, .fd-select{ min-width: unset; width: 100%; }
+}
+
+/* 極小端末 */
+@media (max-width: 360px){
+  .fd-badges{ grid-template-columns: 1fr; }
+}
