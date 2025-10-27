@@ -120,3 +120,33 @@ html,body{margin:0;background:#101010;font-family:Inter,system-ui,"Segoe UI",Rob
 
 /* 画像のインライン隙間対策（既に display:block なら不要） */
 .reel img { display:block; }
+
+/* ======= Mobile (slot overlay) ======= */
+
+@media (max-width: 900px){
+  #slot-overlay .slot-wrap{
+    width: min(92vw, 520px);
+    padding: 16px;
+    border-radius: 16px;
+  }
+  .slot-title{ font-size: clamp(18px, 5vw, 22px); }
+
+  .reels{ gap: 8px; }
+  .reel{ width: 28%; }
+  .reel .cell{
+    font-size: clamp(28px, 10vw, 40px);
+    padding: 12px 0;
+  }
+
+  .slot-controls{ gap: 10px; }
+  .slot-controls button{
+    min-height: 44px; font-size: 16px; padding: 10px 14px; width: 100%;
+  }
+}
+
+/* iOS安全領域下部に余白 */
+@supports (padding: max(0px)){
+  @media (max-width: 680px){
+    #slot-overlay .slot-wrap{ padding-bottom: max(16px, env(safe-area-inset-bottom)); }
+  }
+}
