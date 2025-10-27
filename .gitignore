@@ -1,1 +1,3 @@
 /github_tokens.txt
+# 仮想環境 (Virtual Environment) を無視
+venv/
