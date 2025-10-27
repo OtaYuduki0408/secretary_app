@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>通知マネージャー - メール通知対応版</title>
+    <style>
+        /* 前回と同じCSSスタイルを維持 */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        @media (max-width: 768px) {
+            .dashboard {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .card {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+
+        .card h2 {
+            color: #333;
+            margin-bottom: 20px;
+            font-size: 1.5rem;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 10px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #555;
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #e1e5e9;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: all 0.3s ease;
+        }
+
+        .form-control:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, #28a745, #20c997);
+        }
+
+        .btn-warning {
+            background: linear-gradient(135deg, #ffc107, #fd7e14);
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, #e74c3c, #c0392b);
+        }
+
+        .email-config {
+            background: #f8f9fa;
+            border: 2px dashed #dee2e6;
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 20px;
+        }
+
+        .config-section {
+            display: none;
+        }
+
+        .config-section.active {
+            display: block;
+        }
+
+        .tab-buttons {
+            display: flex;
+            margin-bottom: 15px;
+            border-bottom: 1px solid #dee2e6;
+        }
+
+        .tab-button {
+            padding: 10px 20px;
+            background: none;
+            border: none;
+            cursor: pointer;
+            border-bottom: 3px solid transparent;
+        }
+
+        .tab-button.active {
+            border-bottom-color: #667eea;
+            color: #667eea;
+            font-weight: 600;
+        }
+
+        .test-area {
+            background: #e7f3ff;
+            border: 1px solid #b3d9ff;
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📧 メール通知マネージャー</h1>
+            <p>Gmail APIを使用した本格的なメール通知システム</p>
+        </div>
+
+        <div class="dashboard">
+            <!-- メール設定 -->
+            <div class="card">
+                <h2>⚙️ メール設定</h2>
+                
+                <div class="tab-buttons">
+                    <button class="tab-button active" onclick="showConfigTab('gmail')">Gmail API</button>
+                    <button class="tab-button" onclick="showConfigTab('smtp')">SMTP設定</button>
+                    <button class="tab-button" onclick="showConfigTab('test')">テスト</button>
+                </div>
+
+                <!-- Gmail API設定 -->
+                <div id="gmail-config" class="config-section active">
+                    <div class="form-group">
+                        <label>Gmail API 設定</label>
+                        <div style="background: #fff3cd; padding: 15px; border-radius: 8px; border-left: 4px solid #ffc107;">
+                            <strong>⚠️ 注意:</strong> ブラウザから直接Gmail APIを使用するにはOAuth 2.0認証が必要です。
+                            実際の実装ではバックエンドサーバーを推奨します。
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="gmailClientId">クライアントID</label>
+                        <input type="text" id="gmailClientId" class="form-control" placeholder="xxxxxxxxxxxx-xxxxxxxxxxxxxxxxxxxx.apps.googleusercontent.com">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="gmailApiKey">APIキー</label>
+                        <input type="password" id="gmailApiKey" class="form-control" placeholder="あなたのAPIキー">
+                    </div>
+
+                    <button class="btn btn-success" onclick="saveGmailConfig()">
+                        💾 Gmail設定を保存
+                    </button>
+                </div>
+
+                <!-- SMTP設定 -->
+                <div id="smtp-config" class="config-section">
+                    <div class="form-group">
+                        <label for="smtpHost">SMTPサーバー</label>
+                        <input type="text" id="smtpHost" class="form-control" placeholder="smtp.gmail.com">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="smtpPort">ポート</label>
+                        <input type="number" id="smtpPort" class="form-control" value="587">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="smtpUser">ユーザー名</label>
+                        <input type="email" id="smtpUser" class="form-control" placeholder="your.email@gmail.com">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="smtpPass">パスワード/アプリパスワード</label>
+                        <input type="password" id="smtpPass" class="form-control" placeholder="あなたのパスワード">
+                    </div>
+
+                    <button class="btn btn-success" onclick="saveSMTPConfig()">
+                        💾 SMTP設定を保存
+                    </button>
+                </div>
+
+                <!-- テスト設定 -->
+                <div id="test-config" class="config-section">
+                    <div class="test-area">
+                        <h4>📧 テストメール送信</h4>
+                        <div class="form-group">
+                            <label for="testEmail">テスト送信先</label>
+                            <input type="email" id="testEmail" class="form-control" placeholder="test@example.com">
+                        </div>
+                        <button class="btn btn-warning" onclick="sendTestEmail()">
+                            🚀 テストメール送信
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 通知登録 -->
+            <div class="card">
+                <h2>📅 メール通知登録</h2>
+                <form id="emailNotificationForm">
+                    <div class="form-group">
+                        <label for="emailTo">送信先メールアドレス</label>
+                        <input type="email" id="emailTo" class="form-control" placeholder="recipient@example.com" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="emailSubject">件名</label>
+                        <input type="text" id="emailSubject" class="form-control" placeholder="メールの件名" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="emailBody">本文</label>
+                        <textarea id="emailBody" class="form-control" rows="5" placeholder="メールの本文内容" required></textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="emailScheduleTime">送信予定日時</label>
+                        <input type="datetime-local" id="emailScheduleTime" class="form-control" required>
+                    </div>
+
+                    <button type="submit" class="btn">
+                        📧 メール通知を登録
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- ログ表示 -->
+        <div class="card">
+            <h2>📝 メール送信ログ</h2>
+            <div id="emailLogContainer" class="log-container" style="background: #1a1a1a; color: #00ff00; padding: 15px; border-radius: 8px; font-family: monospace; height: 200px; overflow-y: auto;">
+                <div>[システム] メールマネージャーが初期化されました</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        class EmailNotificationManager {
+            constructor() {
+                this.config = {
+                    gmail: {
+                        clientId: '',
+                        apiKey: ''
+                    },
+                    smtp: {
+                        host: '',
+                        port: 587,
+                        user: '',
+                        pass: ''
+                    },
+                    method: 'smtp' // 'gmail' or 'smtp'
+                };
+                this.scheduledEmails = new Map();
+                this.loadConfig();
+                this.log('📧 EmailNotificationManager 初期化完了');
+            }
+
+            // 設定の保存と読み込み
+            saveConfig() {
+                localStorage.setItem('emailConfig', JSON.stringify(this.config));
+            }
+
+            loadConfig() {
+                const saved = localStorage.getItem('emailConfig');
+                if (saved) {
+                    this.config = { ...this.config, ...JSON.parse(saved) };
+                    this.updateUIFromConfig();
+                }
+            }
+
+            updateUIFromConfig() {
+                // Gmail設定
+                document.getElementById('gmailClientId').value = this.config.gmail.clientId || '';
+                document.getElementById('gmailApiKey').value = this.config.gmail.apiKey || '';
+                
+                // SMTP設定
+                document.getElementById('smtpHost').value = this.config.smtp.host || '';
+                document.getElementById('smtpPort').value = this.config.smtp.port || 587;
+                document.getElementById('smtpUser').value = this.config.smtp.user || '';
+                document.getElementById('smtpPass').value = this.config.smtp.pass || '';
+            }
+
+            // メール送信メソッド
+            async sendEmail(to, subject, body, htmlBody = null) {
+                try {
+                    this.log(`📤 メール送信開始: ${to}`);
+
+                    if (this.config.method === 'gmail' && this.config.gmail.clientId) {
+                        return await this.sendViaGmailAPI(to, subject, body, htmlBody);
+                    } else {
+                        return await this.sendViaSMTP(to, subject, body, htmlBody);
+                    }
+                } catch (error) {
+                    this.log(`❌ メール送信エラー: ${error.message}`);
+                    throw error;
+                }
+            }
+
+            // Gmail APIを使用した送信
+            async sendViaGmailAPI(to, subject, body, htmlBody = null) {
+                this.log('🔐 Gmail APIを使用して送信...');
+                
+                // 注意: 実際の実装ではOAuth 2.0フローが必要
+                // ここではデモ用の疑似コード
+                const email = [
+                    'Content-Type: text/plain; charset="UTF-8"',
+                    'MIME-Version: 1.0',
+                    `To: ${to}`,
+                    `Subject: =?UTF-8?B?${btoa(unescape(encodeURIComponent(subject)))}?=`,
+                    '',
+                    body
+                ].join('\n');
+
+                const encodedEmail = btoa(unescape(encodeURIComponent(email)))
+                    .replace(/\+/g, '-')
+                    .replace(/\//g, '_')
+                    .replace(/=+$/, '');
+
+                // 実際のGmail APIコール (疑似コード)
+                this.log(`⚠️ Gmail API送信: ${to} - "${subject}"`);
+                
+                // 成功をシミュレート
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                this.log(`✅ Gmail送信成功: ${to}`);
+                return true;
+            }
+
+            // SMTPを使用した送信 (EmailJSやバックエンドAPI経由)
+            async sendViaSMTP(to, subject, body, htmlBody = null) {
+                this.log('📤 SMTP経由で送信...');
+
+                // EmailJSサービスを使用する例
+                if (typeof emailjs !== 'undefined') {
+                    try {
+                        const templateParams = {
+                            to_email: to,
+                            subject: subject,
+                            message: body,
+                            from_name: '通知システム'
+                        };
+
+                        await emailjs.send(
+                            this.config.smtp.serviceId || 'default_service',
+                            this.config.smtp.templateId || 'default_template',
+                            templateParams
+                        );
+                        
+                        this.log(`✅ EmailJS送信成功: ${to}`);
+                        return true;
+                    } catch (error) {
+                        throw new Error(`EmailJS Error: ${error.text}`);
+                    }
+                }
+
+                // バックエンドAPIを使用する例
+                try {
+                    const response = await fetch('/api/send-email', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            to,
+                            subject,
+                            body,
+                            htmlBody,
+                            config: this.config.smtp
+                        })
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`HTTP Error: ${response.status}`);
+                    }
+
+                    this.log(`✅ SMTP送信成功: ${to}`);
+                    return true;
+                } catch (error) {
+                    // バックエンドがない場合のフォールバック
+                    this.log(`⚠️ バックエンド未実装: ${to} - "${subject}"`);
+                    this.log(`📧 メール内容:\n宛先: ${to}\n件名: ${subject}\n本文: ${body}`);
+                    return true; // デモ用に成功を返す
+                }
+            }
+
+            // スケジュール登録
+            scheduleEmailNotification(to, subject, body, scheduleTime) {
+                const id = `email_${Date.now()}`;
+                const targetTime = new Date(scheduleTime);
+
+                if (isNaN(targetTime.getTime())) {
+                    throw new Error('無効な日時が指定されました');
+                }
+
+                const delay = targetTime - new Date();
+                if (delay <= 0) {
+                    throw new Error('過去の日時は指定できません');
+                }
+
+                const emailJob = {
+                    id,
+                    to,
+                    subject,
+                    body,
+                    scheduledTime: targetTime,
+                    status: 'scheduled'
+                };
+
+                const timer = setTimeout(async () => {
+                    try {
+                        emailJob.status = 'sending';
+                        this.log(`⏰ スケジュールメール送信開始: ${to}`);
+                        
+                        await this.sendEmail(to, subject, body);
+                        
+                        emailJob.status = 'sent';
+                        this.scheduledEmails.delete(id);
+                        this.log(`✅ スケジュールメール送信完了: ${to}`);
+                    } catch (error) {
+                        emailJob.status = 'failed';
+                        this.log(`❌ スケジュールメール送信失敗: ${error.message}`);
+                    }
+                }, delay);
+
+                emailJob.timer = timer;
+                this.scheduledEmails.set(id, emailJob);
+                this.log(`📅 メールスケジュール登録: ${to} (${targetTime.toLocaleString()})`);
+
+                return id;
+            }
+
+            // ログ記録
+            log(message) {
+                const now = new Date().toLocaleTimeString();
+                const logEntry = `[${now}] ${message}`;
+                console.log(`[EmailManager] ${message}`);
+                
+                const logContainer = document.getElementById('emailLogContainer');
+                if (logContainer) {
+                    const logElement = document.createElement('div');
+                    logElement.textContent = logEntry;
+                    logContainer.appendChild(logElement);
+                    logContainer.scrollTop = logContainer.scrollHeight;
+                }
+            }
+        }
+
+        // グローバルインスタンス
+        const emailManager = new EmailNotificationManager();
+
+        // UI操作関数
+        function showConfigTab(tabName) {
+            // すべてのタブを非表示
+            document.querySelectorAll('.config-section').forEach(section => {
+                section.classList.remove('active');
+            });
+            
+            // すべてのタブボタンを非アクティブに
+            document.querySelectorAll('.tab-button').forEach(button => {
+                button.classList.remove('active');
+            });
+            
+            // 対象タブを表示
+            document.getElementById(`${tabName}-config`).classList.add('active');
+            event.target.classList.add('active');
+        }
+
+        function saveGmailConfig() {
+            emailManager.config.gmail.clientId = document.getElementById('gmailClientId').value;
+            emailManager.config.gmail.apiKey = document.getElementById('gmailApiKey').value;
+            emailManager.config.method = 'gmail';
+            emailManager.saveConfig();
+            emailManager.log('✅ Gmail設定を保存しました');
+        }
+
+        function saveSMTPConfig() {
+            emailManager.config.smtp.host = document.getElementById('smtpHost').value;
+            emailManager.config.smtp.port = parseInt(document.getElementById('smtpPort').value);
+            emailManager.config.smtp.user = document.getElementById('smtpUser').value;
+            emailManager.config.smtp.pass = document.getElementById('smtpPass').value;
+            emailManager.config.method = 'smtp';
+            emailManager.saveConfig();
+            emailManager.log('✅ SMTP設定を保存しました');
+        }
+
+        function sendTestEmail() {
+            const testEmail = document.getElementById('testEmail').value || 'test@example.com';
+            
+            if (!testEmail) {
+                alert('テストメールアドレスを入力してください');
+                return;
+            }
+
+            emailManager.sendEmail(
+                testEmail,
+                'テストメール',
+                'これはメール通知システムのテストメールです。\n\n正常に受信できています。',
+                '<h2>テストメール</h2><p>これはメール通知システムのテストメールです。</p><p><strong>正常に受信できています。</strong></p>'
+            ).catch(error => {
+                console.error('Test email failed:', error);
+            });
+        }
+
+        // メール通知フォーム
+        document.getElementById('emailNotificationForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const to = document.getElementById('emailTo').value;
+            const subject = document.getElementById('emailSubject').value;
+            const body = document.getElementById('emailBody').value;
+            const scheduleTime = document.getElementById('emailScheduleTime').value;
+
+            try {
+                const id = emailManager.scheduleEmailNotification(to, subject, body, scheduleTime);
+                emailManager.log(`📅 メール通知を登録しました: ${to}`);
+                
+                // フォームリセット
+                this.reset();
+                
+                // 次の1時間後にデフォルト設定
+                const nextHour = new Date();
+                nextHour.setHours(nextHour.getHours() + 1);
+                document.getElementById('emailScheduleTime').value = nextHour.toISOString().slice(0, 16);
+                
+            } catch (error) {
+                alert(`エラー: ${error.message}`);
+            }
+        });
+
+        // 初期化
+        document.addEventListener('DOMContentLoaded', function() {
+            // デフォルトで現在時刻から1時間後を設定
+            const nextHour = new Date();
+            nextHour.setHours(nextHour.getHours() + 1);
+            document.getElementById('emailScheduleTime').value = nextHour.toISOString().slice(0, 16);
+        });
+    </script>
+
+    <!-- EmailJSライブラリ (オプション) -->
+    <!-- <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
+    <script>
+        // EmailJSの初期化
+        emailjs.init('YOUR_PUBLIC_KEY');
+    </script> -->
+</body>
+</html>

@@ -51,6 +51,10 @@ def oauth_callback():
 def finance():
     return render_template("finance.html")
 
+@app.route("/nm")
+def nm():
+    return render_template("notification_test.html")
+
 
 # 登録ページ
 @app.route('/register', methods=['GET', 'POST'])
