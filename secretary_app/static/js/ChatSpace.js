@@ -95,10 +95,18 @@ function parseCalendarList(text) {
 
 /** Gemini API 呼び出し */
 async function gemini_request(text) {
+  const timeoutPromise = new Promise((_, reject) =>
+    setTimeout(() => reject(new Error('timeout')), 10000) // 10秒でタイムアウト
+  );
+
   try {
-    console.time("gemini応答時間")
-    const result = await model.generateContent(text);
-    //トークン数の取得
+    console.time("gemini応答時間");
+    const resultPromise = model.generateContent(text);
+    
+    // API呼び出しとタイムアウトを競わせる
+    const result = await Promise.race([resultPromise, timeoutPromise]);
+
+    // トークン数の取得
     try {
       const token_response = await model.countTokens({
         contents: [{ role: "user", parts: [{ text }] }]
@@ -107,14 +115,21 @@ async function gemini_request(text) {
     } catch (e) {
       console.warn("トークン数のカウントに失敗:", e);
     }
+    
     const response_text = result.response.text();
     console.log(response_text);
-    console.timeEnd("gemini応答時間")
+    console.timeEnd("gemini応答時間");
     return response_text;
   } catch (error) {
-    console.error('Geminiリクエストエラー:', error);
-    alert('AI応答取得中にエラーが発生しました。');
-    return "";
+    console.timeEnd("gemini応答時間"); // エラー時もタイマーを終了
+    if (error.message === 'timeout') {
+      console.error('Gemini APIが10秒以内に応答しませんでした。');
+      // reader.speakを使って音声で通知することも可能
+      reader.speak('AIの応答がタイムアウトしました。');
+    } else {
+      console.error('Geminiリクエストエラー:', error);
+    }
+    return ""; // エラー時は空文字列を返す
   }
 }
 
@@ -138,7 +153,7 @@ export async function check_chat_Space(inputValue) {
   
   // 目的分類 (第一解析) - ChatSpace.jsのプロンプトを採用
   const purpose_prompt = `以下のテキストの目的を分析し、対応する機能を大文字、対応する行動を小文字で返してください。
-                          命令を実現できる機能がない場合、機能を使わず、最適と思われる解答をしてください。
+                          命令を実現できる機能がない場合、機能を使わず、最適と思われる解答をしてください。その場合、返答は最大50文字以内にしてください。
                           -機能-
                           C:カレンダー
                           I:収支管理
@@ -299,7 +314,7 @@ async function get_calender(text, isSilent = false) {
   - start_time
   - end_time
   timeはYYYY-MM-DD HH:MM:SS
-  出力はJSON配列のみ、1日単位、他テキスト禁止。
+  出力はJSON配列のみ、最小範囲は1日、最大範囲は半年で、一つの辞書で渡して。他テキスト禁止。
   現在時刻は${now}
   ユーザー入力:
   `;
