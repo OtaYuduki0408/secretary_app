@@ -1,6 +1,6 @@
 const clientId = "964406409299-dd8g3vumtmeuaht9tmq9f5l21otetfn7.apps.googleusercontent.com";
 const apiKey = "AIzaSyDUqgdhLHjWeTqrwYLr2LItsU3C7GYYCDI";
-const redirectUri = "https://127.0.0.1:5000/oauth-callback";
+const redirectUri = `${window.location.origin}/oauth-callback`;
 
 export class ScheduleManager {
     constructor() {

@@ -1019,3 +1019,63 @@
   height: 20px;
   background: url("https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg") no-repeat center/contain;
 }
+
+
+.spotify-btn{
+	 background: linear-gradient(180deg, #1db954, #1ed760); /* Spotify Green */
+	 color: #fff;
+	 border-color: rgba(255,255,255,.2);
+}
+.spotify-btn:hover{
+	 transform: translateY(-2px);
+	 box-shadow: 0 18px 34px rgba(0,0,0,.65), var(--inset);
+}
+.spotify-btn svg{
+	 filter: drop-shadow(0 2px 8px rgba(30,215,96,.55)); /* 緑色の輝き */
+}
+/* Lightテーマ対応 (もし必要であれば追加) */
+html.theme-light .spotify-btn{
+	 background: linear-gradient(180deg, #1db954, #1ed760);
+	 color:#fff;
+	 border-color: rgba(0,0,0,.15);
+	 box-shadow: 0 10px 22px rgba(0,0,0,.15), inset 0 1px 0 rgba(255,255,255,.3);
+}
+html.theme-light .spotify-btn svg{
+	 /* 白いアイコンの場合、フィルターを削除または変更 */
+	 filter: none; 
+}
+
+:root{
+	 --bg-1:#0b1116;
+	 --bg-2:#0f141a;
+	 --panel:#1c232a;
+	 --panel-2:#171d23;
+	 --text:#f4f7fb;
+	 --muted:#cdd6df;
+	 --accent:#66a3ff;
+	 --ring:#7aa8ff;
+	 --shadow: 0 10px 30px rgba(0,0,0,.35);
+	 --inset: inset 0 1px 0 rgba(255,255,255,.05), inset 0 -1px 0 rgba(0,0,0,.4);
+	 --radius: 18px;
+	 --wallpaper:none;
+	 --wallpaper-darken: rgba(0,0,0,.62);
+	 --mx: 0px;
+	 --my: 0px;
+}
+ html.theme-light{
+	 --bg-1:#f7f9fc;
+	 --bg-2:#eef2f7;
+	 --text:#0d1117;
+	 --muted:#4b5563;
+	 --wallpaper-darken: rgba(255,255,255,0);
+	 --accent:#3b82f6;
+}
+ html.theme-purple{
+	 --accent:#c084fc;
+}
+ html.theme-blue {
+	 --accent:#50a8d4;
+}
+
+/* 既存の .toast に追加でOK */
+.toast[hidden] { display: none !important; }
