@@ -12,9 +12,16 @@
         const params = new URLSearchParams(hash);
         const token = params.get("access_token");
  
-        if (token && window.opener && window.opener.receiveAccessToken) {
-            window.opener.receiveAccessToken(token);
-            window.close();
+        if (token && window.opener) {
+            if (window.opener.receiveAccessToken) {
+            window.opener.receiveAccessToken(token); 
+        } else {
+            window.opener.postMessage({
+                type: 'oauth_token',
+                token: token
+            }, '*');
+        }
+        window.close();
         } else {
             document.body.innerHTML = "<p>認証に失敗しました。</p>";
             console.error("アクセストークンが取得できませんでした。");
