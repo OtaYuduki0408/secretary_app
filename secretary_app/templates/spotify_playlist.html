@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Playlist | {{ playlist.name }}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <style>
+    .pl-shell{max-width:980px;width:95%;margin:24px auto;min-height:calc(100vh - 48px);padding:96px 0 120px;}
+    .pl-header{display:flex;gap:18px;align-items:center;padding:18px;border-radius:18px;background:var(--panel);border:1px solid var(--panel-2);box-shadow:var(--shadow);}
+    .pl-cover{width:120px;height:120px;border-radius:12px;object-fit:cover;flex-shrink:0;}
+    .pl-meta h1{margin:0 0 6px;font-size:1.6rem;}
+    .pl-meta small{color:var(--muted);}
+    .tracks{margin-top:20px;border-radius:16px;overflow:hidden;border:1px solid var(--panel-2);}
+    .track-row{display:grid;grid-template-columns:48px 1fr 160px 90px 80px;gap:12px;align-items:center;padding:10px 14px;border-bottom:1px solid var(--panel-2);}
+    .track-row:last-child{border-bottom:none;}
+    .track-num{text-align:right;color:var(--muted);}
+    .track-main{display:flex;align-items:center;gap:12px;min-width:0;}
+    .track-thumb{width:44px;height:44px;border-radius:6px;object-fit:cover;flex-shrink:0;}
+    .track-name{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+    .track-meta{color:var(--muted);font-size:.9rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+    .track-actions{display:flex;gap:8px;}
+    .track-btn{padding:6px 12px;border-radius:8px;border:1px solid var(--panel-2);background:var(--panel);color:var(--text);cursor:pointer;}
+    .track-link{color:var(--accent);text-decoration:none;font-size:.9rem;}
+    .pl-top-nav{position:fixed;top:18px;right:22px;display:flex;gap:12px;z-index:5100;}
+    .pl-top-nav .nav-btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:999px;background:rgba(15,20,26,0.82);border:1px solid rgba(255,255,255,0.12);color:#f8fafc;text-decoration:none;font-weight:600;backdrop-filter:blur(12px);}
+    .pl-top-nav .nav-btn:hover{background:rgba(102,163,255,0.75);}
+    .pl-top-nav .nav-btn:active{transform:translateY(1px);}
+    @media (max-width:640px){
+      .track-row{grid-template-columns:36px 1fr 120px 70px 60px;}
+      .pl-cover{width:92px;height:92px;}
+      .pl-top-nav{top:12px;right:12px;gap:8px;}
+      .pl-top-nav .nav-btn{padding:7px 12px;font-size:.85rem;}
+    }
+  </style>
+</head>
+<body class="theme-purple spotify-page">
+  <nav class="pl-top-nav">
+    <a href="{{ url_for('spotify_page') }}" class="nav-btn">Spotify一覧へ戻る</a>
+    <a href="{{ url_for('spotify_page', section='playlists') }}#my-playlists" class="nav-btn">プレイリスト</a>
+    <a href="{{ url_for('main') }}" class="nav-btn">メイン画面</a>
+  </nav>
+  <main class="pl-shell">
+    <div class="pl-header">
+      {% if playlist.images and playlist.images[0] %}
+        <img class="pl-cover" src="{{ playlist.images[0].url }}" alt="{{ playlist.name }}">
+      {% else %}
+        <div class="pl-cover" style="background:#222;"></div>
+      {% endif %}
+      <div class="pl-meta">
+        <small class="muted">プレイリスト</small>
+        <h1>{{ playlist.name }}</h1>
+        <small class="muted">
+          {{ playlist.owner.display_name }} ・ 合計 {{ playlist.tracks.total }} 曲 ・
+          <a class="track-link" href="{{ playlist.external_urls.spotify }}" target="_blank" rel="noopener">Spotify で開く</a>
+        </small>
+      </div>
+    </div>
+
+    <section class="tracks">
+      {% for t in tracks %}
+      {% set ms = t.duration_ms %}
+      {% set seconds = (ms // 1000) %}
+      {% set mm = (seconds // 60) %}
+      {% set ss = '%02d' % (seconds % 60) %}
+      <div class="track-row">
+        <div class="track-num">{{ loop.index }}</div>
+        <div class="track-main">
+          {% if t.image %}
+            <img class="track-thumb" src="{{ t.image }}" alt="{{ t.name }}">
+          {% endif %}
+          <div style="min-width:0;">
+            <div class="track-name">{{ t.name }}</div>
+            <div class="track-meta">{{ t.artists }}{% if t.album %} ・ {{ t.album }}{% endif %}</div>
+          </div>
+        </div>
+        <div class="track-actions">
+          <button type="button" class="track-btn play-inline js-track-play" data-uri="{{ t.uri }}" data-context="{{ playlist.uri }}" data-offset="{{ loop.index0 }}" data-label="再生" data-playing-label="再生中" data-loading-label="読み込み中...">再生</button>
+          <a class="track-link" href="{{ t.external }}" target="_blank" rel="noopener">Spotify で開く</a>
+        </div>
+        <div class="muted">{{ mm }}:{{ ss }}</div>
+        <div></div>
+      </div>
+      {% endfor %}
+    </section>
+  </main>
+</body>
+</html>
