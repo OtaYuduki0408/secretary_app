@@ -39,7 +39,7 @@
 	 background: radial-gradient(1200px 800px at 70% 20%, rgba(102,163,255,.08), transparent 60%), radial-gradient(900px 700px at 20% 85%, rgba(102,163,255,.05), transparent 60%), linear-gradient(180deg, var(--bg-2), var(--bg-1));
 	 font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans JP", sans-serif;
 }
-/* パララックス */
+/* 繝代Λ繝ｩ繝・け繧ｹ */
  .parallax{
 	 position: fixed;
 	 inset: -12vmax;
@@ -69,7 +69,7 @@
 	 transform: translate3d(calc(var(--mx)*0.90), calc(var(--my)*0.90), 0) scale(1.03);
 	 background: radial-gradient(120vmax 80vmax at 50% 50%, rgba(0,0,0,0) 65%, rgba(0,0,0,.40) 95%), repeating-linear-gradient(135deg, rgba(255,255,255,.025) 0px, rgba(255,255,255,.025) 1px, rgba(0,0,0,0) 2px, rgba(0,0,0,0) 8px);
 }
-/* Light（白） */
+/* Light・育區・・*/
  html.theme-light .plx-layer.back{
 	 transform: translate3d(calc(var(--mx)*0.18), calc(var(--my)*0.18), 0) scale(1.12);
 	 background: radial-gradient(65vmax 42vmax at 70% 25%, rgba(14,165,233,.20), transparent 60%), radial-gradient(55vmax 35vmax at 20% 85%, rgba(16,185,129,.16), transparent 60%), linear-gradient(180deg, var(--bg-2), var(--bg-1));
@@ -82,7 +82,7 @@
 	 transform: translate3d(calc(var(--mx)*0.65), calc(var(--my)*0.65), 0) scale(1.02);
 	 background: radial-gradient(120vmax 80vmax at 50% 50%, rgba(0,0,0,0) 60%, rgba(0,0,0,.12) 96%), repeating-linear-gradient(135deg, rgba(0,0,0,.08) 0px, rgba(0,0,0,.08) 1px, rgba(0,0,0,0) 2px, rgba(0,0,0,0) 9px);
 }
-/* Purple / Blue / Orange（鮮やか） */
+/* Purple / Blue / Orange・磯ｮｮ繧・°・・*/
  html.theme-purple{
 	 --bg-1:#14051f;
 	 --bg-2:#230a39;
@@ -137,7 +137,7 @@
 	 transform: translate3d(calc(var(--mx)*0.78), calc(var(--my)*0.78), 0) scale(1.02);
 	 background: radial-gradient(120vmax 80vmax at 50% 50%, rgba(0,0,0,0) 55%, rgba(0,0,0,.52) 96%), repeating-linear-gradient(135deg, rgba(251,146,60,.38) 0px, rgba(251,146,60,.38) 1px, rgba(0,0,0,0) 2px, rgba(0,0,0,0) 9px);
 }
-/* UI 背面暗幕 */
+/* UI 閭碁擇證怜ｹ・*/
  .ui-backdrop{
 	 position: fixed;
 	 inset: 0;
@@ -148,7 +148,7 @@
  html.theme-light .ui-backdrop{
 	 background: radial-gradient(1200px 900px at 50% 55%, rgba(0,0,0,.03) 0%, rgba(0,0,0,.08) 60%, rgba(0,0,0,.12) 100%);
 }
-/* UI 前面 */
+/* UI 蜑埼擇 */
  .shell{
 	 min-height: 100svh;
 	 display:grid;
@@ -175,7 +175,7 @@
 	 border: 1px solid rgba(0,0,0,.12);
 	 box-shadow: 0 10px 24px rgba(0,0,0,.18);
 }
-/* マイク（テーマに寄せる） */
+/* 繝槭う繧ｯ・医ユ繝ｼ繝槭↓蟇・○繧具ｼ・*/
  .mic-wrap{
 	 display:flex;
 	 align-items:center;
@@ -274,16 +274,16 @@
 	 background: radial-gradient(70% 70% at 50% 35%, rgba(251,146,60,.40), transparent 65%), radial-gradient(85% 85% at 50% 65%, rgba(244,63,94,.28), transparent 70%);
 }
 
-/* 音声認識中のボタンの状態 */
+/* 髻ｳ螢ｰ隱崎ｭ倅ｸｭ縺ｮ繝懊ち繝ｳ縺ｮ迥ｶ諷・*/
 .mic-btn.active .mic-surface {
-    /* 認識中は色を変化させるなど */
+    /* 隱崎ｭ倅ｸｭ縺ｯ濶ｲ繧貞､牙喧縺輔○繧九↑縺ｩ */
     box-shadow: 0 0 15px rgba(122, 168, 255, 0.8), 0 0 30px rgba(122, 168, 255, 0.5);
     transform: scale(1.05);
     transition: all 0.2s ease-in-out;
 }
-/* その他、アクティブ時のアニメーションなどを追加すると分かりやすくなります */
+/* 縺昴・莉悶√い繧ｯ繝・ぅ繝匁凾縺ｮ繧｢繝九Γ繝ｼ繧ｷ繝ｧ繝ｳ縺ｪ縺ｩ繧定ｿｽ蜉縺吶ｋ縺ｨ蛻・°繧翫ｄ縺吶￥縺ｪ繧翫∪縺・*/
 
-/* 検索バー */
+/* 讀懃ｴ｢繝舌・ */
  .search{
 	 width:min(960px, 88vw);
 	 display:flex;
@@ -426,7 +426,7 @@
  html.theme-light .calendar-btn .badge{
 	 box-shadow: 0 6px 12px rgba(59,130,246,.25);
 }
-/* ガラス落下 */
+/* 繧ｬ繝ｩ繧ｹ關ｽ荳・*/
  #shatter{
 	 position:fixed;
 	 inset:0;
@@ -476,7 +476,7 @@
 		 filter:none;
 	}
 }
-/* BTD ロゴ */
+/* BTD 繝ｭ繧ｴ */
  #btd{
 	 position: fixed;
 	 inset: 0;
@@ -508,7 +508,7 @@
 		 transform: scale(1.00);
 	}
 }
-/* ORA 吹き出し */
+/* ORA 蜷ｹ縺榊・縺・*/
  #ora{
 	 position: fixed;
 	 inset: 0;
@@ -550,20 +550,20 @@
 	 overflow: hidden;
 	 opacity: 1;
 	 transition: opacity .35s ease;
-	/* ← 親ごとフェード用 */
+	/* 竊・隕ｪ縺斐→繝輔ぉ繝ｼ繝臥畑 */
 }
  #cracks.fade{
 	 opacity: 0;
 }
-/* ← テーマ切替時に付与 */
+/* 竊・繝・・繝槫・譖ｿ譎ゅ↓莉倅ｸ・*/
  .crack{
 	 position: absolute;
 	 left: 50%;
 	 top: 50%;
 	 transform: translate(-50%,-50%) rotate(var(--r,0deg)) scale(var(--s,1));
 	 opacity: 1;
-	/* 最後まで表示したいのでアニメで消さない */
-	/* ここではフェードアニメを付けない */
+	/* 譛蠕後∪縺ｧ陦ｨ遉ｺ縺励◆縺・・縺ｧ繧｢繝九Γ縺ｧ豸医＆縺ｪ縺・*/
+	/* 縺薙％縺ｧ縺ｯ繝輔ぉ繝ｼ繝峨い繝九Γ繧剃ｻ倥￠縺ｪ縺・*/
 }
  .crack svg{
 	 width: var(--w, 180px);
@@ -584,7 +584,7 @@
 	 stroke-linejoin: round;
 	 filter: drop-shadow(0 4px 10px rgba(0,0,0,.35));
 }
-/* 線を描くアニメのみ */
+/* 邱壹ｒ謠上￥繧｢繝九Γ縺ｮ縺ｿ */
  .crack path.draw{
 	 animation: crack-dash 520ms ease-out forwards;
 }
@@ -598,7 +598,7 @@
 		 opacity: 1;
 	}
 }
-/* ==== JACKPOT cameo（2枚のカットイン） ==== */
+/* ==== JACKPOT cameo・・譫壹・繧ｫ繝・ヨ繧､繝ｳ・・==== */
  #jackpot-cameo{
 	 position:fixed;
 	 inset:0;
@@ -705,7 +705,7 @@
 	 color:#fff;
 	 cursor:pointer;
 }
-/* 小さめ画面でもNOが押せるよう上下に余白を確保（既存の透明ボタンはそのまま動作）*/
+/* 蟆上＆繧∫判髱｢縺ｧ繧・O縺梧款縺帙ｋ繧医≧荳贋ｸ九↓菴咏區繧堤｢ｺ菫晢ｼ域里蟄倥・騾乗・繝懊ち繝ｳ縺ｯ縺昴・縺ｾ縺ｾ蜍穂ｽ懶ｼ・/
 @media (max-height: 540px){
 	 .slot-wrap{
 		 padding:16px;
@@ -774,7 +774,7 @@
  .btd-overlay.is-leaving{
 	 animation:btd-fade-out .3s ease-in both;
 }
-/* 右下フローティング群の土台（既存があれば不要） */
+/* 蜿ｳ荳九ヵ繝ｭ繝ｼ繝・ぅ繝ｳ繧ｰ鄒､縺ｮ蝨溷床・域里蟄倥′縺ゅｌ縺ｰ荳崎ｦ・ｼ・*/
  .fab-group{
 	 position: fixed;
 	 right: 16px;
@@ -784,7 +784,7 @@
 	 gap: 12px;
 	 z-index: 1200;
 }
-/* 共通ボタン（既存があれば不要） */
+/* 蜈ｱ騾壹・繧ｿ繝ｳ・域里蟄倥′縺ゅｌ縺ｰ荳崎ｦ・ｼ・*/
  .fab{
 	 width: 58px;
 	 height: 58px;
@@ -805,22 +805,22 @@
  .fab:active{
 	 transform: translateY(0);
 }
-/* 📊 統計ボタンの見た目強調（青系の輝き） */
+/* 投 邨ｱ險医・繧ｿ繝ｳ縺ｮ隕九◆逶ｮ蠑ｷ隱ｿ・磯搨邉ｻ縺ｮ霈昴″・・*/
  .stats-btn svg{
 	 filter: drop-shadow(0 2px 8px rgba(122,168,255,.35));
 }
-/* ===== トースト通知 ===== */
+/* ===== 繝医・繧ｹ繝磯夂衍 ===== */
  #toast-stack{
 	 position: fixed;
 	 right: 16px;
 	 bottom: 92px;
-	/* 右下のFABと重ならないように */
+	/* 蜿ｳ荳九・FAB縺ｨ驥阪↑繧峨↑縺・ｈ縺・↓ */
 	 display: flex;
 	 flex-direction: column;
 	 gap: 10px;
 	 z-index: 14000;
 	 pointer-events: none;
-	/* 背後クリック可 */
+	/* 閭悟ｾ後け繝ｪ繝・け蜿ｯ */
 }
  .toast{
 	 min-width: 240px;
@@ -882,7 +882,7 @@
 		 opacity: 0;
 	}
 }
-/* ライフバー（下線） */
+/* 繝ｩ繧､繝輔ヰ繝ｼ・井ｸ狗ｷ夲ｼ・*/
  .toast::after{
 	 content: "";
 	 grid-column: 1 / -1;
@@ -900,7 +900,7 @@
 		 width: 0%;
 	}
 }
-/* 狭い画面では中央下に寄せる */
+/* 迢ｭ縺・判髱｢縺ｧ縺ｯ荳ｭ螟ｮ荳九↓蟇・○繧・*/
  @media (max-width: 480px){
 	 #toast-stack{
 		 left: 50%;
@@ -912,7 +912,7 @@
  #toast-stack{
 	 z-index: 20000;
 }
-/* 14000より上に */
+/* 14000繧医ｊ荳翫↓ */
  .toast{
 	 animation: toast-in .18s ease forwards, toast-life 2.6s linear forwards;
 }
@@ -950,12 +950,12 @@
 
 /* ======= Mobile (main screen) ======= */
 
-/* 押しやすさ */
+/* 謚ｼ縺励ｄ縺吶＆ */
 @media (max-width: 900px){
   .search input, .mic-btn{ min-height: 48px; font-size: 16px; }
 }
 
-/* スマホ：中央UIの比率調整・FABの安全配置 */
+/* 繧ｹ繝槭・・壻ｸｭ螟ｮUI縺ｮ豈皮紫隱ｿ謨ｴ繝ｻFAB縺ｮ螳牙・驟咲ｽｮ */
 @media (max-width: 680px){
   .shell{ padding: 0 14px; }
 
@@ -974,13 +974,13 @@
   .calendar-btn .badge{ transform: scale(.9); transform-origin: bottom right; }
 }
 
-/* 極小端末で検索域を確保 */
+/* 讌ｵ蟆冗ｫｯ譛ｫ縺ｧ讀懃ｴ｢蝓溘ｒ遒ｺ菫・*/
 @media (max-width: 360px){
   .mic-wrap{ transform: scale(.82); }
 }
 
 /* ==========================
-   Googleログインボタン スタイリング
+   Google繝ｭ繧ｰ繧､繝ｳ繝懊ち繝ｳ 繧ｹ繧ｿ繧､繝ｪ繝ｳ繧ｰ
    ========================== */
 #authorize-button {
   margin-top: 20px;
@@ -1019,3 +1019,316 @@
   height: 20px;
   background: url("https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg") no-repeat center/contain;
 }
+
+
+.spotify-btn{
+	 background: linear-gradient(180deg, #1db954, #1ed760); /* Spotify Green */
+	 color: #fff;
+	 border-color: rgba(255,255,255,.2);
+}
+.spotify-btn:hover{
+	 transform: translateY(-2px);
+	 box-shadow: 0 18px 34px rgba(0,0,0,.65), var(--inset);
+}
+.spotify-btn svg{
+	 filter: drop-shadow(0 2px 8px rgba(30,215,96,.55)); /* 邱題牡縺ｮ霈昴″ */
+}
+/* Light繝・・繝槫ｯｾ蠢・(繧ゅ＠蠢・ｦ√〒縺ゅｌ縺ｰ霑ｽ蜉) */
+html.theme-light .spotify-btn{
+	 background: linear-gradient(180deg, #1db954, #1ed760);
+	 color:#fff;
+	 border-color: rgba(0,0,0,.15);
+	 box-shadow: 0 10px 22px rgba(0,0,0,.15), inset 0 1px 0 rgba(255,255,255,.3);
+}
+html.theme-light .spotify-btn svg{
+	 /* 逋ｽ縺・い繧､繧ｳ繝ｳ縺ｮ蝣ｴ蜷医√ヵ繧｣繝ｫ繧ｿ繝ｼ繧貞炎髯､縺ｾ縺溘・螟画峩 */
+	 filter: none; 
+}
+
+:root{
+	 --bg-1:#0b1116;
+	 --bg-2:#0f141a;
+	 --panel:#1c232a;
+	 --panel-2:#171d23;
+	 --text:#f4f7fb;
+	 --muted:#cdd6df;
+	 --accent:#66a3ff;
+	 --ring:#7aa8ff;
+	 --shadow: 0 10px 30px rgba(0,0,0,.35);
+	 --inset: inset 0 1px 0 rgba(255,255,255,.05), inset 0 -1px 0 rgba(0,0,0,.4);
+	 --radius: 18px;
+	 --wallpaper:none;
+	 --wallpaper-darken: rgba(0,0,0,.62);
+	 --mx: 0px;
+	 --my: 0px;
+}
+ html.theme-light{
+	 --bg-1:#f7f9fc;
+	 --bg-2:#eef2f7;
+	 --text:#0d1117;
+	 --muted:#4b5563;
+	 --wallpaper-darken: rgba(255,255,255,0);
+	 --accent:#3b82f6;
+}
+ html.theme-purple{
+	 --accent:#c084fc;
+}
+ html.theme-blue {
+	 --accent:#50a8d4;
+}
+
+/* 譌｢蟄倥・ .toast 縺ｫ霑ｽ蜉縺ｧOK */
+.toast[hidden] { display: none !important; }
+
+
+/* ==========================
+   Spotify Player Bar (Global)
+   ========================== */
+#vs-playerbar {
+  position: fixed;
+  left: calc(20px + env(safe-area-inset-left, 0px));
+  bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+  transform: none;
+  width: clamp(260px, 32vw, 420px);
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
+  padding: 14px 18px 16px;
+  border-radius: 18px;
+  background: linear-gradient(145deg, rgba(13,19,28,0.94), rgba(25,34,46,0.88));
+  border: 1px solid rgba(148, 163, 184, 0.12);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(14px) saturate(130%);
+  -webkit-backdrop-filter: blur(14px) saturate(130%);
+  color: var(--text);
+  z-index: 5000;
+}
+
+#vs-playerbar[hidden] {
+  display: none !important;
+}
+
+.vs-section {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+}
+
+.vs-main-controls {
+  justify-content: flex-start;
+  gap: 10px;
+}
+
+.vs-timeline {
+  gap: 10px;
+}
+
+.vs-options {
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.vs-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  background: rgba(148, 163, 184, 0.12);
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  color: inherit;
+  cursor: pointer;
+  transition: background 0.2s ease, transform 0.2s ease, border-color 0.2s ease;
+  font-size: 16px;
+}
+
+.vs-button:hover:not(:disabled) {
+  background: rgba(96, 165, 250, 0.35);
+  border-color: rgba(96, 165, 250, 0.55);
+}
+
+.vs-button:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.vs-button[disabled] {
+  opacity: 0.45;
+  cursor: default;
+}
+
+#vs-play.vs-button {
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  font-size: 20px;
+  background: linear-gradient(160deg, #38bdf8, #2563eb);
+  border: 0;
+  color: #0b1120;
+  font-weight: 700;
+}
+
+#vs-play.vs-button:hover:not(:disabled) {
+  background: linear-gradient(160deg, #60a5fa, #3b82f6);
+}
+
+#vs-time,
+#vs-dur {
+  font-variant-numeric: tabular-nums;
+  min-width: 48px;
+  text-align: center;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+#vs-seek {
+  width: 100%;
+  appearance: none;
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.22);
+  outline: none;
+}
+
+#vs-seek::-webkit-slider-thumb {
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #60a5fa;
+  border: 0;
+  box-shadow: 0 4px 12px rgba(96, 165, 250, 0.6);
+  margin-top: -4px;
+}
+
+#vs-vol {
+  flex: 1 1 110px;
+  max-width: 160px;
+  appearance: none;
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.22);
+  outline: none;
+}
+
+#vs-vol::-webkit-slider-thumb {
+  appearance: none;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: #f8fafc;
+  border: 0;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+  margin-top: -3.5px;
+}
+
+
+
+
+
+
+
+.spotify-page #vs-playerbar {
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  width: clamp(320px, 88vw, 960px);
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 14px 20px;
+}
+
+.spotify-page #vs-playerbar .vs-section {
+  width: auto;
+  gap: 14px;
+}
+
+.spotify-page #vs-playerbar .vs-main-controls {
+  gap: 10px;
+}
+
+.spotify-page #vs-playerbar .vs-timeline {
+  flex: 1;
+  gap: 12px;
+}
+
+.spotify-page #vs-playerbar .vs-options {
+  flex-wrap: nowrap;
+  justify-content: flex-start;
+  gap: 10px;
+}
+
+.spotify-page #vs-playerbar #vs-vol {
+  flex: 0 0 130px;
+  max-width: 130px;
+}
+
+.spotify-page #my-playlists {
+  scroll-margin-top: 140px;
+}
+
+.playlist-focus .spotify-card-intro,
+.playlist-focus .spotify-card-top,
+.playlist-focus .spotify-card-search,
+.playlist-focus .spotify-gap-intro,
+.playlist-focus .spotify-gap-top,
+.playlist-focus .spotify-gap-search {
+  display: none;
+}
+
+.spotify-page 
+
+.spotify-page 
+
+#toast {
+  position: fixed;
+  right: 18px;
+  bottom: 92px;
+  min-width: 220px;
+  max-width: 320px;
+  padding: 12px 16px;
+  border-radius: 14px;
+  background: rgba(20, 24, 32, 0.92);
+  color: var(--text);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: var(--shadow);
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  z-index: 5100;
+}
+
+#toast.show {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+@media (max-width: 640px) {
+  #vs-playerbar {
+    grid-template-columns: repeat(3, auto) 1fr repeat(4, auto);
+    gap: 6px;
+    padding: 10px;
+  }
+
+  #vs-vol {
+    width: 90px;
+  }
+}
+
+
+
+.js-track-play.is-playing {
+  background: linear-gradient(160deg, #60a5fa, #2563eb);
+  color: #0b1120;
+  border-color: rgba(96, 165, 250, 0.45);
+}
+
+.js-track-play.is-playing:hover {
+  filter: brightness(0.95);
+}
+
