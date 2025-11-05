@@ -6,22 +6,25 @@ document.addEventListener("DOMContentLoaded", () => {
     // ----------------------------------------------------
     const rawFinanceRecords = JSON.parse(container.dataset.allRecords || "[]");
     
-    // -------------------------
+    // ------------------------ -
     // 操作要素の取得
-    // -------------------------
+    // ------------------------ -
     const financeTableBody = document.querySelector("#financeTable tbody");
     const searchInput = document.getElementById("searchInput");
     const sortSelect = document.getElementById("sortSelect");
     const filterCategory = document.getElementById("filterCategory");
     const filterType = document.getElementById("filterType");
+    const startDateInput = document.getElementById("startDate");
+    const endDateInput = document.getElementById("endDate");
 
-    // -------------------------
+    let incomeChart = null;
+    let expenseChart = null;
+
+    // ------------------------ -
     // カテゴリオプションの動的更新
-    // -------------------------
+    // ------------------------ -
     const allCategories = [...new Set(rawFinanceRecords.map(r => r.category))].filter(c => c);
 
-    // HTMLに静的に定義されている「すべてのカテゴリ」以外をクリアし、動的カテゴリを追加
-    // ※ HTMLに「すべてのカテゴリ」が<option value="all">として定義されている前提
     filterCategory.querySelectorAll('option:not([value="all"])').forEach(opt => opt.remove());
 
     allCategories.forEach(category => {
@@ -31,9 +34,9 @@ document.addEventListener("DOMContentLoaded", () => {
         filterCategory.appendChild(option);
     });
     
-    // -------------------------
-    // テーブル描画関数 (変更なし)
-    // -------------------------
+    // ------------------------ -
+    // テーブル描画関数
+    // ------------------------ -
     function renderTable(data) {
         financeTableBody.innerHTML = "";
         if (data.length === 0) {
@@ -45,11 +48,10 @@ document.addEventListener("DOMContentLoaded", () => {
             const row = financeTableBody.insertRow();
             row.insertCell().textContent = record.date;
             
-            // タイプ列を追加し、色付けする
             const typeCell = row.insertCell();
             const typeText = record.type === 'income' ? '収入' : '支出';
             typeCell.textContent = typeText;
-            typeCell.style.color = record.type === 'income' ? '#00bcd4' : '#e74c3c'; // CSSに合わせて色を変更
+            typeCell.style.color = record.type === 'income' ? '#00bcd4' : '#e74c3c';
 
             row.insertCell().textContent = record.category;
             row.insertCell().textContent = record.description;
@@ -60,30 +62,22 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
-    /**
-     * 現在の検索、フィルタ、ソート設定を適用してテーブルを更新し、グラフを再描画する
-     */
+    // ------------------------ -
+    // フィルタとソートの適用
+    // ------------------------ -
     function applyFiltersAndSort() {
         let currentData = [...rawFinanceRecords]; 
 
-        // 1a. タイプ (収入/支出) による絞り込み
         const selectedType = document.querySelector('input[name="typeFilter"]:checked').value;
         if (selectedType !== "all") {
             currentData = currentData.filter(record => record.type === selectedType);
         }
         
-        // 1b. カテゴリ (複数選択) による絞り込み
         const selectedOptions = Array.from(filterCategory.selectedOptions).map(option => option.value);
-        
-        // 「すべてのカテゴリ」が選択されている、または何も選択されていない場合
-        if (selectedOptions.includes("all") || selectedOptions.length === 0) {
-            // 何もフィルタしない
-        } else {
-            // 選択されたカテゴリでフィルタ
+        if (!selectedOptions.includes("all") && selectedOptions.length > 0) {
             currentData = currentData.filter(record => selectedOptions.includes(record.category));
         }
 
-        // 1c. 検索ワードによる絞り込み
         const searchTerm = searchInput.value.toLowerCase();
         if (searchTerm) {
             currentData = currentData.filter(record => 
@@ -92,7 +86,15 @@ document.addEventListener("DOMContentLoaded", () => {
             );
         }
 
-        // 2. ソート
+        const startDate = startDateInput.value;
+        const endDate = endDateInput.value;
+        if (startDate) {
+            currentData = currentData.filter(record => record.date >= startDate);
+        }
+        if (endDate) {
+            currentData = currentData.filter(record => record.date <= endDate);
+        }
+
         let sortedData = [...currentData]; 
         const sortKey = sortSelect.value;
         sortedData.sort((a, b) => {
@@ -104,160 +106,157 @@ document.addEventListener("DOMContentLoaded", () => {
             return 0;
         });
 
-        // 3. テーブルを描画
         renderTable(sortedData);
-        
-        // 4. 絞り込み後のデータでグラフを更新
         updateCharts(sortedData);
     }
     
-    // -------------------------
-    // グラフ更新・描画関数 (グラフが表示されない問題の解決)
-    // -------------------------
+    // ------------------------ -
+    // グラフ更新・描画関数
+    // ------------------------ -
     function updateCharts(records) {
         const currentIncomeRecords = records.filter(r => r.type === 'income');
         const currentExpenseRecords = records.filter(r => r.type === 'expense');
 
-        const calculateStats = (data) => {
-            const statsMap = data.reduce((acc, record) => {
-                const month = record.date.substring(0, 7); 
-                acc[month] = (acc[month] || 0) + record.amount;
-                return acc;
-            }, {});
-
-            return Object.keys(statsMap)
-                .sort()
-                .map(month => ({
-                    month: month.substring(5), // '01', '02'など
-                    amount: statsMap[month]
-                }));
-        };
-
-        const incomeData = calculateStats(currentIncomeRecords);
-        const expenseData = calculateStats(currentExpenseRecords);
-
-        drawBarChart("incomeChart", incomeData, "#00bcd4", "#4dd0e1", "収入 (絞り込み結果)"); // シアン系
-        drawBarChart("expenseChart", expenseData, "#ff7043", "#ffccbc", "支出 (絞り込み結果)"); // オレンジ系
+        drawIncomeChart(currentIncomeRecords);
+        drawExpenseChart(currentExpenseRecords);
     }
-    
-    // ★ グラフ描画のコアロジックを完全に追加 ★
-    function drawBarChart(canvasId, data, colorStart, colorEnd, title) {
-        const canvas = document.getElementById(canvasId);
-        if (!canvas) return; 
-        const ctx = canvas.getContext("2d");
-        const width = canvas.width;
-        const height = canvas.height;
-        ctx.clearRect(0, 0, width, height);
-        
-        // データがない場合の表示
-        if (data.length === 0) {
-            ctx.font = "20px sans-serif";
-            ctx.fillStyle = "#e0e0e0"; 
-            ctx.textAlign = "center";
-            ctx.fillText("データなし", width / 2, height / 2);
-            return;
+
+    function drawIncomeChart(records) {
+        const ctx = document.getElementById('incomeChart').getContext('2d');
+        if (incomeChart) {
+            incomeChart.destroy();
         }
 
-        const labels = data.map(d => d.month);
-        const values = data.map(d => d.amount);
-        const maxVal = Math.max(...values) || 1;
-        const yTicks = 5;
-        const padding = 40;
-        const chartHeight = height - padding * 2;
-        const chartWidth = width - padding * 2;
-        const barWidth = chartWidth / values.length * 0.6;
-        const barGap = chartWidth / values.length * 0.4;
-        
-        // Y軸目盛の単位 (例: 1000, 1万)
-        const formatYValue = (val) => {
-             if (val >= 100000) return `${Math.round(val / 10000)}万`;
-             if (val >= 1000) return `${Math.round(val / 1000)}k`;
-             return val.toLocaleString();
-        };
+        const monthlyData = records.reduce((acc, record) => {
+            const month = record.date.substring(0, 7);
+            acc[month] = (acc[month] || 0) + record.amount;
+            return acc;
+        }, {});
 
-        // タイトル
-        ctx.font = "bold 16px sans-serif";
-        ctx.fillStyle = "#e0e0e0";
-        ctx.textAlign = "center";
-        ctx.fillText(title, width / 2, 20);
+        const labels = Object.keys(monthlyData).sort();
+        const data = labels.map(label => monthlyData[label]);
 
-        // Y軸グリッド線とラベル
-        ctx.strokeStyle = "#444";
-        ctx.fillStyle = "#e0e0e0";
-        ctx.font = "10px sans-serif";
-        ctx.textAlign = "right";
-        for (let i = 0; i <= yTicks; i++) {
-            const y = padding + (chartHeight / yTicks) * i;
-            const value = Math.round(maxVal - (maxVal / yTicks) * i);
-            
-            ctx.beginPath();
-            ctx.moveTo(padding, y);
-            ctx.lineTo(width - padding, y);
-            ctx.stroke();
-            
-            ctx.fillText(formatYValue(value), padding - 5, y + 4);
-        }
-
-        // X軸 (基準線)
-        ctx.beginPath();
-        ctx.strokeStyle = "#e0e0e0";
-        ctx.moveTo(padding, height - padding);
-        ctx.lineTo(width - padding, height - padding);
-        ctx.stroke();
-
-        // 棒グラフ描画
-        values.forEach((v, i) => {
-            const x = padding + i * (barWidth + barGap) + barGap / 2;
-            const barHeight = (v / maxVal) * chartHeight;
-
-            // グラデーション設定
-            const grad = ctx.createLinearGradient(0, height - padding - barHeight, 0, height - padding);
-            grad.addColorStop(0, colorStart);
-            grad.addColorStop(1, colorEnd);
-
-            ctx.fillStyle = grad;
-            ctx.fillRect(x, height - padding - barHeight, barWidth, barHeight);
-
-            // 金額ラベル (棒の上)
-            ctx.fillStyle = "#e0e0e0";
-            ctx.textAlign = "center";
-            ctx.font = "10px sans-serif";
-            if (barHeight > 15) { // 棒が高ければ上部に表示
-                ctx.fillText(formatYValue(v), x + barWidth / 2, height - padding - barHeight - 5);
-            } else { // 低ければ棒の中に表示
-                ctx.fillText(formatYValue(v), x + barWidth / 2, height - padding - 5); 
+        incomeChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: '収入',
+                    data: data,
+                    backgroundColor: 'rgba(0, 188, 212, 0.6)',
+                    borderColor: 'rgba(0, 188, 212, 1)',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    y: {
+                        beginAtZero: true
+                    }
+                }
             }
-            
-
-            // 月ラベル (X軸の下)
-            ctx.fillStyle = "#b0b0b0";
-            ctx.textAlign = "center";
-            ctx.fillText(labels[i], x + barWidth / 2, height - padding + 15);
         });
     }
 
+    function drawExpenseChart(records) {
+        const ctx = document.getElementById('expenseChart').getContext('2d');
+        if (expenseChart) {
+            expenseChart.destroy();
+        }
 
-    // -------------------------
+        const categories = [...new Set(records.map(r => r.category))];
+        const categoryColorMap = generateCategoryColors(categories);
+
+        const monthlyData = records.reduce((acc, record) => {
+            const month = record.date.substring(0, 7);
+            if (!acc[month]) {
+                acc[month] = {};
+            }
+            acc[month][record.category] = (acc[month][record.category] || 0) + record.amount;
+            return acc;
+        }, {});
+
+        const labels = Object.keys(monthlyData).sort();
+
+        const datasets = categories.map(category => {
+            return {
+                label: category,
+                data: labels.map(label => monthlyData[label][category] || 0),
+                backgroundColor: categoryColorMap[category]
+            };
+        });
+
+        expenseChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: datasets
+            },
+            options: {
+                responsive: true,
+
+                scales: {
+                    x: {
+                        stacked: true
+                    },
+                    y: {
+                        stacked: true,
+                        beginAtZero: true
+                    }
+                }
+            }
+        });
+    }
+
+    function generateCategoryColors(categories) {
+        const colors = {};
+        const colorPalette = [
+            'rgba(255, 99, 132, 0.6)', 'rgba(54, 162, 235, 0.6)', 'rgba(255, 206, 86, 0.6)',
+            'rgba(75, 192, 192, 0.6)', 'rgba(153, 102, 255, 0.6)', 'rgba(255, 159, 64, 0.6)',
+            'rgba(199, 199, 199, 0.6)', 'rgba(83, 109, 254, 0.6)', 'rgba(46, 125, 50, 0.6)'
+        ];
+        categories.forEach((category, index) => {
+            colors[category] = colorPalette[index % colorPalette.length];
+        });
+        return colors;
+    }
+
+    // ------------------------ -
     // サマリー計算と目標設定機能
-    // -------------------------
-    const totalIncome = rawFinanceRecords.filter(r => r.type === 'income').reduce((sum, d) => sum + d.amount, 0);
-    const totalExpense = rawFinanceRecords.filter(r => r.type === 'expense').reduce((sum, d) => sum + d.amount, 0);
-    
-    // 最新月の特定 (データの日付から動的に計算するのが理想)
-    const latestDate = rawFinanceRecords.reduce((maxDate, record) => {
-        return record.date > maxDate ? record.date : maxDate;
-    }, '0000-00-00');
-    const latestMonth = latestDate.substring(0, 7); 
-    
-    const monthlyExpense = rawFinanceRecords
-        .filter(r => r.type === 'expense' && r.date.startsWith(latestMonth))
-        .reduce((sum, d) => sum + d.amount, 0);
+    // ------------------------ -
+    function updateSummary() {
+        const totalIncome = rawFinanceRecords.filter(r => r.type === 'income').reduce((sum, d) => sum + d.amount, 0);
+        const totalExpense = rawFinanceRecords.filter(r => r.type === 'expense').reduce((sum, d) => sum + d.amount, 0);
 
-    // HTML要素の更新
-    document.getElementById("current-balance").textContent = `${(totalIncome - totalExpense).toLocaleString()} 円`;
-    document.getElementById("monthly-expense").textContent = `${monthlyExpense.toLocaleString()} 円`;
-    
-    // 目標設定のロジック
+        const today = new Date().toISOString().slice(0, 10);
+        const currentMonth = today.slice(0, 7);
+
+        const monthlyExpense = rawFinanceRecords
+            .filter(r => r.type === 'expense' && r.date.startsWith(currentMonth))
+            .reduce((sum, d) => sum + d.amount, 0);
+
+        const monthlyIncome = rawFinanceRecords
+            .filter(r => r.type === 'income' && r.date.startsWith(currentMonth))
+            .reduce((sum, d) => sum + d.amount, 0);
+
+        const dailyExpense = rawFinanceRecords
+            .filter(r => r.type === 'expense' && r.date === today)
+            .reduce((sum, d) => sum + d.amount, 0);
+
+        const dailyExpenseNoNecessities = rawFinanceRecords
+            .filter(r => r.type === 'expense' && r.date === today && r.category !== '必需品')
+            .reduce((sum, d) => sum + d.amount, 0);
+
+        document.getElementById("current-balance").textContent = `${(totalIncome - totalExpense).toLocaleString()} 円`;
+        document.getElementById("monthly-expense").textContent = `${monthlyExpense.toLocaleString()} 円`;
+        document.getElementById("monthly-income").textContent = `${monthlyIncome.toLocaleString()} 円`;
+        document.getElementById("daily-expense").textContent = `${dailyExpense.toLocaleString()} 円`;
+        document.getElementById("daily-expense-no-necessities").textContent = `${dailyExpenseNoNecessities.toLocaleString()} 円`;
+    }
+
+    updateSummary(); // Initial calculation
+
     const inputGoal = document.getElementById("inputGoal");
     const goalAmountDisplay = document.getElementById("goal-amount");
     const settingsForm = document.getElementById("settingsForm");
@@ -284,13 +283,15 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
-    // -------------------------
+    // ------------------------ -
     // イベントリスナーの追加
-    // -------------------------
+    // ------------------------ -
     searchInput.addEventListener("input", applyFiltersAndSort);
     sortSelect.addEventListener("change", applyFiltersAndSort);
     filterCategory.addEventListener("change", applyFiltersAndSort);
     filterType.addEventListener("change", applyFiltersAndSort); 
+    startDateInput.addEventListener("change", applyFiltersAndSort);
+    endDateInput.addEventListener("change", applyFiltersAndSort);
 
     // 初期描画
     applyFiltersAndSort(); 
