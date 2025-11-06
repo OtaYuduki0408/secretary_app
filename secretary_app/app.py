@@ -18,9 +18,16 @@ from services.category_service import (
 )
 from services.auth_service import register_user, login_user
 from services.finance_service import get_finance_summary, get_all_finance_records
+from services.chat_space_model import ChatSpaceModel
+import os
 
 
 app = Flask(__name__, template_folder='templates', static_folder='static')
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+if not GEMINI_API_KEY:
+    print("Warning: GEMINI_API_KEY environment variable not set. ChatSpaceModel may not function correctly.")
+chat_space_model = ChatSpaceModel(gemini_api_key=GEMINI_API_KEY)
+
 app.secret_key = os.getenv("SECRET_KEY", "devsecret")  # セッション用
 
 PLAYER_BAR_SNIPPET = """
@@ -542,6 +549,20 @@ def ensure_spotify_playerbar(response):
                 response.set_data(body)
     return response
 
+
+@app.route('/api/chat', methods=['POST'])
+def chat_api():
+    data = request.get_json()
+    user_input = data.get('inputValue', '')
+    print("--- [DEBUG] /api/chat: Received request ---")
+    app.logger.info(f"Received chat input from frontend: {user_input}")
+    
+    # ChatSpaceModelのcheck_chat_spaceメソッドを呼び出す
+    print("--- [DEBUG] /api/chat: Calling check_chat_space ---")
+    response_data = chat_space_model.check_chat_space(user_input)
+    print(f"--- [DEBUG] /api/chat: Received response from check_chat_space: {response_data} ---")
+    
+    return jsonify(response_data)
 
 if __name__ == '__main__':
     app.run(
