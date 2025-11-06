@@ -1,82 +1,104 @@
-<!-- templates/finance.html -->
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>収支管理統計</title>
-  <!-- 既存の finance.css を読み込む -->
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/finance.css') }}">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>収支管理統計</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/finance.css') }}">
 </head>
 <body>
 
   <div class="fd-wrap">
-    <!-- サマリー -->
-    <section class="fd-section">
+    <div class="fd-button-container">
+      <a href="/" class="link-btn">mainに戻る</a>
+    </div>
+        <section class="fd-section">
       <h2 class="fd-title">サマリー</h2>
-      <div class="fd-summary">
-        <div class="fd-kpi">
-          <h3>現在の所持金</h3>
-          <p id="current-balance" class="fd-num">-- 円</p>
-        </div>
-        <div class="fd-kpi">
-          <h3>目標金額</h3>
-          <p id="goal-amount" class="fd-num">-- 円</p>
-        </div>
-        <div class="fd-kpi">
-          <h3>今月の使用額</h3>
-          <p id="monthly-expense" class="fd-num">-- 円</p>
-        </div>
-      </div>
-    </section>
+            <div class="fd-summary">
+            <div class="fd-kpi">
+              <h3>現在の所持金</h3>
+              <p id="current-balance" class="fd-num">-- 円</p>
+            </div>
+            <div class="fd-kpi">
+              <h3>今月の使用額</h3>
+              <p id="monthly-expense" class="fd-num">-- 円</p>
+            </div>
+            <div class="fd-kpi">
+              <h3>今月の目標額</h3>
+              <p id="goal-amount" class="fd-num">-- 円</p>
+            </div>
+            <div class="fd-kpi">
+              <h3>今月の収入</h3>
+              <p id="monthly-income" class="fd-num">-- 円</p>
+            </div>
+            <div class="fd-kpi">
+              <h3>今日の使用額</h3>
+              <p id="daily-expense" class="fd-num">-- 円</p>
+            </div>
+            <div class="fd-kpi">
+              <h3>今日の使用額(必需品抜き)</h3>
+              <p id="daily-expense-no-necessities" class="fd-num">-- 円</p>
+            </div>
+          </div>    </section>
 
-    <!-- 一覧 -->
     <section class="fd-section">
-      <h2 class="fd-title">一覧</h2>
-      <div class="fd-controls">
-        <input id="searchInput" class="fd-input" placeholder="検索…" />
-        <select id="sortSelect" class="fd-select">
-          <option value="date">日付順</option>
-          <option value="amount">金額順</option>
-        </select>
-        <select id="filterCategory" class="fd-select">
-          <option value="all">全カテゴリ</option>
-          <option value="食費">食費</option>
-          <option value="交通費">交通費</option>
-          <option value="娯楽">娯楽</option>
-        </select>
-      </div>
+      <details>
+        <summary class="fd-collapsible-summary"><h2 class="fd-title">一覧</h2></summary>
+        <div class="fd-controls">
+          <div id="filterType" class="fd-radio-group">
+              <input type="radio" id="typeAll" name="typeFilter" value="all" checked>
+              <label for="typeAll">すべて</label>
+              <input type="radio" id="typeExpense" name="typeFilter" value="expense">
+              <label for="typeExpense">支出</label>
+              <input type="radio" id="typeIncome" name="typeFilter" value="income">
+              <label for="typeIncome">収入</label>
+          </div>
+          
+          <input id="searchInput" class="fd-input" placeholder="検索…" />
+          
+          <select id="sortSelect" class="fd-select">
+            <option value="date">日付順</option>
+            <option value="amount">金額順</option>
+          </select>
+          
+          <select id="filterCategory" class="fd-select" multiple size="3">
+              <option value="all" selected>すべてのカテゴリ</option>
+          </select>
 
-      <table id="financeTable">
-        <thead>
-          <tr><th>日付</th><th>カテゴリ</th><th>内容</th><th>金額</th></tr>
-        </thead>
-        <tbody></tbody>
-      </table>
+          <input type="date" id="startDate" class="fd-input">
+          <input type="date" id="endDate" class="fd-input">
+        </div>
+
+        <table id="financeTable">
+          <thead>
+            <tr>
+                  <th>日付</th>
+                  <th>タイプ</th>
+                  <th>カテゴリ</th>
+                  <th>内容</th>
+                  <th>金額</th>
+              </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </details>
     </section>
 
-    <!-- グラフ -->
     <section class="fd-section">
       <h2 class="fd-title">グラフ</h2>
       <div class="fd-charts">
-        <canvas id="pieChart" class="fd-chart"></canvas>
-        <canvas id="lineChart" class="fd-chart"></canvas>
-        <canvas id="cumulativeChart" class="fd-chart"></canvas>
+        <canvas id="incomeChart" class="fd-chart"></canvas>
+        <canvas id="expenseChart" class="fd-chart"></canvas>
       </div>
-    </section>
-
-    <!-- アチーブメント -->
-    <section class="fd-section">
-      <h2 class="fd-title">アチーブメント</h2>
-      <div class="fd-badges">
-        <div class="fd-badge is-unlocked">💰 初回目標設定</div>
-        <div class="fd-badge">🔥 連続記録 7日</div>
-        <div class="fd-badge">🧊 節約達成</div>
-        <div class="fd-badge">📅 月次記録更新</div>
+      <div 
+        id="finance-data"
+        data-income='{{ income_stats | tojson | safe }}'
+        data-expense='{{ expense_stats | tojson | safe }}'
+        data-all-records='{{ all_records | tojson | safe }}'
+        style="display: none;">
       </div>
-    </section>
 
-    <!-- 設定 -->
+
     <section class="fd-section">
       <h2 class="fd-title">設定</h2>
       <form id="settingsForm" class="fd-form">
@@ -94,8 +116,6 @@
     </section>
   </div>
 
-  <!-- JS は </body> の直前で読み込む -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="{{ url_for('static', filename='js/finance.js') }}" defer></script>
-</body>
-</html>
+</body></html>

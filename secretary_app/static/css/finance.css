@@ -116,6 +116,10 @@ body::after{
 
 }
 
+.fd-button-container {
+  text-align: right;
+}
+
 .header a:hover, .link-btn:hover{ filter:brightness(1.06); transform:translateY(-1px); }
 
 .header a:active, .link-btn:active{ transform:translateY(0) scale(.98); }
@@ -357,10 +361,13 @@ body.no-scroll{ overflow:hidden; }
 
 /* サマリー */
 .fd-summary {
-  display: grid; gap: 14px;
-  grid-template-columns: repeat(3, 1fr);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
 }
+
 .fd-kpi {
+  flex: 1 1 calc(33.333% - 14px);
   background: var(--glass);
   border: 1px solid var(--glass-border);
   border-radius: 16px;
@@ -395,7 +402,7 @@ body.no-scroll{ overflow:hidden; }
 #financeTable tbody td.amount { text-align: right; font-weight: 800; }
 
 /* グラフ */
-.fd-charts { display: grid; gap: 14px; grid-template-columns: repeat(3, 1fr); }
+.fd-charts { display: grid; gap: 14px; grid-template-columns: 1fr; }
 .fd-chart {
   background: rgba(18,25,32,.45);
   border: 1px solid var(--glass-border);
@@ -437,8 +444,78 @@ body.no-scroll{ overflow:hidden; }
 
 /* レスポンシブ */
 @media (max-width: 920px){
-  .fd-summary { grid-template-columns: 1fr; }
+  .fd-summary .fd-kpi { flex-basis: calc(50% - 7px); }
   .fd-charts  { grid-template-columns: 1fr; }
   .fd-badges  { grid-template-columns: 1fr 1fr; }
   #settingsForm.fd-form { grid-template-columns: 1fr; }
+}
+
+/* ======= Mobile (finance dashboard) ======= */
+
+/* 共通押しやすさ */
+@media (max-width: 900px){
+  .fd-input, .fd-select, #settingsForm.fd-form button { min-height: 44px; font-size: 16px; }
+}
+
+/* タブレット以下：段組み調整 */
+@media (max-width: 920px){
+  .fd-wrap{ padding: 0 16px; margin: 24px auto; }
+
+  .fd-charts{ grid-template-columns: 1fr; }
+  .fd-badges{ grid-template-columns: 1fr 1fr; }
+  #settingsForm.fd-form{ grid-template-columns: 1fr; }
+}
+
+/* スマホ：ヘッダー戻るボタン・テーブル・カードサイズ */
+@media (max-width: 680px){
+  .fd-title{ font-size: 1.1rem; }
+
+  /* テーブルは横スクロール可能に */
+  #financeTable{ display:block; overflow-x:auto; -webkit-overflow-scrolling: touch; }
+  #financeTable table{ width: 720px; } /* 列が折れず横スクロール */
+
+  .fd-kpi{ padding: 14px; }
+
+  .fd-kpi .fd-num{ font-size: 1.6rem; }
+
+  .fd-chart{ height: 240px; }
+
+  /* 検索UIは1列で */
+  .fd-controls{ gap: 8px; }
+  .fd-input, .fd-select{ min-width: unset; width: 100%; }
+}
+
+/* 極小端末 */
+@media (max-width: 360px){
+  .fd-badges{ grid-template-columns: 1fr; }
+}
+
+/* Collapsible Summary */
+.fd-collapsible-summary {
+  cursor: pointer;
+  padding: 10px;
+  background: var(--glass);
+  border-radius: 12px;
+  transition: background 0.2s;
+  list-style: none; /* Remove default marker */
+}
+
+.fd-collapsible-summary:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.fd-collapsible-summary h2 {
+  display: inline;
+  font-size: 1.5rem; /* Larger font size */
+  margin: 0;
+}
+
+.fd-collapsible-summary::before {
+  content: '▶';
+  font-size: 1.2rem;
+  margin-right: 10px;
+}
+
+details[open] > .fd-collapsible-summary::before {
+  content: '▼';
 }

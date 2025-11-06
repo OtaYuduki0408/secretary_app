@@ -1,109 +1,151 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-    <meta charset="UTF-8">
-    <title>Googleカレンダー管理</title>
-    <script src="https://apis.google.com/js/api.js"></script>
-    <script src="static/js/ScheduleManager.js"></script>
-    <style>
-       body {
-        font-family: "Segoe UI", sans-serif;
-        margin: 30px;
-        }
-        input, button {
-        margin: 5px;
-        padding: 6px;
-        }
-        #log {
-        margin-top: 20px;
-        border: 1px solid #aaa;
-        padding: 10px;
-        height: 200px;
-        overflow-y: auto;
-        background: #f8f8f8;
-        }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Googleカレンダー管理</title>
+
+  <script src="https://apis.google.com/js/api.js"></script>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/calendar.css') }}">
 </head>
 <body>
-    <h1>Googleカレンダー管理</h1>
-    <button id="authorize-button">Googleログイン</button>
+  <!-- 背景 -->
+  <div class="page-bg" aria-hidden="true"></div>
 
-    <h3>イベント追加</h3>
-    <input id="event-title" placeholder="タイトル">
-    <input id="event-desc" placeholder="説明">
-    <input id="event-start" type="datetime-local">
-    <input id="event-end" type="datetime-local">
-    <button id="add-event-button" disabled>追加</button>
+  <!-- ヘッダー -->
+  <header class="header">
+    <h1 class="title">Googleカレンダー管理</h1>
+    <div class="actions">
+      <a href="{{ url_for('main') }}" class="btn ghost">メインへ戻る</a>
+      <button id="authorize-button" class="btn primary">Googleログイン</button>
+    </div>
+  </header>
 
-    <h3>イベント削除</h3>
-    <input id="event-id" placeholder="イベントID">
-    <button id="delete-event-button" disabled>削除</button>
+  <!-- コンテナ -->
+  <main class="container">
+    <!-- 追加 -->
+    <section class="card">
+      <h2 class="card-title">イベント追加</h2>
 
-    <h3>イベント確認</h3>
-    <input id="check-start" type="date">
-    <input id="check-end" type="date">
-    <button id="check-event-button" disabled>確認</button>
+      <div class="grid g-2">
+        <label class="field">
+          <span class="label">タイトル</span>
+          <input id="event-title" class="input" placeholder="例：打ち合わせ">
+        </label>
 
-    <h3>ログ</h3>
-    <div id="log"></div>
+        <label class="field">
+          <span class="label">説明</span>
+          <input id="event-desc" class="input" placeholder="任意（場所・メモなど）">
+        </label>
+      </div>
 
-    <script>
-        // ScheduleManager2.js で定義されたクラスのインスタンスを生成
-        const manager = new ScheduleManager();
+      <div class="grid g-2">
+        <label class="field">
+          <span class="label">開始日時</span>
+          <input id="event-start" type="datetime-local" class="input">
+        </label>
 
-        // ログメッセージを画面の #log 要素に追加し、スクロール位置を最下部に移動させる関数
-        const log = (msg) => {
-            const el = document.getElementById("log");
-            const time = new Date().toLocaleTimeString();
-            el.innerHTML += `[${time}] ${msg}<br>`;
-            el.scrollTop = el.scrollHeight;
-        };
+        <label class="field">
+          <span class="label">終了日時</span>
+          <input id="event-end" type="datetime-local" class="input">
+        </label>
+      </div>
 
-        // 「Googleログイン」ボタンにクリックイベントリスナーを設定
-        document.getElementById("authorize-button").addEventListener("click", () => {
-            // ScheduleManager クラスの認証処理メソッドを呼び出し
-            manager.handleAuthClick();
-        });
+      <div class="card-actions">
+        <button id="add-event-button" class="btn success" disabled>＋ 追加</button>
+      </div>
+    </section>
 
-        // 「追加」ボタンにクリックイベントリスナーを設定
-        document.getElementById("add-event-button").addEventListener("click", async () => {
-            // 入力フィールドからイベント情報を取得。タイトルと説明にはデフォルト値を設定
-            const title = document.getElementById("event-title").value || "無題のイベント";
-            const desc = document.getElementById("event-desc").value || "";
-            const start = document.getElementById("event-start").value;
-            const end = document.getElementById("event-end").value;
-            // ScheduleManager クラスのイベント追加メソッドを呼び出し
-            await manager.addEvent(title, desc, start, end, log);
-        });
+    <!-- 削除 -->
+    <section class="card">
+      <h2 class="card-title">イベント削除</h2>
 
-        // 「削除」ボタンにクリックイベントリスナーを設定
-        document.getElementById("delete-event-button").addEventListener("click", async () => {
-            // イベントIDを取得
-            const id = document.getElementById("event-id").value;
-            // IDが存在する場合にのみ、ScheduleManager クラスのイベント削除メソッドを呼び出し
-            if (id) await manager.deleteEvent(id, log);
-        });
+      <div class="grid">
+        <label class="field full">
+          <span class="label">イベントID</span>
+          <input id="event-id" class="input" placeholder="calendar.google.com などで取得できるID">
+        </label>
+      </div>
 
-        // 「確認」ボタンにクリックイベントリスナーを設定
-        document.getElementById("check-event-button").addEventListener("click", async () => {
-            // 期間の開始日と終了日を取得
-            const start = document.getElementById("check-start").value;
-            const end = document.getElementById("check-end").value;
-            // ScheduleManager クラスのイベント一覧取得メソッドを呼び出し
-            await manager.listEvents(start, end, log);
-        });
+      <div class="card-actions">
+        <button id="delete-event-button" class="btn danger" disabled>削除</button>
+      </div>
+    </section>
 
-        // ポップアップ（またはリダイレクト先）からの認証完了時に、アクセストークンを受け取るためのグローバル関数
-        // callback.html などから呼び出されることを想定
-        window.receiveAccessToken = (token) => {
-            log("Google認証成功！");
-            // ScheduleManager にアクセストークンをセット
-            manager.setAccessToken(token);
-            // 認証成功後、イベント操作ボタンを有効化
-            document.getElementById("add-event-button").disabled = false;
-            document.getElementById("delete-event-button").disabled = false;
-            document.getElementById("check-event-button").disabled = false;
-        };
-    </script>
+    <!-- 確認 -->
+    <section class="card">
+      <h2 class="card-title">イベント確認</h2>
+
+      <div class="grid g-2">
+        <label class="field">
+          <span class="label">開始日</span>
+          <input id="check-start" type="date" class="input">
+        </label>
+
+        <label class="field">
+          <span class="label">終了日</span>
+          <input id="check-end" type="date" class="input">
+        </label>
+      </div>
+
+      <div class="card-actions">
+        <button id="check-event-button" class="btn ghost" disabled>確認</button>
+      </div>
+    </section>
+
+    <!-- ログ -->
+    <section class="card">
+      <h2 class="card-title">ログ</h2>
+      <div id="log" class="log"></div>
+    </section>
+  </main>
+
+  <script type="module">
+    import { ScheduleManager } from "{{ url_for('static', filename='js/ScheduleManager.js') }}";
+
+    const manager = new ScheduleManager();
+    const $ = s => document.querySelector(s);
+    const logEl = $("#log");
+
+    const log = (msg) => {
+      const t = new Date().toLocaleTimeString();
+      logEl.insertAdjacentHTML("beforeend", `<div>[${t}] ${msg}</div>`);
+      logEl.scrollTop = logEl.scrollHeight;
+    };
+
+    // 認証
+    $("#authorize-button").addEventListener("click", () => manager.handleAuthClick());
+
+    // 認証後コールバック（popup/redirect から呼ばれる）
+    window.receiveAccessToken = (token) => {
+      log("Google認証成功！");
+      manager.setAccessToken(token);
+      $("#add-event-button").disabled = false;
+      $("#delete-event-button").disabled = false;
+      $("#check-event-button").disabled = false;
+    };
+
+    // 追加
+    $("#add-event-button").addEventListener("click", async () => {
+      await manager.addEvent(
+        $("#event-title").value || "無題のイベント",
+        $("#event-desc").value || "",
+        $("#event-start").value,
+        $("#event-end").value,
+        log
+      );
+    });
+
+    // 削除
+    $("#delete-event-button").addEventListener("click", async () => {
+      const id = $("#event-id").value.trim();
+      if (id) await manager.deleteEvent(id, log);
+    });
+
+    // 確認
+    $("#check-event-button").addEventListener("click", async () => {
+      await manager.listEvents($("#check-start").value, $("#check-end").value, log);
+    });
+  </script>
 </body>
 </html>
