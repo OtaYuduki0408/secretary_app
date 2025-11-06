@@ -4,15 +4,13 @@ from services.user_service import (
 from services.category_service import (
     get_all_categories, add_category, delete_category, clear_all_categories)
 from services.auth_service import register_user, login_user
+from services.expense_service import (add_finance_record,delete_finance_record)
 from services.finance_service import get_finance_summary, get_all_finance_records
 import os
 
+app = Flask(__name__, template_folder='templates', static_folder='static')
+app.secret_key = os.getenv("SECRET_KEY", "devsecret")
 
-app = Flask(__name__,
-            template_folder='templates',
-            static_folder='static')
-
-app.secret_key = os.getenv("SECRET_KEY", "devsecret")  # セッション用
 
 # --------------------
 # ページルーティング
@@ -21,56 +19,49 @@ app.secret_key = os.getenv("SECRET_KEY", "devsecret")  # セッション用
 def main():
     return render_template('main.html')
 
-@app.route('/categories')
-def categories():
-    return render_template('categories.html')
-
 @app.route('/expense')
 def expense():
     return render_template('expense.html')
+
+@app.route('/categories')
+def categories():
+    return render_template('categories.html')
 
 @app.route('/slot')
 def slot():
     return render_template('slot.html')
 
-# **修正済み**：xin の重複解消
 @app.route('/index')
 def index_page():
     return render_template('index2.html')
 
-# **修正済み**：gen の重複解消
 @app.route('/oauth-callback2')
 def oauth_callback2():
     return render_template('oauth-callback2.html')
 
-# **修正済み**：xin の重複解消
 @app.route('/calender')
 def calender_page():
     return render_template('calender.html')
 
-# **修正済み**：gen の重複解消
 @app.route('/oauth-callback')
 def oauth_callback():
     return render_template('oauth-callback.html')
 
 @app.route("/finance")
 def finance():
-    # services層から集計済データを取得
     income_stats, expense_stats = get_finance_summary()
-    
-    # ★ データベースから全レコードを取得する関数を呼び出す
-    all_records = get_all_finance_records() 
-
-    # テンプレートに渡す
+    all_records = get_all_finance_records()
     return render_template(
         "finance.html",
         income_stats=income_stats,
         expense_stats=expense_stats,
-        # ★ all_records を追加してテンプレートに渡す
-        all_records=all_records 
+        all_records=all_records
     )
 
-# 登録ページ
+
+# --------------------
+# 認証関係
+# --------------------
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     if request.method == 'POST':
@@ -84,7 +75,6 @@ def register():
     return render_template('register.html')
 
 
-# ログインページ
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
@@ -98,15 +88,61 @@ def login():
     return render_template('login.html')
 
 
-# ログアウト
 @app.route('/logout')
 def logout():
     session.pop('user', None)
     return redirect(url_for('login'))
 
+
 # --------------------
 # APIルーティング
 # --------------------
+
+# ✅ カテゴリー関連API
+@app.route("/api/categories", methods=["GET"])
+def get_categories_route():
+    result = get_all_categories()
+    return jsonify(result)
+
+@app.route("/api/categories", methods=["POST"])
+def add_category_route():
+    data = request.get_json()
+    name = data.get("name", "").strip()
+    if not name:
+        return jsonify({"error": "カテゴリ名が空です"}), 400
+    result = add_category(name)
+    return jsonify(result)
+
+@app.route("/api/categories/<string:cat_id>", methods=["DELETE"])
+def delete_category_route(cat_id):
+    result = delete_category(cat_id) 
+    return jsonify(result)
+
+@app.route("/api/categories/clear", methods=["DELETE"])
+def clear_categories_route():
+    result = clear_all_categories()
+    return jsonify(result)
+
+
+# ✅ 収支関連API
+@app.route("/api/finance", methods=["GET"])
+def get_finance_records_route():
+    result = get_all_finance_records()
+    return jsonify(result)
+
+@app.route("/api/finance", methods=["POST"])
+def add_finance_record_route():
+    data = request.get_json()
+    result = add_finance_record(data)
+    return jsonify(result)
+
+@app.route("/api/finance/<string:record_id>", methods=["DELETE"])
+def delete_finance_record_route(record_id):
+    result = delete_finance_record(record_id)
+    return jsonify(result)
+
+
+# ✅ ユーザー関連API
 @app.route("/users", methods=["GET"])
 def get_users_route():
     return jsonify(get_all_users())
@@ -130,24 +166,10 @@ def delete_user_route():
     email = request.args.get("email")
     return jsonify(delete_user(email))
 
-@app.route("/api/categories", methods=["GET"])
-def get_categories_route():
-    return jsonify(get_all_categories())
 
-@app.route("/api/categories", methods=["POST"])
-def add_category_route():
-    name = request.json.get("name")
-    return jsonify(add_category(name))
-
-@app.route("/api/categories/<id>", methods=["DELETE"])
-def delete_category_route(id):
-    return jsonify(delete_category(id))
-
-@app.route("/api/categories/clear", methods=["DELETE"])
-def clear_categories_route():
-    return jsonify(clear_all_categories())
-
-
+# --------------------
+# 実行
+# --------------------
 if __name__ == '__main__':
     app.run(
         host='127.0.0.1',
