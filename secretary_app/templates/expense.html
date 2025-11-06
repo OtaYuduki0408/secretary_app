@@ -5,154 +5,74 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>収支管理</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/finance.css') }}"/>
-
-  <!-- 画像ナシの戻る確認モーダル用の最小スタイル -->
-  <style>
-    .return-overlay{position:fixed;inset:0;display:none;place-items:center;background:rgba(0,0,0,.55);z-index:2000}
-    .return-overlay.show{display:grid}
-    .return-card{width:min(520px,92vw);background:#0f172a; color:#e5e7eb; border:1px solid #334155; border-radius:14px; padding:22px; box-shadow:0 24px 80px rgba(0,0,0,.55)}
-    .return-card h3{margin:0 0 8px; font-size:1.25rem}
-    .return-steps{display:flex;gap:6px;margin:10px 0 16px}
-    .return-steps span{flex:1;height:6px;background:#475569;border-radius:999px;opacity:.45}
-    .return-steps span.active{background:#93c5fd;opacity:1}
-    .return-actions{display:flex;gap:10px;justify-content:flex-end}
-    .btn{appearance:none;border:0;border-radius:10px;padding:10px 14px;cursor:pointer}
-    .btn-ghost{background:#111827;color:#e5e7eb;border:1px solid #374151}
-    .btn-primary{background:#3b82f6;color:#fff}
-    .no-scroll{overflow:hidden}
-    /* フォーカス可視化 */
-    .btn:focus{outline:2px solid #93c5fd;outline-offset:2px}
-  </style>
 </head>
 <body>
   <div class="container">
     <div class="header">
       <h1>収支管理</h1>
       <div class="header-actions">
-        <a id="to-main" href="{{ url_for('main') }}" class="link-btn">メインへ戻る</a>
         <a href="{{ url_for('categories') }}" class="link-btn">種類の情報変更へ</a>
       </div>
     </div>
 
+    <!-- 現在のステータス -->
     <section class="card status">
       <h2>現在の状況</h2>
       <div class="status">
-        <p>現在の残高：<b class="num" id="balance">0</b> 円</p>
-        <p>今月の使用額：<b class="num" id="monthly">0</b> 円</p>
-        <p>今日の使用額：<b class="num" id="daily">0</b> 円</p>
+        <p>現在の残高：<b id="balance">0</b> 円</p>
+        <p>今月の使用額：<b id="monthly">0</b> 円</p>
+        <p>今日の使用額：<b id="daily">0</b> 円</p>
       </div>
     </section>
 
+    <!-- 入力フォーム -->
     <section class="card">
-      <h2>支出を記録</h2>
+      <h2>収支の記録</h2>
 
       <div class="form-group">
-        <label for="amount">金額（必須）</label>
-        <input id="amount" class="input" type="number" min="0" placeholder="金額を入力" inputmode="numeric">
-      </div>
-
-      <div class="form-group">
-        <label>種類（必須）</label>
-        <div id="chip-box" class="chips"></div>
-        <div id="no-cat" class="empty" style="display:none">
-          種類が未設定です。<a class="link-btn" href="{{ url_for('categories') }}" style="margin-left:8px">種類の情報変更へ</a>
+        <label>種別</label>
+        <div class="radio-group">
+          <label><input type="radio" name="type" value="income"> 収入</label>
+          <label><input type="radio" name="type" value="expense" checked> 支出</label>
         </div>
       </div>
 
       <div class="form-group">
-        <label for="purpose">使用目的（任意）</label>
-        <input id="purpose" class="input" placeholder="例：ランチ、電車賃">
+        <label>金額</label>
+        <input id="amount" type="number" class="input" min="0" placeholder="金額を入力">
       </div>
 
-      <button id="save" class="btn" type="button">データを送信</button>
+      <div class="form-group">
+        <label>種類</label>
+        <select id="category" class="input"></select>
+        <p id="no-cat" class="empty" style="display:none;">
+          種類が登録されていません。
+          <a href="{{ url_for('categories') }}">追加</a>
+        </p>
+      </div>
+
+      <div class="form-group">
+        <label>メモ</label>
+        <input id="memo" class="input" placeholder="例：昼食、電車代">
+      </div>
+
+      <button id="save" class="btn">データを送信</button>
+    </section>
+
+    <!-- 一覧 -->
+    <section class="card">
+      <h2>直近の記録</h2>
+      <table id="records">
+        <thead>
+          <tr>
+            <th>日付</th><th>種別</th><th>種類</th><th>金額</th><th>メモ</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
     </section>
   </div>
 
-  <!-- 画像なしの戻る確認モーダル -->
-<div id="return-overlay" class="return-overlay" aria-hidden="true">
-  <div class="return-card" role="dialog" aria-modal="true" aria-labelledby="ret-title" aria-describedby="ret-desc">
-    <h3 id="ret-title">メインに戻りますか？</h3>
-    <p id="ret-desc" style="margin:0 0 6px;opacity:.85">未保存の内容はそのまま保持されます。</p>
-    <div class="return-actions">
-      <button id="ret-cancel" class="btn btn-ghost" type="button">キャンセル</button>
-      <button id="ret-yes" class="btn btn-primary" type="button">メインへ戻る</button>
-    </div>
-  </div>
-</div>
-
-<style>
-  .return-overlay{position:fixed;inset:0;display:none;place-items:center;background:rgba(0,0,0,.55);z-index:2000}
-  .return-overlay.show{display:grid}
-  .return-card{width:min(520px,92vw);background:#0f172a;color:#e5e7eb;
-    border:1px solid #334155;border-radius:14px;padding:22px;box-shadow:0 24px 80px rgba(0,0,0,.55)}
-  .return-card h3{margin:0 0 8px;font-size:1.25rem}
-  .return-actions{display:flex;gap:10px;justify-content:flex-end}
-  .btn{appearance:none;border:0;border-radius:10px;padding:10px 14px;cursor:pointer}
-  .btn-ghost{background:#111827;color:#e5e7eb;border:1px solid #374151}
-  .btn-primary{background:#3b82f6;color:#fff}
-  .no-scroll{overflow:hidden}
-  .btn:focus{outline:2px solid #93c5fd;outline-offset:2px}
-</style>
-
-<script>
-(() => {
-  const link = document.getElementById('to-main');
-  const ov   = document.getElementById('return-overlay');
-  const yes  = document.getElementById('ret-yes');
-  const cancel = document.getElementById('ret-cancel');
-
-  const lock = (on)=> document.body.classList.toggle('no-scroll', on);
-
-  function open(){
-    ov.classList.add('show');
-    ov.setAttribute('aria-hidden','false');
-    lock(true);
-  }
-
-  function close(){
-    ov.classList.remove('show');
-    ov.setAttribute('aria-hidden','true');
-    lock(false);
-  }
-
-  link?.addEventListener('click',(e)=>{ e.preventDefault(); open(); });
-  yes.addEventListener('click', ()=> { close(); location.href = link.href; });
-  cancel.addEventListener('click', close);
-
-  // EnterでYES、Escでキャンセル
-  addEventListener('keydown', (e)=>{
-    if(!ov.classList.contains('show')) return;
-    if(e.key==='Enter') yes.click();
-    if(e.key==='Escape') close();
-  });
-})();
-</script>
-
-
-  <!-- 画像なしの戻る確認モーダル制御 -->
-  <script>
-    (() => {
-      const link = document.getElementById('to-main');
-      const ov   = document.getElementById('return-overlay');
-      const steps = ov.querySelectorAll('.return-steps span');
-      const yes  = document.getElementById('ret-yes');
-      const cancel = document.getElementById('ret-cancel');
-
-      const lock = (on)=> document.body.classList.toggle('no-scroll', on);
-
-      function open(){
-        ov.classList.add('show'); ov.setAttribute('aria-hidden','false'); lock(true);
-        steps.forEach((s,i)=> s.classList.toggle('active', i===0));
-        setTimeout(()=> steps.forEach((s,i)=> s.classList.toggle('active', i<=1)), 350);
-        setTimeout(()=> steps.forEach((s,i)=> s.classList.toggle('active', true)), 700);
-      }
-      function close(){ ov.classList.remove('show'); ov.setAttribute('aria-hidden','true'); lock(false); }
-
-      link?.addEventListener('click',(e)=>{ e.preventDefault(); open(); });
-      yes.addEventListener('click', ()=> { close(); location.href = link.href; });
-      cancel.addEventListener('click', close);
-      addEventListener('keydown', (e)=>{ if(!ov.classList.contains('show')) return; if(e.key==='Enter') yes.click(); if(e.key==='Escape') close(); });
-    })();
-  </script>
+  <script src="{{ url_for('static', filename='js/expense.js') }}"></script>
 </body>
 </html>

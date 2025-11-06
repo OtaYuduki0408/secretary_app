@@ -8,38 +8,36 @@
 </head>
 <body>
 
-  <div class="fd-wrap">
-    <div class="fd-button-container">
-      <a href="/" class="link-btn">mainに戻る</a>
-    </div>
-        <section class="fd-section">
-      <h2 class="fd-title">サマリー</h2>
-            <div class="fd-summary">
-            <div class="fd-kpi">
-              <h3>現在の所持金</h3>
-              <p id="current-balance" class="fd-num">-- 円</p>
-            </div>
-            <div class="fd-kpi">
-              <h3>今月の使用額</h3>
-              <p id="monthly-expense" class="fd-num">-- 円</p>
-            </div>
-            <div class="fd-kpi">
-              <h3>今月の目標額</h3>
-              <p id="goal-amount" class="fd-num">-- 円</p>
-            </div>
-            <div class="fd-kpi">
-              <h3>今月の収入</h3>
-              <p id="monthly-income" class="fd-num">-- 円</p>
-            </div>
-            <div class="fd-kpi">
-              <h3>今日の使用額</h3>
-              <p id="daily-expense" class="fd-num">-- 円</p>
-            </div>
-            <div class="fd-kpi">
-              <h3>今日の使用額(必需品抜き)</h3>
-              <p id="daily-expense-no-necessities" class="fd-num">-- 円</p>
-            </div>
-          </div>    </section>
+<!-- 右上：メインに戻る -->
+  <div class="header" style="margin: 20px auto 0; max-width: 980px; padding: 0 20px;">
+    <div style="flex:1"></div>
+    <a class="link-btn" href="{{ url_for('main') }}" title="メインに戻る" aria-label="メインに戻る">
+      <!-- 左矢印アイコン -->
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" style="vertical-align:-3px; margin-right:6px">
+        <path d="M15 19l-7-7 7-7" stroke="#eaf1f8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      メインに戻る
+    </a>
+  </div>
+  
+  <div class="fd-wrap">
+        <section class="fd-section">
+      <h2 class="fd-title">サマリー</h2>
+      <div class="fd-summary">
+        <div class="fd-kpi">
+          <h3>現在の所持金</h3>
+          <p id="current-balance" class="fd-num">-- 円</p>
+        </div>
+        <div class="fd-kpi">
+          <h3>目標金額</h3>
+          <p id="goal-amount" class="fd-num">-- 円</p>
+        </div>
+        <div class="fd-kpi">
+          <h3>今月の使用額</h3>
+          <p id="monthly-expense" class="fd-num">-- 円</p>
+        </div>
+      </div>
+    </section>
 
     <section class="fd-section">
       <details>
