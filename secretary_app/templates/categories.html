@@ -1,106 +1,43 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>種類の情報変更</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/finance.css') }}">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>種類の情報変更</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/finance.css') }}">
 </head>
 <body>
-  <div class="container">
-    <div class="header">
-      <h1>種類の情報変更</h1>
-      <a href="{{ url_for('expense') }}">収支管理へ戻る</a>
+    <div class="container">
+        <div class="header">
+            <h1>種類の情報変更</h1>
+            <a href="{{ url_for('expense') }}">収支管理へ戻る</a>
+        </div>
+
+        <section class="card">
+            <h2>種類の追加</h2>
+            <div class="actions">
+                <input id="cat-input" class="input" placeholder="例：食事 / 必需品 / 収入 など" />
+                
+                <select id="cat-type" class="input" style="width: 100px; margin-right: 8px;">
+                    <option value="expense">支出</option>
+                    <option value="income">収入</option>
+                </select>
+                
+                <button id="cat-add" class="btn" type="button">追加</button>
+                <button id="cat-clear" class="btn" type="button" style="background:#ef4444">全削除</button>
+            </div>
+            <p style="color:#6b7280;margin-top:6px">※ 同名・同タイプは追加されません。削除は各ボックスの「×」を押してください。</p>
+        </section>
+
+        <section class="card">
+            <h2>現在の種類</h2>
+            <div id="cat-list" class="chips"></div>
+            <div id="cat-empty" class="empty" style="display:none">種類がまだありません。上の入力から追加してください。</div>
+        </section>
     </div>
 
-    <section class="card">
-      <h2>種類の追加</h2>
-      <div class="actions">
-        <input id="cat-input" class="input" placeholder="例：食事 / 必需品 / 収入 など" />
-        <button id="cat-add" class="btn" type="button">追加</button>
-        <button id="cat-clear" class="btn" type="button" style="background:#ef4444">全削除</button>
-      </div>
-      <p style="color:#6b7280;margin-top:6px">※ 同名は追加されません。削除は各ボックスの「×」を押してください。</p>
-    </section>
+    <script src="{{ url_for('static', filename='js/Parallax_and_Theme_rotation.js') }}"></script>
 
-    <section class="card">
-      <h2>現在の種類</h2>
-      <div id="cat-list" class="chips"></div>
-      <div id="cat-empty" class="empty" style="display:none">種類がまだありません。上の入力から追加してください。</div>
-    </section>
-  </div>
-
-  <!-- 既存のテーマやパララックスJS -->
-  <script src="{{ url_for('static', filename='js/Parallax_and_Theme_rotation.js') }}"></script>
-
-  <!-- Supabaseと通信するカテゴリ管理用JS -->
-  <script>
-  document.addEventListener("DOMContentLoaded", () => {
-    const input = document.getElementById("cat-input");
-    const addBtn = document.getElementById("cat-add");
-    const clearBtn = document.getElementById("cat-clear");
-    const list = document.getElementById("cat-list");
-    const empty = document.getElementById("cat-empty");
-
-    // 初期表示
-    loadCategories();
-
-    async function loadCategories() {
-      const res = await fetch("/api/categories");
-      const data = await res.json();
-      renderCategories(data);
-    }
-
-    async function addCategory() {
-      const name = input.value.trim();
-      if (!name) return;
-      const res = await fetch("/api/categories", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name })
-      });
-      const data = await res.json();
-      if (data.error) alert(data.error);
-      input.value = "";
-      loadCategories();
-    }
-
-    async function deleteCategory(id) {
-      await fetch(`/api/categories/${id}`, { method: "DELETE" });
-      loadCategories();
-    }
-
-    async function clearAll() {
-      if (confirm("本当に全て削除しますか？")) {
-        await fetch("/api/categories/clear", { method: "DELETE" });
-        loadCategories();
-      }
-    }
-
-    function renderCategories(items) {
-      list.innerHTML = "";
-      if (!items.length) {
-        empty.style.display = "block";
-        return;
-      }
-      empty.style.display = "none";
-      items.forEach(cat => {
-        const div = document.createElement("div");
-        div.className = "chip";
-        div.innerHTML = `
-          ${cat.name}
-          <button class="delete" onclick="deleteCategory('${cat.id}')">×</button>
-        `;
-        list.appendChild(div);
-      });
-    }
-
-    // グローバル登録
-    window.deleteCategory = deleteCategory;
-
-    addBtn.addEventListener("click", addCategory);
-    clearBtn.addEventListener("click", clearAll);
-  });
-  </script>
+    <script src="{{ url_for('static', filename='js/categories.js') }}"></script>
 </body>
 </html>
