@@ -127,7 +127,7 @@ def slot():
 
 @app.route('/index')
 def index_page():
-    return render_template('index2.html')
+    return render_template('index.html')
 
 @app.route('/oauth-callback2')
 def oauth_callback2():
