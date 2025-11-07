@@ -2,9 +2,9 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>収支管理</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/finance.css') }}"/>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/expense.css') }}">
 </head>
 <body>
   <div class="container">
@@ -12,13 +12,13 @@
       <h1>収支管理</h1>
       <div class="header-actions">
         <a href="{{ url_for('categories') }}" class="link-btn">種類の情報変更へ</a>
+        <a href="{{ url_for('main') }}" class="link-btn">メインに戻る</a>
       </div>
     </div>
 
-    <!-- 現在のステータス -->
-    <section class="card status">
+    <section class="card status-card">
       <h2>現在の状況</h2>
-      <div class="status">
+      <div class="status-grid">
         <p>現在の残高：<b id="balance">0</b> 円</p>
         <p>今月の使用額：<b id="monthly">0</b> 円</p>
         <p>今日の使用額：<b id="daily">0</b> 円</p>
@@ -28,7 +28,6 @@
     <!-- 入力フォーム -->
     <section class="card">
       <h2>収支の記録</h2>
-
       <div class="form-group">
         <label>種別</label>
         <div class="radio-group">
@@ -36,43 +35,41 @@
           <label><input type="radio" name="type" value="expense" checked> 支出</label>
         </div>
       </div>
-
       <div class="form-group">
         <label>金額</label>
         <input id="amount" type="number" class="input" min="0" placeholder="金額を入力">
       </div>
-
       <div class="form-group">
         <label>種類</label>
         <select id="category" class="input"></select>
         <p id="no-cat" class="empty" style="display:none;">
           種類が登録されていません。
-          <a href="{{ url_for('categories') }}">追加</a>
+          <a href="{{ url_for('categories') }}">追加する</a>
         </p>
       </div>
-
       <div class="form-group">
         <label>メモ</label>
         <input id="memo" class="input" placeholder="例：昼食、電車代">
       </div>
-
       <button id="save" class="btn">データを送信</button>
     </section>
 
-    <!-- 一覧 -->
     <section class="card">
       <h2>直近の記録</h2>
       <table id="records">
         <thead>
           <tr>
-            <th>日付</th><th>種別</th><th>種類</th><th>金額</th><th>メモ</th>
+            <th>日付</th>
+            <th>種別</th>
+            <th>種類</th>
+            <th>金額</th>
+            <th>メモ</th>
           </tr>
         </thead>
         <tbody></tbody>
       </table>
     </section>
   </div>
-
   <script src="{{ url_for('static', filename='js/expense.js') }}"></script>
 </body>
 </html>
