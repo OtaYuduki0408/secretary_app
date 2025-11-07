@@ -20,6 +20,7 @@ from services.category_service import (
 from services.auth_service import register_user, login_user
 from services.finance_service import get_finance_summary, get_all_finance_records
 from services.chat_space_model import ChatSpaceModel
+from services.memo_routes import memo_bp
 import os
 
 app = Flask(__name__, template_folder='templates', static_folder='static')
@@ -152,6 +153,10 @@ def finance():
 @app.route("/nm")
 def nm():
     return render_template("notification_test.html")
+
+@app.route('/memo')
+def memo():
+    return render_template('memo.html')
 
 
 # --------------------
@@ -722,6 +727,8 @@ def chat_api():
     print(f"--- [DEBUG] /api/chat: Received response from check_chat_space: {response_data} ---")
     
     return jsonify(response_data)
+
+app.register_blueprint(memo_bp, url_prefix='/api/memos')
 
 if __name__ == '__main__':
     app.run(

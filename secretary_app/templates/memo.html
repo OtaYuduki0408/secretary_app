@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Keepメモ</title>
+<style>
+    body {
+      font-family: "Segoe UI", sans-serif;
+      background-color: #f5f5f5;
+      margin: 0;
+      padding: 20px;
+    }
+    h1 {
+      text-align: center;
+      color: #333;
+    }
+    .container {
+      max-width: 600px;
+      background: white;
+      margin: 20px auto;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+    }
+    input, textarea, button {
+      width: 100%;
+      margin-bottom: 10px;
+      padding: 8px;
+      font-size: 16px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+    }
+    button {
+      background-color: #007bff;
+      color: white;
+      cursor: pointer;
+      transition: background 0.3s;
+    }
+    button:hover {
+      background-color: #0056b3;
+    }
+    .memo {
+      border: 1px solid #ddd;
+      padding: 10px;
+      margin-top: 10px;
+      border-radius: 6px;
+      background: #fafafa;
+      word-wrap: break-word; /* 内容が長い場合の折り返し */
+    }
+    .memo-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .add-option-group label {
+        margin-bottom: 0;
+    }
+
+    .list-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 20px; /* 上の要素との間隔 */
+    }
+    .list-header h2 {
+      margin: 0;
+    }
+    .list-header button {
+      width: auto;
+      margin-bottom: 0;
+    }
+
+    .bulk-actions-footer {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      background-color: #fff;
+      padding: 15px;
+      display: flex;
+      justify-content: center;
+      gap: 15px;
+      box-shadow: 0 -2px 5px rgba(0,0,0,0.1);
+      border-top: 1px solid #ddd;
+    }
+    .bulk-actions-footer button {
+      width: auto;
+      margin-bottom: 0;
+    }
+    .bulk-actions-footer button.danger {
+      background-color: #dc3545;
+    }
+    .bulk-actions-footer button.danger:hover {
+      background-color: #c82333;
+    }
+
+    /* 一括削除モードの制御 */
+    .bulk-delete-checkbox {
+      display: none; /* 通常時は非表示 */
+    }
+    body.bulk-delete-mode .bulk-delete-checkbox {
+      display: block; /* モード時に表示 */
+    }
+    /* モード時は他のコントロールを隠す */
+    body.bulk-delete-mode .memo-controls {
+      display: none;
+    }
+    body.bulk-delete-mode .pin-checkbox {
+        display: none;
+    }
+</style>
+</head>
+<body>
+<h1>Keepメモ</h1>
+<div class="container">
+<h2>メモを追加</h2>
+<input id="title" type="text" placeholder="タイトル" />
+<textarea id="content" rows="4" placeholder="内容"></textarea>
+<div class="add-options">
+  <div class="add-option-group">
+    <input type="checkbox" id="add-is-pinned">
+    <label for="add-is-pinned">ピン留めする</label>
+  </div>
+  <div class="add-option-group">
+    <label for="add-priority">優先順位:</label>
+    <input type="number" id="add-priority" placeholder="1, 2, 3...">
+  </div>
+</div>
+<button onclick="addMemo()">追加</button>
+<div class="search-bar">
+<input id="search" type="text" placeholder="キーワード検索" />
+<button onclick="searchMemos()">検索</button>
+</div>
+<div class="filter-options">
+  <div class="filter-group">
+    <label for="search-type">検索対象:</label>
+    <select id="search-type">
+      <option value="all" selected>全文</option>
+      <option value="title">タイトル</option>
+      <option value="content">本文</option>
+    </select>
+  </div>
+  <div class="filter-group">
+    <label for="start-date">開始日:</label>
+    <input type="date" id="start-date">
+  </div>
+  <div class="filter-group">
+    <label for="end-date">終了日:</label>
+    <input type="date" id="end-date">
+  </div>
+</div>
+<div class="list-header">
+  <h2>メモ一覧</h2>
+  <button id="bulk-delete-toggle-btn" onclick="toggleBulkDeleteMode()">選択</button>
+</div>
+<div id="memo-list"></div>
+</div>
+<div id="bulk-delete-actions" class="bulk-actions-footer" hidden>
+    <button onclick="deselectAll()">選択をすべて解除</button>
+    <button class="danger" onclick="deleteSelectedMemos()">削除</button>
+    <button onclick="toggleBulkDeleteMode(false)">キャンセル</button>
+</div>
+<script>
+    // Flaskのルーティングに対応するため、相対パスを使用
+    const API_URL_BASE = "/api/memos"; 
+    // メモ一覧の取得と表示
+    async function fetchMemos(params = {}) {
+      const { keyword = "", searchType = "all", startDate = "", endDate = "" } = params;
+      
+      // クエリパラメータを構築
+      const query = new URLSearchParams({
+        q: keyword,
+        type: searchType,
+        start: startDate,
+        end: endDate
+      });
+
+      const res = await fetch(`${API_URL_BASE}?${query.toString()}`);
+ 
+      if (!res.ok) {
+        console.error("Failed to fetch memos:", res.status);
+        document.getElementById("memo-list").innerHTML = "<p>メモの読み込みに失敗しました。</p>";
+        return;
+      }
+      const memos = await res.json();
+      const list = document.getElementById("memo-list");
+      list.innerHTML = "";
+      if (memos.length === 0) {
+        list.innerHTML = "<p>該当するメモがありません。</p>";
+        return;
+      }
+      memos.forEach(memo => {
+        const memoElement = createMemoElement(memo);
+        list.appendChild(memoElement);
+      });
+    }
+
+    // メモ要素を作成する共通関数
+    function createMemoElement(memo) {
+        const div = document.createElement("div");
+        div.className = "memo";
+        div.id = `memo-${memo.id}`;
+
+        // ピン留めと優先順位に応じてクラスを追加
+        if (memo.is_pinned) {
+            div.classList.add("pinned");
+            const priority = parseInt(memo.priority, 10);
+            if (priority >= 1 && priority <= 5) {
+                div.classList.add(`priority-${priority}`);
+            } else if (priority >= 6) {
+                div.classList.add("priority-high");
+            }
+        }
+
+        const date = memo.created_at ? new Date(memo.created_at).toLocaleString() : '日付不明';
+
+        div.innerHTML = `
+        <div class="memo-header">
+          <input type="checkbox" class="bulk-delete-checkbox" value="${memo.id}">
+          <strong>${memo.title}</strong>
+          <div class="memo-controls">
+            <input type="number" class="priority-input" value="${memo.priority || ''}" onchange="updateMemo('${memo.id}', { priority: this.value, is_pinned: true })" placeholder="順位" title="優先順位 (ピン留め時のみ有効)">
+            <input type="checkbox" class="pin-checkbox" ${memo.is_pinned ? 'checked' : ''} onchange="updateMemo('${memo.id}', { is_pinned: this.checked })" title="ピン留め">
+            <span class="delete-btn" onclick="deleteMemo('${memo.id}')">×</span>
+          </div>
+        </div>
+        <p>${memo.content}</p>
+        <small>作成日時: ${date}</small>
+        `;
+        return div;
+    }
+
+    // メモの更新 (ピン留め・優先順位)
+    async function updateMemo(id, data) {
+        // 優先順位が空文字の場合、nullを送信する
+        if (data.priority === '') {
+            data.priority = null;
+        }
+
+        const res = await fetch(`${API_URL_BASE}/${id}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(data)
+        });
+
+        if (res.ok) {
+            searchMemos(); // 成功したらソート順を反映するために再検索
+        } else {
+            const err = await res.json();
+            alert(err.error || "メモの更新に失敗しました。");
+        }
+    }
+
+    // メモの追加
+    async function addMemo() {
+      const title = document.getElementById("title").value.trim();
+      const content = document.getElementById("content").value.trim();
+      const isPinned = document.getElementById("add-is-pinned").checked;
+      const priority = document.getElementById("add-priority").value;
+
+      if (!content) {
+        alert("内容を入力してください。");
+        return;
+      }
+
+      const res = await fetch(API_URL_BASE, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title, content, is_pinned: isPinned, priority })
+      });
+
+      if (res.ok) {
+        const newMemoData = await res.json();
+        const memoElement = createMemoElement(newMemoData.memo);
+        
+        const list = document.getElementById("memo-list");
+        list.prepend(memoElement); // リストの先頭に追加
+
+        // 入力欄をクリア
+        document.getElementById("title").value = "";
+        document.getElementById("content").value = "";
+        document.getElementById("add-is-pinned").checked = false;
+        document.getElementById("add-priority").value = "";
+
+      } else {
+        const err = await res.json();
+        alert(err.error || "メモ追加に失敗しました。");
+      }
+    }
+    // メモの削除
+    async function deleteMemo(id) {
+      if (!confirm("このメモを削除しますか？")) return;
+      const res = await fetch(`${API_URL_BASE}/${id}`, { method: "DELETE" });
+      if (res.ok) {
+        searchMemos(); // 成功したら現在の絞り込み条件で再検索
+      } else {
+        const err = await res.json();
+        alert(err.error || "メモ削除に失敗しました。");
+            }
+          }
+      
+          // --- 一括削除モード関連の関数 ---
+          let isBulkDeleteMode = false;
+      
+          function toggleBulkDeleteMode(forceOff = null) {
+              isBulkDeleteMode = forceOff !== null ? !forceOff : !isBulkDeleteMode;
+              
+              document.body.classList.toggle('bulk-delete-mode', isBulkDeleteMode);
+              document.getElementById('bulk-delete-actions').hidden = !isBulkDeleteMode;
+      
+              // モード終了時にチェックをすべて外す
+              if (!isBulkDeleteMode) {
+                  deselectAll();
+              }
+          }
+      
+          function deselectAll() {
+              const checkedBoxes = document.querySelectorAll('#memo-list .bulk-delete-checkbox:checked');
+              checkedBoxes.forEach(cb => cb.checked = false);
+          }
+      
+          async function deleteSelectedMemos() {
+              const checkedBoxes = document.querySelectorAll('#memo-list .bulk-delete-checkbox:checked');
+              const memoIds = Array.from(checkedBoxes).map(cb => cb.value);
+      
+              if (memoIds.length === 0) {
+                  alert("削除するメモが選択されていません。");
+                  return;
+              }
+      
+              if (!confirm(`${memoIds.length}件のメモを本当に削除しますか？`)) {
+                  return;
+              }
+      
+              const res = await fetch(`${API_URL_BASE}/bulk`, {
+                  method: 'DELETE',
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ ids: memoIds })
+              });
+      
+              if (res.ok) {
+                  const result = await res.json();
+                  alert(result.message || 'メモを削除しました。');
+                  toggleBulkDeleteMode(false); // モードを終了
+                  searchMemos(); // リストを再描画
+              } else {
+                  const err = await res.json();
+                  alert(err.error || "一括削除に失敗しました。");
+              }
+          }
+      
+          // メモの検索
+    function searchMemos() {
+      const keyword = document.getElementById("search").value.trim();
+      const searchType = document.getElementById("search-type").value;
+      const startDate = document.getElementById("start-date").value;
+      const endDate = document.getElementById("end-date").value;
+      
+      fetchMemos({
+        keyword: keyword,
+        searchType: searchType,
+        startDate: startDate,
+        endDate: endDate
+      });
+    }
+    // ページ読み込み時に一覧表示
+    searchMemos();
+    // Enterキーで検索
+    document.getElementById("search").addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            searchMemos();
+        }
+    });
+</script>
+</body>
+</html>
