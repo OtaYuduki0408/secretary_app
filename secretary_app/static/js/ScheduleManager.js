@@ -169,4 +169,38 @@ async listEvents(start, end, log) {
     // 一定要返回 events，这样上层可以拿到数组
     return events;
 }
+
+    async updateEvent(eventId, newStart, newEnd, newTitle, newDescription, log) {
+        await gapi.client.load("calendar", "v3");
+
+        // まず既存のイベントを取得
+        const response = await gapi.client.calendar.events.get({
+            calendarId: "primary",
+            eventId: eventId,
+        });
+        const event = response.result;
+
+        // 更新するフィールドを設定
+        if (newTitle !== undefined) {
+            event.summary = newTitle;
+        }
+        if (newDescription !== undefined) {
+            event.description = newDescription;
+        }
+        if (newStart !== undefined) {
+            event.start = { dateTime: new Date(newStart).toISOString() };
+        }
+        if (newEnd !== undefined) {
+            event.end = { dateTime: new Date(newEnd).toISOString() };
+        }
+
+        // イベントを更新
+        const updatedResponse = await gapi.client.calendar.events.update({
+            calendarId: "primary",
+            eventId: eventId,
+            resource: event,
+        });
+        log(`イベント更新: ${updatedResponse.result.id} (${updatedResponse.result.summary})`);
+        return updatedResponse.result;
+    }
 }

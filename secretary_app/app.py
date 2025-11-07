@@ -109,7 +109,8 @@ def _has_required_scopes(token_info, required_scope: str) -> bool:
 # --------------------
 @app.route('/')
 def main():
-    return render_template('main.html')
+    gemini_api_key = os.getenv("GEMINI_API_KEY")
+    return render_template('main.html', gemini_api_key=gemini_api_key)
 
 @app.route('/expense')
 def expense():

@@ -8,6 +8,9 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
+  <script>
+    window.GEMINI_API_KEY = "{{ gemini_api_key }}";
+  </script>
  
   <div class="parallax" aria-hidden="true">
     <div id="plx-back"  class="plx-layer back"></div>

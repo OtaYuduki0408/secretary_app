@@ -1,32 +1,29 @@
 <!DOCTYPE html>
-<html>
+<html lang="ja">
 <head>
-    <title>Google Auth Callback</title>
-    <script>
+    <meta charset="UTF-8">
+    <title>認証コールバック</title>
+    <script type="text/javascript">
         window.onload = function() {
-            if (window.location.hash) {
-                const params = new URLSearchParams(window.location.hash.substring(1));
-                const accessToken = params.get('access_token');
+            // URLのハッシュフラグメントからアクセストークンを抽出
+            const params = new URLSearchParams(window.location.hash.substring(1));
+            const accessToken = params.get('access_token');
 
-                // Check if opener and scheduleManager exist before calling setAccessToken
-                if (window.opener && window.opener.manager) {
-                    window.opener.manager.setAccessToken(accessToken);
+            if (accessToken) {
+                // 親ウィンドウにアクセストークンを渡す
+                if (window.opener && window.opener.receiveAccessToken) {
+                    window.opener.receiveAccessToken(accessToken);
+                    window.close(); // 認証ウィンドウを閉じる
                 } else {
-                    // Optional: handle the case where the opener is not available
-                    console.error("Opener window or scheduleManager not found.");
+                    document.body.textContent = '認証成功しましたが、親ウィンドウとの連携に失敗しました。';
                 }
-                
-                // Close the popup window
-                window.close();
             } else {
-                // Optional: handle the case where there is no hash in the URL
-                console.error("No auth token found in URL hash.");
-                window.close();
+                document.body.textContent = '認証に失敗しました。アクセストークンが見つかりません。';
             }
         };
     </script>
 </head>
 <body>
-    <p>Authenticating... Please wait.</p>
+    認証処理中...
 </body>
 </html>
