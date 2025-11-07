@@ -2,7 +2,7 @@
 {% block content %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/login.css') }}">
 
-<div class="login-header">
+<div class="auth-header">
   <a href="{{ url_for('main') }}" class="link-btn">メインに戻る</a>
 </div>
 
@@ -22,7 +22,7 @@
   <p class="error-msg">{{ error }}</p>
 {% endif %}
 
-<div class="login-links">
+<div class="auth-links">
   <a href="{{ url_for('register') }}" class="link-text">新規登録はこちら</a>
 </div>
 {% endblock %}

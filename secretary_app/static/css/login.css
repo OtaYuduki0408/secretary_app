@@ -28,14 +28,14 @@ h2{
   font-size:1.9rem;
 }
 
-.login-header{
+.auth-header{
   width:min(560px,92%);
   margin:32px auto 0;
   display:flex;
   justify-content:flex-end;
 }
 
-.login-header .link-btn{
+.auth-header .link-btn{
   text-decoration:none;
   color:var(--text);
   border:1px solid rgba(148,163,184,.45);
@@ -46,12 +46,13 @@ h2{
   transition:.2s;
 }
 
-.login-header .link-btn:hover{
+.auth-header .link-btn:hover{
   background:rgba(56,189,248,.2);
   transform:translateY(-1px);
 }
 
-form[action="/login"]{
+form[action="/login"],
+form[action="/register"]{
   width:min(560px,92%);
   margin:0 auto 40px;
   padding:26px;
@@ -61,7 +62,8 @@ form[action="/login"]{
   box-shadow:var(--shadow);
 }
 
-form[action="/login"] label{
+form[action="/login"] label,
+form[action="/register"] label{
   display:block;
   margin:10px 0 6px;
   font-weight:600;
@@ -69,7 +71,10 @@ form[action="/login"] label{
 }
 
 form[action="/login"] input[type="email"],
-form[action="/login"] input[type="password"]{
+form[action="/login"] input[type="password"],
+form[action="/register"] input[type="email"],
+form[action="/register"] input[type="password"],
+form[action="/register"] input[type="text"]{
   width:100%;
   box-sizing:border-box;
   font-size:1rem;
@@ -83,12 +88,16 @@ form[action="/login"] input[type="password"]{
 }
 
 form[action="/login"] input[type="email"]:focus,
-form[action="/login"] input[type="password"]:focus{
+form[action="/login"] input[type="password"]:focus,
+form[action="/register"] input[type="email"]:focus,
+form[action="/register"] input[type="password"]:focus,
+form[action="/register"] input[type="text"]:focus{
   border-color:var(--accent);
   box-shadow:0 0 0 2px rgba(56,189,248,.3);
 }
 
-form[action="/login"] button[type="submit"]{
+form[action="/login"] button[type="submit"],
+form[action="/register"] button[type="submit"]{
   width:100%;
   margin-top:18px;
   border:none;
@@ -102,22 +111,24 @@ form[action="/login"] button[type="submit"]{
   transition:.2s;
 }
 
-form[action="/login"] button[type="submit"]:hover{
+form[action="/login"] button[type="submit"]:hover,
+form[action="/register"] button[type="submit"]:hover{
   filter:brightness(1.05);
   box-shadow:0 10px 25px rgba(14,165,233,.35);
 }
 
-form[action="/login"] button[type="submit"]:active{
+form[action="/login"] button[type="submit"]:active,
+form[action="/register"] button[type="submit"]:active{
   transform:translateY(1px);
 }
 
-.login-links{
+.auth-links{
   width:min(560px,92%);
   margin:0 auto 24px;
   text-align:right;
 }
 
-.login-links .link-text{
+.auth-links .link-text{
   color:#cfe7ff;
   text-decoration:none;
   border-bottom:1px dashed rgba(207,231,255,.55);
@@ -125,7 +136,7 @@ form[action="/login"] button[type="submit"]:active{
   transition:opacity .2s;
 }
 
-.login-links .link-text:hover{
+.auth-links .link-text:hover{
   opacity:.85;
 }
 

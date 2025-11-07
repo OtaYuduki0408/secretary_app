@@ -1,973 +1,395 @@
-* { box-sizing: border-box; }
-
 :root{
-  /* **変更点: コントラストの高い色に調整** */
-  --bg-1: #121212; /* 濃い背景 */
-  --bg-2: #1e1e1e; /* 薄い背景 */
-  --text: #ffffff; /* 明るい文字色 */
-  --muted: #bbbbbb; /* 控えめな文字色 */
-
-  --ring: #4da6ff; /* アクセントを明るく */
-  --accent: #007bff; /* 青系のアクセント */
-  --primary: #4CAF50; /* 緑のボタン色（変更なし） */
-
-  --glass: rgba(30, 30, 30, 0.8); /* カード背景を濃く透明度を上げる */
-  --glass-border: #444444; /* 境界線を濃くする */
-  --shadow: rgba(0,0,0,.60); /* 影を濃く */
+  --bg:#0f172a;
+  --panel:#1e293b;
+  --panel-soft:#243045;
+  --text:#f8fafc;
+  --muted:#cbd5f5;
+  --accent:#38bdf8;
+  --accent-strong:#0ea5e9;
+  --success:#34d399;
+  --danger:#f87171;
+  --shadow:0 20px 45px rgba(15,23,42,.35);
+  --radius-lg:22px;
 }
 
-/* ===== 背景 (変更点: パターンとグラデーションの調整) ===== */
+*{box-sizing:border-box;}
+
 html,body{
-  height:100%;
   margin:0;
+  min-height:100%;
+  font-family:"Noto Sans JP","Hiragino Kaku Gothic ProN",YuGothic,Meiryo,sans-serif;
   color:var(--text);
-  /* グラデーションをシンプルに、明るさを抑える */
-  background:
-    radial-gradient(1200px 800px at 70% 20%, rgba(77, 166, 255, .15), transparent 60%),
-    radial-gradient(900px 700px at 20% 85%, rgba(77, 166, 255, .10), transparent 60%),
-    linear-gradient(180deg, var(--bg-2), var(--bg-1));
-  font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans JP", "Hiragino Kaku Gothic ProN", "Yu Gothic", Meiryo, sans-serif;
+  background:radial-gradient(circle at 20% 20%, rgba(56,189,248,.15), transparent 40%),
+             radial-gradient(circle at 80% 20%, rgba(14,165,233,.25), transparent 45%),
+             linear-gradient(180deg,#0b1220,#0f172a);
+}
+
+.fd-wrap{
+  width:min(1100px,94%);
+  margin:40px auto 120px;
   position:relative;
+  z-index:1;
+  display:flex;
+  flex-direction:column;
+  gap:24px;
 }
-/* グリッドパターンを控えめに */
-body::before{
-  content:""; position:fixed; inset:-10vmax; pointer-events:none; z-index:0;
-  background: repeating-linear-gradient(135deg,
-              rgba(255,255,255,.015) 0px, /* より薄い線 */
-              rgba(255,255,255,.015) 1px,
-              rgba(0,0,0,0)           2px,
-              rgba(0,0,0,0)           8px);
-  transform: scale(1.02);
-}
-/* オーバーレイを削除/調整 */
-body::after{
-  content:""; position:fixed; inset:0; pointer-events:none; z-index:0;
-  background: radial-gradient(1200px 900px at 50% 55%,
-              rgba(0,0,0,.00) 0%, /* 透明に近い */
-              rgba(0,0,0,.15) 55%,
-              rgba(0,0,0,.30) 100%);
-}
-
-
-/* ===== リンクボタン (変更なし) ===== */
-.header a, .link-btn{
-  text-decoration:none; color:var(--text);
-  background: var(--glass);
-  border:1px solid var(--glass-border);
-  backdrop-filter: blur(12px) saturate(130%);
-  -webkit-backdrop-filter: blur(12px) saturate(130%);
-  padding:10px 14px; border-radius:12px; display:inline-block;
-  box-shadow: 0 10px 24px var(--shadow);
-}
-.fd-button-container {
-  text-align: right;
-}
-.header a:hover, .link-btn:hover{ filter:brightness(1.06); transform:translateY(-1px); }
-.header a:active, .link-btn:active{ transform:translateY(0) scale(.98); }
-
-
-/* ===== 統計ダッシュボード用: 衝突回避プレフィックス .fd- ===== */
-
-.fd-wrap { position: relative; z-index: 1; max-width: 980px; margin: 40px auto; padding: 0 20px; }
-.fd-section { margin: 22px 0; }
-.fd-title { margin: 0 0 12px; font-size: 1.25rem; color: var(--text); /* 変更なし */ }
-
-/* サマリー KPI (変更点: 数値の色を強調) */
-.fd-summary {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 14px;
-}
-
-.fd-kpi {
-  flex: 1 1 calc(33.333% - 14px);
-  background: var(--glass);
-  border: 1px solid var(--glass-border);
-  border-radius: 16px;
-  padding: 16px;
-  backdrop-filter: blur(12px) saturate(130%);
-  -webkit-backdrop-filter: blur(12px) saturate(130%);
-  box-shadow: 0 12px 30px var(--shadow);
-}
-.fd-kpi h3 { margin: 0 0 6px; font-size: .95rem; color: var(--muted); letter-spacing: .06em; }
-/* **変更点: 数値の色を明るい青に** */
-.fd-kpi .fd-num { margin: 0; font-size: 1.8rem; font-weight: 800; color: var(--ring); letter-spacing: .03em; }
-
-
-/* 一覧（検索/ソート/絞り込み + テーブル） */
-.fd-controls { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 10px; }
-/* **変更点: 入力フィールドの背景を濃く** */
-.fd-input, .fd-select {
-  border-radius: 12px; padding: 10px 12px; min-width: 160px; color: var(--text);
-  background: #00000070; /* 濃い目の背景色 */
-  border: 1px solid var(--glass-border);
-  box-shadow: inset 0 1px 0 rgba(255,255,255,.05);
-}
-.fd-input::placeholder { color: var(--muted); opacity:.85; }
-.fd-input:focus, .fd-select:focus {
-  outline: none; border-color: var(--ring);
-  box-shadow: 0 0 0 3px rgba(77, 166, 255,.35);
-}
-
-/* **変更点: テーブルの行の背景と境界線を調整** */
-#financeTable { width: 100%; border-collapse: separate; border-spacing: 0 10px; }
-#financeTable thead th { text-align: left; padding: 0 10px; color: var(--muted); }
-#financeTable tbody tr {
-  background: var(--glass);
-  border: 1px solid var(--glass-border);
-  border-radius: 12px;
-  box-shadow: 0 4px 10px var(--shadow); /* 影を付けて行を強調 */
-  transition: transform 0.1s ease;
-}
-#financeTable tbody tr:hover {
-    transform: translateY(-1px); /* ホバーで少し持ち上げ */
-}
-#financeTable tbody td { padding: 12px 10px; }
-#financeTable tbody td.amount { text-align: right; font-weight: 800; }
-
-/* ラジオボタン/チェックボックスのスタイルを標準化 */
-.fd-radio-group input[type="radio"],
-.fd-radio-group label {
-    cursor: pointer;
-}
-
-/* グラフ (変更点: 背景を濃く) */
-.fd-charts { display: grid; gap: 14px; grid-template-columns: 1fr; }
-.fd-chart {
-  background: rgba(10, 10, 10, 0.7); /* より濃い背景 */
-  border: 1px solid var(--glass-border);
-  border-radius: 16px; padding: 10px;
-  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
-  box-shadow: 0 12px 28px var(--shadow);
-  width: 100%; height: 320px;
-}
-
-/* 設定フォーム (変更点: ボタンの影とアクティブ時の調整) */
-#settingsForm.fd-form {
-  display: grid; grid-template-columns: 1fr 1fr auto; gap: 12px;
-  background: var(--glass); border: 1px solid var(--glass-border);
-  border-radius: 16px; padding: 16px;
-}
-#settingsForm.fd-form input, #settingsForm.fd-form select {
-  background: #00000070; /* 濃い目の背景色 */
-  color: var(--text);
-  border: 1px solid var(--glass-border); border-radius: 12px; padding: 10px 12px;
-}
-#settingsForm.fd-form button {
-  background: linear-gradient(180deg, var(--primary), color-mix(in oklab, var(--primary) 88%, #2b2b2b));
-  color:#fff; border: none; border-radius: 12px; padding: 12px 16px;
-  font-weight: 800; letter-spacing: .02em; cursor: pointer;
-  box-shadow: 0 6px 16px var(--shadow), inset 0 1px 0 rgba(255,255,255,.08); /* 影を調整 */
-  transition: transform .15s ease, filter .15s ease, box-shadow .15s ease;
-}
-#settingsForm.fd-form button:hover {
-    transform: translateY(-1px);
-    filter: brightness(1.06);
-}
-#settingsForm.fd-form button:active { transform: translateY(0) scale(.98); }
-
-/* Collapsible Summary (変更点: 背景をより目立たせる) */
-.fd-collapsible-summary {
-  cursor: pointer;
-  padding: 10px;
-  background: rgba(40, 40, 40, 0.8); /* 濃い目の背景 */
-  border-radius: 12px;
-  transition: background 0.2s;
-  list-style: none;
-  border: 1px solid var(--glass-border); /* 境界線を追加 */
-}
-
-.fd-collapsible-summary:hover {
-  background: rgba(60, 60, 60, 0.8);
-}
-
-.fd-collapsible-summary h2 {
-  display: inline;
-  font-size: 1.25rem; /* サイズを調整 */
-  margin: 0;
-}
-
-.fd-collapsible-summary::before {
-  content: '▶';
-  font-size: 1.0rem; /* サイズを調整 */
-  margin-right: 10px;
-}
-
-details[open] > .fd-collapsible-summary::before {
-  content: '▼';
-}
-
-/* ===== レスポンシブ (調整) ===== */
-@media (max-width: 900px){
-  /* 共通押しやすさ */
-  .fd-input, .fd-select, #settingsForm.fd-form button { min-height: 44px; font-size: 16px; }
-}
-
-@media (max-width: 920px){
-  .fd-wrap{ padding: 0 16px; margin: 24px auto; }
-  .fd-charts{ grid-template-columns: 1fr; }
-  #settingsForm.fd-form{ grid-template-columns: 1fr; }
-}
-
-@media (max-width: 680px){
-  .fd-title{ font-size: 1.1rem; }
-
-  #financeTable{ display:block; overflow-x:auto; -webkit-overflow-scrolling: touch; }
-  #financeTable table{ width: 720px; }
-
-  .fd-kpi{ padding: 14px; }
-  .fd-kpi .fd-num{ font-size: 1.6rem; }
-
-  .fd-chart{ height: 240px; }
-
-  .fd-controls{ gap: 8px; }
-  .fd-input, .fd-select{ min-width: unset; width: 100%; }
-}
-
-/* finance.css の末尾に追加 */
-
-/* ===== テーブルの視認性向上 ===== */
-
-/* 収入の行全体を薄い青色で区別 */
-#financeTable tbody tr.type-income {
-  border-left: 5px solid rgba(0, 188, 212, 0.4);
-}
-/* 支出の行全体を薄い赤色で区別 */
-#financeTable tbody tr.type-expense {
-  border-left: 5px solid rgba(231, 76, 60, 0.4);
-}
-
-/* 金額セルの強調 */
-#financeTable tbody td.fd-amount-cell {
-  color: var(--ring); /* KPIと同じ強調色を使用 */
-}
-
-/* タイプセルのフォントを太く、背景色を調整 */
-#financeTable tbody td.fd-type-cell {
-  font-weight: 700;
-  /* 背景を濃くして文字を浮かび上がらせる */
-  background: rgba(0, 0, 0, 0.15); 
-  border-radius: 4px;
-  padding: 4px 8px; /* パディングを調整してチップ風に */
-  text-align: center;
-}
-
-/* フィルターラジオボタンのスタイルを調整 */
-.fd-radio-group label {
-  background: rgba(0, 0, 0, 0.3);
-  border: 1px solid var(--glass-border);
-  border-radius: 8px;
-  padding: 8px 12px;
-  margin-right: 5px;
-  transition: background 0.2s, border-color 0.2s;
-}
 
-.fd-radio-group input[type="radio"]:checked + label {
-  background: var(--accent);
-  border-color: var(--ring);
-  color: var(--text);
-  box-shadow: 0 0 0 2px rgba(77, 166, 255,.35);
+.link-btn{
+  text-decoration:none;
+  color:var(--text);
+  background:rgba(56,189,248,.12);
+  border:1px solid rgba(56,189,248,.4);
+  padding:10px 18px;
+  border-radius:999px;
+  display:inline-flex;
+  justify-content:center;
+  min-width:150px;
+  transition:.2s;
+  box-shadow:0 15px 30px rgba(8,47,73,.35);
 }
-
-.fd-radio-group input[type="radio"] {
-    /* ラジオボタン自体を非表示にしてラベルをクリックさせる */
-    display: none; 
-}
-
-/* finance.css の該当箇所を修正または追加 */
-
-/* 一覧（検索/ソート/絞り込み + テーブル） */
-.fd-controls { 
-  display: flex; 
-  flex-wrap: wrap; 
-  gap: 12px; /* ギャップを少し広げる */
-  margin-bottom: 12px; /* 下のスペースも少し広げる */
-}
-
-/* 入力・選択要素の共通スタイルを調整 */
-.fd-input, .fd-select {
-  border-radius: 10px; /* 角を少し丸める */
-  padding: 10px 14px; /* 左右のパディングを増やして押しやすく */
-  min-width: 140px; /* 最小幅を確保 */
-  color: var(--text);
-  background: #00000070; 
-  border: 1px solid var(--glass-border);
-  box-shadow: inset 0 1px 0 rgba(255,255,255,.05);
-}
-
-/* 検索入力欄の幅を広げる（柔軟に） */
-#searchInput {
-    flex-grow: 1; /* 可能な限り幅を広げる */
-    min-width: 200px; /* 最小幅を設定 */
-}
-
-/* カテゴリ選択（複数選択）の見た目を調整 */
-#filterCategory {
-    min-width: 180px; 
-    height: 120px; /* 高さを持たせて、リストボックスとして強調 */
-    border: 1px solid var(--glass-border);
-    padding: 8px;
-    background: #00000070;
-}
-
-#filterCategory option:checked {
-    background: var(--accent); /* 選択されたオプションを強調 */
-    color: var(--text);
-}
-
-
-/* ---------------------------------- */
-/* ラジオボタン (fd-radio-group) の調整 */
-/* ---------------------------------- */
-
-.fd-radio-group {
-    /* ラジオボタングループ全体に少しパディングを持たせる */
-    padding: 2px;
-    border-radius: 10px;
-    background: rgba(0, 0, 0, 0.3);
-    display: inline-flex; /* 項目を横並びに */
-}
-
-.fd-radio-group label {
-  background: transparent; /* 通常は透明な背景 */
-  border: none; /* 境界線をなくす */
-  border-radius: 8px; 
-  padding: 8px 14px; /* 押しやすいサイズに */
-  margin: 0;
-  transition: background 0.2s, color 0.2s;
-}
-
-.fd-radio-group input[type="radio"]:checked + label {
-  background: var(--accent); /* 選択時のみ背景色 */
-  color: var(--text);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4); /* 浮き上がっているように見せる影 */
-}
-
-/* finance.css の該当箇所を修正または追加 */
-
-/* 日付入力の視認性向上 */
-.fd-input[type="date"] {
-    /* ブラウザのデフォルトスタイルを上書きして、カレンダーアイコンを見やすくする */
-    color-scheme: dark; /* カレンダーピッカーをダークモードに強制（対応ブラウザのみ） */
-}
-
-/* 入力・選択要素の共通スタイルを調整 (再掲) */
-.fd-input, .fd-select {
-  border-radius: 10px; /* 角を少し丸める */
-  padding: 10px 14px; 
-  min-width: 140px; 
-  color: var(--text); /* 文字色を明るく */
-  background: #00000070; 
-  border: 1px solid var(--glass-border);
-  box-shadow: inset 0 1px 0 rgba(255,255,255,.05);
-}
-
-/* フォーカス時の調整（再掲） */
-.fd-input:focus, .fd-select:focus {
-  outline: none; 
-  border-color: var(--ring);
-  /* シャドウを付けて要素を浮かび上がらせる */
-  box-shadow: 0 0 0 3px rgba(77, 166, 255,.35); 
-}
-
-/* 日付プレースホルダと未入力時の文字色をより見やすく（ブラウザによっては表示されない場合があります） */
-.fd-input[type="date"]::placeholder {
-    color: var(--muted);
-    opacity: 1; 
-}
-.fd-input:not([value]) {
-    color: var(--muted); /* 値がセットされていない場合は控えめな色に */
+.link-btn:hover{
+  background:rgba(56,189,248,.18);
+  transform:translateY(-1px);
 }
 
-/* 日付入力フィールドのテキストが青くハイライトされる問題を抑制
-   (これはブラウザのデフォルトスタイルなので完全に制御できない場合がありますが、
-    inputのtext-shadowを調整することで視認性を改善します) */
-.fd-input {
-    text-shadow: 0 0 1px rgba(0, 0, 0, 0.5); /* 強いハイライトを抑制する効果 */
+.fd-button-container{
+  display:flex;
+  justify-content:flex-end;
 }
 
-/* finance.css の Collapsible Summary セクションを修正 */
-
-/* Collapsible Summary */
-.fd-collapsible-summary {
-  cursor: pointer;
-  padding: 10px;
-  background: rgba(40, 40, 40, 0.8);
-  border-radius: 12px;
-  transition: background 0.2s;
-  list-style: none;
-  border: 1px solid var(--glass-border);
-  margin-bottom: 12px; /* Summaryと次のコンテンツの間にスペースを追加 */
-}
-
-/* 以前の h2 が含まれた summary のスタイルを調整 */
-.fd-collapsible-summary h2 {
-  display: inline;
-  font-size: 1.25rem;
-  margin: 0;
-}
-
-/* 一覧テーブル用の Summary のスタイル */
-.fd-list-summary {
-    font-size: 1.25rem; /* タイトルサイズに合わせる */
-    font-weight: 600;
-}
-
-/* グラフ Summary のスタイル */
-.fd-chart-summary {
-    padding: 0; /* h2でパディングを管理するためリセット */
-    background: transparent;
-    border: none;
-}
-.fd-chart-summary h2 {
-    /* 以前の summary と同じ見た目にするために h2 に背景とパディングを適用 */
-    background: rgba(40, 40, 40, 0.8);
-    border: 1px solid var(--glass-border);
-    border-radius: 12px;
-    padding: 10px;
-    margin-bottom: 0;
-}
-
-
-.fd-collapsible-summary:hover {
-  background: rgba(60, 60, 60, 0.8);
-}
-.fd-chart-summary:hover h2 {
-  background: rgba(60, 60, 60, 0.8);
-}
-
-
-.fd-collapsible-summary::before {
-  content: '▶';
-  font-size: 1.0rem;
-  margin-right: 10px;
+.fd-section{
+  background:var(--panel);
+  border-radius:var(--radius-lg);
+  padding:26px;
+  border:1px solid rgba(148,163,184,.2);
+  box-shadow:var(--shadow);
 }
 
-details[open] > .fd-collapsible-summary::before {
-  content: '▼';
+.fd-title{
+  margin:0 0 16px;
+  font-size:1.35rem;
+  letter-spacing:.05em;
 }
 
-/* グラフ Summary の before は h2 の左側に表示されるように調整 */
-.fd-chart-summary::before {
-    position: absolute;
-    top: 18px; 
-    left: 30px; 
-    z-index: 2; /* h2の上に表示 */
+.fd-summary{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
+  gap:14px;
 }
-details[open] > .fd-chart-summary::before {
-    top: 18px;
-}
-
-/* finance.css の Collapsible Summary セクションを修正 */
-
-/* Collapsible Summary (共通スタイル) */
-.fd-collapsible-summary {
-  cursor: pointer;
-  padding: 10px;
-  background: rgba(40, 40, 40, 0.8);
-  border-radius: 12px;
-  transition: background 0.2s;
-  list-style: none;
-  border: 1px solid var(--glass-border);
-  margin-bottom: 12px; 
-}
-
-/* 以前の h2 が含まれた summary のスタイルを調整 */
-.fd-collapsible-summary h2 {
-  display: inline;
-  font-size: 1.25rem;
-  margin: 0;
-}
-
-/* 一覧テーブル用の Summary のスタイル (太字にする) */
-.fd-list-summary {
-    font-size: 1.25rem; 
-    font-weight: 600;
-}
 
-/* グラフ Summary のスタイルを fd-list-summary と同様に、太字のバーにする */
-.fd-chart-summary {
-    /* fd-collapsible-summary の共通スタイルを継承しつつ、文字を太くする */
-    font-size: 1.25rem; 
-    font-weight: 600;
-    
-    /* h2 を使用しないため、以前の h2 に適用していたスタイルを削除 */
-    padding: 10px; 
-    background: rgba(40, 40, 40, 0.8);
-    border: 1px solid var(--glass-border);
-    border-radius: 12px;
-    margin-bottom: 12px;
+.fd-kpi{
+  background:var(--panel-soft);
+  border-radius:18px;
+  border:1px solid rgba(148,163,184,.25);
+  padding:18px;
+  box-shadow:0 12px 26px rgba(8,15,30,.4);
 }
 
-/* 以前の fd-chart-summary と h2 の複雑なスタイルを削除/リセット */
-.fd-chart-summary {
-    padding: 10px; 
-    background: rgba(40, 40, 40, 0.8);
-    border: 1px solid var(--glass-border);
-    border-radius: 12px;
-}
-.fd-chart-summary h2 {
-    background: transparent;
-    border: none;
-    padding: 0;
-    margin: 0;
-}
-.fd-chart-summary:hover {
-    background: rgba(60, 60, 60, 0.8);
-}
-.fd-chart-summary:hover h2 {
-    background: transparent;
+.fd-kpi h3{
+  margin:0 0 8px;
+  font-size:.95rem;
+  color:var(--muted);
+  letter-spacing:.05em;
 }
 
-
-.fd-collapsible-summary:hover {
-  background: rgba(60, 60, 60, 0.8);
+.fd-kpi .fd-num{
+  margin:0;
+  font-size:1.6rem;
+  font-weight:700;
+  color:var(--accent);
 }
-
 
-.fd-collapsible-summary::before {
-  content: '▶';
-  font-size: 1.0rem;
-  margin-right: 10px;
+.fd-controls{
+  display:flex;
+  flex-wrap:wrap;
+  gap:12px;
+  margin-bottom:16px;
 }
 
-details[open] > .fd-collapsible-summary::before {
-  content: '▼';
+.fd-input,
+.fd-select,
+.fd-radio-group input[type="radio"]{
+  font-size:1rem;
 }
 
-/* グラフ Summary の before の絶対位置指定をリセット */
-.fd-chart-summary::before {
-    position: static;
-    top: initial; 
-    left: initial; 
-    z-index: initial;
-    /* h2 の外側に移動したため、間隔を調整 */
-    margin-right: 10px;
+.fd-input,
+.fd-select{
+  border-radius:14px;
+  border:1px solid rgba(148,163,184,.35);
+  background:var(--panel-soft);
+  color:var(--text);
+  padding:10px 14px;
+  min-width:160px;
+  outline:none;
+  transition:border-color .2s, box-shadow .2s;
 }
-details[open] > .fd-chart-summary::before {
-    top: initial;
-}
-
-/* finance.css の fd-controls セクションを修正 */
 
-/* 一覧（検索/ソート/絞り込み + テーブル） */
-.fd-controls { 
-  display: flex; 
-  flex-wrap: wrap; 
-  gap: 12px; 
-  margin-bottom: 12px; 
-  /* **修正点: 日付入力フィールドのグループ化のため、flex-wrapを調整** */
-  align-items: center;
+.fd-input:focus,
+.fd-select:focus{
+  border-color:var(--accent);
+  box-shadow:0 0 0 2px rgba(56,189,248,.3);
 }
 
-/* 日付入力フィールドをまとめるための新しいコンテナースタイルを追加 */
-.fd-date-range {
-    display: flex;
-    gap: 12px;
-    align-items: center;
+.fd-radio-group{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  background:rgba(148,163,184,.1);
+  border-radius:999px;
+  padding:6px 12px;
 }
 
-/* 入力・選択要素の共通スタイルを調整 (再掲) */
-.fd-input, .fd-select {
-  border-radius: 10px; 
-  padding: 10px 14px; 
-  min-width: 140px; 
-  color: var(--text); 
-  background: #00000070; 
-  border: 1px solid var(--glass-border);
-  box-shadow: inset 0 1px 0 rgba(255,255,255,.05);
+.fd-date-range{
+  display:flex;
+  flex-wrap:wrap;
+  gap:10px;
 }
 
-/* 検索入力欄の幅を広げる（再掲） */
-#searchInput {
-    flex-grow: 1; 
-    min-width: 200px; 
+.fd-date-input-group{
+  display:flex;
+  gap:8px;
+  align-items:center;
 }
 
-/* ======= ホイール式 日付ピッカー ======= */
 .fd-wheel-btn{
-  appearance:none; -webkit-appearance:none;
-  border:1px solid var(--glass-border);
-  background: var(--glass);
-  color: var(--text);
-  border-radius:10px;
-  padding: 10px 12px;
+  border:none;
+  border-radius:12px;
+  background:rgba(148,163,184,.2);
+  color:var(--text);
+  width:44px;
+  height:44px;
   cursor:pointer;
-  line-height:1;
+  transition:.2s;
 }
-.fd-wheel-btn:hover{ filter: brightness(1.06); }
-
-/* モーダル全体 */
-.fd-wheel-backdrop{
-  position: fixed; inset: 0; z-index: 9999;
-  display: grid; place-items: center;
-  background: rgba(0,0,0,.45);
-  backdrop-filter: blur(2px);
-}
-.fd-wheel-dialog{
-  width: min(520px, 92vw);
-  background: var(--glass);
-  border:1px solid var(--glass-border);
-  border-radius:16px;
-  box-shadow: 0 20px 50px var(--shadow);
-  overflow: hidden;
-}
-.fd-wheel-header{
-  padding: 10px 14px;
-  font-weight: 700;
-  color: var(--text);
-  text-align: center;
-  background: rgba(40,40,40,.8);
-  border-bottom:1px solid var(--glass-border);
+.fd-wheel-btn:hover{
+  background:rgba(56,189,248,.25);
 }
 
-/* 本体（3カラム） */
-.fd-wheel-body{
-  position: relative;
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
-  gap: 6px;
-  padding: 12px;
-  background: linear-gradient(180deg, rgba(255,255,255,.03), rgba(0,0,0,.08));
-}
-.fd-wheel-column{
-  position: relative;
-  background: rgba(0,0,0,.25);
-  border:1px solid var(--glass-border);
-  border-radius: 10px;
-  overflow: hidden;
-}
-.fd-wheel-label{
-  position: absolute;
-  inset: 6px auto auto 8px;
-  font-size: .78rem;
-  color: var(--muted);
-  pointer-events: none;
+details{
+  background:var(--panel-soft);
+  border-radius:18px;
+  padding:18px;
+  border:1px solid rgba(148,163,184,.2);
 }
 
-/* iOS風 “ホイール” 表現：size=5 の select を使って中央行をハイライト */
-.fd-wheel-select{
-  width: 100%;
-  height: 180px;           /* 行高×5 程度 */
-  padding: 20px 10px 10px; /* 上はラベルの余白 */
-  background: transparent;
-  color: var(--text);
-  border: none;
-  outline: none;
-  font-size: 1rem;
-  scroll-snap-type: y mandatory;
-}
-.fd-wheel-select option{
-  padding: 8px 6px;
-  text-align: center;
-  scroll-snap-align: center;
-}
-
-/* 中央の選択ライン */
-.fd-wheel-highlight{
-  pointer-events: none;
-  position: absolute;
-  left: 12px; right: 12px;
-  top: 50%; transform: translateY(-50%);
-  height: 36px;
-  border-top: 1px solid rgba(255,255,255,.25);
-  border-bottom: 1px solid rgba(255,255,255,.25);
-  box-shadow: inset 0 12px 12px rgba(0,0,0,.15), inset 0 -12px 12px rgba(0,0,0,.15);
-  border-radius: 6px;
-}
-
-/* フッター */
-.fd-wheel-actions{
-  display: flex; gap: 10px; justify-content: flex-end;
-  padding: 10px 12px;
-  border-top:1px solid var(--glass-border);
-  background: rgba(30,30,30,.7);
-}
-.fd-wheel-actions button{
-  appearance:none; -webkit-appearance:none;
-  border:1px solid var(--glass-border);
-  background: linear-gradient(180deg, #2a2a2a, #1d1d1d);
-  color:#fff; padding:8px 14px; border-radius:10px;
-  cursor:pointer; font-weight:700;
-}
-.fd-wheel-actions .fd-wheel-ok{
-  background: linear-gradient(180deg, var(--accent), color-mix(in oklab, var(--accent) 80%, #1a1a1a));
-  border-color: var(--ring);
-}
-
-/* hidden を強制的に効かせる */
-.fd-wheel-backdrop[hidden]{
-  display: none !important;
-}
-
-
-/* ... (既存のコード) ... */
-
-/* finance.css の fd-controls セクションを修正 */
-
-/* 一覧（検索/ソート/絞り込み + テーブル） */
-.fd-controls { 
-  display: flex; 
-  flex-wrap: wrap; 
-  gap: 12px; 
-  margin-bottom: 12px; 
-  align-items: center;
-}
-
-/* 日付入力フィールドとボタンをまとめるコンテナースタイル */
-.fd-date-range {
-    display: flex;
-    gap: 12px;
-    align-items: center;
-    /* 日付レンジ全体を一行にまとめやすくするため */
-    flex-grow: 1;
-    justify-content: space-between;
-}
-/* 個々の入力フィールドとボタンのグループ */
-.fd-date-input-group {
-    display: flex;
-    gap: 6px;
-    align-items: center;
-    flex-grow: 1; /* 均等に幅を広げる */
-}
-
-/* 日付入力フィールドの幅をボタンとバランスをとって調整 */
-.fd-date-input-group .fd-input[type="date"] {
-    flex-grow: 1;
-    min-width: 100px; 
-}
-
-
-/* ======= ホイール式 日付ピッカー ======= */
-
-/* ボタン */
-.fd-wheel-btn{
-  appearance:none; -webkit-appearance:none;
-  border:1px solid var(--glass-border);
-  background: var(--glass);
-  color: var(--text);
-  border-radius:10px;
-  padding: 10px 12px;
+summary{
   cursor:pointer;
-  line-height:1;
-  font-size: 1.1rem;
+  font-weight:600;
+  margin-bottom:12px;
 }
-.fd-wheel-btn:hover{ filter: brightness(1.06); }
 
-/* 背景 */
-.fd-wheel-backdrop{
-  position: fixed; inset: 0; z-index: 9999;
-  display: grid; place-items: center;
-  background: rgba(0,0,0,.45);
-  backdrop-filter: blur(2px);
+#financeTable{
+  width:100%;
+  border-collapse:separate;
+  border-spacing:0 12px;
 }
-.fd-wheel-backdrop[hidden]{ display: none !important; }
 
-/* ダイアログ */
-.fd-wheel-dialog{
-  width: min(480px, 92vw);
-  background: var(--glass);
-  border:1px solid var(--glass-border);
+#financeTable thead th{
+  text-align:left;
+  padding:0 12px;
+  color:var(--muted);
+}
+
+#financeTable tbody tr{
+  background:var(--panel);
+  border:1px solid rgba(148,163,184,.3);
   border-radius:16px;
-  box-shadow: 0 20px 50px var(--shadow);
-  overflow: hidden;
+  box-shadow:0 6px 18px rgba(8,15,30,.4);
+  transition:.2s;
 }
+
+#financeTable tbody tr:hover{
+  transform:translateY(-2px);
+  background:rgba(56,189,248,.06);
+}
+
+#financeTable tbody td{
+  padding:14px 12px;
+}
+
+#financeTable tbody td.amount{
+  text-align:right;
+  font-weight:700;
+}
+
+.fd-charts{
+  display:grid;
+  gap:18px;
+}
+
+.fd-chart{
+  width:100%;
+  background:var(--panel);
+  border-radius:16px;
+  padding:12px;
+  border:1px solid rgba(148,163,184,.2);
+}
+
+.fd-form{
+  display:flex;
+  flex-wrap:wrap;
+  gap:12px;
+}
+
+.fd-form label{
+  flex:1 1 260px;
+  display:flex;
+  flex-direction:column;
+  gap:6px;
+  color:var(--muted);
+}
+
+.fd-form input,
+.fd-form select{
+  border-radius:14px;
+  border:1px solid rgba(148,163,184,.35);
+  background:var(--panel-soft);
+  color:var(--text);
+  padding:10px 14px;
+  outline:none;
+}
+
+.fd-form button{
+  border:none;
+  border-radius:18px;
+  padding:12px 20px;
+  background:linear-gradient(135deg,var(--accent),var(--accent-strong));
+  color:#0f172a;
+  font-weight:700;
+  cursor:pointer;
+  transition:.2s;
+}
+.fd-form button:hover{filter:brightness(1.05);}
+
+#fdWheel{
+  position:fixed;
+  inset:0;
+  background:rgba(0,0,0,.6);
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  padding:20px;
+  z-index:40;
+}
+
+#fdWheel[hidden]{display:none !important;}
+
+.fd-wheel-dialog{
+  background:var(--panel);
+  border-radius:24px;
+  border:1px solid rgba(148,163,184,.25);
+  box-shadow:var(--shadow);
+  width:min(480px,94vw);
+}
+
 .fd-wheel-header{
-  padding: 10px 14px;
-  font-weight: 700;
-  color: var(--text);
-  text-align: center;
-  background: rgba(40,40,40,.8);
-  border-bottom:1px solid var(--glass-border);
+  padding:16px 20px;
+  border-bottom:1px solid rgba(148,163,184,.25);
+  font-weight:700;
 }
 
-/* 3カラム */
 .fd-wheel-body{
-  position: relative;
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
-  gap: 6px;
-  padding: 12px;
-  background: linear-gradient(180deg, rgba(255,255,255,.03), rgba(0,0,0,.08));
+  position:relative;
+  display:grid;
+  grid-template-columns:1.2fr 1fr 1fr;
+  gap:8px;
+  padding:16px;
+  background:var(--panel-soft);
 }
+
 .fd-wheel-column{
-  position: relative;
-  background: rgba(0,0,0,.25);
-  border:1px solid var(--glass-border);
-  border-radius: 10px;
-  overflow: hidden;
+  position:relative;
+  border:1px solid rgba(148,163,184,.3);
+  border-radius:14px;
+  background:rgba(15,23,42,.5);
+  overflow:hidden;
 }
+
 .fd-wheel-label{
-  position: absolute;
-  left: 8px; top: 6px;
-  font-size: .75rem;
-  color: var(--muted);
-  pointer-events: none;
-  z-index: 1;
+  position:absolute;
+  top:8px;
+  left:10px;
+  font-size:.8rem;
+  color:var(--muted);
 }
 
-/* リスト本体 */
 .fd-wheel-select{
-  width: 100%;
-  height: 180px;
-  padding: 20px 10px 10px;
-  background: transparent;
-  color: var(--text);
-  border: none;
-  outline: none;
-  font-size: 1rem;
-  scroll-snap-type: y mandatory;
+  width:100%;
+  height:180px;
+  padding:24px 10px 10px;
+  background:transparent;
+  border:none;
+  color:var(--text);
+  font-size:1rem;
+  scroll-snap-type:y mandatory;
 }
+
 .fd-wheel-select option{
-  padding: 8px 8px;
-  line-height: 1.2;
-  text-align: center;
-  scroll-snap-align: center;
-  background: #1e1e1e;
-  color: var(--text);
+  text-align:center;
+  padding:8px 0;
+  scroll-snap-align:center;
+  background:transparent;
+  color:var(--text);
 }
 
-/* 年だけ文字小さく */
-#fdWheelYear option{
-  font-size: .95rem;
-  padding: 8px 0;
+.fd-wheel-select option:checked{
+  background:var(--accent);
+  color:#0f172a;
 }
 
-/* 選択行の青ハイライト */
-.fd-wheel-select option[data-selected="true"]{
-  background: var(--accent);
-  color: #fff;
-}
-
-/* 中央ライン */
 .fd-wheel-highlight{
-  pointer-events: none;
-  position: absolute;
-  left: 12px; right: 12px;
-  top: 50%;
-  transform: translateY(-50%);
-  height: 36px;
-  border-top: 1px solid rgba(255,255,255,.35);
-  border-bottom: 1px solid rgba(255,255,255,.35);
-  box-shadow: inset 0 12px 12px rgba(0,0,0,.15),
-              inset 0 -12px 12px rgba(0,0,0,.15);
-  border-radius: 6px;
+  position:absolute;
+  left:12px;
+  right:12px;
+  top:50%;
+  height:40px;
+  transform:translateY(-50%);
+  border:1px solid rgba(56,189,248,.4);
+  border-radius:12px;
+  pointer-events:none;
 }
 
-/* フッター */
 .fd-wheel-actions{
-  display: flex; gap: 10px; justify-content: flex-end;
-  padding: 10px 12px;
-  border-top:1px solid var(--glass-border);
-  background: rgba(30,30,30,.7);
+  display:flex;
+  justify-content:flex-end;
+  gap:12px;
+  padding:14px 18px;
+  border-top:1px solid rgba(148,163,184,.2);
 }
+
 .fd-wheel-actions button{
-  appearance:none; -webkit-appearance:none;
-  border:1px solid var(--glass-border);
-  background: linear-gradient(180deg, #2a2a2a, #1d1d1d);
-  color:#fff; padding:8px 14px; border-radius:10px;
-  cursor:pointer; font-weight:700;
-}
-.fd-wheel-actions .fd-wheel-ok{
-  background: linear-gradient(180deg, var(--accent), color-mix(in oklab, var(--accent) 80%, #1a1a1a));
-  border-color: var(--ring);
+  border:none;
+  border-radius:14px;
+  padding:10px 18px;
+  background:rgba(148,163,184,.2);
+  color:var(--text);
+  cursor:pointer;
 }
 
-
-/* hidden を強制的に効かせる */
-.fd-wheel-backdrop[hidden]{
-  display: none !important;
+.fd-wheel-ok{
+  background:linear-gradient(135deg,var(--accent),var(--accent-strong));
+  color:#0f172a;
 }
 
-/* ... (既存のコード - fd-controls セクションの終わりまで) ... */
-
-/* ======= ホイール式 日付ピッカー ======= */
-
-/* ... (fd-wheel-btn, fd-wheel-backdrop, fd-wheel-dialog, fd-wheel-header は変更なし) ... */
-
-
-/* 本体（3カラム） */
-.fd-wheel-body{
-  position: relative;
-  /* **修正点: 年の幅を広く、月/日を狭く** */
-  grid-template-columns: 1.2fr 1fr 1fr; /* 年を少し広げる (1.2fr:1fr:1fr) */
-  gap: 6px;
-  padding: 12px;
-  background: linear-gradient(180deg, rgba(255,255,255,.03), rgba(0,0,0,.08));
-}
-.fd-wheel-column{
-  position: relative;
-  background: rgba(0,0,0,.25);
-  border:1px solid var(--glass-border);
-  border-radius: 10px;
-  overflow: hidden;
-}
-.fd-wheel-label{
-  position: absolute;
-  inset: 6px auto auto 8px;
-  font-size: .75rem; 
-  color: var(--muted);
-  pointer-events: none;
-  z-index: 1;
+.fd-wheel-cancel{
+  background:rgba(148,163,184,.15);
 }
 
-/* ホイール選択肢 */
-.fd-wheel-select{
-  width: 100%;
-  height: 180px; 
-  padding: 20px 10px 10px; 
-  background: transparent;
-  color: var(--text);
-  border: none;
-  outline: none;
-  font-size: 1rem;
-  scroll-snap-type: y mandatory;
-}
-.fd-wheel-select option{
-  /* **修正点: option内のテキストを中央寄せにして、年の表示を改善** */
-  padding: 8px 0px; /* 左右のパディングをリセットまたは調整 */
-  min-height: 36px; 
-  line-height: 1.5;
-  text-align: center; /* **重要: option内のテキストを中央に** */
-  scroll-snap-align: center;
-  /* 背景が透過しないブラウザ向けに統一 */
-  background: #1e1e1e; 
-  color: var(--text);
-}
-/* 年の選択肢のみ、フォントサイズを微調整 */
-#fdWheelYear option {
-    font-size: 0.95rem; 
-    padding: 8px 0;
-}
-
-
-/* 中央の選択ライン（ハイライト） */
-/* ... (fd-wheel-highlight, fd-wheel-actions, fd-wheel-actions button は変更なし) ... */
-
-.fd-wheel-backdrop[hidden]{
-  display: none !important;
-}
-
-/* --- ホイールの選択行を青くする（年・月・日とも） --- */
-.fd-wheel-select option {
-  background: #1e1e1e;            /* 通常行 */
-  color: var(--text);
-}
-
-/* 通常の :checked（対応ブラウザ） */
-.fd-wheel-select option:checked {
-  background: var(--accent) !important;
-  color: #fff !important;
-}
-
-/* 互換用: JSで付ける data-selected=true でも塗る */
-.fd-wheel-select option[data-selected="true"] {
-  background: var(--accent) !important;
-  color: #fff !important;
-}
-
-/* フォーカス時にもう少し目立たせたい場合（任意） */
-.fd-wheel-select:focus option:checked,
-.fd-wheel-select:focus option[data-selected="true"] {
-  filter: brightness(1.05);
+@media (max-width:720px){
+  .fd-section{
+    padding:20px;
+  }
+  .fd-controls,
+  .fd-form{
+    flex-direction:column;
+  }
+  .fd-button-container{
+    justify-content:flex-start;
+  }
+  .fd-summary{
+    grid-template-columns:repeat(auto-fit,minmax(180px,1fr));
+  }
+  .fd-wheel-body{
+    grid-template-columns:repeat(3,minmax(0,1fr));
+  }
 }
