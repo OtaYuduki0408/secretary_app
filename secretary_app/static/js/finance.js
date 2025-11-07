@@ -1,297 +1,529 @@
+/* =========================
+   finance.js — 完全版 (最終・HTML依存解消版)
+   ・**HTMLの<select>から size="5" を削除していることが前提**
+   ・ホイールの項目高さを36px固定で計算
+   ・中央寄せスクロールをsetTimeoutで強制
+========================= */
+
+// グローバル公開（ホイール側から呼ぶ）
+let applyFiltersAndSort;
+
+/* 日付を YYYY-MM-DD に正規化（2025/11/5, 2025-11-05 など許容） */
+function normalizeDateToKey(s) {
+  if (!s) return "";
+  const m = String(s).trim().match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/);
+  if (!m) return "";
+  const y = m[1];
+  const mo = String(m[2]).padStart(2, "0");
+  const d = String(m[3]).padStart(2, "0");
+  return `${y}-${mo}-${d}`;
+}
+
 document.addEventListener("DOMContentLoaded", () => {
-    const container = document.getElementById("finance-data");
-    
-    // ----------------------------------------------------
-    // 【データ取得】HTMLから全レコードを読み込む
-    // ----------------------------------------------------
-    const rawFinanceRecords = JSON.parse(container.dataset.allRecords || "[]");
-    
-    // -------------------------
-    // 操作要素の取得
-    // -------------------------
-    const financeTableBody = document.querySelector("#financeTable tbody");
-    const searchInput = document.getElementById("searchInput");
-    const sortSelect = document.getElementById("sortSelect");
-    const filterCategory = document.getElementById("filterCategory");
-    const filterType = document.getElementById("filterType");
+  const container = document.getElementById("finance-data");
 
-    // -------------------------
-    // カテゴリオプションの動的更新
-    // -------------------------
-    const allCategories = [...new Set(rawFinanceRecords.map(r => r.category))].filter(c => c);
+  // ---------- データ取得 ----------
+  const rawFinanceRecords = JSON.parse(container?.dataset.allRecords || "[]");
 
-    // HTMLに静的に定義されている「すべてのカテゴリ」以外をクリアし、動的カテゴリを追加
-    // ※ HTMLに「すべてのカテゴリ」が<option value="all">として定義されている前提
-    filterCategory.querySelectorAll('option:not([value="all"])').forEach(opt => opt.remove());
+  // すべてのレコードへ dateKey を付与（内部比較用）
+  rawFinanceRecords.forEach(r => {
+    r.dateKey = normalizeDateToKey(r.date || "");
+  });
 
-    allCategories.forEach(category => {
-        const option = document.createElement('option');
-        option.value = category;
-        option.textContent = category;
-        filterCategory.appendChild(option);
-    });
-    
-    // -------------------------
-    // テーブル描画関数 (変更なし)
-    // -------------------------
-    function renderTable(data) {
-        financeTableBody.innerHTML = "";
-        if (data.length === 0) {
-            financeTableBody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding: 10px;">該当するデータがありません。</td></tr>';
-            return;
-        }
+  // ---------- 要素 ----------
+  const financeTableBody = document.querySelector("#financeTable tbody");
+  const searchInput = document.getElementById("searchInput");
+  const sortSelect = document.getElementById("sortSelect");
+  const filterCategory = document.getElementById("filterCategory");
+  const filterType = document.getElementById("filterType");
+  const startDateInput = document.getElementById("startDate");
+  const endDateInput = document.getElementById("endDate");
 
-        data.forEach(record => {
-            const row = financeTableBody.insertRow();
-            row.insertCell().textContent = record.date;
-            
-            // タイプ列を追加し、色付けする
-            const typeCell = row.insertCell();
-            const typeText = record.type === 'income' ? '収入' : '支出';
-            typeCell.textContent = typeText;
-            typeCell.style.color = record.type === 'income' ? '#00bcd4' : '#e74c3c'; // CSSに合わせて色を変更
+  let incomeChart = null;
+  let expenseChart = null;
 
-            row.insertCell().textContent = record.category;
-            row.insertCell().textContent = record.description;
-            
-            const amountCell = row.insertCell();
-            amountCell.textContent = `${record.amount.toLocaleString()} 円`;
-            amountCell.classList.add('fd-amount-cell');
-        });
-    }
+  // ---------- カテゴリオプション構築 ----------
+  const allCategories = [...new Set(rawFinanceRecords.map(r => r.category))].filter(Boolean);
+  // 既存の "all" 以外をクリア
+  filterCategory.querySelectorAll('option:not([value="all"])').forEach(opt => opt.remove());
+  allCategories.forEach(category => {
+    const option = document.createElement('option');
+    option.value = category;
+    option.textContent = category;
+    filterCategory.appendChild(option);
+  });
 
-    /**
-     * 現在の検索、フィルタ、ソート設定を適用してテーブルを更新し、グラフを再描画する
-     */
-    function applyFiltersAndSort() {
-        let currentData = [...rawFinanceRecords]; 
+  // ---------- テーブル描画 ----------
+  function renderTable(data) {
+    financeTableBody.innerHTML = "";
+    if (data.length === 0) {
+      financeTableBody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding: 10px;">該当するデータがありません。</td></tr>';
+      return;
+    }
 
-        // 1a. タイプ (収入/支出) による絞り込み
-        const selectedType = document.querySelector('input[name="typeFilter"]:checked').value;
-        if (selectedType !== "all") {
-            currentData = currentData.filter(record => record.type === selectedType);
-        }
-        
-        // 1b. カテゴリ (複数選択) による絞り込み
-        const selectedOptions = Array.from(filterCategory.selectedOptions).map(option => option.value);
-        
-        // 「すべてのカテゴリ」が選択されている、または何も選択されていない場合
-        if (selectedOptions.includes("all") || selectedOptions.length === 0) {
-            // 何もフィルタしない
-        } else {
-            // 選択されたカテゴリでフィルタ
-            currentData = currentData.filter(record => selectedOptions.includes(record.category));
-        }
+    data.forEach(record => {
+      const row = financeTableBody.insertRow();
+      row.classList.add(`type-${record.type}`);
 
-        // 1c. 検索ワードによる絞り込み
-        const searchTerm = searchInput.value.toLowerCase();
-        if (searchTerm) {
-            currentData = currentData.filter(record => 
-                record.description.toLowerCase().includes(searchTerm) || 
-                record.date.includes(searchTerm) 
-            );
-        }
+      // 表示は record.date があればそのまま、無ければ dateKey を / 表示
+      const displayDate = record.date || (record.dateKey ? record.dateKey.replaceAll("-", "/") : "");
+      row.insertCell().textContent = displayDate;
 
-        // 2. ソート
-        let sortedData = [...currentData]; 
-        const sortKey = sortSelect.value;
-        sortedData.sort((a, b) => {
-            if (sortKey === "date") {
-                return new Date(b.date) - new Date(a.date); 
-            } else if (sortKey === "amount") {
-                return b.amount - a.amount;
-            }
-            return 0;
-        });
+      const typeCell = row.insertCell();
+      typeCell.textContent = record.type === 'income' ? '収入' : '支出';
+      typeCell.classList.add('fd-type-cell');
+      typeCell.style.color = record.type === 'income' ? '#00bcd4' : '#e74c3c';
 
-        // 3. テーブルを描画
-        renderTable(sortedData);
-        
-        // 4. 絞り込み後のデータでグラフを更新
-        updateCharts(sortedData);
-    }
-    
-    // -------------------------
-    // グラフ更新・描画関数 (グラフが表示されない問題の解決)
-    // -------------------------
-    function updateCharts(records) {
-        const currentIncomeRecords = records.filter(r => r.type === 'income');
-        const currentExpenseRecords = records.filter(r => r.type === 'expense');
+      row.insertCell().textContent = record.category ?? "";
+      row.insertCell().textContent = record.description ?? "";
 
-        const calculateStats = (data) => {
-            const statsMap = data.reduce((acc, record) => {
-                const month = record.date.substring(0, 7); 
-                acc[month] = (acc[month] || 0) + record.amount;
-                return acc;
-            }, {});
+      const amountCell = row.insertCell();
+      amountCell.textContent = `${Number(record.amount || 0).toLocaleString()} 円`;
+      amountCell.classList.add('fd-amount-cell');
+    });
+  }
 
-            return Object.keys(statsMap)
-                .sort()
-                .map(month => ({
-                    month: month.substring(5), // '01', '02'など
-                    amount: statsMap[month]
-                }));
-        };
+  // ---------- フィルタ & ソート ----------
+  applyFiltersAndSort = function () {
+    let currentData = [...rawFinanceRecords];
 
-        const incomeData = calculateStats(currentIncomeRecords);
-        const expenseData = calculateStats(currentExpenseRecords);
+    // タイプ
+    const selectedType = document.querySelector('input[name="typeFilter"]:checked')?.value || "all";
+    if (selectedType !== "all") {
+      currentData = currentData.filter(r => r.type === selectedType);
+    }
 
-        drawBarChart("incomeChart", incomeData, "#00bcd4", "#4dd0e1", "収入 (絞り込み結果)"); // シアン系
-        drawBarChart("expenseChart", expenseData, "#ff7043", "#ffccbc", "支出 (絞り込み結果)"); // オレンジ系
-    }
-    
-    // ★ グラフ描画のコアロジックを完全に追加 ★
-    function drawBarChart(canvasId, data, colorStart, colorEnd, title) {
-        const canvas = document.getElementById(canvasId);
-        if (!canvas) return; 
-        const ctx = canvas.getContext("2d");
-        const width = canvas.width;
-        const height = canvas.height;
-        ctx.clearRect(0, 0, width, height);
-        
-        // データがない場合の表示
-        if (data.length === 0) {
-            ctx.font = "20px sans-serif";
-            ctx.fillStyle = "#e0e0e0"; 
-            ctx.textAlign = "center";
-            ctx.fillText("データなし", width / 2, height / 2);
-            return;
-        }
+    // カテゴリ（複数）
+    const selectedOptions = Array.from(filterCategory.selectedOptions).map(o => o.value);
+    if (!selectedOptions.includes("all") && selectedOptions.length > 0) {
+      currentData = currentData.filter(r => selectedOptions.includes(r.category));
+    }
 
-        const labels = data.map(d => d.month);
-        const values = data.map(d => d.amount);
-        const maxVal = Math.max(...values) || 1;
-        const yTicks = 5;
-        const padding = 40;
-        const chartHeight = height - padding * 2;
-        const chartWidth = width - padding * 2;
-        const barWidth = chartWidth / values.length * 0.6;
-        const barGap = chartWidth / values.length * 0.4;
-        
-        // Y軸目盛の単位 (例: 1000, 1万)
-        const formatYValue = (val) => {
-             if (val >= 100000) return `${Math.round(val / 10000)}万`;
-             if (val >= 1000) return `${Math.round(val / 1000)}k`;
-             return val.toLocaleString();
-        };
+    // 検索（内容/日付文字列）
+    const searchTerm = (searchInput.value || "").toLowerCase();
+    if (searchTerm) {
+      currentData = currentData.filter(r =>
+        (r.description || "").toLowerCase().includes(searchTerm) ||
+        (r.date || "").includes(searchTerm)
+      );
+    }
 
-        // タイトル
-        ctx.font = "bold 16px sans-serif";
-        ctx.fillStyle = "#e0e0e0";
-        ctx.textAlign = "center";
-        ctx.fillText(title, width / 2, 20);
+    // 期間（YYYY-MM-DD で比較）
+    const startDate = startDateInput.value;
+    const endDate = endDateInput.value;
+    if (startDate) currentData = currentData.filter(r => (r.dateKey || "") >= startDate);
+    if (endDate)   currentData = currentData.filter(r => (r.dateKey || "") <= endDate);
 
-        // Y軸グリッド線とラベル
-        ctx.strokeStyle = "#444";
-        ctx.fillStyle = "#e0e0e0";
-        ctx.font = "10px sans-serif";
-        ctx.textAlign = "right";
-        for (let i = 0; i <= yTicks; i++) {
-            const y = padding + (chartHeight / yTicks) * i;
-            const value = Math.round(maxVal - (maxVal / yTicks) * i);
-            
-            ctx.beginPath();
-            ctx.moveTo(padding, y);
-            ctx.lineTo(width - padding, y);
-            ctx.stroke();
-            
-            ctx.fillText(formatYValue(value), padding - 5, y + 4);
-        }
+    // ソート
+    const sortKey = sortSelect.value;
+    currentData.sort((a, b) => {
+      if (sortKey === "date") {
+        return new Date(b.dateKey || 0) - new Date(a.dateKey || 0); // 降順
+      } else if (sortKey === "amount") {
+        return Number(b.amount || 0) - Number(a.amount || 0);
+      }
+      return 0;
+    });
 
-        // X軸 (基準線)
-        ctx.beginPath();
-        ctx.strokeStyle = "#e0e0e0";
-        ctx.moveTo(padding, height - padding);
-        ctx.lineTo(width - padding, height - padding);
-        ctx.stroke();
+    renderTable(currentData);
+    updateCharts(currentData);
+  };
 
-        // 棒グラフ描画
-        values.forEach((v, i) => {
-            const x = padding + i * (barWidth + barGap) + barGap / 2;
-            const barHeight = (v / maxVal) * chartHeight;
+  // ---------- グラフ ----------
+  function updateCharts(records) {
+    const currentIncomeRecords = records.filter(r => r.type === 'income');
+    const currentExpenseRecords = records.filter(r => r.type === 'expense');
+    drawIncomeChart(currentIncomeRecords);
+    drawExpenseChart(currentExpenseRecords);
+  }
 
-            // グラデーション設定
-            const grad = ctx.createLinearGradient(0, height - padding - barHeight, 0, height - padding);
-            grad.addColorStop(0, colorStart);
-            grad.addColorStop(1, colorEnd);
+  function drawIncomeChart(records) {
+    const ctx = document.getElementById('incomeChart').getContext('2d');
+    if (incomeChart) incomeChart.destroy();
 
-            ctx.fillStyle = grad;
-            ctx.fillRect(x, height - padding - barHeight, barWidth, barHeight);
+    const monthlyData = records.reduce((acc, r) => {
+      const m = (r.dateKey || "").substring(0, 7); // YYYY-MM
+      if (!m) return acc;
+      acc[m] = (acc[m] || 0) + Number(r.amount || 0);
+      return acc;
+    }, {});
+    const labels = Object.keys(monthlyData).sort();
+    const data = labels.map(l => monthlyData[l]);
 
-            // 金額ラベル (棒の上)
-            ctx.fillStyle = "#e0e0e0";
-            ctx.textAlign = "center";
-            ctx.font = "10px sans-serif";
-            if (barHeight > 15) { // 棒が高ければ上部に表示
-                ctx.fillText(formatYValue(v), x + barWidth / 2, height - padding - barHeight - 5);
-            } else { // 低ければ棒の中に表示
-                ctx.fillText(formatYValue(v), x + barWidth / 2, height - padding - 5); 
-            }
-            
+    incomeChart = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [{
+          label: '収入',
+          data,
+          backgroundColor: 'rgba(0, 188, 212, 0.8)',
+          borderColor: 'rgba(0, 188, 212, 1)',
+          borderWidth: 1
+        }]
+      },
+      options: {
+        responsive: true,
+        scales: { y: { beginAtZero: true } }
+      }
+    });
+  }
 
-            // 月ラベル (X軸の下)
-            ctx.fillStyle = "#b0b0b0";
-            ctx.textAlign = "center";
-            ctx.fillText(labels[i], x + barWidth / 2, height - padding + 15);
-        });
-    }
+  function drawExpenseChart(records) {
+    const ctx = document.getElementById('expenseChart').getContext('2d');
+    if (expenseChart) expenseChart.destroy();
 
+    const categories = [...new Set(records.map(r => r.category))];
+    const categoryColorMap = generateCategoryColors(categories);
 
-    // -------------------------
-    // サマリー計算と目標設定機能
-    // -------------------------
-    const totalIncome = rawFinanceRecords.filter(r => r.type === 'income').reduce((sum, d) => sum + d.amount, 0);
-    const totalExpense = rawFinanceRecords.filter(r => r.type === 'expense').reduce((sum, d) => sum + d.amount, 0);
-    
-    // 最新月の特定 (データの日付から動的に計算するのが理想)
-    const latestDate = rawFinanceRecords.reduce((maxDate, record) => {
-        return record.date > maxDate ? record.date : maxDate;
-    }, '0000-00-00');
-    const latestMonth = latestDate.substring(0, 7); 
-    
-    const monthlyExpense = rawFinanceRecords
-        .filter(r => r.type === 'expense' && r.date.startsWith(latestMonth))
-        .reduce((sum, d) => sum + d.amount, 0);
+    const monthlyData = records.reduce((acc, r) => {
+      const m = (r.dateKey || "").substring(0, 7);
+      if (!m) return acc;
+      if (!acc[m]) acc[m] = {};
+      const cat = r.category || "未分類";
+      acc[m][cat] = (acc[m][cat] || 0) + Number(r.amount || 0);
+      return acc;
+    }, {});
+    const labels = Object.keys(monthlyData).sort();
 
-    // HTML要素の更新
-    document.getElementById("current-balance").textContent = `${(totalIncome - totalExpense).toLocaleString()} 円`;
-    document.getElementById("monthly-expense").textContent = `${monthlyExpense.toLocaleString()} 円`;
-    
-    // 目標設定のロジック
-    const inputGoal = document.getElementById("inputGoal");
-    const goalAmountDisplay = document.getElementById("goal-amount");
-    const settingsForm = document.getElementById("settingsForm");
+    const datasets = categories.map(category => ({
+      label: category,
+      data: labels.map(l => monthlyData[l][category] || 0),
+      backgroundColor: categoryColorMap[category]
+    }));
 
-    const savedGoal = localStorage.getItem("financeGoalAmount");
-    if (savedGoal) {
-        goalAmountDisplay.textContent = `${Number(savedGoal).toLocaleString()} 円`;
-        inputGoal.value = savedGoal;
-    } else {
-        goalAmountDisplay.textContent = `-- 円`;
-    }
+    expenseChart = new Chart(ctx, {
+      type: 'bar',
+      data: { labels, datasets },
+      options: {
+        responsive: true,
+        scales: {
+          x: { stacked: true },
+          y: { stacked: true, beginAtZero: true }
+        }
+      }
+    });
+  }
 
-    if (settingsForm) {
-        settingsForm.addEventListener("submit", (e) => {
-            e.preventDefault();
-            const goalNum = Number(inputGoal.value);
-            if (!isNaN(goalNum) && goalNum >= 0) {
-                localStorage.setItem("financeGoalAmount", goalNum);
-                goalAmountDisplay.textContent = `${goalNum.toLocaleString()} 円`;
-                alert("目標金額を保存しました。");
-            } else {
-                alert("有効な目標金額を入力してください。");
-            }
-        });
-    }
+  function generateCategoryColors(categories) {
+    const colors = {};
+    const colorPalette = [
+      'rgba(255, 99, 132, 0.8)', 'rgba(54, 162, 235, 0.8)', 'rgba(255, 159, 64, 0.8)',
+      'rgba(75, 192, 192, 0.8)', 'rgba(153, 102, 255, 0.8)', 'rgba(255, 206, 86, 0.8)',
+      'rgba(199, 199, 199, 0.8)', 'rgba(83, 109, 254, 0.8)', 'rgba(46, 125, 50, 0.8)'
+    ];
+    categories.forEach((c, i) => { colors[c] = colorPalette[i % colorPalette.length]; });
+    return colors;
+  }
 
-    // -------------------------
-    // イベントリスナーの追加
-    // -------------------------
-    searchInput.addEventListener("input", applyFiltersAndSort);
-    sortSelect.addEventListener("change", applyFiltersAndSort);
-    filterCategory.addEventListener("change", applyFiltersAndSort);
-    filterType.addEventListener("change", applyFiltersAndSort); 
+  // ---------- サマリー ----------
+  function updateSummary() {
+    const totalIncome  = rawFinanceRecords.filter(r => r.type === 'income')
+      .reduce((s, d) => s + Number(d.amount || 0), 0);
+    const totalExpense = rawFinanceRecords.filter(r => r.type === 'expense')
+      .reduce((s, d) => s + Number(d.amount || 0), 0);
 
-    // 初期描画
-    applyFiltersAndSort(); 
+    const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+    const currentMonth = today.slice(0, 7);              // YYYY-MM
+
+    const monthlyExpense = rawFinanceRecords
+      .filter(r => r.type === 'expense' && (r.dateKey || "").startsWith(currentMonth))
+      .reduce((s, d) => s + Number(d.amount || 0), 0);
+
+    const monthlyIncome = rawFinanceRecords
+      .filter(r => r.type === 'income' && (r.dateKey || "").startsWith(currentMonth))
+      .reduce((s, d) => s + Number(d.amount || 0), 0);
+
+    const dailyExpense = rawFinanceRecords
+      .filter(r => r.type === 'expense' && (r.dateKey || "") === today)
+      .reduce((s, d) => s + Number(d.amount || 0), 0);
+
+    const dailyExpenseNoNecessities = rawFinanceRecords
+      .filter(r => r.type === 'expense' && (r.dateKey || "") === today && r.category !== '必需品')
+      .reduce((s, d) => s + Number(d.amount || 0), 0);
+
+    document.getElementById("current-balance").textContent = `${(totalIncome - totalExpense).toLocaleString()} 円`;
+    document.getElementById("monthly-expense").textContent = `${monthlyExpense.toLocaleString()} 円`;
+    document.getElementById("monthly-income").textContent  = `${monthlyIncome.toLocaleString()} 円`;
+    document.getElementById("daily-expense").textContent   = `${dailyExpense.toLocaleString()} 円`;
+    document.getElementById("daily-expense-no-necessities").textContent = `${dailyExpenseNoNecessities.toLocaleString()} 円`;
+  }
+
+  updateSummary();
+
+  // ---------- 設定（目標金額） ----------
+  const inputGoal = document.getElementById("inputGoal");
+  const goalAmountDisplay = document.getElementById("goal-amount");
+  const settingsForm = document.getElementById("settingsForm");
+
+  const savedGoal = localStorage.getItem("financeGoalAmount");
+  if (savedGoal) {
+    goalAmountDisplay.textContent = `${Number(savedGoal).toLocaleString()} 円`;
+    inputGoal.value = savedGoal;
+  } else {
+    goalAmountDisplay.textContent = `-- 円`;
+  }
+
+  if (settingsForm) {
+    settingsForm.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const goalNum = Number(inputGoal.value);
+      if (!isNaN(goalNum) && goalNum >= 0) {
+        localStorage.setItem("financeGoalAmount", goalNum);
+        goalAmountDisplay.textContent = `${goalNum.toLocaleString()} 円`;
+        alert("目標金額を保存しました。");
+      } else {
+        alert("有効な目標金額を入力してください。");
+      }
+    });
+  }
+
+  // ---------- イベント ----------
+  searchInput.addEventListener("input", applyFiltersAndSort);
+  sortSelect.addEventListener("change", applyFiltersAndSort);
+  filterCategory.addEventListener("change", applyFiltersAndSort);
+  filterType.addEventListener("change", applyFiltersAndSort);
+  // ブラウザのピッカー/手入力どちらでも拾う
+  startDateInput.addEventListener("input", applyFiltersAndSort);
+  endDateInput.addEventListener("input", applyFiltersAndSort);
+
+  // 初期描画
+  applyFiltersAndSort();
 });
+
+
+/* ========= ホイール式 日付ピッカー（モーダル）
+   - 1ステップスクロール
+   - 端まで中央寄せ（上下パディング）
+   - 月/日も選択行を青ハイライト
+   - OKで applyFiltersAndSort()
+=========================================== */
+(() => {
+  const financeDataElement = document.getElementById("finance-data");
+  const raw = JSON.parse(financeDataElement?.dataset.allRecords || "[]");
+
+  // 年範囲（データから＋現在±5年）
+  const currentYear = new Date().getFullYear();
+  const yearsFromData = raw.map(r => Number((r.date || "").slice(0,4))).filter(y => !Number.isNaN(y));
+  let minDataYear = yearsFromData.length ? Math.min(...yearsFromData) : currentYear;
+  let maxDataYear = yearsFromData.length ? Math.max(...yearsFromData) : currentYear;
+  const minYear = Math.min(minDataYear, currentYear - 5);
+  const maxYear = Math.max(maxDataYear, currentYear + 5);
+
+  const modal = document.getElementById('fdWheel');
+  const selY  = document.getElementById('fdWheelYear');
+  const selM  = document.getElementById('fdWheelMonth');
+  const selD  = document.getElementById('fdWheelDay');
+  const btnOK = modal?.querySelector('.fd-wheel-ok');
+  const btnNG = modal?.querySelector('.fd-wheel-cancel');
+  let targetInput = null;
+
+  if (!selY || !selM || !selD || !modal) return;
+
+  /* ---------- リスト構築 ---------- */
+  function fillYears(){
+    selY.innerHTML = '';
+    for(let y = minYear; y <= maxYear; y++){
+      const o = document.createElement('option');
+      o.value = String(y);
+      o.textContent = `${y} 年`;
+      selY.appendChild(o);
+    }
+  }
+  function fillMonths(){
+    selM.innerHTML = '';
+    for(let m=1;m<=12;m++){
+      const o = document.createElement('option');
+      o.value = String(m).padStart(2,'0');
+      o.textContent = `${m} 月`;
+      selM.appendChild(o);
+    }
+  }
+  function daysInYM(y, m){ return new Date(y, Number(m), 0).getDate(); }
+
+  /* ---------- メトリクス/中央寄せ/選択表示 ---------- */
+  
+  // 項目高さをCSSの想定値(36px)に固定
+  const ITEM_HEIGHT = 36; 
+
+  function computeItemHeight(sel){
+    // 固定値を使用
+    return ITEM_HEIGHT; 
+  }
+  function centerOffset(sel, h){
+    // **修正**: HTMLの size="5" を削除しているため、CSSの height: 180px; を基準に5項目と見なす
+    const visible = 5; 
+    return Math.floor((visible - 1) / 2); // (5 - 1) / 2 = 2 (中央の2項目上)
+  }
+  function remeasureAndPad(sel){
+    sel.style.paddingTop = sel.style.paddingBottom = '0px';
+    const h   = computeItemHeight(sel);
+    const off = centerOffset(sel, h);
+    const pad = off * h; // 2 * 36 = 72px
+
+    sel.style.paddingTop = sel.style.paddingBottom = `${pad}px`;
+    
+    sel.dataset.itemH = String(h);
+    sel.dataset.pad   = String(pad);
+    sel.dataset.off   = String(off);
+  }
+  function markSelected(sel){
+    const idx = sel.selectedIndex;
+    Array.from(sel.options).forEach((o, i) => {
+      if (i === idx) o.setAttribute('data-selected', 'true');
+      else o.removeAttribute('data-selected');
+    });
+  }
+    
+  // **↓↓↓ 修正関数: setTimeoutで強制スクロール ↓↓↓**
+  function centerScrollToIndex(sel, idx){
+    const len = sel.options.length;
+    idx = Math.max(0, Math.min(len - 1, idx));
+    sel.selectedIndex = idx;
+
+    const h   = parseFloat(sel.dataset.itemH) || computeItemHeight(sel);
+    const pad = parseFloat(sel.dataset.pad)   || 0;
+
+    const desired = idx * h - pad; 
+    const maxTop  = Math.max(0, sel.scrollHeight - sel.clientHeight);
+    
+    const finalScrollTop = Math.max(0, Math.min(maxTop, desired));
+
+    // setTimeoutで強制的にスクロールを実行
+    setTimeout(() => {
+      sel.scrollTop = finalScrollTop;
+    }, 0); 
+    // --------------------------------------------
+
+    markSelected(sel);
+  }
+  // **↑↑↑ 修正関数 ↑↑↑**
+
+  /* ---------- 日リスト作成（中央寄せまで） ---------- */
+  function fillDays(y, m, pickDay='01'){
+    selD.innerHTML = '';
+    const maxD = daysInYM(Number(y), Number(m));
+    for(let d=1; d<=maxD; d++){
+      const o = document.createElement('option');
+      o.value = String(d).padStart(2,'0');
+      o.textContent = `${d} 日`;
+      selD.appendChild(o);
+    }
+    const safeDay = Math.min(Number(pickDay), maxD);
+    remeasureAndPad(selD);
+    requestAnimationFrame(() => {
+      centerScrollToIndex(selD, safeDay - 1);
+    });
+  }
+
+  /* ---------- ステップスクロール ---------- */
+  function step(sel, delta){
+    const next = sel.selectedIndex + (delta > 0 ? 1 : -1);
+    centerScrollToIndex(sel, next);
+    // 年/月を動かしたら日数の再構築に利用
+    sel.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+  function attachDiscreteWheel(sel){
+    let locked = false;
+    const LOCK_MS = 90;
+    sel.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      if (locked) return;
+      locked = true;
+      const dir = e.deltaY === 0 ? 0 : (e.deltaY > 0 ? 1 : -1);
+      if (dir !== 0) step(sel, dir);
+      setTimeout(() => { locked = false; }, LOCK_MS);
+    }, { passive: false });
+
+    sel.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowDown' || e.key === 'PageDown') { e.preventDefault(); step(sel, +1); }
+      else if (e.key === 'ArrowUp'  || e.key === 'PageUp') { e.preventDefault(); step(sel, -1); }
+      else if (e.key === 'Home')  { e.preventDefault(); centerScrollToIndex(sel, 0); sel.dispatchEvent(new Event('change',{bubbles:true})); }
+      else if (e.key === 'End')   { e.preventDefault(); centerScrollToIndex(sel, sel.options.length - 1); sel.dispatchEvent(new Event('change',{bubbles:true})); }
+    });
+
+    sel.addEventListener('change', () => centerScrollToIndex(sel, sel.selectedIndex));
+  }
+
+  /* ---------- 初期構築 (最終調整済み) ---------- */
+  fillYears();
+  fillMonths();
+  
+  const [ty, tm, td] = new Date().toISOString().slice(0,10).split('-');
+  
+  selY.value = ty;
+  selM.value = tm;
+  
+  fillDays(ty, tm, td);
+  
+  [selY, selM].forEach(sel => { 
+    remeasureAndPad(sel); 
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        centerScrollToIndex(sel, sel.selectedIndex); 
+      });
+    });
+  });
+  
+  [selY, selM, selD].forEach(attachDiscreteWheel);
+  // ------------------------------------
+
+  /* ---------- 開閉 (最終調整済み) ---------- */
+  function openWheel(forInput){
+    targetInput = document.getElementById(forInput);
+    const base = (targetInput?.value && /^\d{4}-\d{2}-\d{2}$/.test(targetInput.value))
+      ? targetInput.value
+      : new Date().toISOString().slice(0,10);
+
+    const [y,m,d] = base.split('-');
+    const yy = Math.max(minYear, Math.min(maxYear, Number(y)));
+
+    selY.value = String(yy);
+    selM.value = m;
+    fillDays(yy, m, d);
+
+    [selY, selM, selD].forEach(remeasureAndPad);
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        centerScrollToIndex(selY, selY.selectedIndex);
+        centerScrollToIndex(selM, selM.selectedIndex);
+        centerScrollToIndex(selD, selD.selectedIndex);
+      });
+    });
+
+    modal.hidden = false;
+    selY.focus();
+  }
+  function closeWheel(){
+    modal.hidden = true;
+    targetInput = null;
+  }
+
+  /* ---------- 依存（年/月変更→日数再構築） ---------- */
+  selY.addEventListener('change', () => fillDays(selY.value, selM.value, selD.value));
+  selM.addEventListener('change', () => fillDays(selY.value, selM.value, selD.value));
+
+  /* ---------- OK/Cancel/外側クリック/Esc ---------- */
+  btnOK?.addEventListener('click', () => {
+    if(!targetInput) return closeWheel();
+    centerScrollToIndex(selY, selY.selectedIndex);
+    centerScrollToIndex(selM, selM.selectedIndex);
+    centerScrollToIndex(selD, selD.selectedIndex);
+
+    const y = selY.value;
+    const m = selM.value.padStart(2,'0');
+    const d = selD.value.padStart(2,'0');
+    targetInput.value = `${y}-${m}-${d}`;
+
+    if (typeof applyFiltersAndSort === 'function') applyFiltersAndSort();
+    closeWheel();
+  });
+  btnNG?.addEventListener('click', closeWheel);
+  modal?.addEventListener('click', (e) => { if(e.target === modal) closeWheel(); });
+  window.addEventListener('keydown', (e) => { if(!modal.hidden && e.key === 'Escape') closeWheel(); });
+
+  /* ---------- 起動ボタン（🗓） ---------- */
+  document.querySelectorAll('.fd-wheel-btn').forEach(btn=>{
+    btn.addEventListener('click', () => openWheel(btn.dataset.target));
+  });
+})();

@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="ja">
 <head>
   <meta charset="utf-8" />
@@ -34,6 +34,21 @@
     .spotify-search-results .track-img{width:56px;height:56px;border-radius:10px;object-fit:cover;}
     .spotify-search-results .playlist-select{min-width:150px;}
     .spotify-search-results .track-actions{display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end;}
+    .track-meta-link{color:var(--muted);text-decoration:none;}
+    .track-meta-link:hover{color:var(--accent);text-decoration:underline;}
+    .playlist-section-header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px;}
+    .playlist-section-header h3{margin:0;}
+    .playlist-create-form{display:grid;gap:10px;padding:14px;border:1px solid var(--panel-2);border-radius:12px;background:var(--panel-2);}
+    .playlist-create-row{display:flex;gap:10px;flex-wrap:wrap;}
+    .playlist-create-row input{flex:1 1 240px;}
+    .playlist-create-form input[type="text"]{padding:8px 12px;border-radius:10px;border:1px solid rgba(148,163,184,.4);background:rgba(15,20,26,.65);color:var(--text);}
+    .playlist-create-form input[type="text"]:focus{outline:2px solid rgba(102,163,255,.45);}
+    .playlist-create-public{display:flex;align-items:center;gap:8px;font-size:.9rem;color:var(--muted);}
+    .playlist-message{margin-top:12px;padding:10px 14px;border-radius:10px;border:1px solid rgba(102,163,255,.35);background:rgba(102,163,255,.12);color:var(--text);}
+    .playlist-message.is-success{border-color:rgba(74,222,128,.45);background:rgba(74,222,128,.16);}
+    .playlist-message.is-error{border-color:rgba(248,113,113,.45);background:rgba(248,113,113,.16);}
+    .playlist-actions{display:flex;gap:10px;flex-wrap:wrap;align-items:center;}
+    .playlist-actions .spotify-btn{white-space:nowrap;}
     .history-actions{display:flex;justify-content:flex-end;margin-top:8px;}
     .spotify-top-nav{position:fixed;top:18px;right:22px;display:flex;gap:12px;z-index:5100;}
     .spotify-top-nav .nav-btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:999px;background:rgba(15,20,26,0.82);border:1px solid rgba(255,255,255,0.12);color:#f8fafc;text-decoration:none;font-weight:600;backdrop-filter:blur(12px);}
@@ -47,6 +62,10 @@
       .spotify-search-results .add-to-playlist-btn,
       .spotify-search-results .track-actions{justify-self:start;}
       .spotify-search-results .track-actions{width:100%;justify-content:flex-start;}
+      .playlist-section-header{flex-direction:column;align-items:flex-start;gap:8px;}
+      .playlist-create-row{flex-direction:column;align-items:stretch;}
+      .playlist-create-row input{flex:1 1 auto;width:100%;}
+      .playlist-actions{width:100%;justify-content:flex-start;}
     }
   </style>
 </head>
@@ -111,9 +130,25 @@
 
     <div class="spotify-gap spotify-gap-search"></div>
 
-    <section class="spotify-card spotify-card-playlists" id="my-playlists">
-      <h3 class="spotify-title">自分のプレイリスト</h3>
-      <ul class="spotify-list playlists">
+            <section class="spotify-card spotify-card-playlists" id="my-playlists">
+      <div class="playlist-section-header">
+        <h3 class="spotify-title">自分のプレイリスト</h3>
+        <button type="button" class="spotify-btn main pill" id="playlist-create-toggle">新規プレイリスト作成</button>
+      </div>
+      <form id="create-playlist-form" class="playlist-create-form" hidden>
+        <div class="playlist-create-row">
+          <input id="create-playlist-name" type="text" placeholder="プレイリスト名" required />
+          <button type="submit" class="spotify-btn main pill">保存</button>
+          <button type="button" class="spotify-btn pill" id="playlist-create-cancel">キャンセル</button>
+        </div>
+        <input id="create-playlist-description" type="text" placeholder="説明 (任意)" />
+        <label class="playlist-create-public">
+          <input id="create-playlist-public" type="checkbox" />
+          公開プレイリストとして作成
+        </label>
+      </form>
+      <div id="playlist-create-message" class="playlist-message" hidden></div>
+      <ul class="spotify-list playlists" id="user-playlists">
         {% if playlists %}
           {% for p in playlists %}
           <li data-plid="{{ p.id }}">
@@ -128,12 +163,15 @@
                 <span class="pl-count" data-plid="{{ p.id }}">{{ p.tracks.total }}</span> 曲 ・ {{ p.owner.display_name }}
               </div>
             </div>
-            <button type="button" class="spotify-btn pill play-context" data-context="{{ p.uri }}">再生</button>
-            <button type="button" class="spotify-btn pill play-context-shuffle" data-context="{{ p.uri }}">シャッフル</button>
+            <div class="playlist-actions">
+              <button type="button" class="spotify-btn pill play-context" data-context="{{ p.uri }}">再生</button>
+              <button type="button" class="spotify-btn pill play-context-shuffle" data-context="{{ p.uri }}">シャッフル</button>
+              <button type="button" class="spotify-btn pill playlist-delete" data-playlist-id="{{ p.id }}" data-playlist-name="{{ p.name }}">削除</button>
+            </div>
           </li>
           {% endfor %}
         {% else %}
-          <li class="spotify-muted">プレイリストが見つかりませんでした。</li>
+          <li class="spotify-muted empty-playlist-placeholder">プレイリストが見つかりません。</li>
         {% endif %}
       </ul>
 
@@ -141,16 +179,9 @@
         {{ (playlists or []) | tojson }}
       </script>
     </section>
-    {% else %}
-    <section class="spotify-card" style="text-align:center;">
-      <h2 class="spotify-title">Spotify 連携エラー</h2>
-      <p style="color:#ff6b6b;margin-top:8px;">{{ error_message or 'Spotify からのデータ取得に失敗しました。もう一度お試しください。' }}</p>
-      <div style="margin-top:18px;">
-        <a class="spotify-btn main pill" href="{{ url_for('spotify_relogin') }}">Spotify でログインし直す</a>
-        <a class="spotify-btn pill" style="margin-left:8px;" href="{{ url_for('main') }}">メイン画面</a>
-      </div>
-    </section>
     {% endif %}
   </main>
 </body>
 </html>
+
+

@@ -339,14 +339,27 @@ def spotify_search_api():
         res = sp.search(q=q, type='track', limit=50, market='JP')
         tracks_out = []
         for item in res.get('tracks', {}).get('items', []):
+            album = item.get("album", {}) or {}
+            artists = item.get("artists", []) or []
+            album_images = album.get("images", []) or [{}]
             tracks_out.append({
-                "id": item["id"],
-                "name": item["name"],
-                "artists": ", ".join(a["name"] for a in item.get("artists", [])),
-                "album": item.get("album", {}).get("name"),
-                "image": (item.get("album", {}).get("images", []) or [{}])[0].get("url"),
+                "id": item.get("id"),
+                "name": item.get("name"),
+                "artists": ", ".join(a.get("name") for a in artists),
+                "artists_detail": [
+                    {
+                        "id": artist.get("id"),
+                        "name": artist.get("name"),
+                        "url": (artist.get("external_urls") or {}).get("spotify")
+                    } for artist in artists if artist.get("id")
+                ],
+                "album": album.get("name"),
+                "album_id": album.get("id"),
+                "album_url": (album.get("external_urls") or {}).get("spotify"),
+                "album_images": album_images,
+                "image": album_images[0].get("url"),
                 "preview_url": item.get("preview_url"),
-                "external_url": item.get("external_urls", {}).get("spotify"),
+                "external_url": (item.get("external_urls") or {}).get("spotify"),
                 "uri": item.get("uri"),
                 "duration_ms": item.get("duration_ms"),
             })
@@ -416,7 +429,27 @@ def spotify_add_track():
         return jsonify({"error": str(e)}), 500
     except Exception:
         return jsonify({"error": "add_failed"}), 500
-    
+
+@app.route('/api/spotify/playlist/<playlist_id>/tracks', methods=['DELETE'])
+def spotify_remove_track(playlist_id):
+    data = request.get_json(force=True) or {}
+    track_uri = data.get('track_uri')
+    position = data.get('position')
+    if not playlist_id or not track_uri or position is None:
+        return jsonify({"error": "missing track_uri or position"}), 400
+    try:
+        access_token = _ensure_access_token()
+        sp = spotipy.Spotify(auth=access_token)
+        sp.playlist_remove_specific_occurrences_of_items(
+            playlist_id,
+            [{'uri': track_uri, 'positions': [int(position)]}]
+        )
+        return jsonify({"ok": True})
+    except spotipy.exceptions.SpotifyException as e:
+        return jsonify({"error": str(e)}), 500
+    except Exception:
+        return jsonify({"error": "remove_failed"}), 500
+
     # === 既存 import/関数はそのまま ===
 
 @app.route('/spotify/playlist/<playlist_id>')
@@ -473,6 +506,100 @@ def spotify_playlist(playlist_id):
     except Exception as e:
         return render_template("spotify.html", is_authenticated=False,
                                error_message=f"プレイリスト取得に失敗: {e}")
+
+@app.route('/spotify/artist/<artist_id>')
+def spotify_artist_page(artist_id: str):
+    try:
+        access_token = _ensure_access_token()
+        sp = spotipy.Spotify(auth=access_token)
+
+        artist = sp.artist(artist_id)
+
+        top_tracks_resp = sp.artist_top_tracks(artist_id, country='JP')
+        top_tracks_raw = top_tracks_resp.get('tracks', [])
+        top_tracks = []
+        for track in top_tracks_raw:
+            album = track.get('album', {}) or {}
+            images = album.get('images', [])
+            img = (images[1]['url'] if len(images) > 1 else None) or (images[0]['url'] if images else None)
+            top_tracks.append({
+                'name': track.get('name'),
+                'uri': track.get('uri'),
+                'duration_ms': track.get('duration_ms') or 0,
+                'album_name': album.get('name'),
+                'album_id': album.get('id'),
+                'image': img,
+                'artists_detail': [
+                    {'id': a.get('id'), 'name': a.get('name')}
+                    for a in (track.get('artists') or []) if a.get('id')
+                ],
+                'external': (track.get('external_urls') or {}).get('spotify'),
+            })
+
+        albums_resp = sp.artist_albums(artist_id, album_type='album', limit=20, country='JP')
+        albums = []
+        seen_album_ids = set()
+        for album in albums_resp.get('items', []):
+            album_id = album.get('id')
+            if not album_id or album_id in seen_album_ids:
+                continue
+            seen_album_ids.add(album_id)
+            images = album.get('images', [])
+            albums.append({
+                'id': album_id,
+                'name': album.get('name'),
+                'release_date': album.get('release_date'),
+                'total_tracks': album.get('total_tracks'),
+                'image': (images[1]['url'] if len(images) > 1 else None) or (images[0]['url'] if images else None),
+                'external': (album.get('external_urls') or {}).get('spotify')
+            })
+
+        return render_template('spotify_artist.html', artist=artist, top_tracks=top_tracks, albums=albums)
+    except spotipy.exceptions.SpotifyException as e:
+        return render_template('spotify_artist.html', error_message=str(e), artist=None, top_tracks=[], albums=[])
+    except Exception as exc:
+        return render_template('spotify_artist.html', error_message=str(exc), artist=None, top_tracks=[], albums=[])
+
+@app.route('/spotify/album/<album_id>')
+def spotify_album_page(album_id: str):
+    try:
+        access_token = _ensure_access_token()
+        sp = spotipy.Spotify(auth=access_token)
+
+        album = sp.album(album_id)
+        album_uri = album.get('uri')
+        album_images = album.get('images', [])
+        primary_image = (album_images[1]['url'] if len(album_images) > 1 else None) or (album_images[0]['url'] if album_images else None)
+
+        tracks = []
+        tracks_page = album.get('tracks', {}) or {}
+        while True:
+            for item in tracks_page.get('items', []):
+                track_artists = item.get('artists', []) or []
+                tracks.append({
+                    'name': item.get('name'),
+                    'uri': item.get('uri'),
+                    'duration_ms': item.get('duration_ms') or 0,
+                    'artists': ", ".join(a.get('name') for a in track_artists),
+                    'artists_detail': [{'id': a.get('id'), 'name': a.get('name')} for a in track_artists if a.get('id')],
+                    'external': (item.get('external_urls') or {}).get('spotify'),
+                })
+            if tracks_page.get('next'):
+                tracks_page = sp.next(tracks_page)
+            else:
+                break
+
+        return render_template(
+            'spotify_album.html',
+            album=album,
+            album_image=primary_image,
+            album_uri=album_uri,
+            tracks=tracks
+        )
+    except spotipy.exceptions.SpotifyException as e:
+        return render_template('spotify_album.html', error_message=str(e), album=None, tracks=[])
+    except Exception as exc:
+        return render_template('spotify_album.html', error_message=str(exc), album=None, tracks=[])
 
 
 # ✅ SDK 用：常に最新の access_token を返す（スコープ不足なら 403）
