@@ -1,5 +1,5 @@
-const clientId = "964406409299-dd8g3vumtmeuaht9tmq9f5l21otetfn7.apps.googleusercontent.com";
-const apiKey = "AIzaSyDUqgdhLHjWeTqrwYLr2LItsU3C7GYYCDI";
+const clientId = "67874123915-sbvbq5g2qo6o2scting658b7qhn7s22a.apps.googleusercontent.com";
+const apiKey = "AIzaSyD3J_To68zeoUn7hOo1fDr9iH9NJ46UPls";
 const redirectUri = `${window.location.origin}/oauth-callback`;
 
 export class ScheduleManager {

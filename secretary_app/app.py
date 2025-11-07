@@ -1,3 +1,11 @@
+from flask import Flask, render_template, jsonify, request, redirect, url_for, session
+from services.user_service import (
+    get_all_users, get_user_by_email, add_user, update_user, delete_user)
+from services.category_service import (
+    get_all_categories, add_category, delete_category, clear_all_categories)
+from services.auth_service import register_user, login_user
+from services.expense_service import (add_finance_record,delete_finance_record)
+from services.finance_service import get_finance_summary, get_all_finance_records
 from flask import Flask, render_template, jsonify, request, redirect, url_for, session, abort
 from spotipy.oauth2 import SpotifyOAuth
 import spotipy
@@ -11,10 +19,16 @@ from services.category_service import (
 )
 from services.auth_service import register_user, login_user
 from services.finance_service import get_finance_summary, get_all_finance_records
-
+from services.chat_space_model import ChatSpaceModel
+import os
 
 app = Flask(__name__, template_folder='templates', static_folder='static')
-app.secret_key = os.getenv("SECRET_KEY", "devsecret")  # セッション用
+app.secret_key = os.getenv("SECRET_KEY", "devsecret")
+
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+if not GEMINI_API_KEY:
+    print("Warning: GEMINI_API_KEY environment variable not set. ChatSpaceModel may not function correctly.")
+chat_space_model = ChatSpaceModel(gemini_api_key=GEMINI_API_KEY)
 
 PLAYER_BAR_SNIPPET = """
   <div id="vs-playerbar" hidden>
@@ -96,13 +110,13 @@ def _has_required_scopes(token_info, required_scope: str) -> bool:
 def main():
     return render_template('main.html')
 
-@app.route('/categories')
-def categories():
-    return render_template('categories.html')
-
 @app.route('/expense')
 def expense():
     return render_template('expense.html')
+
+@app.route('/categories')
+def categories():
+    return render_template('categories.html')
 
 @app.route('/slot')
 def slot():
@@ -110,10 +124,14 @@ def slot():
 
 @app.route('/index')
 def index_page():
-    return render_template('index2.html')
+    return render_template('index.html')
 
-@app.route('/calendar')
-def calendar_page():
+@app.route('/oauth-callback2')
+def oauth_callback2():
+    return render_template('oauth-callback2.html')
+
+@app.route('/calender')
+def calender_page():
     return render_template('calender.html')
 
 @app.route('/oauth-callback')
@@ -247,6 +265,9 @@ def api_spotify_me():
 
 # --------------------
 # 認証/ユーザー管理（既存）
+
+# --------------------
+# 認証関係
 # --------------------
 @app.route('/register', methods=['GET', 'POST'])
 def register():
@@ -282,6 +303,53 @@ def logout():
 # --------------------
 # REST API（既存）
 # --------------------
+
+
+# ✅ カテゴリー関連API
+@app.route("/api/categories", methods=["GET"])
+def get_categories_route():
+    result = get_all_categories()
+    return jsonify(result)
+
+@app.route("/api/categories", methods=["POST"])
+def add_category_route():
+    data = request.get_json()
+    name = data.get("name", "").strip()
+    if not name:
+        return jsonify({"error": "カテゴリ名が空です"}), 400
+    result = add_category(name)
+    return jsonify(result)
+
+@app.route("/api/categories/<string:cat_id>", methods=["DELETE"])
+def delete_category_route(cat_id):
+    result = delete_category(cat_id) 
+    return jsonify(result)
+
+@app.route("/api/categories/clear", methods=["DELETE"])
+def clear_categories_route():
+    result = clear_all_categories()
+    return jsonify(result)
+
+
+# ✅ 収支関連API
+@app.route("/api/finance", methods=["GET"])
+def get_finance_records_route():
+    result = get_all_finance_records()
+    return jsonify(result)
+
+@app.route("/api/finance", methods=["POST"])
+def add_finance_record_route():
+    data = request.get_json()
+    result = add_finance_record(data)
+    return jsonify(result)
+
+@app.route("/api/finance/<string:record_id>", methods=["DELETE"])
+def delete_finance_record_route(record_id):
+    result = delete_finance_record(record_id)
+    return jsonify(result)
+
+
+# ✅ ユーザー関連API
 @app.route("/users", methods=["GET"])
 def get_users_route():
     return jsonify(get_all_users())
@@ -304,23 +372,6 @@ def update_user_route():
 def delete_user_route():
     email = request.args.get("email")
     return jsonify(delete_user(email))
-
-@app.route("/api/categories", methods=["GET"])
-def get_categories_route():
-    return jsonify(get_all_categories())
-
-@app.route("/api/categories", methods=["POST"])
-def add_category_route():
-    name = request.json.get("name")
-    return jsonify(add_category(name))
-
-@app.route("/api/categories/<id>", methods=["DELETE"])
-def delete_category_route(id):
-    return jsonify(delete_category(id))
-
-@app.route("/api/categories/clear", methods=["DELETE"])
-def clear_categories_route():
-    return jsonify(clear_all_categories())
 
 
 # --------------------
@@ -658,6 +709,20 @@ def ensure_spotify_playerbar(response):
                 response.set_data(body)
     return response
 
+
+@app.route('/api/chat', methods=['POST'])
+def chat_api():
+    data = request.get_json()
+    user_input = data.get('inputValue', '')
+    print("--- [DEBUG] /api/chat: Received request ---")
+    app.logger.info(f"Received chat input from frontend: {user_input}")
+    
+    # ChatSpaceModelのcheck_chat_spaceメソッドを呼び出す
+    print("--- [DEBUG] /api/chat: Calling check_chat_space ---")
+    response_data = chat_space_model.check_chat_space(user_input)
+    print(f"--- [DEBUG] /api/chat: Received response from check_chat_space: {response_data} ---")
+    
+    return jsonify(response_data)
 
 if __name__ == '__main__':
     app.run(
