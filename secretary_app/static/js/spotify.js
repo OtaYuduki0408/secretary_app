@@ -259,6 +259,16 @@ const bar = {
 function showBar(){ if(bar.root) bar.root.hidden = false; }
 function fmt(ms){ if(!ms&&ms!==0) return '0:00'; const s=Math.floor(ms/1000); const m=Math.floor(s/60); const ss=String(s%60).padStart(2,'0'); return `${m}:${ss}`; }
 
+function escapeHtml(str){
+  return (str || '').replace(/[&<>"']/g, (ch) => ({
+    '&':'&amp;',
+    '<':'&lt;',
+    '>':'&gt;',
+    '"':'&quot;',
+    "'":'&#39;'
+  }[ch] || ch));
+}
+
 function updateBarFromState(state){
   if(!bar.root){
     return;
@@ -441,6 +451,15 @@ bar?.shuffle?.addEventListener('click', async () => {
     const toastEl       = $('#toast');
     const playlistsEl   = $('#playlists-data');
     const playlistSection = document.getElementById('my-playlists');
+    const playlistList = document.getElementById('user-playlists');
+    const playlistCreateToggle = document.getElementById('playlist-create-toggle');
+    const playlistCreateForm = document.getElementById('create-playlist-form');
+    const playlistCreateName = document.getElementById('create-playlist-name');
+    const playlistCreateDescription = document.getElementById('create-playlist-description');
+    const playlistCreatePublic = document.getElementById('create-playlist-public');
+    const playlistCreateCancel = document.getElementById('playlist-create-cancel');
+    const playlistMessage = document.getElementById('playlist-create-message');
+    const playlistTrackTotalEl = document.getElementById('playlist-track-total');
 
     const ensurePlaylistsUrlState = () => {
       try{
@@ -501,7 +520,320 @@ bar?.shuffle?.addEventListener('click', async () => {
 
     // 
     let userPlaylists=[];
-    try{ userPlaylists = playlistsEl ? JSON.parse(playlistsEl.textContent||'[]').map(p=>({id:p.id,name:p.name})) : []; }catch{}
+    try{ userPlaylists = playlistsEl ? JSON.parse(playlistsEl.textContent||'[]') : []; }catch{}
+
+    function getPlaylistOptions(){
+      return (userPlaylists||[]).map(p=>({ id:p.id, name:p.name }));
+    }
+
+    let playlistMessageTimer = null;
+
+    function setPlaylistMessage(text='', type='info'){
+      if(!playlistMessage) return;
+      if(playlistMessageTimer){
+        clearTimeout(playlistMessageTimer);
+        playlistMessageTimer = null;
+      }
+      if(!text){
+        playlistMessage.hidden = true;
+        playlistMessage.textContent = '';
+        playlistMessage.classList.remove('is-error','is-success');
+        return;
+      }
+      playlistMessage.textContent = text;
+      playlistMessage.hidden = false;
+      playlistMessage.classList.remove('is-error','is-success');
+      if(type==='error') playlistMessage.classList.add('is-error');
+      if(type==='success') playlistMessage.classList.add('is-success');
+      if(type !== 'error'){
+        playlistMessageTimer = window.setTimeout(()=>setPlaylistMessage(), 4000);
+      }
+    }
+
+    function togglePlaylistForm(force){
+      if(!playlistCreateForm) return;
+      const show = typeof force === 'boolean' ? force : playlistCreateForm.hidden;
+      playlistCreateForm.hidden = !show;
+      if(playlistCreateToggle){
+        playlistCreateToggle.textContent = show ? '作成フォームを閉じる' : '新規プレイリスト作成';
+      }
+      if(show && playlistCreateName){
+        requestAnimationFrame(()=>playlistCreateName.focus());
+      }
+    }
+
+    function adjustPlaylistTrackTotal(delta){
+      if(!playlistTrackTotalEl) return;
+      const current = parseInt(playlistTrackTotalEl.textContent || '0', 10);
+      const next = Number.isFinite(current) ? Math.max(current + delta, 0) : 0;
+      playlistTrackTotalEl.textContent = next;
+    }
+
+    function reindexPlaylistRows(){
+      document.querySelectorAll('.track-row[data-playlist-row]').forEach((row, index)=>{
+        row.dataset.playlistRow = index;
+        const num = row.querySelector('.track-num');
+        if(num) num.textContent = index + 1;
+        const playBtn = row.querySelector('.js-track-play');
+        if(playBtn){
+          playBtn.dataset.offset = index;
+        }
+        const deleteBtn = row.querySelector('.playlist-track-delete');
+        if(deleteBtn){
+          deleteBtn.dataset.position = index;
+        }
+      });
+    }
+
+    function buildPlaylistListItem(pl){
+      const li = document.createElement('li');
+      li.dataset.plid = pl.id;
+      const playlistName = pl.name || '無題のプレイリスト';
+      const cover = (pl.images && pl.images[0]?.url) || 'https://placehold.co/56x56/343A40/FFFFFF?text=PL';
+      const ownerName = pl.owner?.display_name || 'あなた';
+      const totalTracks = pl.tracks?.total ?? 0;
+      const contextUri = pl.uri;
+
+      const detailLink = document.createElement('a');
+      detailLink.href = `/spotify/playlist/${encodeURIComponent(pl.id)}`;
+      const img = document.createElement('img');
+      img.className = 'spotify-thumb';
+      img.src = cover;
+      img.alt = playlistName;
+      detailLink.appendChild(img);
+      li.appendChild(detailLink);
+
+      const infoWrap = document.createElement('div');
+      infoWrap.style.minWidth = '0';
+
+      const titleLine = document.createElement('div');
+      titleLine.className = 'spotify-line';
+      const titleLink = document.createElement('a');
+      titleLink.className = 'spotify-link';
+      titleLink.href = `/spotify/playlist/${encodeURIComponent(pl.id)}`;
+      titleLink.innerHTML = `<strong>${escapeHtml(playlistName)}</strong>`;
+      titleLine.appendChild(titleLink);
+      infoWrap.appendChild(titleLine);
+
+      const metaLine = document.createElement('div');
+      metaLine.className = 'spotify-muted spotify-line';
+      const countSpan = document.createElement('span');
+      countSpan.className = 'pl-count';
+      countSpan.dataset.plid = pl.id;
+      countSpan.textContent = totalTracks;
+      metaLine.appendChild(countSpan);
+      metaLine.appendChild(document.createTextNode(` 曲 ・ ${ownerName}`));
+      infoWrap.appendChild(metaLine);
+      li.appendChild(infoWrap);
+
+      const actions = document.createElement('div');
+      actions.className = 'playlist-actions';
+
+      const playBtn = document.createElement('button');
+      playBtn.type = 'button';
+      playBtn.className = 'spotify-btn pill play-context';
+      playBtn.dataset.context = contextUri;
+      playBtn.textContent = '再生';
+      actions.appendChild(playBtn);
+
+      const shuffleBtn = document.createElement('button');
+      shuffleBtn.type = 'button';
+      shuffleBtn.className = 'spotify-btn pill play-context-shuffle';
+      shuffleBtn.dataset.context = contextUri;
+      shuffleBtn.textContent = 'シャッフル';
+      actions.appendChild(shuffleBtn);
+
+      const deleteBtn = document.createElement('button');
+      deleteBtn.type = 'button';
+      deleteBtn.className = 'spotify-btn pill playlist-delete';
+      deleteBtn.dataset.playlistId = pl.id;
+      deleteBtn.dataset.playlistName = playlistName;
+      deleteBtn.textContent = '削除';
+      actions.appendChild(deleteBtn);
+
+      li.appendChild(actions);
+      return li;
+    }
+
+    function wirePlaylistEntry(li){
+      if(!li || li.classList.contains('empty-playlist-placeholder')) return;
+      const playBtn = li.querySelector('.play-context[data-context]');
+      if(playBtn && !playBtn.dataset.wired){
+        playBtn.dataset.wired = '1';
+        playBtn.addEventListener('click', async ()=>{
+          const ctx = playBtn.getAttribute('data-context');
+          if(!ctx) return;
+          playBtn.disabled = true;
+          const old = playBtn.textContent;
+          playBtn.textContent = '読み込み中...';
+          try{
+            await apiPlayContext(ctx);
+          }catch(err){
+            alert('プレイリストの再生に失敗しました。');
+            console.error(err);
+          }finally{
+            playBtn.textContent = old;
+            playBtn.disabled = false;
+          }
+        });
+      }
+
+      const shuffleBtn = li.querySelector('.play-context-shuffle[data-context]');
+      if(shuffleBtn && !shuffleBtn.dataset.wired){
+        shuffleBtn.dataset.wired = '1';
+        shuffleBtn.addEventListener('click', async ()=>{
+          const ctx = shuffleBtn.getAttribute('data-context');
+          if(!ctx) return;
+          shuffleBtn.disabled = true;
+          const old = shuffleBtn.textContent;
+          shuffleBtn.textContent = '読み込み中...';
+          try{
+            await apiSetShuffle(true);
+            await apiPlayContext(ctx);
+          }catch(err){
+            alert('シャッフル再生に失敗しました。');
+            console.error(err);
+          }finally{
+            shuffleBtn.textContent = old;
+            shuffleBtn.disabled = false;
+          }
+        });
+      }
+
+      const deleteBtn = li.querySelector('.playlist-delete[data-playlist-id]');
+      if(deleteBtn && !deleteBtn.dataset.wired){
+        deleteBtn.dataset.wired = '1';
+        deleteBtn.addEventListener('click', async ()=>{
+          const playlistId = deleteBtn.dataset.playlistId;
+          if(!playlistId) return;
+          const playlistName = deleteBtn.dataset.playlistName || 'このプレイリスト';
+          if(!confirm(`${playlistName} を削除しますか？`)) return;
+          deleteBtn.disabled = true;
+          try{
+            const res = await fetch(`/api/spotify/playlist/${encodeURIComponent(playlistId)}`, { method: 'DELETE' });
+            const data = await res.json().catch(()=>({}));
+            if(!res.ok || data?.error){
+              throw new Error(data?.error || `status ${res.status}`);
+            }
+            setPlaylistMessage(`${playlistName} を削除しました。`, 'success');
+            li.remove();
+            userPlaylists = (userPlaylists||[]).filter(p=>p.id !== playlistId);
+            updatePlaylistOptionsForSelects();
+            if(playlistList && !playlistList.querySelector('li')){
+              const empty = document.createElement('li');
+              empty.className = 'spotify-muted empty-playlist-placeholder';
+              empty.textContent = 'プレイリストが見つかりません。';
+              playlistList.appendChild(empty);
+            }
+          }catch(err){
+            console.error(err);
+            setPlaylistMessage('プレイリストの削除に失敗しました。', 'error');
+            deleteBtn.disabled = false;
+            return;
+          }
+        });
+      }
+    }
+
+    function updatePlaylistOptionsForSelects(){
+      const options = getPlaylistOptions();
+      document.querySelectorAll('select.playlist-select').forEach(select=>{
+        const current = select.value;
+        select.innerHTML = '<option value=\"\">プレイリストを選択</option>';
+        options.forEach(p=>{
+          const opt=document.createElement('option');
+          opt.value=p.id;
+          opt.textContent=p.name;
+          select.appendChild(opt);
+        });
+        if(current && options.some(p=>p.id===current)){
+          select.value = current;
+        }
+      });
+    }
+
+    playlistCreateToggle?.addEventListener('click', ()=>{
+      if(!playlistCreateForm) return;
+      const show = playlistCreateForm.hidden;
+      togglePlaylistForm(show);
+      if(show){
+        setPlaylistMessage();
+      }else{
+        playlistCreateForm.reset?.();
+        setPlaylistMessage();
+      }
+    });
+
+    playlistCreateCancel?.addEventListener('click', ()=>{
+      playlistCreateForm?.reset?.();
+      togglePlaylistForm(false);
+      setPlaylistMessage();
+    });
+
+    playlistCreateForm?.addEventListener('submit', async (event)=>{
+      event.preventDefault();
+      if(!playlistCreateName) return;
+      const name = (playlistCreateName.value || '').trim();
+      if(!name){
+        setPlaylistMessage('プレイリスト名を入力してください。', 'error');
+        return;
+      }
+      const description = (playlistCreateDescription?.value || '').trim();
+      const isPublic = !!playlistCreatePublic?.checked;
+      const submitBtn = playlistCreateForm.querySelector('button[type=\"submit\"]');
+      const originalLabel = submitBtn?.textContent;
+      playlistCreateName.disabled = true;
+      if(playlistCreateDescription) playlistCreateDescription.disabled = true;
+      if(playlistCreatePublic) playlistCreatePublic.disabled = true;
+      if(submitBtn){
+        submitBtn.disabled = true;
+        submitBtn.textContent = '作成中...';
+      }
+      setPlaylistMessage();
+      try{
+        const res = await fetch('/api/spotify/create-playlist', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name,
+            description,
+            public: isPublic
+          })
+        });
+        const data = await res.json().catch(()=>({}));
+        if(!res.ok || !data?.playlist){
+          throw new Error(data?.error || `status ${res.status}`);
+        }
+        const newPlaylist = data.playlist || {};
+      if (!newPlaylist.tracks) {
+        newPlaylist.tracks = { total: 0 };
+      } else {
+        const total = Number(newPlaylist.tracks.total ?? 0);
+        newPlaylist.tracks = { total };
+      }
+      if (playlistList) {
+        playlistList.querySelectorAll('.empty-playlist-placeholder').forEach((node) => node.remove());
+        const li = buildPlaylistListItem(newPlaylist);
+        playlistList.prepend(li);
+        wirePlaylistEntry(li);
+      }
+        updatePlaylistOptionsForSelects();
+        playlistCreateForm.reset();
+        togglePlaylistForm(false);
+        setPlaylistMessage('プレイリストを作成しました。', 'success');
+      }catch(err){
+        console.error(err);
+        setPlaylistMessage('プレイリストの作成に失敗しました。', 'error');
+      }finally{
+        playlistCreateName.disabled = false;
+        if(playlistCreateDescription) playlistCreateDescription.disabled = false;
+        if(playlistCreatePublic) playlistCreatePublic.disabled = false;
+        if(submitBtn){
+          submitBtn.disabled = false;
+          submitBtn.textContent = originalLabel || '保存';
+        }
+      }
+    });
 
     // 
     function loadHistory(){ try{ const raw=localStorage.getItem(HISTORY_KEY); return raw?JSON.parse(raw):[] }catch{ return [] } }
@@ -569,9 +901,21 @@ function renderResults(tracks){
         const meta=document.createElement('div'); meta.className='track-info';
         const title=document.createElement('div'); title.className='track-name'; title.textContent=t.name;
         const subtitle=document.createElement('div'); subtitle.className='track-meta';
-        const metaParts=[t.artists || ''];
-        if(t.album) metaParts.push(t.album);
-        subtitle.textContent=metaParts.filter(Boolean).join(' ・ ');
+        const artistLinks = (t.artists_detail||[])
+          .filter(a=>a && a.id && a.name)
+          .map(a=>`<a class="track-meta-link" href="/spotify/artist/${encodeURIComponent(a.id)}">${escapeHtml(a.name)}</a>`)
+          .join('、 ');
+        let albumSegment = '';
+        const albumName = t.album || '';
+        if(t.album_id){
+          albumSegment = `<a class="track-meta-link" href="/spotify/album/${encodeURIComponent(t.album_id)}">${escapeHtml(albumName || 'アルバム')}</a>`;
+        }else if(albumName){
+          albumSegment = escapeHtml(albumName);
+        }
+        const metaSegments = [];
+        if(artistLinks) metaSegments.push(artistLinks);
+        if(albumSegment) metaSegments.push(albumSegment);
+        subtitle.innerHTML = metaSegments.join(' ・ ') || escapeHtml(t.artists || '');
         meta.append(title, subtitle);
 
         const actions=document.createElement('div'); actions.className='track-actions';
@@ -580,37 +924,37 @@ function renderResults(tracks){
         const inlineBtn = document.createElement('button');
         inlineBtn.classList.add('play-btn', 'js-track-play');
         inlineBtn.dataset.uri = t.uri;
-        inlineBtn.dataset.label = 'Play';
-        inlineBtn.dataset.playingLabel = 'Playing';
-        inlineBtn.dataset.loadingLabel = 'Loading...';
+        inlineBtn.dataset.label = '再生';
+        inlineBtn.dataset.playingLabel = '再生中';
+        inlineBtn.dataset.loadingLabel = '読み込み中...';
         inlineBtn.textContent = inlineBtn.dataset.label;
         actions.appendChild(inlineBtn);
         wireInlinePlayButton(inlineBtn);
 
         // Preview if available
         if(t.preview_url){
-          const prev=document.createElement('button'); prev.className='play-btn'; prev.textContent='Preview';
+          const prev=document.createElement('button'); prev.className='play-btn'; prev.textContent='プレビュー';
           prev.addEventListener('click',()=>new Audio(t.preview_url).play().catch(()=>{}));
           actions.appendChild(prev);
         }
 
         // Open in Spotify
-        const openA=document.createElement('a'); openA.href=t.external_url||'#'; openA.target='_blank'; openA.rel='noopener'; openA.className='main-btn'; openA.textContent='Open Spotify';
+        const openA=document.createElement('a'); openA.href=t.external_url||'#'; openA.target='_blank'; openA.rel='noopener'; openA.className='main-btn'; openA.textContent='Spotifyで開く';
         actions.appendChild(openA);
 
         // Add to playlist
-        const select=document.createElement('select'); select.className='playlist-select'; select.innerHTML='<option value=\"\">Select playlist</option>';
-        (userPlaylists||[]).forEach(p=>{ const opt=document.createElement('option'); opt.value=p.id; opt.textContent=p.name; select.appendChild(opt); });
-        const addBtn=document.createElement('button'); addBtn.textContent='Add'; addBtn.className='add-to-playlist-btn'; addBtn.disabled=true;
+        const select=document.createElement('select'); select.className='playlist-select'; select.innerHTML='<option value=\"\">プレイリストを選択</option>';
+        getPlaylistOptions().forEach(p=>{ const opt=document.createElement('option'); opt.value=p.id; opt.textContent=p.name; select.appendChild(opt); });
+        const addBtn=document.createElement('button'); addBtn.textContent='追加'; addBtn.className='add-to-playlist-btn'; addBtn.disabled=true;
         select.addEventListener('change',()=>addBtn.disabled=!select.value);
         addBtn.addEventListener('click', async ()=>{
           const pid=select.value; if(!pid) return;
-          const original=addBtn.textContent; addBtn.textContent='Adding...'; addBtn.disabled=true;
+          const original=addBtn.textContent; addBtn.textContent='追加中...'; addBtn.disabled=true;
           try{
             const res=await fetch('/api/spotify/add-track',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({playlist_id:pid,track_uri:t.uri})});
-            const data=await res.json(); if(res.ok){ const span=document.querySelector(`.pl-count[data-plid=\"${pid}\"]`); if(span){ span.textContent=String(parseInt(span.textContent||'0',10)+1); } showToast('Track added to playlist.'); addBtn.textContent='Added'; addBtn.style.background='#06C755'; }
-            else{ addBtn.textContent='Error'; addBtn.style.background='#FF4500'; alert(`Failed to add track: ${data.error||'unknown'}`); }
-          }catch{ addBtn.textContent='Error'; addBtn.style.background='#FF4500'; alert('Network error'); }
+            const data=await res.json(); if(res.ok){ const span=document.querySelector(`.pl-count[data-plid=\"${pid}\"]`); if(span){ span.textContent=String(parseInt(span.textContent||'0',10)+1); } showToast('プレイリストに追加しました。'); addBtn.textContent='追加完了'; addBtn.style.background='#06C755'; }
+            else{ addBtn.textContent='エラー'; addBtn.style.background='#FF4500'; alert(`追加に失敗しました: ${data.error||'unknown'}`); }
+          }catch{ addBtn.textContent='エラー'; addBtn.style.background='#FF4500'; alert('通信エラーが発生しました。'); }
           finally{ setTimeout(()=>{ addBtn.textContent=original; addBtn.style.background='#c084fc'; addBtn.disabled=false; },1200); }
         });
 
@@ -626,40 +970,66 @@ function renderResults(tracks){
 
     // Render initial history
     renderHistory();
+    updatePlaylistOptionsForSelects();
 
     // Inline play buttons (common across pages)
-    document.querySelectorAll('.js-track-play[data-uri]').forEach(wireInlinePlayButton);
+    const currentPlaylistId = document.querySelector('[data-current-playlist]')?.dataset.currentPlaylist;
 
-    // Playlist context play buttons
-    document.querySelectorAll('.play-context[data-context]').forEach(btn=>{
+    document.querySelectorAll('.js-track-play[data-uri]').forEach(wireInlinePlayButton);
+    document.querySelectorAll('#user-playlists > li').forEach(wirePlaylistEntry);
+    document.querySelectorAll('.playlist-track-delete[data-playlist-id][data-track-uri]').forEach((btn)=>{
+      if(btn.dataset.wired === '1') return;
+      btn.dataset.wired = '1';
       btn.addEventListener('click', async ()=>{
-        const ctx=btn.getAttribute('data-context');
-        btn.disabled=true; const old=btn.textContent; btn.textContent='Loading...';
-        try{ await apiPlayContext(ctx); }catch(err){ alert('Playlist playback failed.'); console.error(err); }
-        finally{ btn.textContent=old; btn.disabled=false; }
+        const playlistId = btn.dataset.playlistId || currentPlaylistId;
+        const trackUri = btn.dataset.trackUri;
+        const position = Number(btn.dataset.position);
+        if(!playlistId || !trackUri || Number.isNaN(position)) return;
+        if(!confirm('このトラックをプレイリストから削除しますか？')) return;
+        const row = btn.closest('.track-row');
+        btn.disabled = true;
+        const original = btn.textContent;
+        btn.textContent = '削除中...';
+        try{
+          const res = await fetch(`/api/spotify/playlist/${encodeURIComponent(playlistId)}/tracks`, {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ track_uri: trackUri, position })
+          });
+          const data = await res.json().catch(()=>({}));
+          if(!res.ok || data?.error){
+            throw new Error(data?.error || `status ${res.status}`);
+          }
+          setPlaylistMessage('トラックを削除しました。', 'success');
+          if(row) row.remove();
+          adjustPlaylistTrackTotal(-1);
+          userPlaylists = (userPlaylists || []).map(p=>{
+            if(p.id === playlistId){
+              const clone = { ...p };
+              const total = Math.max((clone.tracks?.total ?? 0) - 1, 0);
+              clone.tracks = { ...(clone.tracks || {}), total };
+              return clone;
+            }
+            return p;
+          });
+          document.querySelectorAll(`.pl-count[data-plid="${playlistId}"]`).forEach(span=>{
+            span.textContent = Math.max(parseInt(span.textContent || '0', 10) - 1, 0);
+          });
+          updatePlaylistOptionsForSelects();
+          reindexPlaylistRows();
+        }catch(err){
+          console.error(err);
+          setPlaylistMessage('トラックの削除に失敗しました。', 'error');
+        }finally{
+          btn.textContent = original;
+          btn.disabled = false;
+        }
       });
     });
 
-    // Shuffle context play
-
-document.querySelectorAll('.play-context-shuffle[data-context]').forEach(btn => {
-  btn.addEventListener('click', async () => {
-    const ctx = btn.getAttribute('data-context');
-    btn.disabled = true; const old = btn.textContent; btn.textContent = 'Loading...';
-    try {
-      // 1) Enable shuffle
-      await apiSetShuffle(true);
-      // 2) Start playback
-      await apiPlayContext(ctx);
-      // Optionally disable shuffle afterwards
-    } catch (err) {
-      alert('Shuffle playback failed.');
-      console.error(err);
-    } finally {
-      btn.textContent = old; btn.disabled = false;
+    if(currentPlaylistId){
+      reindexPlaylistRows();
     }
-  });
-});
 
 
     // SDK
@@ -668,4 +1038,5 @@ document.querySelectorAll('.play-context-shuffle[data-context]').forEach(btn => 
     if(window.Spotify) ensurePlayer().catch(console.error);
   });
 })();
+
 

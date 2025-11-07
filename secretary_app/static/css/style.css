@@ -1332,3 +1332,11 @@ html.theme-light .spotify-btn svg{
   filter: brightness(0.95);
 }
 
+.nav-btn--outline{
+  border:1px solid rgba(255,255,255,.6);
+  background:transparent;
+  color:#fff;
+}
+.nav-btn--outline:hover{
+  background:rgba(255,255,255,.12);
+}
