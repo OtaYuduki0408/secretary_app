@@ -25,13 +25,10 @@ import os
 app = Flask(__name__, template_folder='templates', static_folder='static')
 app.secret_key = os.getenv("SECRET_KEY", "devsecret")
 
-app = Flask(__name__, template_folder='templates', static_folder='static')
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 if not GEMINI_API_KEY:
     print("Warning: GEMINI_API_KEY environment variable not set. ChatSpaceModel may not function correctly.")
 chat_space_model = ChatSpaceModel(gemini_api_key=GEMINI_API_KEY)
-
-app.secret_key = os.getenv("SECRET_KEY", "devsecret")  # セッション用
 
 PLAYER_BAR_SNIPPET = """
   <div id="vs-playerbar" hidden>
