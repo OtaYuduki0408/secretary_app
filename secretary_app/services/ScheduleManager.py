@@ -4,13 +4,17 @@ from datetime import datetime, timedelta
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 from google.auth.transport.requests import Request
-
+ 
 TOKEN_PATH = "token.json"
 SCOPES = [
+    "openid",
+    "https://www.googleapis.com/auth/gmail.send",
+    "https://www.googleapis.com/auth/gmail.readonly",
+    "https://www.googleapis.com/auth/userinfo.profile",
+    "https://www.googleapis.com/auth/userinfo.email",
     "https://www.googleapis.com/auth/calendar",
-    
 ]
-
+ 
 class ScheduleManager:
     def __init__(self, token_path=TOKEN_PATH, scopes=SCOPES, creds_info=None):
         self.token_path = token_path
@@ -21,7 +25,7 @@ class ScheduleManager:
             self.creds = Credentials.from_authorized_user_info(creds_info, scopes=self.scopes)
         else:
             self._load_token()
-
+ 
         if self.creds and self.creds.expired and self.creds.refresh_token:
             try:
                 self.creds.refresh(Request())
@@ -29,7 +33,7 @@ class ScheduleManager:
             except Exception as e:
                 # refresh error - leave as-is, higher layer should re-auth
                 print("Credentials refresh failed:", e)
-
+ 
     def _load_token(self):
         if os.path.exists(self.token_path):
             with open(self.token_path, "r", encoding="utf-8") as f:
@@ -41,7 +45,7 @@ class ScheduleManager:
                 self.creds = None
         else:
             self.creds = None
-
+ 
     def _save_token(self):
         if not self.creds:
             return
@@ -55,10 +59,10 @@ class ScheduleManager:
         }
         with open(self.token_path, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2)
-
+ 
     def is_authenticated(self):
         return self.creds is not None and self.creds.valid
-
+ 
     def set_credentials_from_info(self, creds_info):
         """呼び出し元（Flask）で OAuth フローが完了した後に creds_info(dict)を渡して保存する"""
         self.creds = Credentials.from_authorized_user_info(creds_info, scopes=self.scopes)
@@ -69,12 +73,12 @@ class ScheduleManager:
             except Exception as e:
                 print("refresh failed:", e)
         self._save_token()
-
+ 
     def _build_service(self, api_name="calendar", version="v3"):
         if not self.creds:
             raise RuntimeError("not_authenticated")
         return build(api_name, version, credentials=self.creds, cache_discovery=False)
-
+ 
     def add_event(self, title, start_iso, end_iso=None, description=""):
         service = self._build_service()
         if not end_iso:
@@ -88,12 +92,12 @@ class ScheduleManager:
         }
         created = service.events().insert(calendarId="primary", body=event).execute()
         return created
-
+ 
     def delete_event(self, event_id):
         service = self._build_service()
         service.events().delete(calendarId="primary", eventId=event_id).execute()
         return {"status": "deleted", "id": event_id}
-
+ 
     def list_events(self, time_min=None, time_max=None, max_results=50):
         service = self._build_service()
         if not time_min:
@@ -110,7 +114,7 @@ class ScheduleManager:
         ).execute()
         items = events_result.get("items", [])
         return items
-
+ 
     def update_event(self, event_id, new_start_iso=None, new_end_iso=None, new_summary=None, new_description=None):
         service = self._build_service()
         event = service.events().get(calendarId="primary", eventId=event_id).execute()

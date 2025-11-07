@@ -9,7 +9,7 @@ import { ScheduleManager } from "/static/js/ScheduleManager.js"; // Googleカレ
 console.log("✅ ChatSpace.js ロード完了 (トースト機能付き)");
 
 // APIキー設定: window.GEMINI_API_KEYを優先
-const apiKey = window.GEMINI_API_KEY;
+const apiKey = "AIzaSyDxoLHxJTA8uyoFWBESsEx-p7-ePTULmuE";
 console.log(apiKey)
 if (!apiKey) console.error("APIキーが未設定");
 
@@ -53,6 +53,13 @@ function formatTimeForSpeech(timeString) {
 // ==============================
 // LLMコア機能（共通化）
 // ==============================
+// ログ出力用のヘルパー関数を定義
+function log(message) {
+  console.log("[ScheduleManager Log]:", message);
+  // 必要であれば、ここでUIにメッセージを表示するなどの処理を追加
+  // 例: showToast(message);
+}
+
 /**
  * ユーザー入力を受け付け、LLMで解析・処理を分岐するメインエントリポイント。
  * @param {string} inputValue - ユーザーの入力テキスト

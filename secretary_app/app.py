@@ -1,4 +1,5 @@
 from flask import Flask, render_template, jsonify, request, redirect, url_for, session
+from datetime import datetime, timedelta
 from services.user_service import (
     get_all_users, get_user_by_email, add_user, update_user, delete_user)
 from services.category_service import (
@@ -21,7 +22,24 @@ from services.auth_service import register_user, login_user
 from services.finance_service import get_finance_summary, get_all_finance_records
 from services.chat_space_model import ChatSpaceModel
 from services.memo_routes import memo_bp
+from services.ScheduleManager import ScheduleManager # ScheduleManagerをインポート
 import os
+
+from flask import redirect, url_for, request, session, jsonify, render_template
+from google_auth_oauthlib.flow import Flow
+from services.ScheduleManager import ScheduleManager
+ 
+ 
+CLIENT_SECRETS_FILE = os.path.join(os.path.dirname(__file__), 'services', 'client_secret.json')
+SCOPES = [
+    "openid",
+    "https://www.googleapis.com/auth/gmail.send",
+    "https://www.googleapis.com/auth/gmail.readonly",
+    "https://www.googleapis.com/auth/userinfo.profile",
+    "https://www.googleapis.com/auth/userinfo.email",
+    "https://www.googleapis.com/auth/calendar",
+]
+ 
 
 app = Flask(__name__, template_folder='templates', static_folder='static')
 app.secret_key = os.getenv("SECRET_KEY", "devsecret")
@@ -29,6 +47,15 @@ app.secret_key = os.getenv("SECRET_KEY", "devsecret")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 if not GEMINI_API_KEY:
     print("Warning: GEMINI_API_KEY environment variable not set. ChatSpaceModel may not function correctly.")
+print(f"--- [DEBUG] Using GEMINI_API_KEY: {GEMINI_API_KEY[:5]}...{GEMINI_API_KEY[-5:]} ---") # APIキーの最初と最後の5文字のみ表示
+chat_space_model = ChatSpaceModel(gemini_api_key=GEMINI_API_KEY)
+
+# ScheduleManagerのインスタンス化
+calendar_manager = ScheduleManager()
+if not calendar_manager.is_authenticated():
+    print("Warning: Google Calendar API is not authenticated. Calendar operations may fail.")
+
+print(f"--- [DEBUG] Using GEMINI_API_KEY: {GEMINI_API_KEY[:5]}...{GEMINI_API_KEY[-5:]} ---") # APIキーの最初と最後の5文字のみ表示
 chat_space_model = ChatSpaceModel(gemini_api_key=GEMINI_API_KEY)
 
 PLAYER_BAR_SNIPPET = """
@@ -64,7 +91,7 @@ SPOTIPY_CLIENT_SECRET = os.environ.get('SPOTIPY_CLIENT_SECRET') or _DEFAULT_CLIE
 SPOTIPY_REDIRECT_URI = "https://127.0.0.1:5000/spotify-callback"
 
 # ✅ スコープは配列で管理して join（全角/改行/スペース抜け事故を防止）
-SCOPE = (
+SCOPES = (
     "user-read-private user-read-email "
     "streaming user-read-playback-state user-modify-playback-state "
     "playlist-read-private playlist-read-collaborative user-top-read "
@@ -136,9 +163,57 @@ def oauth_callback2():
 def calender_page():
     return render_template('calender.html')
 
+@app.route("/google-login")
+def google_login():
+    # OAuth2 フローを作成して認証 URL を作成
+    flow = Flow.from_client_secrets_file(
+        CLIENT_SECRETS_FILE,
+        scopes=["openid", "email", "profile", "https://www.googleapis.com/auth/calendar"],
+        redirect_uri=REDIRECT_URI
+    )
+    auth_url, _ = flow.authorization_url(prompt="consent")
+    return redirect(auth_url)
+ 
+ 
 @app.route('/oauth-callback')
-def oauth_callback():
-    return render_template('oauth-callback.html')
+def oauth_callbac():
+    """Google のコールバックを受け取りサーバ側でトークンを保存する"""
+    state = session.get('oauth_state')
+    app.logger.info('Incoming /oauth-callback request url: %s', request.url)
+    app.logger.info('Request args: %s', dict(request.args))
+    flow = Flow.from_client_secrets_file(
+        CLIENT_SECRETS_FILE,
+        scopes=SCOPES,
+        state=state,
+        redirect_uri="https://127.0.0.1:5000/oauth-callback"
+    )
+    try:
+        flow.fetch_token(authorization_response=request.url)
+    except Exception as e:
+        app.logger.exception("Failed to fetch token during oauth callback")
+        return render_template('oauth-callback.html', error=str(e))
+ 
+    creds = flow.credentials
+    creds_info = {
+        "token": creds.token,
+        "refresh_token": creds.refresh_token,
+        "token_uri": creds.token_uri,
+        "client_id": creds.client_id,
+        "client_secret": creds.client_secret,
+        "scopes": list(creds.scopes)
+    }
+ 
+    sm = ScheduleManager()
+    sm.set_credentials_from_info(creds_info)
+ 
+    # ログ出力して保存場所を明示（開発時の確認用）
+    try:
+        app.logger.info('Saved credentials via ScheduleManager to token path: %s', sm.token_path)
+    except Exception:
+        app.logger.info('Saved credentials (token path unknown)')
+ 
+    # トークンを簡易にフロントに渡して popup に通知させる（開発用）
+    return render_template('oauth-callback.html', token=creds.token)
 
 @app.route("/finance")
 def finance():
@@ -727,6 +802,102 @@ def chat_api():
     response_data = chat_space_model.check_chat_space(user_input)
     print(f"--- [DEBUG] /api/chat: Received response from check_chat_space: {response_data} ---")
     
+    action = response_data.get('action')
+    calendar_event_data = response_data.get('data')
+
+    if calendar_manager.is_authenticated():
+        if action == "add_calendar_event" and calendar_event_data:
+            try:
+                for event_to_add in calendar_event_data:
+                    # YYYY-MM-DD HH:MM:SS 形式をISO 8601形式に変換
+                    start_iso = datetime.strptime(event_to_add.get('start_time'), '%Y-%m-%d %H:%M:%S').isoformat() if event_to_add.get('start_time') else None
+                    end_iso = datetime.strptime(event_to_add.get('end_time'), '%Y-%m-%d %H:%M:%S').isoformat() if event_to_add.get('end_time') else None
+                    
+                    calendar_manager.add_event(
+                        event_to_add.get('name'),
+                        start_iso,
+                        end_iso,
+                        event_to_add.get('description', '')
+                    )
+                response_data['message'] = f"{len(calendar_event_data)}件の予定をGoogleカレンダーに登録しました。"
+                response_data['status'] = "success"
+            except Exception as e:
+                response_data['message'] = f"Googleカレンダーへの登録に失敗しました: {str(e)}"
+                response_data['status'] = "error"
+        elif action == "get_calendar_events" and calendar_event_data:
+            try:
+                # ScheduleManager.pyのlist_eventsはtimeMin/timeMaxをISO 8601形式で期待する
+                # chat_space_modelからはYYYY-MM-DD HH:MM:SS形式が来るので変換
+                start_time_str = calendar_event_data.get('start_time')
+                end_time_str = calendar_event_data.get('end_time')
+
+                start_iso = None
+                if start_time_str:
+                    start_iso = datetime.strptime(start_time_str, '%Y-%m-%d %H:%M:%S').isoformat() + 'Z'
+                
+                end_iso = None
+                if end_time_str:
+                    end_iso = datetime.strptime(end_time_str, '%Y-%m-%d %H:%M:%S').isoformat() + 'Z'
+                
+                events = calendar_manager.list_events(start_iso, end_iso)
+                if events:
+                    event_summaries = [f"{e['summary']} ({e['start'].get('dateTime', e['start'].get('date'))})" for e in events]
+                    response_data['message'] = f"以下の予定が見つかりました: {', '.join(event_summaries)}"
+                    response_data['data'] = events # 取得したイベントデータを返す
+                    response_data['status'] = "success"
+                else:
+                    response_data['message'] = "該当期間に予定は見つかりませんでした。"
+                    response_data['status'] = "success"
+            except Exception as e:
+                response_data['message'] = f"Googleカレンダーからの予定取得に失敗しました: {str(e)}"
+                response_data['status'] = "error"
+        elif action == "remove_calendar_event" and calendar_event_data:
+            try:
+                for event_to_delete in calendar_event_data:
+                    # 削除対象のイベントを特定するために、まずイベントを検索する必要がある
+                    # ここでは簡略化のため、event_to_deleteにeventIdが含まれていると仮定
+                    # 実際には、name, start_time, end_timeを使ってlist_eventsで検索し、eventIdを取得する必要がある
+                    event_id = event_to_delete.get('id') # または検索して取得
+                    if event_id:
+                        calendar_manager.delete_event(event_id)
+                        response_data['message'] = f"イベントID {event_id} の予定を削除しました。"
+                        response_data['status'] = "success"
+                    else:
+                        response_data['message'] = "削除対象のイベントIDが指定されていません。"
+                        response_data['status'] = "error"
+            except Exception as e:
+                response_data['message'] = f"Googleカレンダーからの予定削除に失敗しました: {str(e)}"
+                response_data['status'] = "error"
+        elif action == "change_calendar_event" and calendar_event_data:
+            try:
+                for event_to_change in calendar_event_data:
+                    # 変更対象のイベントを特定するために、まずイベントを検索する必要がある
+                    # ここでは簡略化のため、event_to_changeにeventIdが含まれていると仮定
+                    # 実際には、before_name, before_start_time, before_end_timeを使ってlist_eventsで検索し、eventIdを取得する必要がある
+                    event_id = event_to_change.get('id') # または検索して取得
+                    if event_id:
+                        new_start_iso = datetime.strptime(event_to_change.get('after_start_time'), '%Y-%m-%d %H:%M:%S').isoformat() if event_to_change.get('after_start_time') else None
+                        new_end_iso = datetime.strptime(event_to_change.get('after_end_time'), '%Y-%m-%d %H:%M:%S').isoformat() if event_to_change.get('after_end_time') else None
+                        new_summary = event_to_change.get('after_name')
+                        
+                        calendar_manager.update_event(
+                            event_id,
+                            new_start_iso,
+                            new_end_iso,
+                            new_summary
+                        )
+                        response_data['message'] = f"イベントID {event_id} の予定を変更しました。"
+                        response_data['status'] = "success"
+                    else:
+                        response_data['message'] = "変更対象のイベントIDが指定されていません。"
+                        response_data['status'] = "error"
+            except Exception as e:
+                response_data['message'] = f"Googleカレンダーからの予定変更に失敗しました: {str(e)}"
+                response_data['status'] = "error"
+    else:
+        response_data['message'] = "GoogleカレンダーAPIが認証されていません。カレンダー操作は実行できません。"
+        response_data['status'] = "error"
+
     return jsonify(response_data)
 
 app.register_blueprint(memo_bp, url_prefix='/api/memos')
