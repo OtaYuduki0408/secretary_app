@@ -67,19 +67,18 @@ def require_api_key():
 
 app.secret_key = os.getenv("SECRET_KEY", "devsecret")
 
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-if not GEMINI_API_KEY:
-    print("Warning: GEMINI_API_KEY environment variable not set. ChatSpaceModel may not function correctly.")
-print(f"--- [DEBUG] Using GEMINI_API_KEY: {GEMINI_API_KEY[:5]}...{GEMINI_API_KEY[-5:]} ---") # APIキーの最初と最後の5文字のみ表示
-chat_space_model = ChatSpaceModel(gemini_api_key=GEMINI_API_KEY)
+ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
+if not ANTHROPIC_API_KEY:
+    print("Warning: ANTHROPIC_API_KEY environment variable not set. ChatSpaceModel may not function correctly.")
+else:
+    print("--- [DEBUG] ANTHROPIC_API_KEY is set. ---")
+
+chat_space_model = ChatSpaceModel(anthropic_api_key=ANTHROPIC_API_KEY)
 
 # ScheduleManagerのインスタンス化
 calendar_manager = ScheduleManager()
 if not calendar_manager.is_authenticated():
     print("Warning: Google Calendar API is not authenticated. Calendar operations may fail.")
-
-print(f"--- [DEBUG] Using GEMINI_API_KEY: {GEMINI_API_KEY[:5]}...{GEMINI_API_KEY[-5:]} ---") # APIキーの最初と最後の5文字のみ表示
-chat_space_model = ChatSpaceModel(gemini_api_key=GEMINI_API_KEY)
 
 PLAYER_BAR_SNIPPET = """
   <div id="vs-playerbar" hidden>
@@ -159,8 +158,7 @@ def _has_required_scopes(token_info, required_scope: str) -> bool:
 # --------------------
 @app.route('/')
 def main():
-    gemini_api_key = os.getenv("GEMINI_API_KEY")
-    return render_template('main.html', gemini_api_key=gemini_api_key)
+    return render_template('main.html')
 
 @app.route('/expense')
 def expense():
