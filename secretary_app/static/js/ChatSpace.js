@@ -2,20 +2,10 @@
 // ChatSpace.js（統合・整理版 - トースト機能追加済み）
 // ===================================
 
-// Google Generative AI SDK（ESM）をインポート
-import { GoogleGenerativeAI } from 'https://cdn.jsdelivr.net/npm/@google/generative-ai@0.14.1/dist/index.mjs';
+// 必要なモジュールをインポート
 import { TextToSpeechReader } from "/static/js/TextToSpeechReader.js";
 import { ScheduleManager } from "/static/js/ScheduleManager.js"; // Googleカレンダー操作クラス
 console.log("✅ ChatSpace.js ロード完了 (トースト機能付き)");
-
-// APIキー設定: window.GEMINI_API_KEYを優先
-const apiKey = "AIzaSyDxoLHxJTA8uyoFWBESsEx-p7-ePTULmuE";
-console.log(apiKey)
-if (!apiKey) console.error("APIキーが未設定");
-
-const genAI = new GoogleGenerativeAI(apiKey);
-// ChatSpace_ikuto.jsに合わせてモデルを明示的に指定
-const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" }); 
 
 const reader = new TextToSpeechReader(); // 音声読み上げ
 // window.managerが存在しない場合のフォールバック（ChatSpace.jsのロジックを維持）

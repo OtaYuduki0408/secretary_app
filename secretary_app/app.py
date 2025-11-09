@@ -42,6 +42,29 @@ SCOPES = [
  
 
 app = Flask(__name__, template_folder='templates', static_folder='static')
+
+# --- API Key Authentication ---
+# 環境変数から許可されたAPIキーを読み込む。カンマ区切りで複数指定可能。
+# 例: ALLOWED_API_KEYS=key1,key2,key3
+ALLOWED_API_KEYS = set(os.environ.get('ALLOWED_API_KEYS', '').split(','))
+
+@app.before_request
+def require_api_key():
+    # /api/ で始まるパス以外は認証をスキップ
+    if not request.path.startswith('/api/'):
+        return
+
+    # 許可されたキーが一つも設定されていない、または空文字のキーのみの場合は認証をスキップ
+    if not ALLOWED_API_KEYS or ALLOWED_API_KEYS == {''}:
+        return
+
+    # APIキーをリクエストヘッダー 'X-API-KEY' から取得
+    provided_key = request.headers.get('X-API-KEY')
+
+    if provided_key not in ALLOWED_API_KEYS:
+        return jsonify({'message': 'Error: Invalid or missing API Key.'}), 403
+# --- End of API Key Authentication ---
+
 app.secret_key = os.getenv("SECRET_KEY", "devsecret")
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
@@ -103,7 +126,7 @@ def get_spotify_oauth():
         client_id=SPOTIPY_CLIENT_ID,
         client_secret=SPOTIPY_CLIENT_SECRET,
         redirect_uri=SPOTIPY_REDIRECT_URI,
-        scope=SCOPE,
+        scope=SCOPES,
         cache_path=None
     )
 
@@ -803,6 +826,25 @@ def chat_api():
     print(f"--- [DEBUG] /api/chat: Received response from check_chat_space: {response_data} ---")
     
     action = response_data.get('action')
+
+    if action == "switchbot_control":
+        command = response_data.get("data", {}).get("command")
+        if command:
+            switchbot_result, status_code = execute_switchbot_command(command)
+            # SwitchBot APIの成功ステータスコードは100
+            if status_code == 200 and switchbot_result.get("statusCode") == 100:
+                response_data["message"] = f"SwitchBotを{command}しました。"
+                response_data["status"] = "success"
+            else:
+                error_message = switchbot_result.get('message', 'Unknown error')
+                response_data["message"] = f"SwitchBotの操作に失敗しました: {error_message}"
+                response_data["status"] = "error"
+        else:
+            response_data["message"] = "SwitchBotのコマンドが不正です。"
+            response_data["status"] = "error"
+        
+        return jsonify(response_data)
+
     calendar_event_data = response_data.get('data')
 
     if calendar_manager.is_authenticated():
@@ -901,6 +943,66 @@ def chat_api():
     return jsonify(response_data)
 
 app.register_blueprint(memo_bp, url_prefix='/api/memos')
+
+import time
+import hashlib
+import hmac
+import base64
+import requests
+
+# --- SwitchBot API設定 ---
+# 環境変数から取得することを推奨しますが、ここでは直接記述します。
+# 実際の運用では、.envファイルや環境変数で管理してください。
+SWITCHBOT_TOKEN = os.getenv("SWITCHBOT_TOKEN", "87f70ffd2329f4e533761b77e0681f4200e99e6a4f84ff22525ab65a5d65358a41d1bf675b579cad88e885b06b010ce8")
+SWITCHBOT_SECRET = os.getenv("SWITCHBOT_SECRET", "034a7fe15be770c6bfe5c01af23691e8")
+SWITCHBOT_DEVICE_ID = os.getenv("SWITCHBOT_DEVICE_ID", "E13D0486756A")
+
+def execute_switchbot_command(command: str):
+    """SwitchBotにコマンドを送信する"""
+    if command not in ['turnOn', 'turnOff']:
+        return {"error": "Invalid command"}, 400
+
+    # --- 認証のための署名（Sign）生成 ---
+    t = int(round(time.time() * 1000))
+    nonce = str(t)
+    string_to_sign = f"{SWITCHBOT_TOKEN}{t}{nonce}"
+    sign = base64.b64encode(
+        hmac.new(
+            bytes(SWITCHBOT_SECRET, "utf-8"),
+            bytes(string_to_sign, "utf-8"),
+            hashlib.sha256
+        ).digest()
+    ).decode("utf-8")
+
+    # --- APIリクエストの実行 ---
+    url = f"https://api.switch-bot.com/v1.1/devices/{SWITCHBOT_DEVICE_ID}/commands"
+    headers = {
+        "Authorization": SWITCHBOT_TOKEN,
+        "sign": sign,
+        "t": str(t),
+        "nonce": nonce,
+        "Content-Type": "application/json; charset=utf8"
+    }
+    body = {
+        "command": command,
+        "parameter": "default",
+        "commandType": "command"
+    }
+
+    try:
+        response = requests.post(url, headers=headers, json=body)
+        response.raise_for_status()
+        return response.json(), response.status_code
+    except requests.exceptions.RequestException as e:
+        return {"error": str(e)}, 500
+
+@app.route('/api/switchbot', methods=['POST'])
+def control_switchbot():
+    """SwitchBotを操作するAPIエンドポイント"""
+    data = request.get_json()
+    command = data.get('command') # 'turnOn' or 'turnOff'
+    result, status_code = execute_switchbot_command(command)
+    return jsonify(result), status_code
 
 if __name__ == '__main__':
     app.run(

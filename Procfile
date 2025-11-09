@@ -1,0 +1,1 @@
+web: gunicorn secretary_app.app:app
