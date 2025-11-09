@@ -948,17 +948,19 @@ import hmac
 import base64
 import requests
 
-# --- SwitchBot API設定 ---
-# 環境変数から取得することを推奨しますが、ここでは直接記述します。
-# 実際の運用では、.envファイルや環境変数で管理してください。
-SWITCHBOT_TOKEN = os.getenv("SWITCHBOT_TOKEN", "87f70ffd2329f4e533761b77e0681f4200e99e6a4f84ff22525ab65a5d65358a41d1bf675b579cad88e885b06b010ce8")
-SWITCHBOT_SECRET = os.getenv("SWITCHBOT_SECRET", "034a7fe15be770c6bfe5c01af23691e8")
-SWITCHBOT_DEVICE_ID = os.getenv("SWITCHBOT_DEVICE_ID", "E13D0486756A")
-
 def execute_switchbot_command(command: str):
     """SwitchBotにコマンドを送信する"""
     if command not in ['turnOn', 'turnOff']:
         return {"error": "Invalid command"}, 400
+
+    # 環境変数から読み込む
+    SWITCHBOT_TOKEN = os.getenv("SWITCHBOT_TOKEN")
+    SWITCHBOT_SECRET = os.getenv("SWITCHBOT_SECRET")
+    SWITCHBOT_DEVICE_ID = os.getenv("SWITCHBOT_DEVICE_ID")
+
+    if not SWITCHBOT_TOKEN or not SWITCHBOT_SECRET or not SWITCHBOT_DEVICE_ID:
+        print("Error: SwitchBot API credentials (TOKEN, SECRET, DEVICE_ID) are not set as environment variables.")
+        return {"error": "SwitchBot API credentials missing"}, 500
 
     # --- 認証のための署名（Sign）生成 ---
     t = int(round(time.time() * 1000))
