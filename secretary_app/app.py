@@ -1,14 +1,22 @@
-from flask import Flask, render_template, jsonify, request, redirect, url_for, session
+from flask import (
+    Flask, render_template, jsonify, request, 
+    redirect, url_for, session, abort
+)
 from services.user_service import (
-    get_all_users, get_user_by_email, add_user, update_user, delete_user)
+    get_all_users, get_user_by_email, add_user, update_user, delete_user
+)
 from services.category_service import (
-    get_all_categories, add_category, delete_category, clear_all_categories)
+    get_all_categories, add_category, delete_category, clear_all_categories
+)
 from services.auth_service import register_user, login_user
 from services.finance_service import get_finance_summary, get_all_finance_records
-from flask import Flask, render_template, jsonify, request, redirect, url_for, session, abort
-from spotipy.oauth2 import SpotifyOAuth
+
+# Spotify関連のインポート
 import spotipy
+from spotipy.oauth2 import SpotifyOAuth
+
 import os
+from datetime import datetime, timedelta
 
 from services.user_service import (
     get_all_users, get_user_by_email, add_user, update_user, delete_user
@@ -18,18 +26,82 @@ from services.category_service import (
 )
 from services.auth_service import register_user, login_user
 from services.finance_service import get_finance_summary, get_all_finance_records
-from services.chat_space_model import ChatSpaceModel
 import os
+from flask import redirect, url_for, request, session, jsonify, render_template
+from google_auth_oauthlib.flow import Flow
+from services.ScheduleManager import ScheduleManager
 
+from services.screen_tools import ScreenTool
+
+
+screen_tool = ScreenTool() if ScreenTool else None
+
+CLIENT_SECRETS_FILE = os.path.join(os.path.dirname(__file__), 'services', 'client_secret.json')
+SCOPES = [
+    "openid",
+    "https://www.googleapis.com/auth/gmail.send",
+    "https://www.googleapis.com/auth/gmail.readonly",
+    "https://www.googleapis.com/auth/userinfo.profile",
+    "https://www.googleapis.com/auth/userinfo.email",
+    "https://www.googleapis.com/auth/calendar",
+]
 
 
 app = Flask(__name__, template_folder='templates', static_folder='static')
+
+# ChatSpaceModel のインポートと初期化はオプション扱いにする
+# （ローカルに google.generativeai 等が無い場合でもサーバーを起動できるようにする）
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-if not GEMINI_API_KEY:
-    print("Warning: GEMINI_API_KEY environment variable not set. ChatSpaceModel may not function correctly.")
-chat_space_model = ChatSpaceModel(gemini_api_key=GEMINI_API_KEY)
+try:
+    from services.chat_space_model import ChatSpaceModel
+    if not GEMINI_API_KEY:
+        print("Warning: GEMINI_API_KEY environment variable not set. ChatSpaceModel may not function correctly.")
+    chat_space_model = ChatSpaceModel(gemini_api_key=GEMINI_API_KEY)
+except Exception as e:
+    # 依存ライブラリが無い場合は簡易スタブを提供して最低限の動作を可能にする
+    print(f"Warning: ChatSpaceModel could not be imported/initialized: {e}")
+
+    class StubChatSpaceModel:
+        """簡易スタブ: LLM が無い環境でもフロントからの呼び出しに応答するための最小実装。
+        - 'add' / '追加' / '创建' 等を含む入力は予定追加 (Ca) として扱い、簡易イベントを返す
+        - それ以外はエラーメッセージを返す
+        """
+        def __init__(self):
+            pass
+
+        def check_chat_space(self, input_value: str) -> dict:
+            if not input_value:
+                return {"status": "error", "purpose": None, "data": None, "message": "入力が空です。"}
+            txt = input_value.lower()
+            now = datetime.utcnow().replace(microsecond=0)
+            start_iso = (now + timedelta(minutes=5)).isoformat() + 'Z'
+            end_iso = (now + timedelta(hours=1)).isoformat() + 'Z'
+            if any(k in txt for k in ("add", "追加", "创建", "新規", "予定")):
+                # 可能であれば Google Calendar に予定を作成する（token.json から creds をロード）
+                try:
+                    sm = ScheduleManager()
+                    created = sm.add_event(input_value, start_iso, end_iso)
+                    evt = {
+                        "name": created.get('summary'),
+                        "start_time": created.get('start', {}).get('dateTime'),
+                        "end_time": created.get('end', {}).get('dateTime'),
+                        "id": created.get('id')
+                    }
+                    return {"status": "success", "purpose": "Ca", "data": [evt], "message": "予定を Google カレンダーに作成しました（stub）。"}
+                except Exception as e:
+                    # 作成に失敗したらローカル stub 応答を返す
+                    print(f"Stub: failed to create event via ScheduleManager: {e}")
+                    evt = {"name": input_value, "start_time": start_iso, "end_time": end_iso}
+                    return {"status": "success", "purpose": "Ca", "data": [evt], "message": f"(stub) 予定をローカルで作成しました（カレンダー作成失敗: {e}）。"}
+                sm.add_event(input_value, start_iso, end_iso)
+            return {"status": "error", "purpose": None, "data": None, "message": "LLM 未設定のため処理できません。GEMINI_API_KEY を設定するか、スタブを改善してください。"}
+
+    chat_space_model = StubChatSpaceModel()
 
 app.secret_key = os.getenv("SECRET_KEY", "devsecret")  # セッション用
+# 開発時にルート / で自動的に Google ログインを開始したい場合は
+# 環境変数 AUTO_GOOGLE_LOGIN=true を設定してください（デフォルトは無効）。
+AUTO_GOOGLE_LOGIN = os.getenv("AUTO_GOOGLE_LOGIN", "false").lower() in ("1", "true", "yes")
 
 PLAYER_BAR_SNIPPET = """
   <div id="vs-playerbar" hidden>
@@ -75,7 +147,7 @@ def get_spotify_oauth():
     return SpotifyOAuth(
         client_id=SPOTIPY_CLIENT_ID,
         client_secret=SPOTIPY_CLIENT_SECRET,
-        redirect_uri=SPOTIPY_REDIRECT_URI,
+        redirect_uri="https://your-ngrok-domain.ngrok-free.dev/oauth-callback",
         scope=SCOPE,
         cache_path=None
     )
@@ -109,6 +181,9 @@ def _has_required_scopes(token_info, required_scope: str) -> bool:
 # --------------------
 @app.route('/')
 def main():
+    # AUTO_GOOGLE_LOGIN を有効にしている開発環境では、ルートで自動的に Google ログインを開始する
+    if AUTO_GOOGLE_LOGIN:
+        return redirect(url_for('google_login'))
     return render_template('main.html')
 
 @app.route('/categories')
@@ -125,11 +200,64 @@ def slot():
 
 @app.route('/calendar')
 def calendar_page():
-    return render_template('calender.html')
+    return render_template('xincalender.html')
+
+@app.route('/google-login')
+def google_login():
+    """開始 server-side OAuth フロー（authorization code, offline）"""
+    flow = Flow.from_client_secrets_file(
+        CLIENT_SECRETS_FILE,
+        scopes=SCOPES,
+        redirect_uri="https://127.0.0.1:5000/oauth-callback"
+    )
+    auth_url, state = flow.authorization_url(
+        access_type="offline",
+        include_granted_scopes="true",
+        prompt="consent"
+    )
+    session['oauth_state'] = state
+    return redirect(auth_url)
+
 
 @app.route('/oauth-callback')
-def oauth_callback_A():
-    return render_template('oauth-callback.html')
+def oauth_callbac():
+    """Google のコールバックを受け取りサーバ側でトークンを保存する"""
+    state = session.get('oauth_state')
+    app.logger.info('Incoming /oauth-callback request url: %s', request.url)
+    app.logger.info('Request args: %s', dict(request.args))
+    flow = Flow.from_client_secrets_file(
+        CLIENT_SECRETS_FILE,
+        scopes=SCOPES,
+        state=state,
+        redirect_uri="https://127.0.0.1:5000/oauth-callback"
+    )
+    try:
+        flow.fetch_token(authorization_response=request.url)
+    except Exception as e:
+        app.logger.exception("Failed to fetch token during oauth callback")
+        return render_template('oauth-callback.html', error=str(e))
+
+    creds = flow.credentials
+    creds_info = {
+        "token": creds.token,
+        "refresh_token": creds.refresh_token,
+        "token_uri": creds.token_uri,
+        "client_id": creds.client_id,
+        "client_secret": creds.client_secret,
+        "scopes": list(creds.scopes)
+    }
+
+    sm = ScheduleManager()
+    sm.set_credentials_from_info(creds_info)
+
+    # ログ出力して保存場所を明示（開発時の確認用）
+    try:
+        app.logger.info('Saved credentials via ScheduleManager to token path: %s', sm.token_path)
+    except Exception:
+        app.logger.info('Saved credentials (token path unknown)')
+
+    # トークンを簡易にフロントに渡して popup に通知させる（開発用）
+    return render_template('oauth-callback.html', token=creds.token)
 
 @app.route("/finance")
 def finance():
@@ -149,6 +277,12 @@ def finance():
 @app.route("/nm")
 def nm():
     return render_template("notification_test.html")
+
+@app.route("/tri")
+def trigger():
+    return render_template("trigger.html")
+
+
 
 
 # --------------------
@@ -398,6 +532,25 @@ def spotify_create_playlist():
         return jsonify({"error": "create_failed", "detail": str(exc)}), 500
 
 
+@app.route('/api/calendar/add', methods=['POST'])
+def api_calendar_add():
+    data = request.get_json(force=True) or {}
+    title = data.get("title")
+    start = data.get("start")   
+    end = data.get("end")
+    desc = data.get("description") or ""
+
+    if not title or not start:
+        return jsonify({"error": "missing title or start"}), 400
+
+    sm = ScheduleManager()
+    if not sm.is_authenticated():
+        return jsonify({"error": "not_authenticated"}), 401
+
+    created = sm.add_event(title, start, end, description=desc)
+    return jsonify(created)
+
+
 @app.route('/api/spotify/playlist/<playlist_id>', methods=['DELETE'])
 def spotify_delete_playlist(playlist_id):
     if not playlist_id:
@@ -556,65 +709,43 @@ def chat_api():
     
     # ChatSpaceModelのcheck_chat_spaceメソッドを呼び出す
     print("--- [DEBUG] /api/chat: Calling check_chat_space ---")
+    if chat_space_model is None:
+        app.logger.error('ChatSpaceModel is not initialized. Gemini/LLM support is unavailable.')
+        return jsonify({
+            "status": "error",
+            "purpose": None,
+            "data": None,
+            "message": "Chat model not available on server. Set GEMINI_API_KEY and install/configure the Gemini client to enable this feature."
+        }), 503
+
     response_data = chat_space_model.check_chat_space(user_input)
     print(f"--- [DEBUG] /api/chat: Received response from check_chat_space: {response_data} ---")
     
     return jsonify(response_data)
 
+@app.route("/api/screenshot", methods=["POST"])
+def api_screenshot():
+    path = screen_tool.take_screenshot()
+    return jsonify({"status": "ok", "path": path})
 
-import os
-import json
-from flask import redirect, url_for, request, session, jsonify, render_template
-from google_auth_oauthlib.flow import Flow
-from google.oauth2.credentials import Credentials
-from google.auth.transport.requests import Request
-from services.ScheduleManager import ScheduleManager
+@app.route("/api/start_record", methods=["POST"])
+def api_start_record():
+    path = screen_tool.start_recording()
+    return jsonify({"status": "ok", "path": path})
 
-# Google OAuth 配置
-CLIENT_SECRETS_FILE = "client_secret.json"
-SCOPES = [
-    "https://www.googleapis.com/auth/calendar",
-    "https://www.googleapis.com/auth/gmail.send",
-    "https://www.googleapis.com/auth/gmail.readonly",
-    "openid",
-    "email",
-    "profile"
-]
+@app.route("/api/stop_record", methods=["POST"])
+def api_stop_record():
+    msg = screen_tool.stop_recording()
+    return jsonify({"status": "ok", "message": msg})
 
-# ==== 回调 ====
-@app.route("/oauth-callback")
-def oauth_callback():
-    """Google 返回后保存 token 并跳转到 /calendar"""
-    state = session.get("oauth_state")
-    flow = Flow.from_client_secrets_file(
-        CLIENT_SECRETS_FILE,
-        scopes=SCOPES,
-        state=state,
-        redirect_uri="https://127.0.0.1:5000/oauth-callback"
-    )
-    flow.fetch_token(authorization_response=request.url)
-    creds = flow.credentials
-
-    creds_info = {
-        "token": creds.token,
-        "refresh_token": creds.refresh_token,
-        "token_uri": creds.token_uri,
-        "client_id": creds.client_id,
-        "client_secret": creds.client_secret,
-        "scopes": list(creds.scopes)
-    }
-
-    sm = ScheduleManager()
-    sm.set_credentials_from_info(creds_info)
-
-    return redirect("/calendar")
-
-
+@app.route("/screen")
+def screen_page():
+    return render_template("screen.html")
 
 if __name__ == '__main__':
     app.run(
         host='0.0.0.0',
         port=5000,
         debug=True,
-        ssl_context='adhoc'
+        ssl_context='adhoc',
     )

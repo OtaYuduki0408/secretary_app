@@ -103,8 +103,11 @@ class ChatSpaceModel:
             print(f"--- [DEBUG] Gemini response text: {response.text} ---")
             return response.text.strip()
         except Exception as e:
+            import traceback
             print(f"Geminiリクエストエラー: {e}")
-            return ""
+            traceback.print_exc()
+            # 明示的に None を返して上位で検出しやすくする
+            return None
 
     def _parse_calendar_list(self, text: str) -> list:
         # ... (前回の回答と同じ実装を想定)
@@ -154,9 +157,18 @@ class ChatSpaceModel:
         print("--- [DEBUG] check_chat_space: Calling _gemini_request for purpose ---")
         purpose = self._gemini_request(purpose_prompt)
         print(f"--- [DEBUG] check_chat_space: Received purpose: {purpose} ---")
-        
+
+        # LLM が応答しなかった場合はエラー応答を返す
+        if not purpose:
+            return {
+                "status": "error",
+                "purpose": None,
+                "data": None,
+                "message": "LLM (Gemini) から応答が得られませんでした。サービスの設定（APIキーやネットワーク）を確認してください。"
+            }
+
         result = {"status": "success", "purpose": purpose, "data": None, "message": ""}
-        
+
         if purpose == "Ca":
             data, msg = self._add_calendar(input_value)
             print(f"DEBUG: _add_calendar returned data={data}, msg={msg}") # デバッグ用

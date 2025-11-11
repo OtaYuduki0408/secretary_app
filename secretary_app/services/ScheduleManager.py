@@ -7,12 +7,12 @@ from google.auth.transport.requests import Request
 
 TOKEN_PATH = "token.json"
 SCOPES = [
-    "https://www.googleapis.com/auth/calendar",
+    "openid",
     "https://www.googleapis.com/auth/gmail.send",
     "https://www.googleapis.com/auth/gmail.readonly",
-    "openid",
-    "email",
-    "profile"
+    "https://www.googleapis.com/auth/userinfo.profile",
+    "https://www.googleapis.com/auth/userinfo.email",
+    "https://www.googleapis.com/auth/calendar",
 ]
 
 class ScheduleManager:
