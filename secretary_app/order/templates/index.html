@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8">
     <title>カスタム命令ビルダー</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('custom_order_pages.static', filename='css/edit_command_style.css') }}">
   </head>
   <body>
     <!-- 🔹 戻るボタン -->
@@ -49,7 +49,7 @@
       <ul id="command-list"></ul>
     </section>
 
-    <script src="{{ url_for('static', filename='script.js') }}"></script>
+    <script src="{{ url_for('custom_order_pages.static', filename='script.js') }}"></script>
     <script>
       // 🔹 戻るボタンの動作
       document.getElementById("back-btn").addEventListener("click", () => {
