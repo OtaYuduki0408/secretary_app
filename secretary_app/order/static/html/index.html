@@ -13,8 +13,58 @@
   </div>
 
   <script>
-    document.getElementById("go-edit").addEventListener("click", () => {
-      window.location.href = "/custom_order/edit";
+    document.addEventListener("DOMContentLoaded", async () => {
+      const loadOrders = async () => {
+        const res = await fetch("/api/custom_orders");
+        const data = await res.json();
+        const tbody = document.getElementById("orders-body");
+        tbody.innerHTML = "";
+
+        data.forEach(order => {
+          const tr = document.createElement("tr");
+          tr.innerHTML = `
+            <td>${order.id}</td>
+            <td>${order.name}</td>
+            <td>${order.triggers.map(t=>t.trigger_value).join("<br>")}</td>
+            <td>${order.conditions.length}</td>
+            <td>${order.actions ? order.actions.length : 1}</td>
+            <td>${order.created_at}</td>
+            <td>
+              <button class="edit-button" data-id="${order.id}">編集</button>
+              <button class="delete-button" data-id="${order.id}">削除</button>
+            </td>
+          `;
+          tbody.appendChild(tr);
+        });
+
+        // 編集ボタン
+        document.querySelectorAll(".edit-button").forEach(btn => {
+          btn.addEventListener("click", () => {
+            const id = btn.dataset.id;
+            window.location.href = `/custom_order/edit/${id}`;
+          });
+        });
+
+        // 削除ボタン
+        document.querySelectorAll(".delete-button").forEach(btn => {
+          btn.addEventListener("click", async () => {
+            const id = btn.dataset.id;
+            if (confirm("この命令を削除しますか？")) {
+              const res = await fetch(`/api/custom_orders/${id}`, { method: "DELETE" });
+              const data = await res.json();
+              alert(data.message);
+              loadOrders();
+            }
+          });
+        });
+      };
+
+      document.getElementById("create-button").addEventListener("click", () => {
+        window.location.href = "/custom_order/edit";
+      });
+
+      // 初回ロード
+      loadOrders();
     });
   </script>
 </body>
