@@ -125,7 +125,7 @@
         document.querySelectorAll(".edit-button").forEach(btn => {
           btn.addEventListener("click", () => {
             const id = btn.dataset.id;
-            window.location.href = `/edit_command.html?id=${id}`;
+            window.location.href = `/custom_order/edit/${id}`;
           });
         });
 
@@ -144,7 +144,7 @@
       };
 
       document.getElementById("create-button").addEventListener("click", () => {
-        window.location.href = "/edit_command.html";
+        window.location.href = "/custom_order/edit";
       });
 
       // 初回ロード

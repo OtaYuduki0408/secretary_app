@@ -71,13 +71,19 @@ from flask import Blueprint
 custom_order_pages_bp = Blueprint(
     'custom_order_pages', 
     __name__,
-    template_folder='order/templates',
+    template_folder='order/static/html',
     static_folder='order/static'
 )
 
 @custom_order_pages_bp.route('/')
 def custom_order_index():
     return render_template('index.html')
+
+@custom_order_pages_bp.route('/edit')
+@custom_order_pages_bp.route('/edit/<int:order_id>')
+def edit_command_page(order_id=None):
+    # order_id があれば、そのデータをテンプレートに渡すことも可能（将来的な拡張）
+    return render_template('edit_command.html', order_id=order_id)
 
 # ページ用Blueprintを登録
 app.register_blueprint(custom_order_pages_bp, url_prefix='/custom_order')
