@@ -1,3 +1,5 @@
+
+
 import { check_chat_Space } from '/static/js/ChatSpace.js';
 
 /* =======================
@@ -83,7 +85,6 @@ if (input) {
     if (isBTD(raw))        { startBTDSequence(e); console.log("isBTDを実行"); return; }
     if (v === 'transform') { startTransform(); console.log("transformを実行"); return; }
     if (isORA(raw))        { startOraOra(); console.log("isORAを実行"); return; }
-    console.log("チャットスペースへ渡す")
     check_chat_Space(v);
   });
 

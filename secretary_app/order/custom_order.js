@@ -1,229 +1,110 @@
-// custom_order.js
- 
-document.addEventListener("DOMContentLoaded", () => {
-  const form = document.getElementById("orderForm");
- 
-  // フォーム送信時の登録処理
-  form?.addEventListener("submit", async (e) => {
-    e.preventDefault();
- 
-    const data = {
-      trigger: document.getElementById("trigger").value,
-      commandName: document.getElementById("commandName").value,
-      condition: document.getElementById("condition").value,
-      repeat: document.getElementById("repeat").value
-    };
- 
-    // DBへ保存（Flask経由）
-    const res = await fetch("/api/custom_orders", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data)
+//------------------------------------------------------
+// custom_order.js - 命令登録・一覧管理スクリプト
+//------------------------------------------------------
+
+// --------------------
+// 命令一覧の取得・表示
+// --------------------
+async function loadCommands() {
+  try {
+    const res = await fetch("/api/custom_orders");
+    const commands = await res.json();
+
+    const list = document.getElementById("command-list");
+    list.innerHTML = "";
+
+    if (commands.length === 0) {
+      list.innerHTML = "<p>登録された命令はありません。</p>";
+      return;
+    }
+
+    commands.forEach((cmd) => {
+      const item = document.createElement("div");
+      item.className = "command-item";
+      item.innerHTML = `
+        <div class="command-info">
+          <strong>${cmd.name}</strong><br/>
+          <span>動作: ${cmd.action_type} → ${cmd.content}</span><br/>
+          <span>トリガー: ${cmd.trigger_type} (${cmd.trigger_value || "なし"})</span><br/>
+          <span>条件: ${cmd.condition_expr || "なし"}</span><br/>
+          <span>破棄条件: ${cmd.break_expr || "なし"}</span><br/>
+          <span>ループ: ${cmd.loop_count || "once"}</span>
+        </div>
+        <button class="delete-btn" data-id="${cmd.id}">削除</button>
+      `;
+      list.appendChild(item);
     });
- 
-    const result = await res.json();
-    console.log("登録完了:", result);
-  });
-});
- 
-// ---- 音声テキストを受け取る側 ----
-export async function checkCustomOrder(spokenText) {
-  const res = await fetch("/api/custom_orders");
-  const orders = await res.json();
- 
-  // 一致するトリガーを検索
-  const matched = orders.find(o => spokenText.includes(o.trigger));
- 
-  if (matched) {
-    console.log("✅ Custom Order 検知");
-    console.log("ID:", matched.id);
-    console.log("命令名:", matched.commandName);
-    console.log("条件式:", matched.condition);
-    console.log("繰り返し:", matched.repeat);
-  }
-}
-// custom_order.js
- 
-document.addEventListener("DOMContentLoaded", () => {
-  const form = document.getElementById("orderForm");
- 
-  // フォーム登録処理
-  form?.addEventListener("submit", async (e) => {
-    e.preventDefault();
- 
-    const data = {
-      trigger: document.getElementById("trigger").value,
-      commandName: document.getElementById("commandName").value,
-      condition: document.getElementById("condition").value,
-      repeat: document.getElementById("repeat").value
-    };
- 
-    const res = await fetch("/api/custom_orders", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data)
+
+    // 削除ボタンイベント登録
+    document.querySelectorAll(".delete-btn").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const id = btn.getAttribute("data-id");
+        if (confirm(`命令(ID=${id})を削除しますか？`)) {
+          await deleteCommand(id);
+          loadCommands();
+        }
+      });
     });
- 
-    const result = await res.json();
-    console.log("登録完了:", result);
-  });
-});
- 
-// ---- Custom Order 検知 + 実行 ----
-export async function checkCustomOrder(spokenText) {
-  const res = await fetch("/api/custom_orders");
-  const orders = await res.json();
- 
-  const matched = orders.find(o => spokenText.includes(o.trigger));
- 
-  if (matched) {
-    console.log("✅ Custom Order 検知");
-    console.log("ID:", matched.id);
-    console.log("命令名:", matched.commandName);
-    console.log("条件式:", matched.condition);
-    console.log("繰り返し:", matched.repeat);
- 
-    // 命令実行
-    executeCustomOrder(matched);
+  } catch (err) {
+    console.error("命令一覧の取得に失敗:", err);
   }
 }
- 
-// ---- 命令実行ロジック ----
-async function executeCustomOrder(order) {
-  switch (order.commandName) {
-    case "今日のカレンダーを読む":
-    case "カレンダー読み上げ":
-    case "今日の予定":
-      const res = await fetch("/api/calendar/today");
-      const data = await res.json();
- 
-      const message = data.events.length > 0
-        ? `今日の予定は${data.events.join("、")}です。`
-        : "今日は予定がありません。";
- 
-      console.log("📅", message);
-      speak(message);
-      break;
- 
-    default:
-      console.log("⚙ 未対応の命令:", order.commandName);
-      speak(`命令 ${order.commandName} はまだ登録されていません。`);
-  }
+
+// --------------------
+// 命令削除
+// --------------------
+async function deleteCommand(id) {
+  const res = await fetch(`/api/custom_orders/${id}`, { method: "DELETE" });
+  const data = await res.json();
+  console.log(data.message);
 }
- 
-// ---- 音声読み上げ（SpeechSynthesis） ----
-function speak(text) {
-  const uttr = new SpeechSynthesisUtterance(text);
-  uttr.lang = "ja-JP";
-  speechSynthesis.speak(uttr);
-}
-// ============================================
-// Custom_Order.js
-// ============================================
- 
-// サンプルの登録データ（DB代わり）
-// 実際はバックエンドDBから取得する形に
-const customOrders = [
-  {
-    id: 1,
-    triggerType: "voice",
-    triggerValue: "おはよう",
-    actions: ["カレンダー情報を取得", "時刻を読み上げ"],
-  },
-  {
-    id: 2,
-    triggerType: "time",
-    triggerValue: "07:00",
-    actions: ["ニュースを読み上げ", "天気を表示"],
-  },
-  {
-    id: 3,
-    triggerType: "gps",
-    triggerValue: { lat: 35.6812, lon: 139.7671, radius: 500 }, // 東京駅500m以内
-    actions: ["『会社到着』と通知", "出勤記録を保存"],
-  },
-];
- 
-// ===================================================
-// GPSトリガー監視処理
-// ===================================================
-function startGPSTriggerCheck() {
-  if (!navigator.geolocation) {
-    console.warn("このブラウザでは位置情報がサポートされていません。");
+
+// --------------------
+// 命令登録処理
+// --------------------
+async function registerCommand() {
+  const name = document.getElementById("name").value;
+  const actionType = document.getElementById("action_type").value;
+  const content = document.getElementById("content").value;
+  const triggerType = document.getElementById("trigger_type").value;
+  const triggerValue = document.getElementById("trigger_value").value;
+  const conditionExpr = document.getElementById("condition_expr").value;
+  const breakExpr = document.getElementById("break_expr").value;
+  const loopCount = document.getElementById("loop_count").value;
+
+  if (!name || !content) {
+    alert("命令名と内容は必須です。");
     return;
   }
- 
-  console.log("📍 GPSトリガー監視を開始");
- 
-  // 定期的に位置を監視
-  setInterval(() => {
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const { latitude, longitude } = position.coords;
-        console.log(`現在位置: ${latitude}, ${longitude}`);
- 
-        // 登録済みのGPSトリガーをチェック
-        customOrders.forEach((order) => {
-          if (order.triggerType === "gps") {
-            const { lat, lon, radius } = order.triggerValue;
-            const distance = getDistance(latitude, longitude, lat, lon);
- 
-            if (distance <= radius) {
-              console.log(`✅ GPSトリガー発動: ${order.id}`);
-              executeActions(order.actions);
-            }
-          }
-        });
-      },
-      (error) => {
-        console.error("GPS取得エラー:", error.message);
-      }
-    );
-  }, 10000); // 10秒おきにチェック
+
+  const payload = {
+    name,
+    actions: [{ type: actionType, value: content }],
+    triggers: [{ type: triggerType, value: triggerValue }],
+    conditions: conditionExpr ? [{ expr: conditionExpr }] : [],
+    break_conditions: breakExpr ? [{ expr: breakExpr }] : [],
+    loop_count: loopCount
+  };
+
+  try {
+    const res = await fetch("/api/custom_orders", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+
+    const data = await res.json();
+    alert(data.message);
+    loadCommands();
+  } catch (err) {
+    console.error("登録エラー:", err);
+  }
 }
- 
-// ===================================================
-// 2点間の距離を求める関数（メートル）
-// ===================================================
-function getDistance(lat1, lon1, lat2, lon2) {
-  const R = 6371e3; // 地球の半径 (m)
-  const φ1 = (lat1 * Math.PI) / 180;
-  const φ2 = (lat2 * Math.PI) / 180;
-  const Δφ = ((lat2 - lat1) * Math.PI) / 180;
-  const Δλ = ((lon2 - lon1) * Math.PI) / 180;
- 
-  const a =
-    Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
-    Math.cos(φ1) * Math.cos(φ2) *
-    Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
- 
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
- 
-  return R * c;
-}
- 
-// ===================================================
-// 命令実行部分（例）
-// ===================================================
-function executeActions(actions) {
-  actions.forEach((action) => {
-    console.log(`🧠 実行: ${action}`);
- 
-    // ここに実際の機能を割り当てる
-    if (action.includes("通知")) {
-      alert("📢 " + action);
-    }
-    if (action.includes("出勤記録")) {
-      console.log("📒 出勤記録をデータベースに保存（仮）");
-    }
-  });
-}
- 
-// ===================================================
-// ページ読み込み時の処理
-// ===================================================
-window.addEventListener("DOMContentLoaded", () => {
-  console.log("Custom_Orderシステム起動");
-  startGPSTriggerCheck();
+
+// --------------------
+// 初期化
+// --------------------
+document.addEventListener("DOMContentLoaded", () => {
+  document.getElementById("register-btn").addEventListener("click", registerCommand);
+  loadCommands();
 });
- 

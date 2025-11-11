@@ -1,0 +1,187 @@
+﻿<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Spotify 連携</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}">
+  <style>
+    .spotify-shell{max-width:1080px;width:95%;margin:24px auto;min-height:calc(100vh - 48px);padding:96px 0 120px;}
+    .spotify-card{background:var(--panel);border:1px solid var(--panel-2);border-radius:18px;box-shadow:var(--shadow);padding:20px;}
+    .spotify-row{display:flex;align-items:center;gap:16px;}
+    .spotify-gap{height:18px;}
+    .spotify-muted{color:var(--muted);}
+    .spotify-title{font-size:1.4rem;margin:0 0 .4rem;}
+    .spotify-list{list-style:none;margin:0;padding:0;}
+    .spotify-list.tracks > li{display:grid;grid-template-columns:48px 1fr auto;gap:12px;align-items:center;padding:10px 12px;border-bottom:1px solid var(--panel-2);}
+    .spotify-list.tracks > li:last-child{border-bottom:none;}
+    .spotify-list.playlists > li{display:grid;grid-template-columns:58px 1fr auto auto;gap:12px;align-items:center;padding:10px 12px;border-bottom:1px solid var(--panel-2);}
+    .spotify-list.playlists > li:last-child{border-bottom:none;}
+    .spotify-thumb{width:56px;height:56px;border-radius:12px;object-fit:cover;flex-shrink:0;}
+    .spotify-thumb-sm{width:44px;height:44px;border-radius:8px;object-fit:cover;flex-shrink:0;}
+    .spotify-line{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+    .spotify-btn{border:1px solid var(--panel-2);background:var(--panel);color:var(--text);padding:6px 12px;border-radius:10px;cursor:pointer;}
+    .spotify-btn.main{background:linear-gradient(180deg,#1ed760,#1db954);border:none;color:#fff;font-weight:700;}
+    .spotify-btn.pill{border-radius:999px;padding:6px 16px;}
+    .spotify-link{color:var(--accent);text-decoration:none;}
+    .spotify-search{display:grid;grid-template-columns:1fr auto;gap:10px;margin-top:10px;}
+    .spotify-search-results > li{display:grid;grid-template-columns:56px minmax(0,1fr) auto auto auto;gap:14px;align-items:flex-start;padding:12px 14px;border-bottom:1px solid var(--panel-2);}
+    .spotify-search-results > li:last-child{border-bottom:none;}
+    .spotify-search-results .track-info{display:flex;flex-direction:column;gap:4px;min-width:0;}
+    .spotify-search-results .track-info .track-name{font-weight:700;font-size:1.05rem;word-break:break-word;line-height:1.3;}
+    .spotify-search-results .track-info .track-meta{color:var(--muted);font-size:.9rem;white-space:normal;word-break:break-word;line-height:1.25;}
+    .spotify-search-results .track-img{width:56px;height:56px;border-radius:10px;object-fit:cover;}
+    .spotify-search-results .playlist-select{min-width:150px;}
+    .spotify-search-results .track-actions{display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end;}
+    .track-meta-link{color:var(--muted);text-decoration:none;}
+    .track-meta-link:hover{color:var(--accent);text-decoration:underline;}
+    .playlist-section-header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px;}
+    .playlist-section-header h3{margin:0;}
+    .playlist-create-form{display:grid;gap:10px;padding:14px;border:1px solid var(--panel-2);border-radius:12px;background:var(--panel-2);}
+    .playlist-create-row{display:flex;gap:10px;flex-wrap:wrap;}
+    .playlist-create-row input{flex:1 1 240px;}
+    .playlist-create-form input[type="text"]{padding:8px 12px;border-radius:10px;border:1px solid rgba(148,163,184,.4);background:rgba(15,20,26,.65);color:var(--text);}
+    .playlist-create-form input[type="text"]:focus{outline:2px solid rgba(102,163,255,.45);}
+    .playlist-create-public{display:flex;align-items:center;gap:8px;font-size:.9rem;color:var(--muted);}
+    .playlist-message{margin-top:12px;padding:10px 14px;border-radius:10px;border:1px solid rgba(102,163,255,.35);background:rgba(102,163,255,.12);color:var(--text);}
+    .playlist-message.is-success{border-color:rgba(74,222,128,.45);background:rgba(74,222,128,.16);}
+    .playlist-message.is-error{border-color:rgba(248,113,113,.45);background:rgba(248,113,113,.16);}
+    .playlist-actions{display:flex;gap:10px;flex-wrap:wrap;align-items:center;}
+    .playlist-actions .spotify-btn{white-space:nowrap;}
+    .history-actions{display:flex;justify-content:flex-end;margin-top:8px;}
+    .spotify-top-nav{position:fixed;top:18px;right:22px;display:flex;gap:12px;z-index:5100;}
+    .spotify-top-nav .nav-btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:999px;background:rgba(15,20,26,0.82);border:1px solid rgba(255,255,255,0.12);color:#f8fafc;text-decoration:none;font-weight:600;backdrop-filter:blur(12px);}
+    .spotify-top-nav .nav-btn:hover{background:rgba(102,163,255,0.75);}
+    .spotify-top-nav .nav-btn:active{transform:translateY(1px);}
+    @media (max-width:640px){
+      .spotify-top-nav{top:12px;right:12px;gap:8px;}
+      .spotify-top-nav .nav-btn{padding:7px 12px;font-size:.85rem;}
+      .spotify-search-results > li{grid-template-columns:56px minmax(0,1fr);row-gap:10px;column-gap:12px;align-items:center;}
+      .spotify-search-results .playlist-select,
+      .spotify-search-results .add-to-playlist-btn,
+      .spotify-search-results .track-actions{justify-self:start;}
+      .spotify-search-results .track-actions{width:100%;justify-content:flex-start;}
+      .playlist-section-header{flex-direction:column;align-items:flex-start;gap:8px;}
+      .playlist-create-row{flex-direction:column;align-items:stretch;}
+      .playlist-create-row input{flex:1 1 auto;width:100%;}
+      .playlist-actions{width:100%;justify-content:flex-start;}
+    }
+  </style>
+</head>
+<body class="theme-purple spotify-page{{ ' playlist-focus' if (focus_section|default('')) == 'playlists' else '' }}">
+  <nav class="spotify-top-nav">
+    <a href="{{ url_for('spotify_page') }}" class="nav-btn">Spotify一覧へ戻る</a>
+    <a href="{{ url_for('spotify_page', section='playlists') }}#my-playlists" class="nav-btn">プレイリスト</a>
+    <a href="{{ url_for('main') }}" class="nav-btn">メイン画面</a>
+  </nav>
+  <main class="spotify-shell">
+    {% if is_authenticated %}
+    <section class="spotify-card spotify-card-intro">
+      <div class="spotify-row">
+        {% if user.images and user.images[0] %}
+          <img src="{{ user.images[0].url }}" alt="Spotify avatar" class="spotify-thumb">
+        {% endif %}
+        <div>
+          <h2 class="spotify-title">ようこそ、{{ user.display_name or user.id }} さん 🎵</h2>
+          <p class="spotify-muted" style="margin:4px 0 0;">Spotify の連携が完了しています。</p>
+        </div>
+      </div>
+    </section>
+
+    <div class="spotify-gap spotify-gap-intro"></div>
+
+    <section class="spotify-card spotify-card-top">
+      <h3 class="spotify-title">最近よく聴くトラック (Top 5)</h3>
+      <ul class="spotify-list tracks">
+        {% for t in tracks %}
+        <li>
+          <div class="spotify-muted">{{ loop.index }}</div>
+          <div class="spotify-row" style="gap:12px;min-width:0;">
+            <img class="spotify-thumb-sm" src="{{ (t.album.images[0].url if t.album and t.album.images and t.album.images[0]) or 'https://placehold.co/44x44/343A40/FFFFFF?text=No' }}" alt="{{ t.name }}">
+            <div style="min-width:0;">
+              <div class="spotify-line"><strong>{{ t.name }}</strong></div>
+              <div class="spotify-muted spotify-line">{{ t.artists|map(attribute='name')|join(', ') }}{% if t.album %} ・ {{ t.album.name }}{% endif %}</div>
+            </div>
+          </div>
+          <button type="button" class="spotify-btn pill play-inline js-track-play" data-uri="{{ t.uri }}" data-label="再生" data-playing-label="再生中" data-loading-label="読み込み中...">再生</button>
+        </li>
+        {% endfor %}
+      </ul>
+    </section>
+
+    <div class="spotify-gap spotify-gap-top"></div>
+
+    <section class="spotify-card spotify-card-search">
+      <h3 class="spotify-title">曲を検索</h3>
+      <form id="search-form" class="spotify-search">
+        <input id="search-query" type="search" placeholder="曲名 / アーティスト名 / アルバム名で検索…" />
+        <button class="spotify-btn main pill" type="submit">検索</button>
+      </form>
+      <div id="search-message" class="spotify-muted" style="margin-top:8px;"></div>
+      <div id="search-history" style="margin-top:12px;">
+        <div class="spotify-muted" style="margin-bottom:6px;">最近の検索</div>
+        <div class="history-actions">
+          <button id="history-clear" class="spotify-btn pill" style="display:none;">履歴をクリア</button>
+        </div>
+      </div>
+      <ul id="search-results" class="spotify-search-results spotify-list" style="margin-top:12px;"></ul>
+    </section>
+
+    <div class="spotify-gap spotify-gap-search"></div>
+
+            <section class="spotify-card spotify-card-playlists" id="my-playlists">
+      <div class="playlist-section-header">
+        <h3 class="spotify-title">自分のプレイリスト</h3>
+        <button type="button" class="spotify-btn main pill" id="playlist-create-toggle">新規プレイリスト作成</button>
+      </div>
+      <form id="create-playlist-form" class="playlist-create-form" hidden>
+        <div class="playlist-create-row">
+          <input id="create-playlist-name" type="text" placeholder="プレイリスト名" required />
+          <button type="submit" class="spotify-btn main pill">保存</button>
+          <button type="button" class="spotify-btn pill" id="playlist-create-cancel">キャンセル</button>
+        </div>
+        <input id="create-playlist-description" type="text" placeholder="説明 (任意)" />
+        <label class="playlist-create-public">
+          <input id="create-playlist-public" type="checkbox" />
+          公開プレイリストとして作成
+        </label>
+      </form>
+      <div id="playlist-create-message" class="playlist-message" hidden></div>
+      <ul class="spotify-list playlists" id="user-playlists">
+        {% if playlists %}
+          {% for p in playlists %}
+          <li data-plid="{{ p.id }}">
+            <a href="{{ url_for('spotify_playlist', playlist_id=p.id) }}">
+              <img class="spotify-thumb" src="{{ (p.images[0].url if p.images and p.images[0]) or 'https://placehold.co/56x56/343A40/FFFFFF?text=PL' }}" alt="{{ p.name }}">
+            </a>
+            <div style="min-width:0;">
+              <div class="spotify-line">
+                <a class="spotify-link" href="{{ url_for('spotify_playlist', playlist_id=p.id) }}"><strong>{{ p.name }}</strong></a>
+              </div>
+              <div class="spotify-muted spotify-line">
+                <span class="pl-count" data-plid="{{ p.id }}">{{ p.tracks.total }}</span> 曲 ・ {{ p.owner.display_name }}
+              </div>
+            </div>
+            <div class="playlist-actions">
+              <button type="button" class="spotify-btn pill play-context" data-context="{{ p.uri }}">再生</button>
+              <button type="button" class="spotify-btn pill play-context-shuffle" data-context="{{ p.uri }}">シャッフル</button>
+              <button type="button" class="spotify-btn pill playlist-delete" data-playlist-id="{{ p.id }}" data-playlist-name="{{ p.name }}">削除</button>
+            </div>
+          </li>
+          {% endfor %}
+        {% else %}
+          <li class="spotify-muted empty-playlist-placeholder">プレイリストが見つかりません。</li>
+        {% endif %}
+      </ul>
+
+      <script id="playlists-data" type="application/json">
+        {{ (playlists or []) | tojson }}
+      </script>
+    </section>
+    {% endif %}
+  </main>
+</body>
+</html>
+
+

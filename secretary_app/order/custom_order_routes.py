@@ -70,10 +70,17 @@ def list_orders():
     orders = CustomOrder.query.all()
     result = []
     for o in orders:
+        # 各オーダーに紐づく情報を取得
+        triggers = CustomTrigger.query.filter_by(order_id=o.id).all()
+        conditions = CustomCondition.query.filter_by(order_id=o.id).all()
+        actions = CustomAction.query.filter_by(order_id=o.id).all()
         result.append({
             "id": o.id,
             "name": o.name,
-            "created_at": o.created_at.strftime("%Y-%m-%d %H:%M:%S") if o.created_at else None
+            "created_at": o.created_at.strftime("%Y-%m-%d %H:%M:%S") if o.created_at else None,
+            "triggers": [{"trigger_value": t.trigger_value} for t in triggers],
+            "conditions": [{"condition_type": c.condition_type} for c in conditions],
+            "actions": [{"action_type": a.action_type} for a in actions]
         })
     return jsonify(result)
 

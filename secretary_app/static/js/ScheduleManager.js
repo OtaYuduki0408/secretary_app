@@ -1,172 +1,100 @@
-const clientId = "964406409299-dd8g3vumtmeuaht9tmq9f5l21otetfn7.apps.googleusercontent.com";
-const apiKey = "AIzaSyDUqgdhLHjWeTqrwYLr2LItsU3C7GYYCDI";
-const redirectUri = `${window.location.origin}/oauth-callback`;
-
 export class ScheduleManager {
-    constructor() {
-        this.accessToken = null;
+  constructor() {
+    this.accessToken = null;
+    this.clientId = null;
+    this.scopes = [
+      "openid",
+      "https://www.googleapis.com/auth/userinfo.email",
+      "https://www.googleapis.com/auth/userinfo.profile",
+      "https://www.googleapis.com/auth/calendar"
+    ];
+  }
+ 
+  log(...args) {
+    console.log("[ScheduleManager]", ...args);
+  }
+ 
+  // ✅ 设置服务器返回的 Access Token（由 oauth-callback.html 通知）
+  setAccessToken(token) {
+    this.accessToken = token;
+    this.log("Access token set:", token ? "OK" : "empty");
+  }
+ 
+  // ✅ 打开 Google 登录窗口（服务器端 OAuth 流程）
+  handleAuthClick() {
+    const authUrl = "https://127.0.0.1:5000/google-login";
+    const popup = window.open(
+      authUrl,
+      "googleLogin",
+      "width=520,height=600"
+    );
+    if (!popup) {
+      alert("ポップアップがブロックされました。ポップアップを許可してください。");
+      return;
     }
-
-    handleAuthClick() {
-        const scope = "https://www.googleapis.com/auth/calendar";
-        const authUrl =
-            "https://accounts.google.com/o/oauth2/v2/auth?" +
-            new URLSearchParams({
-                client_id: clientId,
-                redirect_uri: redirectUri,
-                response_type: "token",
-                scope: scope,
-            });
-
-        const width = 500, height = 600;
-        const left = (window.screen.width - width) / 2;
-        const top = (window.screen.height - height) / 2;
-        window.open(authUrl, "googleAuth", `width=${width},height=${height},top=${top},left=${left}`);
+    this.log("Opened OAuth popup window:", authUrl);
+  }
+ 
+  // ✅ 使用已授权的 token 调用 Google Calendar API（例：获取事件列表）
+  async listEvents() {
+    if (!this.accessToken) {
+      alert("先にGoogleログインを完了してください。");
+      return [];
     }
-
-    setAccessToken(token) {
-        this.accessToken = token;
-        gapi.load("client", async () => {
-            await gapi.client.init({ apiKey });
-            gapi.client.setToken({ access_token: token });
-        });
+    const now = new Date().toISOString();
+    const weekLater = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+    const url = `https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=${now}&timeMax=${weekLater}&orderBy=startTime&singleEvents=true`;
+    const res = await fetch(url, {
+      headers: { Authorization: `Bearer ${this.accessToken}` }
+    });
+    if (!res.ok) {
+      this.log("listEvents failed:", res.status, await res.text());
+      throw new Error("イベントの取得に失敗しました。");
     }
-
-    /**
-     * 
-     * @param {str} title タイトル 
-     * @param {str} description 説明
-     * @param {str} start 開始時間
-     * @param {str} end 終了時間
-     * @param {str} log 登録
-     * @returns 
-     */
-    async addEvent(title, description, start, end, log) {
-        await gapi.client.load("calendar", "v3");
-
-        const startTime = start ? new Date(start).toISOString() : new Date().toISOString();
-        const endTime = end ? new Date(end).toISOString() : new Date(Date.now() + 60 * 60 * 1000).toISOString();
-
-        const event = {
-            summary: title,
-            description,
-            start: { dateTime: startTime },
-            end: { dateTime: endTime },
-        };
-
-        const response = await gapi.client.calendar.events.insert({
-            calendarId: "primary",
-            resource: event,
-        });
-        log(`イベント追加: ${response.result.id} (${response.result.summary})`);
+    const data = await res.json();
+    this.log("Events:", data.items);
+    return data.items;
+  }
+ 
+  // ✅ 添加日程（直接调用 Google API）
+  async addEvent(title, startTime, endTime) {
+    if (!this.accessToken) {
+      alert("Googleログインが必要です。");
+      return null;
     }
-
-    async deleteEvent(eventId, log) {
-        await gapi.client.load("calendar", "v3");
-        await gapi.client.calendar.events.delete({
-            calendarId: "primary",
-            eventId: eventId,
-        });
-        log(`イベント削除: ${eventId}`);
-    }
-
-async listEvents(start, end, log) {
-    await gapi.client.load("calendar", "v3");
-
-    // 安全解析时间字符串并返回 ISO 字符串
-    function toSafeISOString(str, fallbackToNow = false) {
-        // 如果已经是 Date 对象，直接返回 ISO
-        if (str instanceof Date) return str.toISOString();
-
-        if (!str || typeof str !== "string") {
-            if (fallbackToNow) return new Date().toISOString();
-            throw new Error("invalid_time_string");
-        }
-
-        // 处理常见格式 "YYYY-MM-DD HH:MM:SS" -> "YYYY-MM-DDTHH:MM:SS"
-        let s = str.trim();
-
-        // 有些地方会传 "YYYY-MM-DD 24:00:00" -> 等价于 next day 00:00:00
-        if (s.includes("24:00:00")) {
-            s = s.replace("24:00:00", "00:00:00");
-            // 先尝试构造日期，再加一天
-            const d = new Date(s.replace(" ", "T"));
-            if (isNaN(d.getTime())) {
-                // 如果依然无效，回退到当前时间
-                return new Date().toISOString();
-            }
-            d.setDate(d.getDate() + 1);
-            return d.toISOString();
-        }
-
-        // 如果格式是 "YYYY-MM-DD HH:MM:SS"（存在空格和时间部分），把空格替成 'T'
-        if (/^\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}$/.test(s)) {
-            s = s.replace(/\s+/, "T");
-        }
-
-        // 如果是 "YYYY-MM-DD" 的形式，补上 00:00:00
-        if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
-            s = s + "T00:00:00";
-        }
-
-        // 最后尝试解析
-        const parsed = new Date(s);
-        if (!isNaN(parsed.getTime())) {
-            return parsed.toISOString();
-        }
-
-        // 解析失败：根据 fallbackToNow 返回 now 的 ISO 或抛错误
-        if (fallbackToNow) return new Date().toISOString();
-        throw new Error("invalid_time_string");
-    }
-
-    // 调试输出（若报错可查看控制台）
-    console.log("[ScheduleManager.listEvents] raw start:", start, "raw end:", end);
-
-    let startDateISO, endDateISO;
-    try {
-        startDateISO = toSafeISOString(start, true); // fallback to now
-    } catch (e) {
-        console.warn("[listEvents] start parse failed:", e);
-        startDateISO = new Date().toISOString();
-    }
-    try {
-        endDateISO = toSafeISOString(end, true); // fallback to now+1day
-        // 如果 end 等于 fallback now，则把 end 加 1 天（避免 start>end）
-        if (endDateISO === new Date().toISOString()) {
-            const d = new Date();
-            d.setDate(d.getDate() + 1);
-            endDateISO = d.toISOString();
-        }
-    } catch (e) {
-        console.warn("[listEvents] end parse failed:", e);
-        const d = new Date();
-        d.setDate(d.getDate() + 1);
-        endDateISO = d.toISOString();
-    }
-
-    // 继续使用解析后的 ISO 时间调用 API
-    const response = await gapi.client.calendar.events.list({
-        calendarId: "primary",
-        timeMin: startDateISO,
-        timeMax: endDateISO,
-        singleEvents: true,
-        orderBy: "startTime",
+    const event = {
+      summary: title,
+      start: { dateTime: startTime },
+      end: { dateTime: endTime },
+    };
+    const res = await fetch("https://www.googleapis.com/calendar/v3/calendars/primary/events", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${this.accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(event),
     });
 
-    const events = response.result.items || [];
-
-    if (!events.length) {
-        log("該当期間にイベントはありません。");
-    } else {
-        log(`=== ${events.length} 件のイベント ===`);
-        events.forEach(ev => {
-            const s = ev.start.dateTime || ev.start.date;
-            log(`📅 ${s} : ${ev.summary} [${ev.id}]`);
-        });
+    const data = await res.json();
+    this.log("Event added:", data);
+    return data;
+  }
+ 
+  // ✅ 删除日程
+  async deleteEvent(eventId) {
+    if (!this.accessToken) {
+      alert("Googleログインが必要です。");
+      return;
     }
-
-    // 一定要返回 events，这样上层可以拿到数组
-    return events;
-}
+    const res = await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events/${eventId}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${this.accessToken}` },
+    });
+    if (!res.ok) {
+      this.log("deleteEvent failed:", res.status, await res.text());
+      throw new Error("予定の削除に失敗しました。");
+    }
+    this.log("Event deleted:", eventId);
+  }
 }
