@@ -67,13 +67,13 @@ def require_api_key():
 
 app.secret_key = os.getenv("SECRET_KEY", "devsecret")
 
-ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
-if not ANTHROPIC_API_KEY:
-    print("Warning: ANTHROPIC_API_KEY environment variable not set. ChatSpaceModel may not function correctly.")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+if not GEMINI_API_KEY:
+    print("Warning: GEMINI_API_KEY environment variable not set. ChatSpaceModel may not function correctly.")
 else:
-    print("--- [DEBUG] ANTHROPIC_API_KEY is set. ---")
+    print("--- [DEBUG] GEMINI_API_KEY is set. ---")
 
-chat_space_model = ChatSpaceModel(anthropic_api_key=ANTHROPIC_API_KEY)
+chat_space_model = ChatSpaceModel(gemini_api_key=GEMINI_API_KEY)
 
 # ScheduleManagerのインスタンス化
 calendar_manager = ScheduleManager()
