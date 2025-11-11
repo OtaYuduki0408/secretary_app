@@ -33,7 +33,6 @@ from services.ScheduleManager import ScheduleManager
 
 from services.screen_tools import ScreenTool
 
-
 screen_tool = ScreenTool() if ScreenTool else None
 
 CLIENT_SECRETS_FILE = os.path.join(os.path.dirname(__file__), 'services', 'client_secret.json')
@@ -46,6 +45,7 @@ SCOPES = [
     "https://www.googleapis.com/auth/calendar",
 ]
 
+current_command = None
 
 app = Flask(__name__, template_folder='templates', static_folder='static')
 
@@ -278,10 +278,36 @@ def finance():
 def nm():
     return render_template("notification_test.html")
 
-@app.route("/tri")
-def trigger():
-    return render_template("trigger.html")
 
+@app.route("/api/chatspace/voice", methods=["POST"])
+def api_chatspace_voice():
+    """ChatSpace 音声起動API"""
+    data = request.get_json() or {}
+    command = data.get("command")
+
+    if command == "start_voice":
+        print("🎤 ChatSpace 音声起動信号を受信しました")
+        # ここで ChatSpaceModel の関数を呼び出す
+        # 例：
+        # from chatSpaceModel import start_voice
+        # start_voice()
+        current_command = "start_voice"
+        return jsonify({"status": "ok", "message": "voice started"})
+
+    return jsonify({"status": "error", "message": "invalid command"}), 400
+
+@app.route("/api/chatspace/state", methods=["GET"])
+def get_chatspace_state():
+    """現在のChatSpace指令を取得"""
+    global current_command
+    return jsonify({"command": current_command})
+
+@app.route("/api/chatspace/clear", methods=["GET"])
+def clear_chatspace_state():
+    """指令をリセット"""
+    global current_command
+    current_command = None
+    return jsonify({"status": "cleared"})
 
 
 

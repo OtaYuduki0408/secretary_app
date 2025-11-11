@@ -115,3 +115,53 @@ export async function check_chat_Space(inputValue) {
 function fire(name, detail) {
   document.dispatchEvent(new CustomEvent(name, { detail }));
 }
+// ==========================
+// Flaskコマンドポーリング
+// ==========================
+
+async function pollChatSpaceCommand() {
+  try {
+    const resp = await fetch("/api/chatspace/state");
+    const data = await resp.json();
+    if (data.command === "start_voice") {
+      console.log("🎤 Flaskから音声起動指令を受信");
+      // ✅ 自動音声起動
+      if (typeof startVoice === "function") {
+        startVoice();
+      } else {
+        const btn = document.querySelector("#voiceButton");
+        if (btn) {
+          console.log("🎤 音声ボタンを自動クリック");
+          btn.click();
+        } else {
+          console.log("⚠️ 音声起動関数もボタンも見つかりません。");
+        }
+      }
+      await fetch("/api/chatspace/clear");
+    }
+  } catch (err) {
+    console.warn("状態取得エラー:", err);
+  }
+}
+setInterval(pollChatSpaceCommand, 2000);
+
+
+// ==========================
+// 音声起動関数（予備）
+// ==========================
+function startVoice() {
+  try {
+    const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+    recognition.lang = 'ja-JP';
+    recognition.onresult = (event) => {
+      const text = event.results[0][0].transcript;
+      console.log("🎙️ 音声入力:", text);
+      check_chat_Space(text);
+    };
+    recognition.start();
+    console.log("🎤 音声認識を開始しました");
+  } catch (err) {
+    console.error("音声起動エラー:", err);
+  }
+}
+

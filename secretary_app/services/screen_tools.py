@@ -13,9 +13,9 @@ class ScreenTool:
         self.recording = False
         self.record_thread = None
         print("🧩 ScreenTool 已启动。使用以下热键操作：")
-        print("  Shift + D  → 截图")
+        print("  Shift + E  → 截图")
         print("  Shift + R  → 开始录屏")
-        print("  Shift + S  → 停止录屏")
+        print("  Shift + T  → 停止录屏")
         print("  ESC        → 退出程序\n")
 
 
@@ -66,9 +66,9 @@ def main():
     tool = ScreenTool()
 
     # 注册热键
-    keyboard.add_hotkey("shift+d", tool.take_screenshot)  # 截图
+    keyboard.add_hotkey("shift+e", tool.take_screenshot)  # 截图
     keyboard.add_hotkey("shift+r", tool.start_recording)  # 开始录屏
-    keyboard.add_hotkey("shift+s", tool.stop_recording)   # 停止录屏
+    keyboard.add_hotkey("shift+t", tool.stop_recording)   # 停止录屏
     keyboard.wait("esc")  # 退出
     print("👋 已退出程序。")
 
