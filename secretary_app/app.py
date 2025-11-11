@@ -16,6 +16,65 @@ from models.finance_model import FinanceModel
 import os
 
 app = Flask(__name__, template_folder='templates', static_folder='static')
+
+# --- SQLAlchemy for Custom Order ---
+# DBファイルのパス設定
+instance_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'instance')
+os.makedirs(instance_path, exist_ok=True)
+app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{os.path.join(instance_path, "orders.db")}'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+# DBをアプリに連携
+db.init_app(app)
+
+# --- Custom Order Blueprint ---
+# API用Blueprintの登録
+app.register_blueprint(custom_order_bp, url_prefix='/api')
+
+# ページ表示用のBlueprintを動的に作成
+from flask import Blueprint
+custom_order_pages_bp = Blueprint(
+    'custom_order_pages', 
+    __name__,
+    template_folder='order/static/html',
+    static_folder='order/static'
+)
+
+@custom_order_pages_bp.route('/')
+def custom_order_index():
+    return render_template('index.html')
+
+@custom_order_pages_bp.route('/edit')
+@custom_order_pages_bp.route('/edit/<int:order_id>')
+def edit_command_page(order_id=None):
+    # order_id があれば、そのデータをテンプレートに渡すことも可能（将来的な拡張）
+    return render_template('edit_command.html', order_id=order_id)
+
+# ページ用Blueprintを登録
+app.register_blueprint(custom_order_pages_bp, url_prefix='/custom_order')
+
+# --- API Key Authentication ---
+# 環境変数から許可されたAPIキーを読み込む。カンマ区切りで複数指定可能。
+# 例: ALLOWED_API_KEYS=key1,key2,key3
+ALLOWED_API_KEYS = set(os.environ.get('ALLOWED_API_KEYS', '').split(','))
+
+@app.before_request
+def require_api_key():
+    # /api/ で始まるパス以外は認証をスキップ
+    if not request.path.startswith('/api/'):
+        return
+
+    # 許可されたキーが一つも設定されていない、または空文字のキーのみの場合は認証をスキップ
+    if not ALLOWED_API_KEYS or ALLOWED_API_KEYS == {''}:
+        return
+
+    # APIキーをリクエストヘッダー 'X-API-KEY' から取得
+    provided_key = request.headers.get('X-API-KEY')
+
+    if provided_key not in ALLOWED_API_KEYS:
+        return jsonify({'message': 'Error: Invalid or missing API Key.'}), 403
+# --- End of API Key Authentication ---
+
 app.secret_key = os.getenv("SECRET_KEY", "devsecret")
 
 # Model instances
