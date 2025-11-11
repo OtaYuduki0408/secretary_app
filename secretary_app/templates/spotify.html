@@ -50,6 +50,11 @@
     .playlist-actions{display:flex;gap:10px;flex-wrap:wrap;align-items:center;}
     .playlist-actions .spotify-btn{white-space:nowrap;}
     .history-actions{display:flex;justify-content:flex-end;margin-top:8px;}
+    .spotify-voice-control{display:flex;flex-wrap:wrap;gap:10px;margin-top:12px;}
+    .spotify-voice-control button{white-space:nowrap;}
+    .spotify-voice-select{flex:1 1 220px;min-width:200px;padding:6px 10px;border-radius:10px;border:1px solid rgba(148,163,184,.4);background:rgba(15,20,26,.65);color:var(--text);}
+    .spotify-voice-select:focus{outline:2px solid rgba(102,163,255,.45);}
+    .spotify-voice-status{margin-top:6px;font-size:.9rem;}
     .spotify-top-nav{position:fixed;top:18px;right:22px;display:flex;gap:12px;z-index:5100;}
     .spotify-top-nav .nav-btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:999px;background:rgba(15,20,26,0.82);border:1px solid rgba(255,255,255,0.12);color:#f8fafc;text-decoration:none;font-weight:600;backdrop-filter:blur(12px);}
     .spotify-top-nav .nav-btn:hover{background:rgba(102,163,255,0.75);}
@@ -118,6 +123,20 @@
         <input id="search-query" type="search" placeholder="曲名 / アーティスト名 / アルバム名で検索…" />
         <button class="spotify-btn main pill" type="submit">検索</button>
       </form>
+      <div class="spotify-voice-control">
+        <button type="button" class="spotify-btn pill voice-mic-btn" id="spotify-voice-btn" aria-pressed="false">🎙 音声コマンド</button>
+        <select id="spotify-voice-playlist" class="spotify-voice-select" data-placeholder="音声追加先プレイリスト（任意）">
+          <option value="">音声追加先プレイリスト（任意）</option>
+          {% if playlists %}
+            {% for p in playlists %}
+              <option value="{{ p.id }}">{{ p.name }}</option>
+            {% endfor %}
+          {% endif %}
+        </select>
+      </div>
+      <p id="spotify-voice-status" class="spotify-muted spotify-voice-status" aria-live="polite">
+        マイクボタンを押して「次の曲を再生」や「この曲をプレイリストに追加」と話しかけてください。
+      </p>
       <div id="search-message" class="spotify-muted" style="margin-top:8px;"></div>
       <div id="search-history" style="margin-top:12px;">
         <div class="spotify-muted" style="margin-bottom:6px;">最近の検索</div>
@@ -181,6 +200,7 @@
     </section>
     {% endif %}
   </main>
+  <script src="{{ url_for('static', filename='js/spotify_voice.js') }}" defer></script>
 </body>
 </html>
 
