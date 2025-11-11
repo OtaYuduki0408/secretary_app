@@ -1,3 +1,8 @@
+import sys
+import os
+# 'order' ディレクトリへのパスを追加
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'order'))
+
 from flask import Flask, render_template, jsonify, request, redirect, url_for, session
 from datetime import datetime, timedelta
 from services.user_service import (
@@ -11,7 +16,6 @@ from flask import Flask, render_template, jsonify, request, redirect, url_for, s
 from spotipy.oauth2 import SpotifyOAuth
 import spotipy
 import os
-from routes.memo_routes import memo_bp  # ← ここを修正
 from supabase_client import supabase
 from dotenv import load_dotenv
 
@@ -25,6 +29,8 @@ from services.auth_service import register_user, login_user
 from services.finance_service import get_finance_summary, get_all_finance_records
 from services.chat_space_model import ChatSpaceModel
 from services.memo_routes import memo_bp
+from order.models import db
+from order.custom_order_routes import custom_order_bp
 from services.ScheduleManager import ScheduleManager # ScheduleManagerをインポート
 import os
 
@@ -45,6 +51,36 @@ SCOPES = [
  
 
 app = Flask(__name__, template_folder='templates', static_folder='static')
+
+# --- SQLAlchemy for Custom Order ---
+# DBファイルのパス設定
+instance_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'instance')
+os.makedirs(instance_path, exist_ok=True)
+app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{os.path.join(instance_path, "orders.db")}'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+# DBをアプリに連携
+db.init_app(app)
+
+# --- Custom Order Blueprint ---
+# API用Blueprintの登録
+app.register_blueprint(custom_order_bp, url_prefix='/api')
+
+# ページ表示用のBlueprintを動的に作成
+from flask import Blueprint
+custom_order_pages_bp = Blueprint(
+    'custom_order_pages', 
+    __name__,
+    template_folder='order/templates',
+    static_folder='order/static'
+)
+
+@custom_order_pages_bp.route('/')
+def custom_order_index():
+    return render_template('index.html')
+
+# ページ用Blueprintを登録
+app.register_blueprint(custom_order_pages_bp, url_prefix='/custom_order')
 
 # --- API Key Authentication ---
 # 環境変数から許可されたAPIキーを読み込む。カンマ区切りで複数指定可能。
@@ -1006,6 +1042,10 @@ def control_switchbot():
     command = data.get('command') # 'turnOn' or 'turnOff'
     result, status_code = execute_switchbot_command(command)
     return jsonify(result), status_code
+
+# --- DBテーブルの作成 ---
+with app.app_context():
+    db.create_all()
 
 if __name__ == '__main__':
     app.run(
