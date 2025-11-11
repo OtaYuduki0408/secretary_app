@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8">
+    <title>カスタム命令ビルダー</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  </head>
+  <body>
+    <!-- 🔹 戻るボタン -->
+    <button id="back-btn" class="back-button">← 命令編集画面に戻る</button>
+
+    <h1>カスタム命令ビルダー</h1>
+
+    <section id="condition-section">
+      <h2>条件設定</h2>
+      <div class="condition">
+        <select class="condition-type">
+          <option>8時になったら</option>
+          <option>"おはよう"と言ったら</option>
+          <option>現在位置が●●の半径100m以内なら</option>
+          <option>Wi-Fiが接続されたら</option>
+        </select>
+      </div>
+      <button id="add-condition">＋ 条件を追加</button>
+    </section>
+
+    <section id="command-section">
+      <h2>命令設定（順に実行）</h2>
+      <div class="command">
+        <select class="command-type">
+          <option>電気を付ける</option>
+          <option>今日の予定を読み上げる</option>
+          <option>現在の所持金を読み上げる</option>
+          <option>3分待つ</option>
+        </select>
+      </div>
+      <button id="add-command">＋ 命令を追加</button>
+    </section>
+
+    <section id="break-section">
+      <h2>破壊条件（中断トリガー）</h2>
+      <input type="text" id="break-condition" placeholder='"おはよう"と言う など'>
+    </section>
+
+    <button id="save">カスタム命令を保存</button>
+
+    <section id="result">
+      <h2>保存済み命令</h2>
+      <ul id="command-list"></ul>
+    </section>
+
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+    <script>
+      // 🔹 戻るボタンの動作
+      document.getElementById("back-btn").addEventListener("click", () => {
+        // edit_command.html が存在するならそこへ、なければトップへ
+        fetch("/static/html/edit_command.html", { method: "HEAD" })
+          .then(res => {
+            if (res.ok) location.href = "/static/html/edit_command.html";
+            else location.href = "/";
+          })
+          .catch(() => location.href = "/");
+      });
+    </script>
+  </body>
+</html>
