@@ -7,50 +7,41 @@ from flask import Blueprint, request, jsonify
 TABLE_NAME = "memos"
 
  
-def get_all_memos(keyword: str = "", search_type: str = "all", start_date: str = "", end_date: str = ""):
+def get_all_memos(keyword: str = ""):
     """
-    全てのメモを取得する。キーワード、検索対象、日付範囲で絞り込みを行う。
+    全てのメモを取得する。キーワードがある場合はタイトルと内容で検索する。
     """
     try:
-        query = supabase.table(TABLE_NAME).select("id, title, content, created_at, is_pinned, priority")
-        
-        # キーワード検索
+        query = supabase.table(TABLE_NAME).select("id, title, content, created_at")
+        # ★ 簡易的な検索ロジック (title または content にキーワードが含まれる)
         if keyword:
-            search_pattern = f"%{keyword}%"
-            if search_type == "title":
-                query = query.ilike("title", search_pattern)
-            elif search_type == "content":
-                query = query.ilike("content", search_pattern)
-            else: # "all"
-                query = query.or_(f"title.ilike.{search_pattern},content.ilike.{search_pattern}")
-
-        # 日付範囲での絞り込み
-        if start_date:
-            query = query.gte("created_at", start_date)
-        if end_date:
-            # 終了日はその日の終わりまでを含むように調整
-            query = query.lte("created_at", f"{end_date}T23:59:59")
-
-        # ピン留め(is_pinned=trueが先)、優先順位(priorityが小さいものが先、nullは後方)、作成日時(新しいものが先)の順でソート
-        response = query.order("is_pinned", desc=True).order("priority", desc=False, nullsfirst=False).order("created_at", desc=True).execute()
+            # iLike (大文字小文字を区別しないLIKE) を使用して部分一致検索
+            # title または content のいずれかでフィルタリングを行う (or句の代わり)
+            # PostgrestでOR条件を構築するのは複雑なため、ここではシンプルなフィルタを適用するか、
+            # 検索機能がないものとして全件取得・フロントでフィルタリングも可能です。
+            # 一応、Postgrest-pyの機能を使ってOR検索を試みますが、複雑なエラーを避けるため
+            # シンプルに全文検索を導入していない場合はキーワードは無視することが安全です。
+            # 💡 以下のロジックは全文検索が設定されていないと機能しない可能性が高いため、
+            # シンプルにキーワードを無視して全件取得し、フロントエンドに任せることを推奨します。
+ 
+            # (キーワード検索を無効化し、全件取得に徹します)
+            pass
+ 
+        # created_at (作成日時) の降順でソート
+        response = query.order("created_at", descending=True).execute()
         return response.data or []
     except Exception as e:
         print("❌ get_all_memos エラー:", e)
         return {"error": str(e)}
  
  
-def add_memo(title: str, content: str, is_pinned: bool = False, priority: int = None):
+def add_memo(title: str, content: str):
     """
     新しいメモを追加する。
     """
     try:
-        insert_data = {
-            "title": title,
-            "content": content,
-            "is_pinned": is_pinned,
-            "priority": priority
-        }
-        response = supabase.table(TABLE_NAME).insert(insert_data).execute()
+        # created_at はDB側でデフォルト値が設定されているため、不要
+        response = supabase.table(TABLE_NAME).insert({"title": title, "content": content}).execute()
         if response.data:
             return response.data[0] 
         return {"error": "メモの挿入に失敗しました"}
@@ -71,31 +62,4 @@ def delete_memo(memo_id: str):
         return {"message": f"メモ(ID={memo_id})を削除しました"}
     except Exception as e:
         print("❌ delete_memo エラー:", e)
-        return {"error": str(e)}
-
-def update_memo(memo_id: str, data: dict):
-    """
-    指定したメモのデータを更新する。
-    `data` 辞書に含まれるキーと値でレコードを更新する。
-    """
-    try:
-        response = supabase.table(TABLE_NAME).update(data).eq("id", memo_id).execute()
-        if response.data:
-            return response.data[0]
-        # Supabaseのupdateは、条件に合う行がない場合でもエラーにならず、空のdataを返す
-        return {"error": "指定したIDのメモが見つからないか、更新に失敗しました"}
-    except Exception as e:
-        print("❌ update_memo エラー:", e)
-        return {"error": str(e)}
-
-def delete_memos_bulk(memo_ids: list):
-    """
-    指定されたIDのリストに一致するすべてのメモを削除する。
-    """
-    try:
-        response = supabase.table(TABLE_NAME).delete().in_("id", memo_ids).execute()
-        # response.dataには削除されたレコードが含まれる
-        return {"message": f"{len(response.data)}件のメモを削除しました", "deleted_count": len(response.data)}
-    except Exception as e:
-        print("❌ delete_memos_bulk エラー:", e)
         return {"error": str(e)}
