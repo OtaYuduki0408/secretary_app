@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>命令編集（複数登録対応）</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/edit_command_style.css') }}">
+  <script src="{{ url_for('static', filename='js/edit_command_multi.js') }}" defer></script>
+
+  <style>
+    body {
+      font-family: "Noto Sans JP", sans-serif;
+      background: #f7f7f7;
+      color: #222;
+      margin: 0;
+      padding: 0;
+    }
+
+    .container {
+      max-width: 960px;
+      margin: 60px auto;
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      padding: 2em;
+    }
+
+    h2 {
+      text-align: center;
+      margin-bottom: 1em;
+    }
+
+    .back-button {
+      background: #6c757d;
+      color: white;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 8px;
+      cursor: pointer;
+      margin-bottom: 1em;
+    }
+
+    .back-button:hover {
+      background: #5a6268;
+    }
+
+    .command-block {
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      padding: 1em;
+      margin-bottom: 1em;
+      background: #f0f8ff;
+    }
+
+    .add-button {
+      background: #007bff;
+      color: #fff;
+      border: none;
+      padding: 10px 16px;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+
+    .add-button:hover {
+      background: #0056b3;
+    }
+
+    .save-button {
+      background: #28a745;
+      color: #fff;
+      border: none;
+      padding: 12px 20px;
+      border-radius: 8px;
+      cursor: pointer;
+      display: block;
+      margin: 2em auto 0;
+    }
+
+    .save-button:hover {
+      background: #218838;
+    }
+
+    input, textarea {
+      width: 100%;
+      padding: 6px 10px;
+      margin-top: 5px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+    }
+
+    label {
+      display: block;
+      margin-top: 10px;
+      font-weight: bold;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <button class="back-button" id="back-btn">← トップに戻る</button>
+
+    <h2>命令編集（複数登録可能）</h2>
+
+    <div id="commands-container">
+      <!-- 命令ブロックをここに動的に追加 -->
+    </div>
+
+    <button id="add-command" class="add-button">＋ 命令を追加</button>
+    <button id="save-all" class="save-button">💾 全て保存</button>
+  </div>
+
+  <script>
+    // 戻るボタン処理
+    document.getElementById("back-btn").addEventListener("click", () => {
+      window.location.href = "/";
+    });
+
+    // 命令ブロック生成
+    const container = document.getElementById("commands-container");
+    const addBtn = document.getElementById("add-command");
+    const saveBtn = document.getElementById("save-all");
+
+    let commandCount = 0;
+
+    addBtn.addEventListener("click", () => {
+      commandCount++;
+      const block = document.createElement("div");
+      block.className = "command-block";
+      block.innerHTML = `
+        <label>命令名：</label>
+        <input type="text" class="cmd-name" placeholder="例：朝のルーティン">
+
+        <label>条件：</label>
+        <textarea class="cmd-condition" rows="2" placeholder="例：(8時になったら AND 現在位置が自宅の半径100m以内なら) OR 'おはよう'と言ったら"></textarea>
+
+        <label>命令内容：</label>
+        <textarea class="cmd-actions" rows="3" placeholder="例：電気を付ける → 今日の予定を読み上げる → 所持金を読み上げる → 3分待つ"></textarea>
+
+        <label>繰り返し回数（for文）：</label>
+        <input type="number" class="cmd-loop" min="1" value="1">
+
+        <label>破壊条件：</label>
+        <input type="text" class="cmd-break" placeholder="例：'おはよう'と言う">
+      `;
+      container.appendChild(block);
+    });
+
+    // 保存ボタン処理
+    saveBtn.addEventListener("click", async () => {
+      const commands = [];
+      document.querySelectorAll(".command-block").forEach(block => {
+        commands.push({
+          name: block.querySelector(".cmd-name").value,
+          conditions: [{ expr: block.querySelector(".cmd-condition").value }],
+          actions: [{ type: "custom", value: block.querySelector(".cmd-actions").value }],
+          loops: [{ count: block.querySelector(".cmd-loop").value, break_condition: block.querySelector(".cmd-break").value }]
+        });
+      });
+
+      const res = await fetch("/api/custom_orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(commands)
+      });
+
+      const data = await res.json();
+      alert(data.message || "保存しました");
+    });
+    <!-- 戻るボタン -->
+<div style="text-align:center; margin-top:20px;">
+  <button
+    onclick="window.location.href='http://127.0.0.1:5000/edit_command.html'"
+    style="padding:10px 20px; font-size:16px; cursor:pointer;"
+  >
+    ← 戻る
+  </button>
+</div>
+
+  </script>
+</body>
+</html>
