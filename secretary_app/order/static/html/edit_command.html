@@ -2,117 +2,111 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8" />
-  <title>命令編集</title>
+  <title>命令編集（高度条件対応）</title>
+  <link rel="stylesheet" href="/static/css/index_style.css">
   <style>
     body {
-      font-family: "Segoe UI", sans-serif;
+      font-family: "Segoe UI", "Noto Sans JP", sans-serif;
       background: #f6f8fa;
-      color: #333;
       margin: 0;
       padding: 20px;
+      color: #333;
     }
-    h1 { text-align: center; }
-    .section {
+    .container {
+      max-width: 960px;
+      margin: 50px auto;
       background: #fff;
-      border-radius: 10px;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
-      margin: 20px auto;
-      padding: 20px;
-      max-width: 800px;
+      padding: 2em;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
     }
-    .section h2 {
-      font-size: 18px;
-      border-bottom: 1px solid #ccc;
-      padding-bottom: 5px;
-      margin-bottom: 10px;
+    h2 {
+      text-align: center;
+      margin-bottom: 1.2em;
     }
-    .item {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      margin: 5px 0;
+    .block {
+      margin-bottom: 20px;
     }
-    input[type="text"], select {
-      flex: 1;
-      padding: 6px;
+    label {
+      display: block;
+      font-weight: bold;
+      margin-bottom: 6px;
+    }
+    input[type="text"], select, textarea {
+      width: 100%;
+      padding: 8px;
+      border-radius: 6px;
       border: 1px solid #ccc;
-      border-radius: 5px;
+      box-sizing: border-box;
+      font-size: 14px;
     }
-    button {
-      background: #0078d7;
-      color: white;
+    textarea { resize: vertical; }
+    .add-button, .save-button, .remove {
+      background: #007bff;
+      color: #fff;
       border: none;
-      border-radius: 5px;
+      border-radius: 6px;
       padding: 6px 10px;
+      margin-top: 6px;
       cursor: pointer;
     }
-    button:hover { background: #005fa3; }
-    .remove { background: #e74c3c; }
-    .remove:hover { background: #c0392b; }
-    #save {
-      display: block;
-      margin: 20px auto;
-      font-size: 16px;
-      padding: 10px 20px;
-      background: #2ecc71;
-    }
-    #save:hover { background: #27ae60; }
-    .msg {
-      text-align: center;
-      color: #27ae60;
-      font-weight: bold;
+    .add-button:hover, .save-button:hover { background: #0056b3; }
+    .remove { background: #dc3545; }
+    .remove:hover { background: #b02a37; }
+    .back-button { text-decoration: none; display: inline-block; margin-bottom: 15px; }
+    .msg { margin-top: 10px; color: green; font-weight: bold; }
+    .item { margin: 6px 0; }
+    .condition-block {
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      padding: 10px;
       margin-top: 10px;
     }
-    .command-btn {
-      display: flex;
-      justify-content: space-between;
-      margin: 5px 0;
-      background: #f0f0f0;
-      padding: 6px 10px;
-      border-radius: 5px;
-    }
-    .command-btn button {
-      background: #e74c3c;
-      padding: 3px 6px;
-    }
-    .command-btn button:hover { background: #c0392b; }
+    .condition-block h3 { margin-top: 0; }
   </style>
 </head>
 <body>
-  <h1>命令編集</h1>
+  <div class="container">
+    <a class="back-button" href="/">← 戻る</a>
+    <h2>命令編集（高度条件対応）</h2>
 
-  <!-- 命令名 -->
-  <div class="section">
-    <h2>命令名</h2>
-    <input type="text" id="command-name" placeholder="例：朝の挨拶" />
-  </div>
+    <!-- 命令名 -->
+    <div class="block">
+      <label>命令名</label>
+      <input type="text" id="command-name" placeholder="例：朝の挨拶">
+    </div>
 
-  <!-- トリガー -->
-  <div class="section" id="trigger-section">
-    <h2>トリガー</h2>
-    <div id="trigger-list"></div>
-    <button id="add-trigger">＋ トリガーを追加</button>
-  </div>
+    <!-- トリガー -->
+    <div class="block" id="trigger-section">
+      <label>トリガー</label>
+      <div id="trigger-list"></div>
+      <button class="add-button" id="add-trigger">＋ トリガー追加</button>
+    </div>
 
-  <!-- 条件 -->
-  <div class="section" id="condition-section">
-    <h2>条件</h2>
-    <div id="condition-list"></div>
-    <button id="add-condition">＋ 条件を追加</button>
-  </div>
+    <!-- 条件 -->
+    <div class="block" id="condition-section">
+      <label>単純条件</label>
+      <div id="condition-list"></div>
+      <button class="add-button" id="add-condition">＋ 条件追加</button>
+    </div>
 
-  <!-- 破壊条件 -->
-  <div class="section" id="break-condition-section">
-    <h2>破壊条件（ループ停止条件）</h2>
-    <div id="break-condition-list"></div>
-    <button id="add-break-condition">＋ 破壊条件を追加</button>
-  </div>
+    <!-- 高度条件構築 -->
+    <div class="block" id="advanced-condition-section">
+      <label>高度条件（IF / ELSE IF / ELSE / ネスト対応）</label>
+      <div id="condition-builder"></div>
+      <button class="add-button" id="add-if">＋ IF追加</button>
+    </div>
 
-  <!-- ループ設定 -->
-  <div class="section" id="loop-section">
-    <h2>ループ設定</h2>
-    <div class="item">
-      <label>繰り返し回数：</label>
+    <!-- 破壊条件 -->
+    <div class="block" id="break-condition-section">
+      <label>破壊条件</label>
+      <div id="break-condition-list"></div>
+      <button class="add-button" id="add-break-condition">＋ 破壊条件追加</button>
+    </div>
+
+    <!-- ループ設定 -->
+    <div class="block">
+      <label>繰り返し回数</label>
       <select id="loop-count">
         <option value="once">1回のみ</option>
         <option value="3">3回</option>
@@ -121,22 +115,27 @@
         <option value="infinite">無限</option>
       </select>
     </div>
-  </div>
 
-  <!-- アクション -->
-  <div class="section" id="action-section">
-    <h2>アクション</h2>
-    <div id="action-list"></div>
-    <button id="add-action">＋ アクションを追加</button>
-  </div>
+    <!-- アクション -->
+    <div class="block" id="action-section">
+      <label>アクション</label>
+      <div id="action-list"></div>
+      <button class="add-button" id="add-action">＋ アクション追加</button>
+    </div>
 
-  <button id="save">💾 保存</button>
-  <div class="msg" id="message"></div>
-  <div class="section" id="existing-commands">
-    <h2>既存命令一覧</h2>
+    <button class="save-button" id="save">💾 保存</button>
+    <div id="message" class="msg"></div>
+
+    <!-- 既存命令 -->
+    <div class="block" id="existing-commands">
+      <h2>既存命令一覧</h2>
+      <p>読み込み中...</p>
+    </div>
   </div>
 
   <script>
+  window.addEventListener("DOMContentLoaded", () => {
+
     const nameInput = document.getElementById("command-name");
     const loopSelect = document.getElementById("loop-count");
     const triggerList = document.getElementById("trigger-list");
@@ -145,169 +144,155 @@
     const actionList = document.getElementById("action-list");
     const existingCommands = document.getElementById("existing-commands");
     const msgBox = document.getElementById("message");
+    const builder = document.getElementById("condition-builder");
 
-    function createTrigger(trigger={type:"manual", value:""}) {
-      const div = document.createElement("div");
-      div.className = "item";
-      div.innerHTML = `
+    // ===== 各追加ボタン =====
+    document.getElementById("add-trigger").onclick = () => addTrigger();
+    document.getElementById("add-condition").onclick = () => addCondition();
+    document.getElementById("add-break-condition").onclick = () => addBreak();
+    document.getElementById("add-action").onclick = () => addAction();
+    document.getElementById("add-if").onclick = () => builder.appendChild(createConditionBlock("if"));
+
+    function addTrigger(t={type:"manual", value:""}) {
+      const el = document.createElement("div");
+      el.className="item";
+      el.innerHTML=`
         <select class="trigger-type">
           <option value="time">時間</option>
           <option value="voice">音声</option>
           <option value="manual">手動</option>
         </select>
-        <input type="text" placeholder="値" class="trigger-value">
+        <input type="text" class="trigger-value" placeholder="値" value="${t.value||""}">
         <button class="remove">削除</button>
       `;
-      div.querySelector(".trigger-type").value = trigger.type;
-      div.querySelector(".trigger-value").value = trigger.value || "";
-      div.querySelector(".remove").onclick = () => div.remove();
-      triggerList.appendChild(div);
+      el.querySelector(".trigger-type").value = t.type;
+      el.querySelector(".remove").onclick=()=>el.remove();
+      triggerList.appendChild(el);
     }
 
-    function createCondition(cond={expr:""}) {
-      const div = document.createElement("div");
-      div.className = "item";
-      div.innerHTML = `
-        <input type="text" placeholder="条件式" class="condition-expr">
+    function addCondition(c={expr:""}) {
+      const el = document.createElement("div");
+      el.className="item";
+      el.innerHTML=`
+        <input type="text" class="condition-expr" placeholder="条件式" value="${c.expr||""}">
         <button class="remove">削除</button>
       `;
-      div.querySelector(".condition-expr").value = cond.expr || "";
-      div.querySelector(".remove").onclick = () => div.remove();
-      conditionList.appendChild(div);
+      el.querySelector(".remove").onclick=()=>el.remove();
+      conditionList.appendChild(el);
     }
 
-    function createBreakCondition(cond={expr:""}) {
-      const div = document.createElement("div");
-      div.className = "item";
-      div.innerHTML = `
-        <input type="text" placeholder="破壊条件式" class="break-expr">
+    function addBreak(c={expr:""}) {
+      const el = document.createElement("div");
+      el.className="item";
+      el.innerHTML=`
+        <input type="text" class="break-expr" placeholder="破壊条件式" value="${c.expr||""}">
         <button class="remove">削除</button>
       `;
-      div.querySelector(".break-expr").value = cond.expr || "";
-      div.querySelector(".remove").onclick = () => div.remove();
-      breakList.appendChild(div);
+      el.querySelector(".remove").onclick=()=>el.remove();
+      breakList.appendChild(el);
     }
 
-    function createAction(act={type:"speak", value:""}) {
-      const div = document.createElement("div");
-      div.className = "item";
-      div.innerHTML = `
+    function addAction(a={type:"speak", value:""}) {
+      const el = document.createElement("div");
+      el.className="item";
+      el.innerHTML=`
         <select class="action-type">
           <option value="speak">話す</option>
           <option value="display">表示</option>
-          <option value="execute">コマンド実行</option>
+          <option value="execute">実行</option>
         </select>
-        <input type="text" placeholder="内容" class="action-value">
+        <input type="text" class="action-value" placeholder="内容" value="${a.value||""}">
         <button class="remove">削除</button>
       `;
-      div.querySelector(".action-type").value = act.type;
-      div.querySelector(".action-value").value = act.value || "";
-      div.querySelector(".remove").onclick = () => div.remove();
-      actionList.appendChild(div);
+      el.querySelector(".action-type").value=a.type;
+      el.querySelector(".remove").onclick=()=>el.remove();
+      actionList.appendChild(el);
     }
 
-    document.getElementById("add-trigger").onclick = () => createTrigger();
-    document.getElementById("add-condition").onclick = () => createCondition();
-    document.getElementById("add-break-condition").onclick = () => createBreakCondition();
-    document.getElementById("add-action").onclick = () => createAction();
+    function createConditionBlock(type="if", data={condition:"", actions:[], nested:[]}) {
+      const div = document.createElement("div");
+      div.className="condition-block";
+      const title = type === "elif" ? "ELSE IF" : type.toUpperCase();
+      div.innerHTML=`
+        <h3>${title}</h3>
+        ${type!=="else"?`<input type="text" class="condition-input" placeholder="条件式" value="${data.condition||""}">`:``}
+        <label>アクション</label>
+        <textarea class="action-input">${(data.actions||[]).join("\n")}</textarea>
+        <div class="nested"></div>
+        <div>
+          ${type==="if"?
+            `<button class="add-nested">＋ ネストIF</button>
+             <button class="add-elif">＋ ELSE IF</button>
+             <button class="add-else">＋ ELSE</button>`:""}
+          <button class="remove">削除</button>
+        </div>
+      `;
+      div.querySelector(".remove").onclick=()=>div.remove();
+      if(type==="if"){
+        div.querySelector(".add-nested").onclick=()=>div.querySelector(".nested").appendChild(createConditionBlock("if"));
+        div.querySelector(".add-elif").onclick=()=>builder.appendChild(createConditionBlock("elif"));
+        div.querySelector(".add-else").onclick=()=>builder.appendChild(createConditionBlock("else"));
+      }
+      return div;
+    }
 
-    async function loadCommands() {
+    function extractBlocks(container){
+      return Array.from(container.children).map(block=>{
+        const type = block.querySelector("h3").innerText.toLowerCase().replace(" ","");
+        const cond = block.querySelector(".condition-input")?.value || "";
+        const acts = block.querySelector(".action-input")?.value.split("\n").filter(v=>v.trim()!=="") || [];
+        const nested = extractBlocks(block.querySelector(".nested"));
+        return {type, condition: cond, actions: acts, nested};
+      });
+    }
+
+    // ===== 保存 =====
+    document.getElementById("save").onclick = async ()=>{
+      const data = {
+        name: nameInput.value.trim(),
+        loop_count: loopSelect.value,
+        triggers: [...document.querySelectorAll(".trigger-type")].map((t,i)=>({
+          type: t.value, value: document.querySelectorAll(".trigger-value")[i].value
+        })),
+        conditions: [...document.querySelectorAll(".condition-expr")].map(e=>({expr:e.value})),
+        break_conditions: [...document.querySelectorAll(".break-expr")].map(e=>({expr:e.value})),
+        actions: [...document.querySelectorAll(".action-type")].map((t,i)=>({
+          type: t.value, value: document.querySelectorAll(".action-value")[i].value
+        })),
+        advanced_conditions: extractBlocks(builder)
+      };
+      const res = await fetch("/api/custom_orders",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(data)});
+      const result = await res.json();
+      msgBox.innerText=result.message||"保存しました";
+      loadCommands();
+      setTimeout(()=>msgBox.innerText="",3000);
+    };
+
+    // ===== 一覧取得 =====
+    async function loadCommands(){
       const res = await fetch("/api/custom_orders");
-      const commands = await res.json();
-      existingCommands.innerHTML = "<h2>既存命令一覧</h2>";
-      commands.forEach(cmd => {
-        const div = document.createElement("div");
-        div.className = "command-btn";
-        const btnLoad = document.createElement("button");
-        btnLoad.innerText = `${cmd.name} (ID:${cmd.id})`;
-        btnLoad.onclick = () => loadCommandToEditor(cmd);
-        const btnDel = document.createElement("button");
-        btnDel.innerText = "削除";
-        btnDel.onclick = async () => {
-          if(confirm("本当に削除しますか？")){
-            await fetch(`/api/custom_orders/${cmd.id}`, { method: "DELETE" });
+      const list = await res.json();
+      existingCommands.innerHTML="<h2>既存命令一覧</h2>";
+      list.forEach(cmd=>{
+        const div=document.createElement("div");
+        div.className="item";
+        div.innerHTML=`<b>${cmd.name}</b> (ID:${cmd.id})`;
+        const del=document.createElement("button");
+        del.className="remove";
+        del.innerText="削除";
+        del.onclick=async()=>{
+          if(confirm("削除しますか？")){
+            await fetch(`/api/custom_orders/${cmd.id}`,{method:"DELETE"});
             loadCommands();
           }
         };
-        div.appendChild(btnLoad);
-        div.appendChild(btnDel);
+        div.appendChild(del);
         existingCommands.appendChild(div);
       });
     }
 
-    function loadCommandToEditor(cmd) {
-      nameInput.value = cmd.name;
-      loopSelect.value = cmd.loop_count || "once";
-      triggerList.innerHTML = "";
-      cmd.triggers.forEach(t=>createTrigger(t));
-      conditionList.innerHTML = "";
-      cmd.conditions.forEach(c=>createCondition(c));
-      breakList.innerHTML = "";
-      cmd.break_conditions.forEach(b=>createBreakCondition(b));
-      actionList.innerHTML = "";
-      cmd.actions.forEach(a=>createAction(a));
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    }
-
-    document.getElementById("save").onclick = async () => {
-      if(!nameInput.value.trim()){
-        msgBox.innerText = "命令名は必須です";
-        return;
-      }
-      const actions = Array.from(document.querySelectorAll(".action-type")).map((el,i)=>({
-        type: el.value,
-        value: document.querySelectorAll(".action-value")[i].value
-      })).filter(a=>a.value.trim()!=="");
-      if(actions.length === 0){
-        msgBox.innerText = "少なくとも1つのアクションが必要です";
-        return;
-      }
-      const data = {
-        name: nameInput.value,
-        loop_count: loopSelect.value,
-        triggers: Array.from(document.querySelectorAll(".trigger-type")).map((el,i)=>({
-          type: el.value,
-          value: document.querySelectorAll(".trigger-value")[i].value
-        })),
-        conditions: Array.from(document.querySelectorAll(".condition-expr")).map(el=>({expr: el.value})),
-        break_conditions: Array.from(document.querySelectorAll(".break-expr")).map(el=>({expr: el.value})),
-        actions
-      };
-      try {
-        const res = await fetch("/api/custom_orders", {
-          method: "POST",
-          headers: {"Content-Type":"application/json"},
-          body: JSON.stringify(data)
-        });
-        const result = await res.json();
-        msgBox.innerText = result.message || "保存完了！";
-        setTimeout(()=>msgBox.innerText="", 3000);
-        loadCommands();
-      } catch(e){
-        msgBox.innerText = "保存中にエラーが発生しました";
-        console.error(e);
-      }
-    };
-
-    window.onload = loadCommands;
+    loadCommands();
+  });
   </script>
-
-  <!-- 戻るボタン -->
-  <div style="text-align:center; margin-top:30px;">
-    <button
-      onclick="window.location.href='/'"
-      style="
-        background:#555;
-        color:white;
-        border:none;
-        border-radius:5px;
-        padding:10px 20px;
-        font-size:16px;
-        cursor:pointer;
-      "
-    >
-      ← 戻る
-    </button>
-  </div>
 </body>
 </html>

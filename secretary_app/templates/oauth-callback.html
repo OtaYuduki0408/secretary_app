@@ -1,32 +1,90 @@
 <!DOCTYPE html>
 <html>
 <head>
+    <meta charset="utf-8" />
     <title>Google Auth Callback</title>
+    <style>
+      body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial; padding:20px }
+      pre { background:#111; color:#9ff; padding:8px; border-radius:6px; word-break:break-all }
+      .error { color: #f88 }
+    </style>
+ 
+    {# prepare JSON-serialized values for JS to read (safe) #}
+    {% if token is defined %}
+      {% set server_token = token|tojson %}
+    {% else %}
+      {% set server_token = 'null' %}
+    {% endif %}
+    {% if error is defined %}
+      {% set server_error = error|tojson %}
+    {% else %}
+      {% set server_error = 'null' %}
+    {% endif %}
+ 
     <script>
+        function setStatus(msg){
+            const s = document.getElementById('status'); if(s) s.textContent = msg;
+        }
+ 
         window.onload = function() {
+            try { console.log('[oauth-callback] opener present:', !!window.opener); } catch(e){}
+ 
+            // server-passed values are exposed in a hidden element's data- attributes
+            const serverData = document.getElementById('server-data');
+            const rawToken = serverData ? serverData.dataset.token : null;
+            const rawError = serverData ? serverData.dataset.error : null;
+            const token = rawToken && rawToken !== 'null' ? JSON.parse(rawToken) : null;
+            const error = rawError && rawError !== 'null' ? JSON.parse(rawError) : null;
+ 
+            // 1) implicit (hash) flow: parent.manager expects access_token
             if (window.location.hash) {
                 const params = new URLSearchParams(window.location.hash.substring(1));
                 const accessToken = params.get('access_token');
-
-                // Check if opener and scheduleManager exist before calling setAccessToken
-                if (window.opener && window.opener.manager) {
-                    window.opener.manager.setAccessToken(accessToken);
+                console.log('[oauth-callback] hash access_token present:', !!accessToken);
+                if (accessToken && window.opener && window.opener.manager) {
+                    try {
+                        window.opener.manager.setAccessToken(accessToken);
+                        setStatus('認証成功（クライアント側）。parent.managerにトークンを設定しました。');
+                    } catch(e){
+                        console.error(e);
+                        setStatus('認証完了したが parent に設定できませんでした。');
+                    }
                 } else {
-                    // Optional: handle the case where the opener is not available
-                    console.error("Opener window or scheduleManager not found.");
+                    setStatus('認証トークンが見つかりましたが parent に渡せませんでした。');
                 }
-                
-                // Close the popup window
-                window.close();
-            } else {
-                // Optional: handle the case where there is no hash in the URL
-                console.error("No auth token found in URL hash.");
-                window.close();
+                return; // keep popup open so you can read messages / close manually
             }
+ 
+            // 2) server-side flow
+            if (token) {
+                document.getElementById('token').textContent = token;
+                setStatus('認証成功（サーバ側）。トークンを受け取りました。');
+                if (window.opener && window.opener.receiveAccessToken) {
+                    try { window.opener.receiveAccessToken(token); console.log('[oauth-callback] notified opener via receiveAccessToken'); } catch(e){ console.error(e); }
+                }
+                return;
+            }
+ 
+            if (error) {
+                document.getElementById('error').textContent = error;
+                setStatus('認証に失敗しました（サーバエラー）。下のエラーを参照してください。');
+                return;
+            }
+ 
+            setStatus('認証結果が見つかりません。サーバログとポップアップのコンソールを確認してください。');
         };
     </script>
 </head>
 <body>
-    <p>Authenticating... Please wait.</p>
+    <!-- server から来る token/error を data 属性で受け渡す（JS 側で JSON.parse する） -->
+    <div id="server-data" data-token='{{ server_token }}' data-error='{{ server_error }}' style="display:none"></div>
+ 
+    <h2 id="status">Authenticating... Please wait.</h2>
+    <div>
+      <p>Token (開発表示)：</p>
+      <pre id="token"></pre>
+      <p class="error" id="error"></p>
+      <p><button onclick="window.close()">Close window</button></p>
+    </div>
 </body>
 </html>
