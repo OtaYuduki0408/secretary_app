@@ -11,6 +11,9 @@ from flask import Flask, render_template, jsonify, request, redirect, url_for, s
 from spotipy.oauth2 import SpotifyOAuth
 import spotipy
 import os
+from routes.memo_routes import memo_bp  # ← ここを修正
+from supabase_client import supabase
+from dotenv import load_dotenv
 
 from services.user_service import (
     get_all_users, get_user_by_email, add_user, update_user, delete_user
