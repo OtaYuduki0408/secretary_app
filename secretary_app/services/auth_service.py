@@ -1,61 +1,63 @@
 from supabase_client import supabase
+from werkzeug.security import generate_password_hash, check_password_hash
+
+TABLE_USERS = "users"  
+TABLE_AUTH = "auth"    
+
 
 # ✅ ユーザー登録
 def register_user(name, email, password):
-    try:
-        # Supabase Auth でユーザー登録
-        auth_res = supabase.auth.sign_up({
-            "email": email,
-            "password": password
-        })
+    # 既に登録済みか確認
+    exists = supabase.table(TABLE_USERS).select("email").eq("email", email).execute()
+    if exists.data:
+        return {"error": "このメールアドレスはすでに登録されています。"}
 
-        if not auth_res or not auth_res.user:
-            return {"success": False, "error": "認証登録に失敗しました。"}
+    # users に登録
+    user_res = supabase.table(TABLE_USERS).insert({
+        "name": name,
+        "email": email
+    }).execute()
 
-        user_id = auth_res.user.id
+    if not user_res.data:
+        return {"error": "ユーザー登録に失敗しました。"}
 
-        # 既に public.users に登録済みでないか確認
-        existing = supabase.table("users").select("*").eq("id", user_id).execute()
-        if not existing.data:
-            supabase.table("users").insert({
-                "id": user_id,   # auth.users.id と同じUUID
-                "name": name,
-                "email": email
-            }).execute()
+    user_id = user_res.data[0]["id"]
 
-        return {"success": True, "message": "登録完了", "user_id": user_id}
+    # パスワードをハッシュ化
+    hashed_password = generate_password_hash(password)
 
-    except Exception as e:
-        return {"success": False, "error": str(e)}
+    # auth に登録
+    auth_res = supabase.table(TABLE_AUTH).insert({
+        "user_id": user_id,
+        "password_hash": hashed_password,
+        "salt": ""  # werkzeug では内部でソルトを扱うため空文字でもOK
+    }).execute()
+
+    if not auth_res.data:
+        return {"error": "認証情報の登録に失敗しました。"}
+
+    return {"message": "登録完了", "user_id": user_id}
 
 
 # ✅ ログイン
 def login_user(email, password):
-    try:
-        res = supabase.auth.sign_in_with_password({
-            "email": email,
-            "password": password
-        })
+    # email から users を検索
+    user_res = supabase.table(TABLE_USERS).select("*").eq("email", email).execute()
+    if not user_res.data:
+        return {"error": "ユーザーが見つかりません。"}
 
-        if not res or not res.user:
-            return {"success": False, "error": "ログインに失敗しました。"}
+    user = user_res.data[0]
+    user_id = user["id"]
 
-        user = res.user
-        user_id = user.id
+    # auth テーブルから password_hash を取得
+    auth_res = supabase.table(TABLE_AUTH).select("password_hash").eq("user_id", user_id).execute()
+    if not auth_res.data:
+        return {"error": "パスワード情報が見つかりません。"}
 
-        # public.users からプロフィールを取得
-        profile_res = supabase.table("users").select("*").eq("id", user_id).execute()
-        profile = profile_res.data[0] if profile_res.data else None
+    stored_hash = auth_res.data[0]["password_hash"]
 
-        return {
-            "success": True,
-            "message": "ログイン成功",
-            "user": {
-                "id": user_id,
-                "email": user.email
-            },
-            "profile": profile
-        }
+    # パスワード照合
+    if not check_password_hash(stored_hash, password):
+        return {"error": "パスワードが正しくありません。"}
 
-    except Exception as e:
-        return {"success": False, "error": str(e)}
+    return {"message": "ログイン成功", "user": user}

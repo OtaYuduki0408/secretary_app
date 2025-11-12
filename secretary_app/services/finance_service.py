@@ -3,20 +3,14 @@ from supabase_client import supabase # 外部で定義されたsupabaseクライ
 from datetime import datetime
 from postgrest.exceptions import APIError 
 
-def get_all_finance_records(user_id: str):
+def get_all_finance_records():
     """
     Supabaseから全レコードを取得する。
     DB接続失敗時は空のリストを返すことで、Flask/Jinja2でのTypeErrorを防ぐ。
     """
     try:
-        # ログインユーザーのデータのみ取得
-        all_records = (
-            supabase.table("finance")
-            .select("*")
-            .eq("user_id", user_id)
-            .execute()
-            .data
-        )
+        # DBから全データを取得
+        all_records = supabase.table("finance").select("*").execute().data
         return all_records
     except (APIError, Exception) as e:
         # 接続エラーやその他のエラーを捕捉
@@ -24,11 +18,11 @@ def get_all_finance_records(user_id: str):
         # 安全策として空のリストを返す
         return []
 
-def get_finance_summary(user_id: str):
+def get_finance_summary():
     """
     Supabaseから取得したデータを使用して月ごとの統計を集計する。
     """
-    finance_data = get_all_finance_records(user_id)
+    finance_data = get_all_finance_records()
     
     if not finance_data:
         return [], []

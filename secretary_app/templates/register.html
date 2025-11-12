@@ -18,31 +18,14 @@
   <label>パスワード</label>
   <input type="password" name="password" required>
 
-  <div class="form-group">
-    <label for="password">パスワード:</label>
-    <input type="password" id="password" name="password" required minlength="6">
-  </div>
-
-  <button type="submit" class="btn">登録</button>
+  <button type="submit">登録</button>
 </form>
 
 {% if error %}
-<<<<<<< HEAD
   <p class="error-msg">{{ error }}</p>
 {% endif %}
 
 <div class="auth-links">
   <a href="{{ url_for('login') }}" class="link-text">ログインはこちら</a>
 </div>
-=======
-  <p class="message error">{{ error }}</p>
-{% elif message %}
-  <p class="message success">{{ message }}</p>
-{% endif %}
-
-<p class="link">
-  <a href="{{ url_for('login') }}">ログインはこちら</a>
-</p>
-
->>>>>>> main/NAOYA
 {% endblock %}
