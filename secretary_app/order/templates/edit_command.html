@@ -4,6 +4,12 @@
   <meta charset="UTF-8" />
   <title>命令編集（高度条件対応）</title>
   <link rel="stylesheet" href="/static/css/index_style.css">
+  <style>
+    .msg { margin-top: 10px; font-weight: bold; }
+    .item { margin:5px 0; }
+    .command-btn { margin-bottom: 5px; }
+    .condition-block { margin:10px 0; padding:10px; border-radius:8px; border:1px solid #ccc; }
+  </style>
 </head>
 <body>
   <div class="container">
@@ -248,7 +254,7 @@
 
     // ======= 保存 =======
     document.getElementById("save").onclick = async ()=>{
-      if(!nameInput.value.trim()){ msgBox.innerText="命令名は必須です"; return;}
+      if(!nameInput.value.trim()){ msgBox.innerText="命令名は必須です"; msgBox.style.color="red"; return;}
       const data = {
         name: nameInput.value,
         loop_count: loopSelect.value,
@@ -261,7 +267,7 @@
         actions: Array.from(document.querySelectorAll(".action-type")).map((el,i)=>({
           type: el.value,
           value: document.querySelectorAll(".action-value")[i].value
-        })).filter(a=>a.value.trim()!==""),
+        })).filter(a=>a.value.trim()!==""), 
         advanced_conditions: extractConditionBlock(builder)
       };
 
@@ -272,11 +278,23 @@
           body: JSON.stringify(data)
         });
         const result = await res.json();
-        msgBox.innerText = result.message || "保存完了！";
+        msgBox.innerText = result.message || "登録できました";
+        msgBox.style.color = "green";
         setTimeout(()=> msgBox.innerText="", 3000);
+
+        // フォームリセット
+        nameInput.value = "";
+        loopSelect.value = "once";
+        triggerList.innerHTML = "";
+        conditionList.innerHTML = "";
+        breakList.innerHTML = "";
+        actionList.innerHTML = "";
+        builder.innerHTML = "";
+
         loadCommands();
       }catch(e){
         msgBox.innerText="保存中にエラーが発生しました";
+        msgBox.style.color="red";
         console.error(e);
       }
     };
