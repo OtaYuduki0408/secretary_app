@@ -79,19 +79,29 @@ class ScheduleManager:
             raise RuntimeError("not_authenticated")
         return build(api_name, version, credentials=self.creds, cache_discovery=False)
  
-    def add_event(self, title, start_iso, end_iso=None, description=""):
-        service = self._build_service()
-        if not end_iso:
-            # デフォルト 1 時間
-            end_iso = (datetime.fromisoformat(start_iso) + timedelta(hours=1)).isoformat()
-        event = {
-            "summary": title,
-            "description": description,
-            "start": {"dateTime": start_iso},
-            "end": {"dateTime": end_iso},
-        }
-        created = service.events().insert(calendarId="primary", body=event).execute()
-        return created
+    def add_event(self, name, start_time, end_time):
+        try:
+            service = self.get_service()
+
+            # Google Calendar API が要求する形式に整形
+            event = {
+                "summary": name,
+                "start": {
+                    "dateTime": start_time.strftime("%Y-%m-%dT%H:%M:%S+09:00")
+                },
+                "end": {
+                    "dateTime": end_time.strftime("%Y-%m-%dT%H:%M:%S+09:00")
+                },
+            }
+
+            created = service.events().insert(calendarId="primary", body=event).execute()
+            print(f"✅ イベント作成成功: {created.get('htmlLink')}")
+            return created
+
+        except Exception as e:
+            print(f"予定追加エラー: {e}")
+            raise
+
  
     def delete_event(self, event_id):
         service = self._build_service()
