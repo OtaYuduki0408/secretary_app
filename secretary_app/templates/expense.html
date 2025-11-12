@@ -11,6 +11,7 @@
     <div class="header">
       <h1>収支管理</h1>
       <div class="header-actions">
+        <a href="{{ url_for('main') }}" class="link-btn">メインへ戻る</a>
         <a href="{{ url_for('categories') }}" class="link-btn">種類の情報変更へ</a>
       </div>
     </div>
@@ -19,9 +20,9 @@
     <section class="card status">
       <h2>現在の状況</h2>
       <div class="status">
-        <p>現在の残高：<b id="balance">0</b> 円</p>
-        <p>今月の使用額：<b id="monthly">0</b> 円</p>
-        <p>今日の使用額：<b id="daily">0</b> 円</p>
+        <p>現在の残高：<b>{{ balance }}</b> 円</p>
+        <p>今月の使用額：<b>{{ monthly }}</b> 円</p>
+        <p>今日の使用額：<b>{{ daily }}</b> 円</p>
       </div>
     </section>
 
@@ -29,34 +30,37 @@
     <section class="card">
       <h2>収支の記録</h2>
 
-      <div class="form-group">
-        <label>種別</label>
-        <div class="radio-group">
-          <label><input type="radio" name="type" value="income"> 収入</label>
-          <label><input type="radio" name="type" value="expense" checked> 支出</label>
+      <form method="POST" action="{{ url_for('expense') }}">
+        <div class="form-group">
+          <label>種別</label>
+          <div class="radio-group">
+            <label><input type="radio" name="type" value="income"> 収入</label>
+            <label><input type="radio" name="type" value="expense" checked> 支出</label>
+          </div>
         </div>
-      </div>
 
-      <div class="form-group">
-        <label>金額</label>
-        <input id="amount" type="number" class="input" min="0" placeholder="金額を入力">
-      </div>
+        <div class="form-group">
+          <label>金額</label>
+          <input name="amount" type="number" class="input" min="0" placeholder="金額を入力" required>
+        </div>
 
-      <div class="form-group">
-        <label>種類</label>
-        <select id="category" class="input"></select>
-        <p id="no-cat" class="empty" style="display:none;">
-          種類が登録されていません。
-          <a href="{{ url_for('categories') }}">追加</a>
-        </p>
-      </div>
+        <div class="form-group">
+          <label>種類</label>
+          <div id="exp-cat-data" data-categories='{{ categories | default([]) | tojson }}'></div>
+          <select id="exp-category" name="category" class="input" required></select>
+          <p id="exp-cat-empty" class="empty" style="display:none">
+            選択された種別の種類がありません。
+            <a href="{{ url_for('categories') }}">追加</a>
+          </p>
+        </div>
 
-      <div class="form-group">
-        <label>メモ</label>
-        <input id="memo" class="input" placeholder="例：昼食、電車代">
-      </div>
+        <div class="form-group">
+          <label>メモ</label>
+          <input name="memo" class="input" placeholder="例：昼食、電車代">
+        </div>
 
-      <button id="save" class="btn">データを送信</button>
+        <button type="submit" class="btn">データを送信</button>
+      </form>
     </section>
 
     <!-- 一覧 -->
@@ -68,11 +72,20 @@
             <th>日付</th><th>種別</th><th>種類</th><th>金額</th><th>メモ</th>
           </tr>
         </thead>
-        <tbody></tbody>
+        <tbody>
+          {% for r in records %}
+          <tr>
+            <td>{{ r.date }}</td>
+            <td>{{ "収入" if r.type == "income" else "支出" }}</td>
+            <td>{{ r.category }}</td>
+            <td>{{ "{:,}".format(r.amount) }}円</td>
+            <td>{{ r.memo or "" }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
       </table>
     </section>
   </div>
-
   <script src="{{ url_for('static', filename='js/expense.js') }}"></script>
 </body>
 </html>
