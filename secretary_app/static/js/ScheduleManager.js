@@ -9,17 +9,17 @@ export class ScheduleManager {
       "https://www.googleapis.com/auth/calendar"
     ];
   }
-
+ 
   log(...args) {
     console.log("[ScheduleManager]", ...args);
   }
-
+ 
   // ✅ 设置服务器返回的 Access Token（由 oauth-callback.html 通知）
   setAccessToken(token) {
     this.accessToken = token;
     this.log("Access token set:", token ? "OK" : "empty");
   }
-
+ 
   // ✅ 打开 Google 登录窗口（服务器端 OAuth 流程）
   handleAuthClick() {
     const authUrl = "https://127.0.0.1:5000/google-login";
@@ -34,7 +34,7 @@ export class ScheduleManager {
     }
     this.log("Opened OAuth popup window:", authUrl);
   }
-
+ 
   // ✅ 使用已授权的 token 调用 Google Calendar API（例：获取事件列表）
   async listEvents() {
     if (!this.accessToken) {
@@ -55,40 +55,32 @@ export class ScheduleManager {
     this.log("Events:", data.items);
     return data.items;
   }
-
+ 
   // ✅ 添加日程（直接调用 Google API）
   async addEvent(title, startTime, endTime) {
-    // Use backend proxy to create the event so the browser does not need the access token
-    const payload = {
-      title,
-      start_time: startTime,
-      end_time: endTime
-    };
-
-    try {
-      const res = await fetch('/api/calendar/add', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-
-      const text = await res.text();
-      let json = null;
-      try { json = JSON.parse(text); } catch (e) { }
-
-      if (!res.ok) {
-        this.log('addEvent backend failed:', res.status, text);
-        throw new Error(json && json.message ? json.message : '予定の追加に失敗しました（サーバー）。');
-      }
-
-      this.log('Event added via backend:', json);
-      return json && json.event ? json.event : json;
-    } catch (err) {
-      this.log('addEvent error:', err);
-      throw err;
+    if (!this.accessToken) {
+      alert("Googleログインが必要です。");
+      return null;
     }
-  }
+    const event = {
+      summary: title,
+      start: { dateTime: startTime },
+      end: { dateTime: endTime },
+    };
+    const res = await fetch("https://www.googleapis.com/calendar/v3/calendars/primary/events", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${this.accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(event),
+    });
 
+    const data = await res.json();
+    this.log("Event added:", data);
+    return data;
+  }
+ 
   // ✅ 删除日程
   async deleteEvent(eventId) {
     if (!this.accessToken) {

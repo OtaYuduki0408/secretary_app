@@ -8,7 +8,7 @@
       pre { background:#111; color:#9ff; padding:8px; border-radius:6px; word-break:break-all }
       .error { color: #f88 }
     </style>
-
+ 
     {# prepare JSON-serialized values for JS to read (safe) #}
     {% if token is defined %}
       {% set server_token = token|tojson %}
@@ -20,22 +20,22 @@
     {% else %}
       {% set server_error = 'null' %}
     {% endif %}
-
+ 
     <script>
         function setStatus(msg){
             const s = document.getElementById('status'); if(s) s.textContent = msg;
         }
-
+ 
         window.onload = function() {
             try { console.log('[oauth-callback] opener present:', !!window.opener); } catch(e){}
-
+ 
             // server-passed values are exposed in a hidden element's data- attributes
             const serverData = document.getElementById('server-data');
             const rawToken = serverData ? serverData.dataset.token : null;
             const rawError = serverData ? serverData.dataset.error : null;
             const token = rawToken && rawToken !== 'null' ? JSON.parse(rawToken) : null;
             const error = rawError && rawError !== 'null' ? JSON.parse(rawError) : null;
-
+ 
             // 1) implicit (hash) flow: parent.manager expects access_token
             if (window.location.hash) {
                 const params = new URLSearchParams(window.location.hash.substring(1));
@@ -54,7 +54,7 @@
                 }
                 return; // keep popup open so you can read messages / close manually
             }
-
+ 
             // 2) server-side flow
             if (token) {
                 document.getElementById('token').textContent = token;
@@ -64,13 +64,13 @@
                 }
                 return;
             }
-
+ 
             if (error) {
                 document.getElementById('error').textContent = error;
                 setStatus('認証に失敗しました（サーバエラー）。下のエラーを参照してください。');
                 return;
             }
-
+ 
             setStatus('認証結果が見つかりません。サーバログとポップアップのコンソールを確認してください。');
         };
     </script>
@@ -78,7 +78,7 @@
 <body>
     <!-- server から来る token/error を data 属性で受け渡す（JS 側で JSON.parse する） -->
     <div id="server-data" data-token='{{ server_token }}' data-error='{{ server_error }}' style="display:none"></div>
-
+ 
     <h2 id="status">Authenticating... Please wait.</h2>
     <div>
       <p>Token (開発表示)：</p>

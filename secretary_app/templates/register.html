@@ -1,23 +1,31 @@
 {% extends "base.html" %}
 {% block content %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/login.css') }}">
+
+<div class="auth-header">
+  <a href="{{ url_for('login') }}" class="link-btn">ログインへ戻る</a>
+</div>
+
 <h2>ユーザー登録</h2>
 
 <form method="post" action="/register">
-  <label>名前:</label>
-  <input type="text" name="name" required><br>
+  <label>名前</label>
+  <input type="text" name="name" required>
 
-  <label>メール:</label>
-  <input type="email" name="email" required><br>
+  <label>メールアドレス</label>
+  <input type="email" name="email" required>
 
-  <label>パスワード:</label>
-  <input type="password" name="password" required><br>
+  <label>パスワード</label>
+  <input type="password" name="password" required>
 
   <button type="submit">登録</button>
 </form>
 
 {% if error %}
-  <p style="color:red">{{ error }}</p>
+  <p class="error-msg">{{ error }}</p>
 {% endif %}
 
-<p><a href="{{ url_for('login') }}">ログインはこちら</a></p>
+<div class="auth-links">
+  <a href="{{ url_for('login') }}" class="link-text">ログインはこちら</a>
+</div>
 {% endblock %}

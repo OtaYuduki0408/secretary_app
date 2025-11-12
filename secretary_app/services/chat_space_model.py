@@ -2,7 +2,7 @@ import os
 import re
 import json
 from datetime import datetime, timedelta
-import google.generativeai as genai
+import google.generativeai as genai # 変更
 from services.ScheduleManager import ScheduleManager
 
 
@@ -15,10 +15,11 @@ class ChatSpaceModel:
     # 意図判定プロンプト
     PURPOSE_PROMPT_TEMPLATE = """
     以下のテキストの目的を分析し、対応する機能を大文字、対応する行動を小文字で返してください。
-    命令を実現できる機能がない場合、機能を使わず、最適と思われる解答をしてください。その場合、返答は最大50文字以内にしてください。
+    命令を確実に実現できる機能がない場合、機能を使わず、最適と思われる解答をしてください。その場合、返答は最大30文字以内でなるべく少なくしてください。
     -機能-
     C:カレンダー
     I:収支管理
+    T:時刻、年月日、曜日確認(行動はn)
     R:過去の命令の修正(行動はn)
     -行動-
     a:追加
@@ -27,7 +28,6 @@ class ChatSpaceModel:
     g:取得
     例：カレンダーへの追加がユーザーの目的なら、Caを返す。
     -情報-
-    現在時刻:{current_time}
     ユーザーの入力:{input_value}
     """
     
@@ -84,30 +84,36 @@ class ChatSpaceModel:
     予定一覧:{task_list_json}
     ユーザー入力:{input_value}
     """
+    
+    #時刻確認プロンプト
+    TIME_GET_PROMPT_TEMPLATE = """
+    目標：ユーザーが求めているように、以下の時刻情報を編集して返してください。
+    例：何年？→20xx年、令和x年です。　何時？：午後xx時xx分xx秒です。　何日？：20xx年xx月xx日です。
+    無駄な情報を含めず、的確にユーザーが求めている返答を返してください。返答は最大20文字以内にしてください。
+    曜日はツェラーの公式などを使って計算してください。
+    現在時刻は{current_time}
+    ユーザー入力:{input_value}
+    """
 
 
-    def __init__(self, gemini_api_key: str, calendar_manager=None):
-        genai.configure(api_key=gemini_api_key)
-        self.model_name = "gemini-2.5-flash"
-        self.model = genai.GenerativeModel(model_name=self.model_name)
+    def __init__(self, gemini_api_key: str, calendar_manager=None): # 変更
+        genai.configure(api_key=gemini_api_key) # 変更
+        print(gemini_api_key[:-5])
+        self.model_name = "gemini-2.5-flash" # 変更
+        self.model = genai.GenerativeModel(model_name=self.model_name) # 変更
         self.manager = ScheduleManager() # ScheduleManagerのインスタンスを作成
         
-    def _gemini_request(self, prompt: str) -> str:
-        # ... (前回の回答と同じ実装を想定)
-        print(f"--- [DEBUG] _gemini_request: Sending prompt to Gemini ---")
+    def _gemini_request(self, prompt: str) -> str: # 変更
+        print(f"--- [DEBUG] geminiに解析リクエスト\nユーザー入力={prompt}") # 変更
         try:
-            response = self.model.generate_content(
+            response = self.model.generate_content( # 変更
                 contents=prompt
             )
-            print(f"--- [DEBUG] _gemini_request: Received response from Gemini ---")
-            print(f"--- [DEBUG] Gemini response text: {response.text} ---")
+            print(f"--- [DEBUG] Geminiの解答: {response.text} ---") # 変更
             return response.text.strip()
         except Exception as e:
-            import traceback
-            print(f"Geminiリクエストエラー: {e}")
-            traceback.print_exc()
-            # 明示的に None を返して上位で検出しやすくする
-            return None
+            print(f"Geminiリクエストエラー: {e}") # 変更
+            return ""
 
     def _parse_calendar_list(self, text: str) -> list:
         # ... (前回の回答と同じ実装を想定)
@@ -157,18 +163,9 @@ class ChatSpaceModel:
         print("--- [DEBUG] check_chat_space: Calling _gemini_request for purpose ---")
         purpose = self._gemini_request(purpose_prompt)
         print(f"--- [DEBUG] check_chat_space: Received purpose: {purpose} ---")
-
-        # LLM が応答しなかった場合はエラー応答を返す
-        if not purpose:
-            return {
-                "status": "error",
-                "purpose": None,
-                "data": None,
-                "message": "LLM (Gemini) から応答が得られませんでした。サービスの設定（APIキーやネットワーク）を確認してください。"
-            }
-
+        
         result = {"status": "success", "purpose": purpose, "data": None, "message": ""}
-
+        
         if purpose == "Ca":
             data, msg = self._add_calendar(input_value)
             print(f"DEBUG: _add_calendar returned data={data}, msg={msg}") # デバッグ用
@@ -180,6 +177,12 @@ class ChatSpaceModel:
             result["data"], result["message"] = self._get_calender(input_value, is_silent=False)
         elif purpose == "Cc":
             result["data"], result["message"] = self._change_calendar(input_value)
+        elif purpose == "Tn":
+            time_prompt = self.TIME_GET_PROMPT_TEMPLATE.format(
+                current_time=current_time,
+                input_value=input_value
+            )
+            result["message"] = self._gemini_request(time_prompt)
         else:
             result["message"] = purpose
             

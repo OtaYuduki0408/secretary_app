@@ -2,19 +2,10 @@
 // ChatSpace.js（統合・整理版 - トースト機能追加済み）
 // ===================================
 
-// Google Generative AI SDK（ESM）をインポート
-import { GoogleGenerativeAI } from 'https://cdn.jsdelivr.net/npm/@google/generative-ai@0.14.1/dist/index.mjs';
+// 必要なモジュールをインポート
 import { TextToSpeechReader } from "/static/js/TextToSpeechReader.js";
 import { ScheduleManager } from "/static/js/ScheduleManager.js"; // Googleカレンダー操作クラス
 console.log("✅ ChatSpace.js ロード完了 (トースト機能付き)");
-
-// APIキー設定: window.GEMINI_API_KEYを優先
-const apiKey = window.GEMINI_API_KEY || "AIzaSyCoyPKhnAhlZrekrnOyljxtl4zpo3hTEtc";
-if (!apiKey) console.error("APIキーが未設定");
-
-const genAI = new GoogleGenerativeAI(apiKey);
-// ChatSpace_ikuto.jsに合わせてモデルを明示的に指定
-const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" }); 
 
 const reader = new TextToSpeechReader(); // 音声読み上げ
 // window.managerが存在しない場合のフォールバック（ChatSpace.jsのロジックを維持）
@@ -52,6 +43,13 @@ function formatTimeForSpeech(timeString) {
 // ==============================
 // LLMコア機能（共通化）
 // ==============================
+// ログ出力用のヘルパー関数を定義
+function log(message) {
+  console.log("[ScheduleManager Log]:", message);
+  // 必要であれば、ここでUIにメッセージを表示するなどの処理を追加
+  // 例: showToast(message);
+}
+
 /**
  * ユーザー入力を受け付け、LLMで解析・処理を分岐するメインエントリポイント。
  * @param {string} inputValue - ユーザーの入力テキスト
@@ -83,16 +81,58 @@ export async function check_chat_Space(inputValue) {
       reader.speak(result.message);
     }
 
-    // 必要に応じて、result.purpose や result.data を使ってトースト通知やUI更新を行う
-    if (result.purpose === "Ca" && result.data) {
+    // Python側から返された action に応じてカレンダー操作を実行
+    if (result.action === "add_calendar_event" && result.data) {
+      console.log("--- [DEBUG] ChatSpace.js: add_calendar_event action detected ---"); // 追加
+      // 複数のイベントが返される可能性があるので、ループで処理
+      for (const eventData of result.data) {
+        console.log("--- [DEBUG] ChatSpace.js: Calling manager.addEvent with:", eventData); // 追加
+        await manager.addEvent(
+          eventData.name,
+          eventData.description || "", // description がない場合を考慮
+          eventData.start_time,
+          eventData.end_time,
+          log // log 関数を渡す
+        );
+        console.log("--- [DEBUG] ChatSpace.js: manager.addEvent call completed ---"); // 追加
+      }
+      // トースト通知は ScheduleManager.js の addEvent 内で処理されるか、別途ここで発火
       window.dispatchEvent(new CustomEvent('calendar:added', { detail: result.data }));
-    } else if (result.purpose === "Cd" && result.data) {
+      console.log("--- [DEBUG] ChatSpace.js: calendar:added event dispatched ---"); // 追加
+    } else if (result.action === "remove_calendar_event" && result.data) {
+      for (const eventData of result.data) {
+        // 削除には eventId が必要。Python側から返されるデータに id が含まれているか確認
+        if (eventData.id) {
+          await manager.deleteEvent(eventData.id, log);
+        } else {
+          console.warn("削除対象のイベントIDが見つかりません:", eventData);
+        }
+      }
       window.dispatchEvent(new CustomEvent('calendar:deleted', { detail: result.data }));
-    } else if (result.purpose === "Cc" && result.data) {
+    } else if (result.action === "get_calendar_events" && result.data) {
+      // 取得の場合、result.data には期間情報が含まれる
+      const events = await manager.listEvents(result.data.start_time, result.data.end_time, log);
+      // 取得したイベントをUIに表示するなどの処理が必要であればここに追加
+      // 現状は log 関数で出力されるのみ
+      window.dispatchEvent(new CustomEvent('calendar:listed', { detail: events })); // 新しいイベントを発火
+    } else if (result.action === "change_calendar_event" && result.data) {
+      for (const eventData of result.data) {
+        // 変更には eventId が必要。Python側から返されるデータに id が含まれているか確認
+        if (eventData.id) {
+          await manager.updateEvent(
+            eventData.id,
+            eventData.after_start_time,
+            eventData.after_end_time,
+            eventData.after_name,
+            eventData.after_description || "", // description がない場合を考慮
+            log
+          );
+        } else {
+          console.warn("変更対象のイベントIDが見つかりません:", eventData);
+        }
+      }
       window.dispatchEvent(new CustomEvent('calendar:changed', { detail: result.data }));
     }
-    // Cg (取得) の場合は、メッセージを読み上げるだけで良いことが多いが、
-    // 必要であれば別途イベントを発火してUIに表示することも可能
 
   } catch (error) {
     console.error("ChatSpace API呼び出しエラー:", error);
@@ -103,65 +143,129 @@ export async function check_chat_Space(inputValue) {
   }
 }
 
-// ==============================
-// インジケーターイベント
-// ==============================
-
-// ==============================
-// インジケーターイベント
-// ==============================
-
 /** AIインジケータ更新イベントを発火 */
 function fire(name, detail) {
   document.dispatchEvent(new CustomEvent(name, { detail }));
 }
-// ==========================
-// Flaskコマンドポーリング
-// ==========================
 
+// ==============================
+// 🎤 Flask からの音声起動指令をポーリング監視
+// ==============================
 async function pollChatSpaceCommand() {
   try {
     const resp = await fetch("/api/chatspace/state");
+    if (!resp.ok) return;
     const data = await resp.json();
+
     if (data.command === "start_voice") {
       console.log("🎤 Flaskから音声起動指令を受信");
-      // ✅ 自動音声起動
+
+      // ✅ ChatSpaceの音声認識機能を起動
       if (typeof startVoice === "function") {
         startVoice();
+        alert("🎤 音声認識モードを開始します。");
       } else {
-        const btn = document.querySelector("#voiceButton");
-        if (btn) {
-          console.log("🎤 音声ボタンを自動クリック");
-          btn.click();
-        } else {
-          console.log("⚠️ 音声起動関数もボタンも見つかりません。");
-        }
+        console.warn("⚠️ startVoice() 関数が見つかりません。");
       }
-      await fetch("/api/chatspace/clear");
+
+      // 状態をリセット（防止重複トリガー）
+      await fetch("/api/chatspace/clear", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
     }
   } catch (err) {
-    console.warn("状態取得エラー:", err);
+    console.warn("pollChatSpaceCommand エラー:", err);
   }
 }
+
+// 🔁 2秒ごとに状態をチェック
 setInterval(pollChatSpaceCommand, 2000);
 
+// ==============================
+// 🎧 Shift+D ホットキーで音声認識を起動
+// ==============================
+window.addEventListener("keydown", (e) => {
+  // 入力欄を打っている時は無効（邪魔しない）
+  const tag = (e.target && e.target.tagName) || "";
+  const isTyping = e.target && (e.target.isContentEditable || tag === "INPUT" || tag === "TEXTAREA");
+  if (isTyping) return;
 
-// ==========================
-// 音声起動関数（予備）
-// ==========================
+  // Shift + D が押されたら音声認識起動
+  if (e.shiftKey && e.key.toLowerCase() === "d") {
+    e.preventDefault();
+    console.log("🎤 Shift + D が押されました → 音声認識を起動します");
+
+    if (typeof startVoice === "function") {
+      startVoice();
+      alert("🎤 音声認識モードを開始します。");
+    } else {
+      console.warn("⚠️ startVoice() が見つかりません。");
+    }
+  }
+});
+
+// ==============================
+// 🎤 音声認識ロジック（Web Speech API）
+// ==============================
+window.SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+let recognition;
+let recognizing = false;
+
 function startVoice() {
-  try {
-    const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
-    recognition.lang = 'ja-JP';
-    recognition.onresult = (event) => {
-      const text = event.results[0][0].transcript;
-      console.log("🎙️ 音声入力:", text);
-      check_chat_Space(text);
+  if (!window.SpeechRecognition) {
+    alert("⚠️ このブラウザは音声認識に対応していません。");
+    return;
+  }
+
+  if (!recognition) {
+    recognition = new SpeechRecognition();
+    recognition.lang = "ja-JP"; // 言語を日本語に設定
+    recognition.interimResults = false;
+    recognition.continuous = false; // 1回の発話ごとに終了
+
+    recognition.onstart = () => {
+      recognizing = true;
+      console.log("🎙️ 音声認識を開始しました。話してください...");
+      alert("🎙️ 音声認識を開始しました。話してください...");
     };
+
+    recognition.onresult = async (event) => {
+      const transcript = event.results[0][0].transcript.trim();
+      console.log("🗣️ 認識結果:", transcript);
+      alert(`🗣️ 認識結果: ${transcript}`);
+      recognizing = false;
+
+      // ChatSpace に送信
+      if (transcript) {
+        await check_chat_Space(transcript);
+      }
+    };
+
+    recognition.onerror = (event) => {
+      console.error("❌ 音声認識エラー:", event.error);
+      alert(`❌ 音声認識エラー: ${event.error}`);
+      recognizing = false;
+    };
+
+    recognition.onend = () => {
+      if (recognizing) {
+        console.log("🎤 音声認識が終了しました。");
+        recognizing = false;
+      }
+    };
+  }
+
+  // 既に起動していたら止める
+  if (recognizing) {
+    recognition.stop();
+    recognizing = false;
+    console.log("🛑 音声認識を停止しました。");
+  } else {
     recognition.start();
-    console.log("🎤 音声認識を開始しました");
-  } catch (err) {
-    console.error("音声起動エラー:", err);
   }
 }
 
+// グローバルスコープに公開（他ファイルから呼べるように）
+window.startVoice = startVoice;
