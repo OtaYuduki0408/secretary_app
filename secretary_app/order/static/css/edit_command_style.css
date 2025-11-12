@@ -1,153 +1,233 @@
-/* ===========================
-   基本スタイル
-=========================== */
+/* ==============================
+   基本デザイン
+============================== */
 body {
+  font-family: "Segoe UI", "Hiragino Sans", "Meiryo", sans-serif;
+  background: #f7f9fc;
+  color: #333;
   margin: 0;
-  font-family: "Noto Sans JP", sans-serif;
-  background: #f7f7f7;
-  color: #222;
-  transition: background-color 0.4s, color 0.4s;
+  padding: 0;
 }
 
 .container {
-  max-width: 960px;
-  margin: 80px auto;
-  padding: 2em;
-  background: rgba(255, 255, 255, 0.9);
-  border-radius: 12px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  width: 90%;
+  max-width: 900px;
+  margin: 40px auto;
+  background: #fff;
+  padding: 30px;
+  border-radius: 16px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
 }
 
-.header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 1em;
-}
-
-.back-button {
-  text-decoration: none;
-  color: #333;
-  background: #ddd;
-  padding: 6px 12px;
-  border-radius: 6px;
-}
-
-.back-button:hover {
-  background: #ccc;
-}
-
+/* ==============================
+   タイトル・ヘッダー
+============================== */
 h2 {
   text-align: center;
+  color: #444;
+  margin-bottom: 25px;
 }
 
-.add-menu {
-  position: relative;
-}
-
-.add-button {
-  font-size: 20px;
-  padding: 6px 12px;
-  border: none;
-  background: #0078ff;
-  color: white;
-  border-radius: 50%;
-  cursor: pointer;
-}
-
-.add-options {
-  position: absolute;
-  right: 0;
-  top: 40px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  background: white;
-  border: 1px solid #ccc;
-  border-radius: 6px;
-  padding: 8px;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
-  z-index: 10;
-}
-
-.hidden {
-  display: none;
-}
-
-.option-button {
-  border: none;
-  background: #eee;
-  padding: 6px 10px;
-  cursor: pointer;
-  border-radius: 6px;
-  text-align: left;
-}
-
-.option-button:hover {
-  background: #ddd;
-}
-
-/* ===========================
-   ブロックスタイル
-=========================== */
-.block {
-  background: #f0f8ff;
-  border: 1px solid #ccc;
-  border-radius: 8px;
-  padding: 1em;
-  margin: 1em 0;
-}
-
-.block h3 {
-  margin-top: 0;
-}
-
-/* ===========================
-   保存ボタン
-=========================== */
-.save-button {
-  display: block;
-  margin: 2em auto 0;
-  padding: 12px 24px;
-  font-size: 16px;
-  border: none;
-  background: #28a745;
-  color: white;
-  border-radius: 6px;
-  cursor: pointer;
-}
-
-.save-button:hover {
-  background: #218838;
-}
+/* ==============================
+   戻るボタン
+============================== */
 .back-button {
-  background: #6c757d;
-  color: white;
-  border: none;
-  padding: 8px 14px;
-  border-radius: 8px;
-  cursor: pointer;
-  margin-bottom: 10px;
+  display: inline-block;
+  margin-bottom: 20px;
+  text-decoration: none;
+  color: #007bff;
+  font-weight: bold;
+  transition: 0.2s;
 }
 
 .back-button:hover {
-  background: #5a6268;
+  color: #0056b3;
 }
 
-/* ===========================
-   入力・選択欄
-=========================== */
-input[type="text"], select {
+/* ==============================
+   各ブロック
+============================== */
+.block {
+  margin-bottom: 25px;
+  background: #fafafa;
+  padding: 15px;
+  border-radius: 10px;
+  border: 1px solid #e3e3e3;
+}
+
+.block label {
+  font-weight: bold;
+  display: block;
+  margin-bottom: 6px;
+  color: #333;
+}
+
+.block input[type="text"],
+.block select,
+.block textarea {
   width: 100%;
-  padding: 6px 10px;
-  margin: 4px 0 8px 0;
+  padding: 8px 10px;
+  margin-bottom: 8px;
   border: 1px solid #ccc;
   border-radius: 6px;
+  font-size: 14px;
   box-sizing: border-box;
 }
 
-label {
-  font-weight: bold;
-  margin-top: 6px;
+textarea {
+  resize: vertical;
+}
+
+/* ==============================
+   各項目リスト
+============================== */
+.item {
+  background: #fff;
+  padding: 10px;
+  margin-bottom: 6px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.item input, .item select {
+  flex: 1;
+}
+
+/* ==============================
+   ボタン類
+============================== */
+button,
+.add-button,
+.save-button {
+  background: #007bff;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 14px;
+  cursor: pointer;
+  transition: 0.2s;
+  font-size: 14px;
+}
+
+button:hover,
+.add-button:hover,
+.save-button:hover {
+  background: #0056b3;
+}
+
+button.remove {
+  background: #dc3545;
+}
+
+button.remove:hover {
+  background: #a71d2a;
+}
+
+.add-button {
+  margin-top: 8px;
+  background: #28a745;
+}
+
+.add-button:hover {
+  background: #1e7e34;
+}
+
+/* 保存ボタン */
+.save-button {
   display: block;
+  width: 100%;
+  margin-top: 25px;
+  font-size: 16px;
+  font-weight: bold;
+}
+
+/* ==============================
+   メッセージエリア
+============================== */
+.msg {
+  margin-top: 15px;
+  text-align: center;
+  color: #007bff;
+  font-weight: bold;
+}
+
+/* ==============================
+   既存命令一覧
+============================== */
+.command-btn {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #eef2f8;
+  border: 1px solid #d4dae5;
+  border-radius: 8px;
+  padding: 8px 12px;
+  margin: 6px 0;
+}
+
+.command-btn button {
+  padding: 6px 10px;
+  font-size: 13px;
+}
+
+/* ==============================
+   高度条件ブロック
+============================== */
+.condition-block {
+  background: #fff;
+  border: 2px solid #ccd6f6;
+  border-left: 6px solid #4e73df;
+  padding: 15px;
+  margin: 10px 0;
+  border-radius: 10px;
+}
+
+.condition-block h3 {
+  margin-top: 0;
+  color: #4e73df;
+}
+
+.condition-block input.condition-input {
+  width: 100%;
+  margin-bottom: 10px;
+  padding: 6px;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+}
+
+.condition-block .actions {
+  margin-bottom: 10px;
+}
+
+.condition-block textarea {
+  width: 100%;
+  min-height: 70px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  padding: 8px;
+}
+
+.condition-block .buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.condition-block .nested {
+  margin-left: 20px;
+  border-left: 3px dashed #ccc;
+  padding-left: 10px;
+}
+
+/* ELSEブロック色 */
+.condition-block:has(h3:contains('ELSE')) {
+  border-left-color: #6c757d;
+}
+
+/* ELSE IF ブロック色 */
+.condition-block:has(h3:contains('ELSE IF')) {
+  border-left-color: #17a2b8;
 }
