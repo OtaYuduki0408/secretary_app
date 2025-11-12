@@ -5,7 +5,7 @@ from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 from google.auth.transport.requests import Request
  
-TOKEN_PATH = "token.json"
+TOKEN_PATH = os.getenv("GOOGLE_TOKEN_PATH", "token.json")
 SCOPES = [
     "openid",
     "https://www.googleapis.com/auth/gmail.send",

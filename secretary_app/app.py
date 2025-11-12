@@ -149,10 +149,10 @@ PLAYER_BAR_SNIPPET = """
 # ====================================================================
 # ✅ Spotify 認証情報
 # ====================================================================
-_DEFAULT_CLIENT_ID = '6e488b5a5d3045089c2764317b756eee'
-_DEFAULT_CLIENT_SECRET = 'd4f1f05bcaa4472bba1ce6bae2455eb8'
-SPOTIPY_CLIENT_ID = os.environ.get('SPOTIPY_CLIENT_ID') or _DEFAULT_CLIENT_ID
-SPOTIPY_CLIENT_SECRET = os.environ.get('SPOTIPY_CLIENT_SECRET') or _DEFAULT_CLIENT_SECRET
+SPOTIPY_CLIENT_ID = os.environ.get('SPOTIPY_CLIENT_ID')
+SPOTIPY_CLIENT_SECRET = os.environ.get('SPOTIPY_CLIENT_SECRET')
+if not SPOTIPY_CLIENT_ID or not SPOTIPY_CLIENT_SECRET:
+    print("Warning: SPOTIPY_CLIENT_ID and SPOTIPY_CLIENT_SECRET environment variables are not set. Spotify integration will be disabled.")
 
 # ✅ HTTPS コールバック（Dashboard側にも完全一致で登録）
 SPOTIPY_REDIRECT_URI = "https://127.0.0.1:5000/spotify-callback"
@@ -1030,7 +1030,7 @@ def execute_switchbot_command(command: str):
     }
 
     try:
-        response = requests.post(url, headers=headers, json=body)
+        response = requests.post(url, headers=headers, json=body, timeout=10)
         response.raise_for_status()
         return response.json(), response.status_code
     except requests.exceptions.RequestException as e:
@@ -1049,9 +1049,12 @@ with app.app_context():
     db.create_all()
 
 if __name__ == '__main__':
+    # For production, use a production-ready WSGI server like Gunicorn or Waitress.
+    # The debug flag should be controlled by an environment variable and default to False.
+    is_debug = os.environ.get('FLASK_DEBUG', 'false').lower() == 'true'
     app.run(
-        host='0.0.0.0',
+        host='127.0.0.1',  # Changed from '0.0.0.0' for security
         port=5000,
-        debug=True,
+        debug=is_debug,
         ssl_context='adhoc'  # ✅ https
     )

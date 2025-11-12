@@ -41,11 +41,25 @@ def register_command(**kwargs):
     """
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
-    columns = ", ".join(kwargs.keys())
-    placeholders = ", ".join(["?"] * len(kwargs))
-    values = list(kwargs.values())
-    c.execute(f"INSERT INTO commands ({columns}) VALUES ({placeholders})", values)
-    conn.commit()
+
+    # Whitelist of allowed columns to prevent SQL injection via column names
+    ALLOWED_COLUMNS = [
+        "name", "action_type", "content", "trigger_type", "trigger_value",
+        "repeat_interval", "condition_expr", "break_expr", "loop_count",
+        "calendar_event", "memo_text", "tag"
+    ]
+    
+    # Filter kwargs to only include allowed columns
+    filtered_kwargs = {k: v for k, v in kwargs.items() if k in ALLOWED_COLUMNS}
+
+    columns = ", ".join(filtered_kwargs.keys())
+    placeholders = ", ".join(["?"] * len(filtered_kwargs))
+    values = list(filtered_kwargs.values())
+    
+    # Only execute if there are valid columns to insert
+    if columns:
+        c.execute(f"INSERT INTO commands ({columns}) VALUES ({placeholders})", values)
+        conn.commit()
     conn.close()
 
 # ---------------------------
