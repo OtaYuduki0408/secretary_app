@@ -1,4 +1,4 @@
-from supabase_client import supabase  # ← app.py ではなく共通クライアントからimport
+from supabase_client import supabase
 
 TABLE_NAME = "users"
 
@@ -7,60 +7,44 @@ TABLE_NAME = "users"
 def get_all_users():
     try:
         response = supabase.table(TABLE_NAME).select("*").execute()
-        return response.data
+        return {"success": True, "data": response.data}
     except Exception as e:
-        return {"error": str(e)}
+        return {"success": False, "error": str(e)}
 
 
-# ✅ メールで特定ユーザーを取得
-def get_user_by_email(email: str):
+# ✅ ID でユーザー取得（auth.users と紐づけ前提）
+def get_user_by_id(user_id: str):
     try:
-        response = supabase.table(TABLE_NAME).select("*").eq("email", email).execute()
+        response = supabase.table(TABLE_NAME).select("*").eq("id", user_id).execute()
         if response.data:
-            return response.data[0]
-        else:
-            return {"message": "User not found"}
+            return {"success": True, "data": response.data[0]}
+        return {"success": False, "error": "User not found"}
     except Exception as e:
-        return {"error": str(e)}
+        return {"success": False, "error": str(e)}
 
 
-# ✅ 新規ユーザー登録
+# ✅ 新規ユーザー追加（管理者用途）
 def add_user(data: dict):
-    """
-    data = {
-      "email": "sample@example.com",
-      "name": "Naoya",
-      "age": 25
-    }
-    """
     try:
         response = supabase.table(TABLE_NAME).insert(data).execute()
-        return {"message": "User added successfully", "data": response.data}
+        return {"success": True, "data": response.data}
     except Exception as e:
-        return {"error": str(e)}
+        return {"success": False, "error": str(e)}
 
 
-# ✅ ユーザー情報を更新
-def update_user(email: str, new_data: dict):
-    """
-    new_data = {"name": "New Name"}
-    """
+# ✅ ユーザー更新
+def update_user(user_id: str, new_data: dict):
     try:
-        response = (
-            supabase.table(TABLE_NAME)
-            .update(new_data)
-            .eq("email", email)
-            .execute()
-        )
-        return {"message": "User updated", "data": response.data}
+        response = supabase.table(TABLE_NAME).update(new_data).eq("id", user_id).execute()
+        return {"success": True, "data": response.data}
     except Exception as e:
-        return {"error": str(e)}
+        return {"success": False, "error": str(e)}
 
 
-# ✅ ユーザーを削除
-def delete_user(email: str):
+# ✅ ユーザー削除
+def delete_user(user_id: str):
     try:
-        response = supabase.table(TABLE_NAME).delete().eq("email", email).execute()
-        return {"message": "User deleted", "data": response.data}
+        response = supabase.table(TABLE_NAME).delete().eq("id", user_id).execute()
+        return {"success": True, "data": response.data}
     except Exception as e:
-        return {"error": str(e)}
+        return {"success": False, "error": str(e)}

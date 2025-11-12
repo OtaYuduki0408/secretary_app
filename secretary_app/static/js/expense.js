@@ -1,89 +1,46 @@
-document.addEventListener("DOMContentLoaded", () => {
-  const amountEl = document.getElementById("amount");
-  const memoEl = document.getElementById("memo");
-  const catEl = document.getElementById("category");
-  const noCatEl = document.getElementById("no-cat");
-  const saveBtn = document.getElementById("save");
-  const tbody = document.querySelector("#records tbody");
+document.addEventListener('DOMContentLoaded', () => {
+  const dataEl = document.getElementById('exp-cat-data');
+  const selectEl = document.getElementById('exp-category');
+  const emptyEl = document.getElementById('exp-cat-empty');
+  const typeRadios = Array.from(document.querySelectorAll('input[name="type"]'));
 
-  // --- カテゴリ読み込み ---
-  async function loadCategories() {
-    const res = await fetch("/api/categories");
-    const data = await res.json();
+  let categories = [];
+  try {
+    categories = JSON.parse(dataEl?.dataset?.categories || '[]') || [];
+  } catch (_) {
+    categories = [];
+  }
 
-    catEl.innerHTML = "";
-    if (!data || data.length === 0) {
-      catEl.style.display = "none";
-      noCatEl.style.display = "block";
+  function renderOptions(type) {
+    // Filter categories by selected type
+    const items = categories.filter(c => c.type === type);
+
+    // Clear current options
+    while (selectEl.firstChild) selectEl.removeChild(selectEl.firstChild);
+
+    if (!items.length) {
+      selectEl.disabled = true;
+      emptyEl.style.display = 'block';
       return;
     }
 
-    noCatEl.style.display = "none";
-    catEl.style.display = "block";
-    data.forEach(c => {
-      const opt = document.createElement("option");
+    emptyEl.style.display = 'none';
+    selectEl.disabled = false;
+
+    // Append options
+    for (const c of items) {
+      const opt = document.createElement('option');
       opt.value = c.name;
       opt.textContent = c.name;
-      catEl.appendChild(opt);
-    });
-  }
-
-  // --- 収支一覧読み込み ---
-  async function loadRecords() {
-    const res = await fetch("/api/finance");
-    const data = await res.json();
-    tbody.innerHTML = "";
-
-    if (!Array.isArray(data)) return;
-
-    data.forEach(r => {
-      const tr = document.createElement("tr");
-      tr.innerHTML = `
-        <td>${r.date}</td>
-        <td>${r.type === "income" ? "収入" : "支出"}</td>
-        <td>${r.category}</td>
-        <td>${Number(r.amount).toLocaleString()}円</td>
-        <td>${r.memo || ""}</td>
-      `;
-      tbody.appendChild(tr);
-    });
-  }
-
-  // --- 登録 ---
-  async function saveFinance() {
-    const type = document.querySelector("input[name='type']:checked").value;
-    const category = catEl.value;
-    const amount = Number(amountEl.value);
-    const memo = memoEl.value.trim();
-
-    if (!amount || !category) {
-      alert("金額と種類を入力してください。");
-      return;
-    }
-
-    const today = new Date().toISOString().split("T")[0];
-    const payload = { date: today, type, category, amount, memo };
-
-    const res = await fetch("/api/finance", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-
-    const data = await res.json();
-    if (data.error) {
-      alert(data.error);
-    } else {
-      alert("登録しました！");
-      amountEl.value = "";
-      memoEl.value = "";
-      loadRecords();
+      selectEl.appendChild(opt);
     }
   }
 
-  saveBtn.addEventListener("click", saveFinance);
+  // On radio change, re-render options
+  typeRadios.forEach(r => r.addEventListener('change', () => renderOptions(r.value)));
 
-  // 初期ロード
-  loadCategories();
-  loadRecords();
+  // Initial render based on checked type (default: expense)
+  const checked = typeRadios.find(r => r.checked)?.value || 'expense';
+  renderOptions(checked);
 });
+

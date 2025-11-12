@@ -6,197 +6,81 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'order'))
 from flask import Flask, render_template, jsonify, request, redirect, url_for, session
 from datetime import datetime, timedelta
 from services.user_service import (
-    get_all_users, get_user_by_email, add_user, update_user, delete_user)
+    get_all_users, get_user_by_id, add_user, update_user, delete_user)
 from services.category_service import (
-    get_all_categories, add_category, delete_category, clear_all_categories)
+    get_user_categories, add_category, delete_category, clear_all_categories)
 from services.auth_service import register_user, login_user
-from services.expense_service import (add_finance_record,delete_finance_record)
+from services.expense_service import (add_finance_record, delete_finance_record, get_all_expenses)
 from services.finance_service import get_finance_summary, get_all_finance_records
-from flask import Flask, render_template, jsonify, request, redirect, url_for, session, abort
-from spotipy.oauth2 import SpotifyOAuth
-import spotipy
+from models.finance_model import FinanceModel
 import os
-from supabase_client import supabase
-from dotenv import load_dotenv
-
-from services.user_service import (
-    get_all_users, get_user_by_email, add_user, update_user, delete_user
-)
-from services.category_service import (
-    get_all_categories, add_category, delete_category, clear_all_categories
-)
-from services.auth_service import register_user, login_user
-from services.finance_service import get_finance_summary, get_all_finance_records
-from services.chat_space_model import ChatSpaceModel
-from services.memo_routes import memo_bp
-from order.models import db
-from order.custom_order_routes import custom_order_bp
-from services.ScheduleManager import ScheduleManager # ScheduleManagerをインポート
-import os
-
-from flask import redirect, url_for, request, session, jsonify, render_template
-from google_auth_oauthlib.flow import Flow
-from services.ScheduleManager import ScheduleManager
- 
- 
-CLIENT_SECRETS_FILE = os.path.join(os.path.dirname(__file__), 'services', 'client_secret.json')
-SCOPES = [
-    "openid",
-    "https://www.googleapis.com/auth/gmail.send",
-    "https://www.googleapis.com/auth/gmail.readonly",
-    "https://www.googleapis.com/auth/userinfo.profile",
-    "https://www.googleapis.com/auth/userinfo.email",
-    "https://www.googleapis.com/auth/calendar",
-]
- 
 
 app = Flask(__name__, template_folder='templates', static_folder='static')
-
-# --- SQLAlchemy for Custom Order ---
-# DBファイルのパス設定
-instance_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'instance')
-os.makedirs(instance_path, exist_ok=True)
-app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{os.path.join(instance_path, "orders.db")}'
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-
-# DBをアプリに連携
-db.init_app(app)
-
-# --- Custom Order Blueprint ---
-# API用Blueprintの登録
-app.register_blueprint(custom_order_bp, url_prefix='/api')
-
-# ページ表示用のBlueprintを動的に作成
-from flask import Blueprint
-custom_order_pages_bp = Blueprint(
-    'custom_order_pages', 
-    __name__,
-    template_folder='order/static/html',
-    static_folder='order/static'
-)
-
-@custom_order_pages_bp.route('/')
-def custom_order_index():
-    return render_template('index.html')
-
-@custom_order_pages_bp.route('/edit')
-@custom_order_pages_bp.route('/edit/<int:order_id>')
-def edit_command_page(order_id=None):
-    # order_id があれば、そのデータをテンプレートに渡すことも可能（将来的な拡張）
-    return render_template('edit_command.html', order_id=order_id)
-
-# ページ用Blueprintを登録
-app.register_blueprint(custom_order_pages_bp, url_prefix='/custom_order')
-
-# --- API Key Authentication ---
-# 環境変数から許可されたAPIキーを読み込む。カンマ区切りで複数指定可能。
-# 例: ALLOWED_API_KEYS=key1,key2,key3
-ALLOWED_API_KEYS = set(os.environ.get('ALLOWED_API_KEYS', '').split(','))
-
-@app.before_request
-def require_api_key():
-    # /api/ で始まるパス以外は認証をスキップ
-    if not request.path.startswith('/api/'):
-        return
-
-    # 許可されたキーが一つも設定されていない、または空文字のキーのみの場合は認証をスキップ
-    if not ALLOWED_API_KEYS or ALLOWED_API_KEYS == {''}:
-        return
-
-    # APIキーをリクエストヘッダー 'X-API-KEY' から取得
-    provided_key = request.headers.get('X-API-KEY')
-
-    if provided_key not in ALLOWED_API_KEYS:
-        return jsonify({'message': 'Error: Invalid or missing API Key.'}), 403
-# --- End of API Key Authentication ---
-
 app.secret_key = os.getenv("SECRET_KEY", "devsecret")
 
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-if not GEMINI_API_KEY:
-    print("Warning: GEMINI_API_KEY environment variable not set. ChatSpaceModel may not function correctly.")
-else:
-    print("--- [DEBUG] GEMINI_API_KEY is set. ---")
+# Model instances
+finance_model = FinanceModel()
 
-chat_space_model = ChatSpaceModel(gemini_api_key=GEMINI_API_KEY)
 
-# ScheduleManagerのインスタンス化
-calendar_manager = ScheduleManager()
-if not calendar_manager.is_authenticated():
-    print("Warning: Google Calendar API is not authenticated. Calendar operations may fail.")
+# --------------------
+# ユーザー情報ヘルパー
+# --------------------
+def current_user_id():
+    user = session.get('user')
+    return user.get('id') if user else None
 
-PLAYER_BAR_SNIPPET = """
-  <div id="vs-playerbar" hidden>
-    <div class="vs-section vs-main-controls">
-      <button id="vs-prev" class="vs-button" title="Prev">&#9198;</button>
-      <button id="vs-play" class="vs-button" title="Play/Pause">&#9654;</button>
-      <button id="vs-next" class="vs-button" title="Next">&#9197;</button>
-    </div>
-    <div class="vs-section vs-timeline">
-      <span id="vs-time">0:00</span>
-      <input id="vs-seek" type="range" min="0" max="1000" value="0" />
-      <span id="vs-dur">0:00</span>
-    </div>
-    <div class="vs-section vs-options">
-      <button id="vs-loop" class="vs-button" title="Repeat">&#128257;</button>
-      <button id="vs-shuffle" class="vs-button" title="Shuffle">&#128256;</button>
-      <input id="vs-vol" type="range" min="0" max="100" value="80" title="Volume" />
-    </div>
-  </div>
-  <div id="toast" hidden aria-live="polite" aria-atomic="true"></div>
-"""
 
-# ====================================================================
-# ✅ Spotify 認証情報
-# ====================================================================
-_DEFAULT_CLIENT_ID = '6e488b5a5d3045089c2764317b756eee'
-_DEFAULT_CLIENT_SECRET = 'd4f1f05bcaa4472bba1ce6bae2455eb8'
-SPOTIPY_CLIENT_ID = os.environ.get('SPOTIPY_CLIENT_ID') or _DEFAULT_CLIENT_ID
-SPOTIPY_CLIENT_SECRET = os.environ.get('SPOTIPY_CLIENT_SECRET') or _DEFAULT_CLIENT_SECRET
+def resolve_request_user_id():
+    """Resolve user_id for API access.
+    Priority: session -> X-User-Id header -> query param -> JSON body.
+    """
+    uid = current_user_id()
+    if uid:
+        return uid
+    uid = request.headers.get('X-User-Id') or request.args.get('user_id')
+    if uid:
+        return uid
+    try:
+        if request.is_json:
+            body = request.get_json(silent=True) or {}
+            uid = body.get('user_id')
+            if uid:
+                return uid
+    except Exception:
+        pass
+    return None
 
-# ✅ HTTPS コールバック（Dashboard側にも完全一致で登録）
-SPOTIPY_REDIRECT_URI = "https://127.0.0.1:5000/spotify-callback"
 
-# ✅ スコープは配列で管理して join（全角/改行/スペース抜け事故を防止）
-SCOPES = (
-    "user-read-private user-read-email "
-    "streaming user-read-playback-state user-modify-playback-state "
-    "playlist-read-private playlist-read-collaborative user-top-read "
-    "playlist-modify-public playlist-modify-private"
-)
+# --------------------
+# CORS (for Android/Windows/Web)
+# --------------------
+ALLOWED_ORIGINS = os.getenv('ALLOW_ORIGINS', '*')
 
-def get_spotify_oauth():
-    return SpotifyOAuth(
-        client_id=SPOTIPY_CLIENT_ID,
-        client_secret=SPOTIPY_CLIENT_SECRET,
-        redirect_uri=SPOTIPY_REDIRECT_URI,
-        scope=SCOPES,
-        cache_path=None
-    )
 
-# ====== 汎用ヘルパ ======
-def _get_token_info():
-    return session.get('spotify_token_info')
+@app.after_request
+def add_cors_headers(resp):
+    origin = request.headers.get('Origin')
+    allow_origin = ALLOWED_ORIGINS
+    # Reflect specific origin when configured as comma-separated list
+    if ALLOWED_ORIGINS != '*':
+        allowed = [o.strip() for o in ALLOWED_ORIGINS.split(',') if o.strip()]
+        if origin and origin in allowed:
+            allow_origin = origin
+        else:
+            allow_origin = allowed[0] if allowed else 'null'
+    resp.headers['Access-Control-Allow-Origin'] = allow_origin
+    resp.headers['Access-Control-Allow-Methods'] = 'GET,POST,DELETE,OPTIONS'
+    resp.headers['Access-Control-Allow-Headers'] = 'Content-Type, X-User-Id'
+    resp.headers['Access-Control-Max-Age'] = '600'
+    return resp
 
-def _save_token_info(token_info: dict):
-    session['spotify_token_info'] = token_info
 
-def _ensure_access_token() -> str:
-    """有効な access_token を返す（期限切れなら refresh）。未認証なら 401。"""
-    token_info = _get_token_info()
-    if not token_info:
-        abort(401, description="Not authenticated to Spotify")
-    sp_oauth = get_spotify_oauth()
-    if sp_oauth.is_token_expired(token_info):
-        token_info = sp_oauth.refresh_access_token(token_info['refresh_token'])
-        _save_token_info(token_info)
-    return token_info['access_token']
+@app.route('/api/finance', methods=['OPTIONS'])
+@app.route('/api/categories', methods=['OPTIONS'])
+@app.route('/api/categories/<path:_any>', methods=['OPTIONS'])
+def cors_preflight(_any=None):
+    return ('', 204)
 
-# 追加: スコープ比較ヘルパ
-def _has_required_scopes(token_info, required_scope: str) -> bool:
-    cur = set((token_info or {}).get("scope", "").split())
-    need = set(required_scope.split())
-    return need.issubset(cur)
 
 # --------------------
 # ページ
@@ -205,9 +89,61 @@ def _has_required_scopes(token_info, required_scope: str) -> bool:
 def main():
     return render_template('main.html')
 
-@app.route('/expense')
+@app.route('/expense', methods=['GET', 'POST'])
 def expense():
-    return render_template('expense.html')
+    uid = current_user_id()
+    if not uid:
+        return redirect(url_for('login'))
+
+    if request.method == 'POST':
+        form = request.form
+        rec = {
+            'type': form.get('type', 'expense'),
+            'amount': int(form.get('amount', 0) or 0),
+            'category': form.get('category', ''),
+            'memo': form.get('memo', '')
+        }
+        add_finance_record(uid, rec)
+        return redirect(url_for('expense'))
+
+    # GET: 種類と直近レコードを表示
+    categories_data = get_user_categories(uid) or []
+    categories_list = [dict(cat) for cat in categories_data]
+
+    records = get_all_expenses(uid) or []
+    # 任意: 最新20件に絞る
+    recent_records = records[:20]
+
+    # 簡易ステータス計算
+    balance = 0
+    monthly = 0
+    daily = 0
+    try:
+        from datetime import datetime
+        today_str = datetime.now().strftime('%Y-%m-%d')
+        month_prefix = today_str[:7]
+        for r in records:
+            amt = r.get('amount', 0) or 0
+            if r.get('type') == 'income':
+                balance += amt
+            elif r.get('type') == 'expense':
+                balance -= amt
+                if isinstance(r.get('date'), str):
+                    if r['date'] == today_str:
+                        daily += amt
+                    if r['date'].startswith(month_prefix):
+                        monthly += amt
+    except Exception:
+        pass
+
+    return render_template(
+        'expense.html',
+        categories=categories_list,
+        records=recent_records,
+        balance=balance,
+        monthly=monthly,
+        daily=daily
+    )
 
 @app.route('/categories')
 def categories():
@@ -281,10 +217,22 @@ def oauth_callbac():
     # トークンを簡易にフロントに渡して popup に通知させる（開発用）
     return render_template('oauth-callback.html', token=creds.token)
 
+@app.route("/categories")
+def categories():
+    uid = current_user_id()
+    if not uid:
+        return redirect(url_for('login'))
+    categories_data = get_user_categories(uid) or []
+    categories_list = [dict(cat) for cat in categories_data]
+    return render_template('categories.html', categories=categories_list)
+
 @app.route("/finance")
 def finance():
-    income_stats, expense_stats = get_finance_summary()
-    all_records = get_all_finance_records()
+    uid = current_user_id()
+    if not uid:
+        return redirect(url_for('login'))
+    income_stats, expense_stats = get_finance_summary(uid)
+    all_records = get_all_finance_records(uid)
     return render_template(
         "finance.html",
         income_stats=income_stats,
@@ -454,44 +402,84 @@ def logout():
 # ✅ カテゴリー関連API
 @app.route("/api/categories", methods=["GET"])
 def get_categories_route():
-    result = get_all_categories()
+    uid = resolve_request_user_id()
+    if not uid:
+        return jsonify({"error": "Unauthorized"}), 401
+    result = get_user_categories(uid)
     return jsonify(result)
 
 @app.route("/api/categories", methods=["POST"])
 def add_category_route():
+    uid = resolve_request_user_id()
+    if not uid:
+        return jsonify({"error": "Unauthorized"}), 401
     data = request.get_json()
     name = data.get("name", "").strip()
+    cat_type = data.get("type", "").strip() or "expense"
     if not name:
         return jsonify({"error": "カテゴリ名が空です"}), 400
-    result = add_category(name)
+    result = add_category(uid, name, cat_type)
+    # 前方互換: dataを配列で返す期待に合わせる
+    try:
+        if isinstance(result.get("data"), dict):
+            result["data"] = [result["data"]]
+    except Exception:
+        pass
     return jsonify(result)
 
 @app.route("/api/categories/<string:cat_id>", methods=["DELETE"])
 def delete_category_route(cat_id):
-    result = delete_category(cat_id) 
+    uid = resolve_request_user_id()
+    if not uid:
+        return jsonify({"error": "Unauthorized"}), 401
+    result = delete_category(uid, cat_id)
     return jsonify(result)
 
 @app.route("/api/categories/clear", methods=["DELETE"])
 def clear_categories_route():
-    result = clear_all_categories()
+    uid = resolve_request_user_id()
+    if not uid:
+        return jsonify({"error": "Unauthorized"}), 401
+    result = clear_all_categories(uid)
     return jsonify(result)
 
 
 # ✅ 収支関連API
 @app.route("/api/finance", methods=["GET"])
 def get_finance_records_route():
-    result = get_all_finance_records()
+    uid = resolve_request_user_id()
+    if not uid:
+        return jsonify({"error": "Unauthorized"}), 401
+    # Support filters: type, category, date_from, date_to, limit, offset, order, q
+    qargs = request.args
+    result = finance_model.list_records(
+        uid,
+        limit=int(qargs.get('limit', 100) or 100),
+        offset=int(qargs.get('offset', 0) or 0),
+        order=qargs.get('order', 'desc'),
+        type=qargs.get('type'),
+        category=qargs.get('category'),
+        date_from=qargs.get('date_from'),
+        date_to=qargs.get('date_to'),
+        memo_query=qargs.get('q'),
+    )
     return jsonify(result)
 
 @app.route("/api/finance", methods=["POST"])
 def add_finance_record_route():
+    uid = resolve_request_user_id()
+    if not uid:
+        return jsonify({"error": "Unauthorized"}), 401
     data = request.get_json()
-    result = add_finance_record(data)
+    result = finance_model.create_record(uid, data)
     return jsonify(result)
 
 @app.route("/api/finance/<string:record_id>", methods=["DELETE"])
 def delete_finance_record_route(record_id):
-    result = delete_finance_record(record_id)
+    uid = resolve_request_user_id()
+    if not uid:
+        return jsonify({"error": "Unauthorized"}), 401
+    result = finance_model.delete_record(uid, record_id)
     return jsonify(result)
 
 
@@ -502,7 +490,7 @@ def get_users_route():
 
 @app.route("/user/<email>", methods=["GET"])
 def get_user_route(email):
-    return jsonify(get_user_by_email(email))
+    return jsonify(get_user_by_id(email))
 
 @app.route("/user", methods=["POST"])
 def add_user_route():
@@ -1053,10 +1041,13 @@ def control_switchbot():
 with app.app_context():
     db.create_all()
 
+# --------------------
+# 実行
+# --------------------
 if __name__ == '__main__':
     app.run(
         host='0.0.0.0',
         port=5000,
         debug=True,
-        ssl_context='adhoc'  # ✅ https
+        ssl_context='adhoc'
     )
