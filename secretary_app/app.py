@@ -890,99 +890,94 @@ def chat_api():
 
     calendar_event_data = response_data.get('data')
 
-    if calendar_manager.is_authenticated():
-        if action == "add_calendar_event" and calendar_event_data:
-            try:
-                for event_to_add in calendar_event_data:
-                    # YYYY-MM-DD HH:MM:SS 形式をISO 8601形式に変換
-                    start_iso = datetime.strptime(event_to_add.get('start_time'), '%Y-%m-%d %H:%M:%S').isoformat() if event_to_add.get('start_time') else None
-                    end_iso = datetime.strptime(event_to_add.get('end_time'), '%Y-%m-%d %H:%M:%S').isoformat() if event_to_add.get('end_time') else None
-                    
-                    calendar_manager.add_event(
-                        event_to_add.get('name'),
-                        start_iso,
-                        end_iso,
-                        event_to_add.get('description', '')
-                    )
-                response_data['message'] = f"{len(calendar_event_data)}件の予定をGoogleカレンダーに登録しました。"
-                response_data['status'] = "success"
-            except Exception as e:
-                response_data['message'] = f"Googleカレンダーへの登録に失敗しました: {str(e)}"
-                response_data['status'] = "error"
-        elif action == "get_calendar_events" and calendar_event_data:
-            try:
-                # ScheduleManager.pyのlist_eventsはtimeMin/timeMaxをISO 8601形式で期待する
-                # chat_space_modelからはYYYY-MM-DD HH:MM:SS形式が来るので変換
-                start_time_str = calendar_event_data.get('start_time')
-                end_time_str = calendar_event_data.get('end_time')
+    if action == "add_calendar_event" and calendar_event_data:
+        try:
+            for event_to_add in calendar_event_data:
+                # YYYY-MM-DD HH:MM:SS 形式をISO 8601形式に変換
+                start_iso = datetime.strptime(event_to_add.get('start_time'), '%Y-%m-%d %H:%M:%S').isoformat() if event_to_add.get('start_time') else None
+                end_iso = datetime.strptime(event_to_add.get('end_time'), '%Y-%m-%d %H:%M:%S').isoformat() if event_to_add.get('end_time') else None
+                
+                calendar_manager.add_event(
+                    event_to_add.get('name'),
+                    start_iso,
+                    end_iso,
+                    event_to_add.get('description', '')
+                )
+            response_data['message'] = f"{len(calendar_event_data)}件の予定をGoogleカレンダーに登録しました。"
+            response_data['status'] = "success"
+        except Exception as e:
+            response_data['message'] = f"Googleカレンダーへの登録に失敗しました: {str(e)}"
+            response_data['status'] = "error"
+    elif action == "get_calendar_events" and calendar_event_data:
+        try:
+            # ScheduleManager.pyのlist_eventsはtimeMin/timeMaxをISO 8601形式で期待する
+            # chat_space_modelからはYYYY-MM-DD HH:MM:SS形式が来るので変換
+            start_time_str = calendar_event_data.get('start_time')
+            end_time_str = calendar_event_data.get('end_time')
 
-                start_iso = None
-                if start_time_str:
-                    start_iso = datetime.strptime(start_time_str, '%Y-%m-%d %H:%M:%S').isoformat() + 'Z'
-                
-                end_iso = None
-                if end_time_str:
-                    end_iso = datetime.strptime(end_time_str, '%Y-%m-%d %H:%M:%S').isoformat() + 'Z'
-                
-                events = calendar_manager.list_events(start_iso, end_iso)
-                if events:
-                    event_summaries = [f"{e['summary']} ({e['start'].get('dateTime', e['start'].get('date'))})" for e in events]
-                    response_data['message'] = f"以下の予定が見つかりました: {', '.join(event_summaries)}"
-                    response_data['data'] = events # 取得したイベントデータを返す
+            start_iso = None
+            if start_time_str:
+                start_iso = datetime.strptime(start_time_str, '%Y-%m-%d %H:%M:%S').isoformat() + 'Z'
+            
+            end_iso = None
+            if end_time_str:
+                end_iso = datetime.strptime(end_time_str, '%Y-%m-%d %H:%M:%S').isoformat() + 'Z'
+            
+            events = calendar_manager.list_events(start_iso, end_iso)
+            if events:
+                event_summaries = [f"{e['summary']} ({e['start'].get('dateTime', e['start'].get('date'))})" for e in events]
+                response_data['message'] = f"以下の予定が見つかりました: {', '.join(event_summaries)}"
+                response_data['data'] = events # 取得したイベントデータを返す
+                response_data['status'] = "success"
+            else:
+                response_data['message'] = "該当期間に予定は見つかりませんでした。"
+                response_data['status'] = "success"
+        except Exception as e:
+            response_data['message'] = f"Googleカレンダーからの予定取得に失敗しました: {str(e)}"
+            response_data['status'] = "error"
+    elif action == "remove_calendar_event" and calendar_event_data:
+        try:
+            for event_to_delete in calendar_event_data:
+                # 削除対象のイベントを特定するために、まずイベントを検索する必要がある
+                # ここでは簡略化のため、event_to_deleteにeventIdが含まれていると仮定
+                # 実際には、name, start_time, end_timeを使ってlist_eventsで検索し、eventIdを取得する必要がある
+                event_id = event_to_delete.get('id') # または検索して取得
+                if event_id:
+                    calendar_manager.delete_event(event_id)
+                    response_data['message'] = f"イベントID {event_id} の予定を削除しました。"
                     response_data['status'] = "success"
                 else:
-                    response_data['message'] = "該当期間に予定は見つかりませんでした。"
+                    response_data['message'] = "削除対象のイベントIDが指定されていません。"
+                    response_data['status'] = "error"
+        except Exception as e:
+            response_data['message'] = f"Googleカレンダーからの予定削除に失敗しました: {str(e)}"
+            response_data['status'] = "error"
+    elif action == "change_calendar_event" and calendar_event_data:
+        try:
+            for event_to_change in calendar_event_data:
+                # 変更対象のイベントを特定するために、まずイベントを検索する必要がある
+                # ここでは簡略化のため、event_to_changeにeventIdが含まれていると仮定
+                # 実際には、before_name, before_start_time, before_end_timeを使ってlist_eventsで検索し、eventIdを取得する必要がある
+                event_id = event_to_change.get('id') # または検索して取得
+                if event_id:
+                    new_start_iso = datetime.strptime(event_to_change.get('after_start_time'), '%Y-%m-%d %H:%M:%S').isoformat() if event_to_change.get('after_start_time') else None
+                    new_end_iso = datetime.strptime(event_to_change.get('after_end_time'), '%Y-%m-%d %H:%M:%S').isoformat() if event_to_change.get('after_end_time') else None
+                    new_summary = event_to_change.get('after_name')
+                    
+                    calendar_manager.update_event(
+                        event_id,
+                        new_start_iso,
+                        new_end_iso,
+                        new_summary
+                    )
+                    response_data['message'] = f"イベントID {event_id} の予定を変更しました。"
                     response_data['status'] = "success"
-            except Exception as e:
-                response_data['message'] = f"Googleカレンダーからの予定取得に失敗しました: {str(e)}"
-                response_data['status'] = "error"
-        elif action == "remove_calendar_event" and calendar_event_data:
-            try:
-                for event_to_delete in calendar_event_data:
-                    # 削除対象のイベントを特定するために、まずイベントを検索する必要がある
-                    # ここでは簡略化のため、event_to_deleteにeventIdが含まれていると仮定
-                    # 実際には、name, start_time, end_timeを使ってlist_eventsで検索し、eventIdを取得する必要がある
-                    event_id = event_to_delete.get('id') # または検索して取得
-                    if event_id:
-                        calendar_manager.delete_event(event_id)
-                        response_data['message'] = f"イベントID {event_id} の予定を削除しました。"
-                        response_data['status'] = "success"
-                    else:
-                        response_data['message'] = "削除対象のイベントIDが指定されていません。"
-                        response_data['status'] = "error"
-            except Exception as e:
-                response_data['message'] = f"Googleカレンダーからの予定削除に失敗しました: {str(e)}"
-                response_data['status'] = "error"
-        elif action == "change_calendar_event" and calendar_event_data:
-            try:
-                for event_to_change in calendar_event_data:
-                    # 変更対象のイベントを特定するために、まずイベントを検索する必要がある
-                    # ここでは簡略化のため、event_to_changeにeventIdが含まれていると仮定
-                    # 実際には、before_name, before_start_time, before_end_timeを使ってlist_eventsで検索し、eventIdを取得する必要がある
-                    event_id = event_to_change.get('id') # または検索して取得
-                    if event_id:
-                        new_start_iso = datetime.strptime(event_to_change.get('after_start_time'), '%Y-%m-%d %H:%M:%S').isoformat() if event_to_change.get('after_start_time') else None
-                        new_end_iso = datetime.strptime(event_to_change.get('after_end_time'), '%Y-%m-%d %H:%M:%S').isoformat() if event_to_change.get('after_end_time') else None
-                        new_summary = event_to_change.get('after_name')
-                        
-                        calendar_manager.update_event(
-                            event_id,
-                            new_start_iso,
-                            new_end_iso,
-                            new_summary
-                        )
-                        response_data['message'] = f"イベントID {event_id} の予定を変更しました。"
-                        response_data['status'] = "success"
-                    else:
-                        response_data['message'] = "変更対象のイベントIDが指定されていません。"
-                        response_data['status'] = "error"
-            except Exception as e:
-                response_data['message'] = f"Googleカレンダーからの予定変更に失敗しました: {str(e)}"
-                response_data['status'] = "error"
-    else:
-        response_data['message'] = "GoogleカレンダーAPIが認証されていません。カレンダー操作は実行できません。"
-        response_data['status'] = "error"
-
+                else:
+                    response_data['message'] = "変更対象のイベントIDが指定されていません。"
+                    response_data['status'] = "error"
+        except Exception as e:
+            response_data['message'] = f"Googleカレンダーからの予定変更に失敗しました: {str(e)}"
+            response_data['status'] = "error"
     return jsonify(response_data)
 
 app.register_blueprint(memo_bp, url_prefix='/api/memos')
