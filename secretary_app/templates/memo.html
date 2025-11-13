@@ -18,7 +18,7 @@
     <section class="memo-card">
       <h2>メモを追加</h2>
       <input id="title" type="text" placeholder="タイトル" />
-      <textarea id="content" rows="4" placeholder="内容を入力"></textarea>
+      <textarea id="content" rows="4" placeholder="本文を入力"></textarea>
       <div class="add-options">
         <div class="add-option-group">
           <input type="checkbox" id="add-is-pinned">
@@ -77,6 +77,86 @@
     const API_URL_BASE = "/api/memos";
     let isBulkDeleteMode = false;
 
+    const focusRestoreState = {
+      plan: null,
+      depth: 0
+    };
+
+    const getDefaultScrollContainer = () => document.scrollingElement || document.documentElement;
+
+    // 再描画後に元の位置へスクロールを補正するためにスクロール親を特定
+    const getScrollParent = (element) => {
+      if (!element) return getDefaultScrollContainer();
+      let parent = element.parentElement;
+      while (parent) {
+        const style = window.getComputedStyle(parent);
+        const overflowY = style ? style.overflowY : "";
+        if ((overflowY === "auto" || overflowY === "scroll" || overflowY === "overlay") && parent.scrollHeight > parent.clientHeight) {
+          return parent;
+        }
+        parent = parent.parentElement;
+      }
+      return getDefaultScrollContainer();
+    };
+
+    const scheduleFocusRestore = (memoId, targetClass, rectSnapshot) => {
+      focusRestoreState.plan = {
+        memoId,
+        targetClass,
+        rectTop: rectSnapshot ? rectSnapshot.top : null,
+        scrollContainer: (rectSnapshot && rectSnapshot.scrollContainer) || getDefaultScrollContainer()
+      };
+      focusRestoreState.depth += 1;
+    };
+
+    const cancelFocusRestore = () => {
+      if (focusRestoreState.depth > 0) {
+        focusRestoreState.depth -= 1;
+      }
+      if (focusRestoreState.depth === 0) {
+        focusRestoreState.plan = null;
+      }
+    };
+
+    const applyFocusRestorePlan = () => {
+      const focusPlan = focusRestoreState.plan;
+      focusRestoreState.plan = null;
+      if (!focusPlan) return;
+      const asyncCall = window.requestAnimationFrame || ((cb) => setTimeout(cb, 0));
+      asyncCall(() => {
+        const memoNode = document.getElementById(`memo-${focusPlan.memoId}`);
+        if (!memoNode) return;
+        if (typeof focusPlan.rectTop === "number" && focusPlan.scrollContainer) {
+          const updatedRect = memoNode.getBoundingClientRect();
+          const deltaY = updatedRect.top - focusPlan.rectTop;
+          if (Math.abs(deltaY) > 1) {
+            const container = focusPlan.scrollContainer;
+            const isWindowScroll =
+              container === document.body ||
+              container === document.documentElement ||
+              container === document.scrollingElement;
+            if (isWindowScroll) {
+              window.scrollBy({ top: deltaY });
+            } else {
+              container.scrollTop += deltaY;
+            }
+          }
+        }
+        if (focusPlan.targetClass) {
+          const focusTarget = memoNode.querySelector(`.${focusPlan.targetClass}`);
+          if (focusTarget) focusTarget.focus();
+        }
+      });
+    };
+
+    const resolveFocusRestoreAfterRender = () => {
+      if (focusRestoreState.depth === 0) return;
+      focusRestoreState.depth -= 1;
+      if (focusRestoreState.depth === 0) {
+        applyFocusRestorePlan();
+      }
+    };
+
     async function fetchMemos(params = {}) {
       const {
         keyword = "",
@@ -97,19 +177,21 @@
 
       try {
         const res = await fetch(`${API_URL_BASE}?${query.toString()}`);
-        if (!res.ok) {
-          throw new Error(`HTTP ${res.status}`);
-        }
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
         const memos = await res.json();
         if (!Array.isArray(memos) || memos.length === 0) {
           list.innerHTML = '<p class="memo-placeholder">該当するメモがありません。</p>';
           return;
         }
+
         list.innerHTML = "";
         memos.forEach((memo) => list.appendChild(createMemoElement(memo)));
       } catch (err) {
         console.error(err);
         list.innerHTML = '<p class="memo-placeholder error">メモの読み込みに失敗しました。</p>';
+      } finally {
+        resolveFocusRestoreAfterRender();
       }
     }
 
@@ -118,9 +200,8 @@
       wrapper.className = "memo";
       wrapper.id = `memo-${memo.id}`;
 
-      if (memo.is_pinned) {
-        wrapper.classList.add("pinned");
-      }
+      if (memo.is_pinned) wrapper.classList.add("pinned");
+
       const priorityValue = Number(memo.priority);
       if (!Number.isNaN(priorityValue)) {
         wrapper.classList.add(priorityValue >= 6 ? "priority-high" : `priority-${priorityValue}`);
@@ -136,16 +217,45 @@
       const controls = document.createElement("div");
       controls.className = "memo-controls";
 
+      // 優先度入力
       const priorityInput = document.createElement("input");
       priorityInput.type = "number";
+      priorityInput.min = "0";
       priorityInput.className = "priority-input";
       priorityInput.value = memo.priority ?? "";
       priorityInput.placeholder = "優先度";
-      priorityInput.title = "優先度 (ピン留め時のみ有効)";
-      const commitPriorityChange = () => {
-        updateMemo(memo.id, { priority: priorityInput.value, is_pinned: true });
+      priorityInput.title = "優先度（ピン留め時のみ有効）";
+
+      const captureMemoRect = () => {
+        const memoEl = document.getElementById(`memo-${memo.id}`);
+        if (!memoEl) return null;
+        const rect = memoEl.getBoundingClientRect();
+        return {
+          top: rect.top,
+          scrollContainer: getScrollParent(memoEl)
+        };
       };
-      priorityInput.addEventListener("change", commitPriorityChange);
+
+      const commitPriorityChange = (activeElementClass) => {
+        scheduleFocusRestore(memo.id, activeElementClass, captureMemoRect());
+        const maybePromise = updateMemo(memo.id, { priority: priorityInput.value, is_pinned: true });
+        if (maybePromise && typeof maybePromise.then === "function") {
+          maybePromise.then((success) => {
+            if (!success) cancelFocusRestore();
+          }).catch((err) => {
+            console.error(err);
+            cancelFocusRestore();
+          });
+        } else {
+          cancelFocusRestore();
+        }
+      };
+
+      priorityInput.addEventListener("change", () => {
+        const value = Math.max(0, Number(priorityInput.value) || 0);
+        priorityInput.value = value;
+        commitPriorityChange("priority-input");
+      });
 
       const priorityWrap = document.createElement("div");
       priorityWrap.className = "priority-input-wrap";
@@ -154,12 +264,12 @@
       const priorityArrows = document.createElement("div");
       priorityArrows.className = "priority-arrows";
 
-      const changePriorityBy = (delta) => {
+      const changePriorityBy = (delta, targetClass) => {
         let current = Number(priorityInput.value);
         if (Number.isNaN(current)) current = 0;
-        current += delta;
+        current = Math.max(0, current + delta);
         priorityInput.value = current;
-        commitPriorityChange();
+        commitPriorityChange(targetClass);
       };
 
       const arrowUp = document.createElement("button");
@@ -167,20 +277,21 @@
       arrowUp.className = "priority-arrow arrow-up";
       arrowUp.setAttribute("aria-label", "優先度を下げる");
       arrowUp.textContent = "▲";
-      arrowUp.addEventListener("click", () => changePriorityBy(-1));
+      arrowUp.addEventListener("click", () => changePriorityBy(-1, "arrow-up"));
 
       const arrowDown = document.createElement("button");
       arrowDown.type = "button";
       arrowDown.className = "priority-arrow arrow-down";
       arrowDown.setAttribute("aria-label", "優先度を上げる");
       arrowDown.textContent = "▼";
-      arrowDown.addEventListener("click", () => changePriorityBy(1));
+      arrowDown.addEventListener("click", () => changePriorityBy(1, "arrow-down"));
 
       priorityArrows.appendChild(arrowUp);
       priorityArrows.appendChild(arrowDown);
       priorityWrap.appendChild(priorityArrows);
       controls.appendChild(priorityWrap);
 
+      // ピンチェック
       const pinCheckbox = document.createElement("input");
       pinCheckbox.type = "checkbox";
       pinCheckbox.className = "pin-checkbox";
@@ -191,16 +302,18 @@
       });
       controls.appendChild(pinCheckbox);
 
+      // 削除ボタン
       const deleteBtn = document.createElement("button");
       deleteBtn.type = "button";
       deleteBtn.className = "icon-btn delete-btn";
-      deleteBtn.textContent = "×";
+      deleteBtn.textContent = "🗑";
       deleteBtn.title = "削除";
       deleteBtn.addEventListener("click", () => deleteMemo(memo.id));
       controls.appendChild(deleteBtn);
 
       header.appendChild(controls);
 
+      // 一括削除チェック
       const bulkWrap = document.createElement("div");
       bulkWrap.className = "bulk-checkbox-wrap";
 
@@ -219,7 +332,7 @@
 
       const meta = document.createElement("small");
       const created = memo.created_at ? new Date(memo.created_at) : null;
-      meta.textContent = `作成日時: ${created ? created.toLocaleString() : "不明"}`;
+      meta.textContent = `作成日時: ${created ? created.toLocaleString('ja-JP') : "不明"}`;
       wrapper.appendChild(meta);
 
       return wrapper;
@@ -235,13 +348,13 @@
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(data)
         });
-        if (!res.ok) {
-          throw new Error("update_failed");
-        }
-        searchMemos();
+        if (!res.ok) throw new Error("update_failed");
+        await searchMemos();
+        return true;
       } catch (err) {
         console.error(err);
         alert("メモの更新に失敗しました。");
+        return false;
       }
     }
 
@@ -258,7 +371,7 @@
       };
 
       if (!payload.content) {
-        alert("内容を入力してください。");
+        alert("本文を入力してください。");
         return;
       }
 
@@ -305,15 +418,13 @@
       document.getElementById("bulk-delete-actions").hidden = !isBulkDeleteMode;
       document.getElementById("bulk-delete-toggle-btn").textContent =
         isBulkDeleteMode ? "通常モード" : "選択モード";
-      if (!isBulkDeleteMode) {
-        deselectAll();
-      }
+      if (!isBulkDeleteMode) deselectAll();
     }
 
     function deselectAll() {
-      document.querySelectorAll('#memo-list .bulk-delete-checkbox:checked').forEach((cb) => {
-        cb.checked = false;
-      });
+      document
+        .querySelectorAll('#memo-list .bulk-delete-checkbox:checked')
+        .forEach((cb) => { cb.checked = false; });
     }
 
     async function deleteSelectedMemos() {
@@ -322,9 +433,8 @@
         alert("削除するメモを選択してください。");
         return;
       }
-      if (!confirm(`${checked.length}件のメモを削除しますか？`)) {
-        return;
-      }
+      if (!confirm(`${checked.length}件のメモを削除しますか？`)) return;
+
       try {
         const res = await fetch(`${API_URL_BASE}/bulk`, {
           method: "DELETE",
@@ -344,7 +454,7 @@
     }
 
     function searchMemos() {
-      fetchMemos({
+      return fetchMemos({
         keyword: document.getElementById("search").value.trim(),
         searchType: document.getElementById("search-type").value,
         startDate: document.getElementById("start-date").value,

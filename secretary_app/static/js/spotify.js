@@ -460,6 +460,8 @@ bar?.shuffle?.addEventListener('click', async () => {
     const playlistCreateCancel = document.getElementById('playlist-create-cancel');
     const playlistMessage = document.getElementById('playlist-create-message');
     const playlistTrackTotalEl = document.getElementById('playlist-track-total');
+    const voicePlaylistSelect = document.getElementById('spotify-voice-playlist');
+    const voiceStatusEl = document.getElementById('spotify-voice-status');
 
     const ensurePlaylistsUrlState = () => {
       try{
@@ -548,6 +550,99 @@ bar?.shuffle?.addEventListener('click', async () => {
       if(type !== 'error'){
         playlistMessageTimer = window.setTimeout(()=>setPlaylistMessage(), 4000);
       }
+    }
+
+    const normalizeForCompare = (value) => (value || '').toString().trim().toLowerCase().normalize('NFKC');
+
+    function refreshVoicePlaylistSelect(options){
+      if(!voicePlaylistSelect) return;
+      const current = voicePlaylistSelect.value;
+      const placeholder = voicePlaylistSelect.getAttribute('data-placeholder') || '音声追加先プレイリスト（任意）';
+      voicePlaylistSelect.innerHTML = '';
+      const initialOpt = document.createElement('option');
+      initialOpt.value = '';
+      initialOpt.textContent = placeholder;
+      voicePlaylistSelect.appendChild(initialOpt);
+      options.forEach((p)=>{
+        const opt = document.createElement('option');
+        opt.value = p.id;
+        opt.textContent = p.name;
+        voicePlaylistSelect.appendChild(opt);
+      });
+      if(current && options.some((p)=>p.id===current)){
+        voicePlaylistSelect.value = current;
+      }
+    }
+
+    function findPlaylistByName(name){
+      if(!name) return null;
+      const normalized = normalizeForCompare(name);
+      if(!normalized) return null;
+      const options = getPlaylistOptions();
+      let match = options.find((p)=>normalizeForCompare(p.name) === normalized);
+      if(match) return match;
+      match = options.find((p)=>normalizeForCompare(p.name).includes(normalized));
+      if(match) return match;
+      return options.find((p)=>normalized.includes(normalizeForCompare(p.name))) || null;
+    }
+
+    function incrementPlaylistCount(playlistId, delta){
+      if(!playlistId || !Number.isFinite(delta)) return;
+      document.querySelectorAll(`.pl-count[data-plid="${playlistId}"]`).forEach((span)=>{
+        const current = parseInt(span.textContent || '0', 10);
+        span.textContent = String(Math.max(current + delta, 0));
+      });
+      userPlaylists = (userPlaylists || []).map((p)=>{
+        if(p.id !== playlistId) return p;
+        const nextTotal = Math.max((p.tracks?.total ?? 0) + delta, 0);
+        return { ...p, tracks: { ...(p.tracks || {}), total: nextTotal } };
+      });
+    }
+
+    async function addTrackToPlaylistApi(playlistId, trackUri){
+      if(!playlistId || !trackUri) throw new Error('playlistId/trackUri missing');
+      const res = await fetch('/api/spotify/add-track',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({playlist_id:playlistId,track_uri:trackUri})
+      });
+      const data = await res.json().catch(()=>({}));
+      if(!res.ok){
+        throw new Error(data?.error || `status ${res.status}`);
+      }
+      incrementPlaylistCount(playlistId, 1);
+      updatePlaylistOptionsForSelects();
+      return data;
+    }
+
+    async function addCurrentTrackToPlaylistViaVoice(options = {}){
+      const trackUri = _lastState?.track_window?.current_track?.uri;
+      const trackName = _lastState?.track_window?.current_track?.name || '';
+      if(!trackUri){
+        throw new Error('現在再生中の曲がありません');
+      }
+      let playlistId = options.playlistId || '';
+      let playlistLabel = '';
+      if(!playlistId && options.playlistName){
+        const match = findPlaylistByName(options.playlistName);
+        if(match){
+          playlistId = match.id;
+          playlistLabel = match.name || '';
+        }
+      }
+      if(!playlistId && voicePlaylistSelect && voicePlaylistSelect.value){
+        playlistId = voicePlaylistSelect.value;
+        const selectedOption = voicePlaylistSelect.options[voicePlaylistSelect.selectedIndex];
+        playlistLabel = selectedOption ? selectedOption.textContent.trim() : '';
+      }
+      if(!playlistId){
+        throw new Error('プレイリストを特定できませんでした');
+      }
+      const result = await addTrackToPlaylistApi(playlistId, trackUri);
+      if(typeof showToast === 'function'){
+        showToast(`${playlistLabel || 'プレイリスト'}に追加しました`);
+      }
+      return { playlistId, playlistName: playlistLabel, trackName, result };
     }
 
     function togglePlaylistForm(force){
@@ -737,6 +832,7 @@ bar?.shuffle?.addEventListener('click', async () => {
 
     function updatePlaylistOptionsForSelects(){
       const options = getPlaylistOptions();
+      refreshVoicePlaylistSelect(options);
       document.querySelectorAll('select.playlist-select').forEach(select=>{
         const current = select.value;
         select.innerHTML = '<option value=\"\">プレイリストを選択</option>';
@@ -1031,6 +1127,34 @@ function renderResults(tracks){
       reindexPlaylistRows();
     }
 
+
+    const voiceBridge = {
+      async searchTracks(query){
+        const value = (query || '').trim();
+        if(!value) throw new Error('検索キーワードが空です');
+        if(searchInput) searchInput.value = value;
+        await handleSearchSubmit(value);
+        return value;
+      },
+      async nextTrack(){
+        await apiNext();
+      },
+      async previousTrack(){
+        await apiPrev();
+      },
+      async addCurrentTrackToPlaylist(options){
+        return addCurrentTrackToPlaylistViaVoice(options || {});
+      },
+      setStatus(message){
+        if(voiceStatusEl) voiceStatusEl.textContent = message;
+        return message;
+      },
+      getVoicePlaylistId(){
+        return voicePlaylistSelect?.value || '';
+      }
+    };
+    window.SpotifyVoiceBridge = voiceBridge;
+    window.dispatchEvent(new CustomEvent('spotify:voice-bridge-ready', { detail: voiceBridge }));
 
     // SDK
     window.onSpotifyWebPlaybackSDKReady = () => { ensurePlayer().catch(console.error); };
