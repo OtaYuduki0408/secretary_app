@@ -1,11 +1,13 @@
-import os
-import json
 from datetime import datetime, timedelta
+from typing import Optional
+
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 from google.auth.transport.requests import Request
- 
-TOKEN_PATH = os.getenv("GOOGLE_TOKEN_PATH", "token.json")
+
+from services.google_token_service import get_credentials, upsert_credentials
+
+
 SCOPES = [
     "openid",
     "https://www.googleapis.com/auth/gmail.send",
@@ -14,102 +16,119 @@ SCOPES = [
     "https://www.googleapis.com/auth/userinfo.email",
     "https://www.googleapis.com/auth/calendar",
 ]
- 
+
+
 class ScheduleManager:
-    def __init__(self, token_path=TOKEN_PATH, scopes=SCOPES, creds_info=None):
-        self.token_path = token_path
+    """
+    Googleカレンダー操作をユーザー単位の認証情報(Supabase保管)で実行する。
+    - 認証情報は Supabase テーブル google_credentials に保存する
+    - 各APIは user_id を必須にし、そのユーザーのトークンでGoogle APIを実行する
+    """
+
+    def __init__(self, scopes=SCOPES):
         self.scopes = scopes
-        self.creds = None
-        # creds_info: dict (from oauth flow) OR None to load from token_path
-        if creds_info:
-            self.creds = Credentials.from_authorized_user_info(creds_info, scopes=self.scopes)
-        else:
-            self._load_token()
- 
-        if self.creds and self.creds.expired and self.creds.refresh_token:
-            try:
-                self.creds.refresh(Request())
-                self._save_token()
-            except Exception as e:
-                # refresh error - leave as-is, higher layer should re-auth
-                print("Credentials refresh failed:", e)
- 
-    def _load_token(self):
-        if os.path.exists(self.token_path):
-            with open(self.token_path, "r", encoding="utf-8") as f:
-                data = json.load(f)
-            try:
-                self.creds = Credentials.from_authorized_user_info(data, scopes=self.scopes)
-            except Exception as e:
-                print("Failed to load credentials:", e)
-                self.creds = None
-        else:
-            self.creds = None
- 
-    def _save_token(self):
-        if not self.creds:
-            return
-        data = {
-            "token": self.creds.token,
-            "refresh_token": self.creds.refresh_token,
-            "token_uri": self.creds.token_uri,
-            "client_id": self.creds.client_id,
-            "client_secret": self.creds.client_secret,
-            "scopes": list(self.creds.scopes or [])
-        }
-        with open(self.token_path, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2)
- 
-    def is_authenticated(self):
-        return self.creds is not None and self.creds.valid
- 
-    def set_credentials_from_info(self, creds_info):
-        """呼び出し元（Flask）で OAuth フローが完了した後に creds_info(dict)を渡して保存する"""
-        self.creds = Credentials.from_authorized_user_info(creds_info, scopes=self.scopes)
-        # refresh if needed
-        if self.creds.expired and self.creds.refresh_token:
-            try:
-                self.creds.refresh(Request())
-            except Exception as e:
-                print("refresh failed:", e)
-        self._save_token()
- 
-    def _build_service(self, api_name="calendar", version="v3"):
-        if not self.creds:
-            raise RuntimeError("not_authenticated")
-        return build(api_name, version, credentials=self.creds, cache_discovery=False)
- 
-    def add_event(self, name, start_time, end_time):
+
+    # 認証情報の取得/更新 ----------------------------------------------------
+    def _load_creds_for_user(self, user_id: str) -> Optional[Credentials]:
+        data = get_credentials(user_id)
+        if not data:
+            return None
         try:
-            service = self.get_service()
+            creds = Credentials.from_authorized_user_info(data, scopes=self.scopes)
+        except Exception:
+            return None
+        # 期限切れなら更新
+        try:
+            if creds and creds.expired and creds.refresh_token:
+                creds.refresh(Request())
+                self._save_creds_for_user(user_id, creds)
+        except Exception:
+            pass
+        return creds
 
-            # Google Calendar API が要求する形式に整形
-            event = {
-                "summary": name,
-                "start": {
-                    "dateTime": start_time.strftime("%Y-%m-%dT%H:%M:%S+09:00")
-                },
-                "end": {
-                    "dateTime": end_time.strftime("%Y-%m-%dT%H:%M:%S+09:00")
-                },
-            }
+    def _save_creds_for_user(self, user_id: str, creds: Credentials) -> None:
+        payload = {
+            "token": creds.token,
+            "refresh_token": creds.refresh_token,
+            "token_uri": creds.token_uri,
+            "client_id": creds.client_id,
+            "client_secret": creds.client_secret,
+            "scopes": list(creds.scopes or []),
+        }
+        upsert_credentials(user_id, payload)
 
-            created = service.events().insert(calendarId="primary", body=event).execute()
-            print(f"✅ イベント作成成功: {created.get('htmlLink')}")
-            return created
+    def is_authenticated(self, user_id: str) -> bool:
+        creds = self._load_creds_for_user(user_id)
+        return bool(creds and creds.valid)
 
-        except Exception as e:
-            print(f"予定追加エラー: {e}")
-            raise
+    def set_credentials_from_info(self, user_id: str, creds_info: dict) -> None:
+        """OAuth完了後の creds_info(dict) を保存。必要なら即リフレッシュ。"""
+        creds = Credentials.from_authorized_user_info(creds_info, scopes=self.scopes)
+        if creds.expired and creds.refresh_token:
+            try:
+                creds.refresh(Request())
+            except Exception:
+                pass
+        self._save_creds_for_user(user_id, creds)
 
- 
-    def delete_event(self, event_id):
-        service = self._build_service()
+    # Googleサービスのビルド -------------------------------------------------
+    def _build_service(self, user_id: str, api_name: str = "calendar", version: str = "v3"):
+        creds = self._load_creds_for_user(user_id)
+        if not creds:
+            raise RuntimeError("not_authenticated")
+        return build(api_name, version, credentials=creds, cache_discovery=False)
+
+    # カレンダー操作 ---------------------------------------------------------
+    def _to_rfc3339(self, dt_str: str) -> str:
+        """
+        Google Calendar API に渡す RFC3339 形式へ正規化する。
+        受け取りは「YYYY-MM-DD HH:MM:SS」や「YYYY-MM-DDTHH:MM:SS」想定。
+        タイムゾーンが無い場合はそのまま（別途 timeZone フィールドで指定）。
+        """
+        if not dt_str:
+            return dt_str
+        s = dt_str.strip().replace(" ", "T")
+        try:
+            # 'Z' は +00:00 として扱う
+            parsed = datetime.fromisoformat(s.replace("Z", "+00:00"))
+            # 秒までに揃える（ミリ秒を落とす）
+            return parsed.isoformat(timespec="seconds")
+        except Exception:
+            # パースできない場合は置換のみの結果を返す（最悪でも 'T' 区切り）
+            return s
+
+    def add_event(self, user_id: str, title: str, start_iso: str, end_iso: str | None = None, description: str = ""):
+        service = self._build_service(user_id)
+
+        # 入力の正規化（RFC3339に揃え、timeZoneは別で付与）
+        start_rfc3339 = self._to_rfc3339(start_iso)
+        if not end_iso:
+            # end が無い場合は +1 時間
+            try:
+                base = datetime.fromisoformat(start_rfc3339.replace("Z", "+00:00"))
+                end_iso = (base + timedelta(hours=1)).isoformat(timespec="seconds")
+            except Exception:
+                # どうしてもパースできなければ start をそのまま基準にしておく
+                end_iso = start_rfc3339
+        end_rfc3339 = self._to_rfc3339(end_iso)
+
+        event = {
+            "summary": title,
+            "description": description,
+            # タイムゾーンは日本時間に固定（必要ならユーザー設定に）
+            "start": {"dateTime": start_rfc3339, "timeZone": "Asia/Tokyo"},
+            "end": {"dateTime": end_rfc3339, "timeZone": "Asia/Tokyo"},
+        }
+        created = service.events().insert(calendarId="primary", body=event).execute()
+        return created
+
+    def delete_event(self, user_id: str, event_id: str):
+        service = self._build_service(user_id)
         service.events().delete(calendarId="primary", eventId=event_id).execute()
         return {"status": "deleted", "id": event_id}
- 
-    def list_events(self, time_min=None, time_max=None, max_results=50):
-        service = self._build_service()
+
+    def list_events(self, user_id: str, time_min: str | None = None, time_max: str | None = None, max_results: int = 50):
+        service = self._build_service(user_id)
         if not time_min:
             time_min = datetime.utcnow().isoformat() + "Z"
         if not time_max:
@@ -120,13 +139,14 @@ class ScheduleManager:
             timeMax=time_max,
             maxResults=max_results,
             singleEvents=True,
-            orderBy="startTime"
+            orderBy="startTime",
         ).execute()
         items = events_result.get("items", [])
         return items
- 
-    def update_event(self, event_id, new_start_iso=None, new_end_iso=None, new_summary=None, new_description=None):
-        service = self._build_service()
+
+    def update_event(self, user_id: str, event_id: str, new_start_iso: str | None = None, new_end_iso: str | None = None,
+                     new_summary: str | None = None, new_description: str | None = None):
+        service = self._build_service(user_id)
         event = service.events().get(calendarId="primary", eventId=event_id).execute()
         if new_summary is not None:
             event["summary"] = new_summary

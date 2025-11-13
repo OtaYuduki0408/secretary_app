@@ -1,21 +1,283 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8" />
-  <title>命令管理システム</title>
-  <link rel="stylesheet" href="/css/index.css" />
+<meta charset="UTF-8">
+<title>命令編集（if/elif/else＋ネスト条件・アクション）</title>
+<style>
+  body { font-family:"Segoe UI","Noto Sans JP",sans-serif; background:#f6f8fa; margin:0; padding:20px; color:#333; }
+  .container { max-width:1000px; margin:40px auto; background:#fff; padding:2em; border-radius:12px; box-shadow:0 4px 12px rgba(0,0,0,0.1);}
+  h2 { text-align:center; margin-bottom:1.2em; }
+  .block { margin-bottom:25px; }
+  label { display:block; font-weight:bold; margin-bottom:6px; }
+  input[type="text"], select, textarea { width:100%; padding:8px; border-radius:6px; border:1px solid #ccc; box-sizing:border-box; font-size:14px; }
+  textarea { resize: vertical; height:70px; }
+  .add-button, .save-button, .remove, .nest-button { background:#007bff; color:#fff; border:none; border-radius:6px; padding:6px 10px; margin-top:6px; cursor:pointer; }
+  .remove { background:#dc3545; }
+  .remove:hover { background:#b02a37; }
+  .nest-button { background:#17a2b8; }
+  .nest-button:hover { background:#10707e; }
+  .save-button:hover, .add-button:hover { background:#0056b3; }
+  .msg { margin-top:10px; color:green; font-weight:bold; }
+  .item { background:#f9f9f9; padding:10px; border-radius:8px; border:1px solid #ddd; margin-bottom:8px; }
+  .nested-conditions, .nested-actions { margin-left:20px; margin-top:5px; }
+  .condition-block { background:#f0f0f0; padding:8px; border-radius:6px; margin-bottom:8px; }
+</style>
 </head>
 <body>
-  <div class="container">
-    <h1>命令管理システム</h1>
-    <p>ここから命令編集ページへ移動できます。</p>
-    <button id="go-edit">命令編集ページへ</button>
+<div class="container">
+  <a href="/" style="text-decoration:none;color:#007bff;">← 戻る</a>
+  <h2>命令編集（if/elif/else＋ネスト条件・アクション）</h2>
+
+  <!-- 命令名 -->
+  <div class="block">
+    <label>命令名</label>
+    <input type="text" id="name" placeholder="例：朝の通知">
   </div>
 
-  <script>
-    document.getElementById("go-edit").addEventListener("click", () => {
-      window.location.href = "/custom_order/edit";
+  <!-- トリガー設定 -->
+  <div class="block">
+    <label>トリガー設定</label>
+    <select id="trigger_category"></select>
+    <select id="trigger_sub"></select>
+    <input type="text" id="trigger_value" placeholder="値（例: ◯◯に到着）">
+  </div>
+
+  <!-- 条件設定 -->
+  <div class="block">
+    <label>条件設定</label>
+    <div id="condition_blocks"></div>
+    <button class="add-button" id="add-condition">＋ 条件追加</button>
+  </div>
+
+  <!-- アクション設定 -->
+  <div class="block">
+    <label>トップレベルアクション</label>
+    <select id="action_category"></select>
+    <select id="action_sub"></select>
+    <textarea id="action_detail" placeholder="内容"></textarea>
+  </div>
+
+  <button class="save-button" id="register-btn">💾 保存</button>
+  <div id="message" class="msg"></div>
+
+  <!-- 既存命令一覧 -->
+  <div class="block">
+    <h2>既存命令一覧</h2>
+    <div id="command-list"></div>
+  </div>
+</div>
+
+<script>
+const TRIGGER_CATEGORIES = {
+  "場所": ["現在地が◯◯", "特定エリアに入った", "特定エリアを出た"],
+  "カレンダー": ["特定日付", "曜日", "予定がある", "予定がない"],
+  "収支管理": ["残高が◯◯円以下", "出費が◯◯円を超えた", "収入があった"],
+  "メモ": ["メモに◯◯が追加された", "特定キーワードが含まれた"]
+};
+const ACTION_CATEGORIES = {
+  "収支管理": ["登録", "削除", "変更", "取得"],
+  "カレンダー": ["登録", "削除", "変更", "取得"],
+  "メモ": ["登録", "削除", "変更", "取得"],
+  "時刻": ["通知", "タイマー開始", "タイマー停止"]
+};
+
+function populateSelect(selectId, options) {
+  const select = document.getElementById(selectId);
+  select.innerHTML = "<option value=''>選択してください</option>";
+  for (const key in options) {
+    const opt = document.createElement("option");
+    opt.value = key;
+    opt.textContent = key;
+    select.appendChild(opt);
+  }
+}
+
+function updateSubOptions(categoryId, subId, data) {
+  const cat = document.getElementById(categoryId).value;
+  const sub = document.getElementById(subId);
+  sub.innerHTML = "<option value=''>選択してください</option>";
+  if (data[cat]) data[cat].forEach(v=>{ const o=document.createElement("option"); o.value=v;o.textContent=v; sub.appendChild(o); });
+}
+
+function addConditionBlock(parent=document.getElementById("condition_blocks"), data={}) {
+  const block = document.createElement("div");
+  block.className = "condition-block";
+  block.innerHTML = `
+    <select class="condition-logic">
+      <option value="">(最初)</option><option value="AND">AND</option><option value="OR">OR</option>
+    </select>
+    <select class="condition-type"><option value="if">if</option><option value="elif">elif</option><option value="else">else</option></select>
+    <input type="text" class="condition-expr" placeholder="例: x > 5" />
+    <button class="add-nested-condition">＋ ネスト条件追加</button>
+    <button class="add-nested-action">＋ ネストアクション追加</button>
+    <button class="remove-condition">削除</button>
+    <div class="nested-conditions"></div>
+    <div class="nested-actions"></div>
+  `;
+  parent.appendChild(block);
+
+  const typeSelect = block.querySelector(".condition-type");
+  const exprInput = block.querySelector(".condition-expr");
+  typeSelect.value = data.type || "if";
+  exprInput.value = data.expr || "";
+  typeSelect.addEventListener("change",()=>{ if(typeSelect.value==="else"){exprInput.disabled=true;exprInput.value="";}else exprInput.disabled=false; });
+  block.querySelector(".remove-condition").onclick = ()=>block.remove();
+  block.querySelector(".add-nested-condition").onclick = ()=>addConditionBlock(block.querySelector(".nested-conditions"));
+  block.querySelector(".add-nested-action").onclick = ()=>addAction(block.querySelector(".nested-actions"));
+}
+
+function addAction(parent, a={category:"メモ", sub:"登録", timing:"今すぐ", detail:""}) {
+  const el = document.createElement("div");
+  el.className = "item";
+  el.innerHTML = `
+    <select class="action-category"><option value="カレンダー">カレンダー</option><option value="メモ">メモ</option><option value="収支管理">収支管理</option><option value="時刻">時刻</option></select>
+    <select class="action-sub"><option value="登録">登録</option><option value="削除">削除</option><option value="変更">変更</option><option value="取得">取得</option></select>
+    <input type="text" class="action-timing" placeholder="実行タイミング" value="${a.timing}"/>
+    <textarea class="action-detail" placeholder="内容">${a.detail}</textarea>
+    <button class="remove-action">削除</button>
+  `;
+  el.querySelector(".remove-action").onclick=()=>el.remove();
+  el.querySelector(".action-category").value=a.category;
+  el.querySelector(".action-sub").value=a.sub;
+  parent.appendChild(el);
+}
+
+function parseConditions(root){
+  return [...root.children].map(b=>({
+    logic:b.querySelector(".condition-logic").value,
+    type:b.querySelector(".condition-type").value,
+    expr:b.querySelector(".condition-expr").value,
+    nested:parseConditions(b.querySelector(".nested-conditions")),
+    actions:[...b.querySelectorAll(".nested-actions>.item")].map(a=>({
+      category:a.querySelector(".action-category").value,
+      sub:a.querySelector(".action-sub").value,
+      timing:a.querySelector(".action-timing").value,
+      detail:a.querySelector(".action-detail").value
+    }))
+  }));
+}
+
+function loadCommandToForm(cmd){
+  document.getElementById("name").value = cmd.name;
+  document.getElementById("trigger_category").value = cmd.triggers?.[0]?.type?.split(":")[0]||"";
+  updateSubOptions("trigger_category","trigger_sub",TRIGGER_CATEGORIES);
+  document.getElementById("trigger_sub").value = cmd.triggers?.[0]?.type?.split(":")[1]||"";
+  document.getElementById("trigger_value").value = cmd.triggers?.[0]?.value||"";
+
+  document.getElementById("condition_blocks").innerHTML="";
+  (cmd.conditions||[]).forEach(c=>addConditionBlockFromData(c, document.getElementById("condition_blocks")));
+
+  if(cmd.actions?.length>0){
+    const a=cmd.actions[0];
+    document.getElementById("action_category").value=a.category;
+    document.getElementById("action_sub").value=a.sub;
+    document.getElementById("action_detail").value=a.detail||"";
+  }
+
+  document.getElementById("command-id")?.remove();
+  const hid=document.createElement("input"); hid.type="hidden"; hid.id="command-id"; hid.value=cmd.id;
+  document.getElementById("register-btn").parentNode.appendChild(hid);
+}
+
+function addConditionBlockFromData(data,parent){
+  addConditionBlock(parent,{type:data.type,expr:data.expr});
+  const b=parent.lastElementChild;
+  if(data.nested?.length) data.nested.forEach(n=>addConditionBlockFromData(n,b.querySelector(".nested-conditions")));
+  if(data.actions?.length) data.actions.forEach(a=>addAction(b.querySelector(".nested-actions"),a));
+}
+
+async function registerCommand(){
+  console.log("--- [DEBUG] registerCommand called ---");
+  const id=document.getElementById("command-id")?.value||null;
+  const payload={
+    name:document.getElementById("name").value,
+    triggers:[{type:`${document.getElementById("trigger_category").value}:${document.getElementById("trigger_sub").value}`, value:document.getElementById("trigger_value").value}],
+    conditions:parseConditions(document.getElementById("condition_blocks")),
+    actions:[{category:document.getElementById("action_category").value, sub:document.getElementById("action_sub").value, detail:document.getElementById("action_detail").value}]
+  };
+  console.log("--- [DEBUG] Payload to be sent:", JSON.stringify(payload, null, 2));
+
+  try {
+    const res = await fetch(id ? `/api/custom_orders/${id}` : "/api/custom_orders", {
+      method: id ? "PUT" : "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
     });
-  </script>
+
+    console.log("--- [DEBUG] Fetch response status:", res.status);
+    const data = await res.json();
+    console.log("--- [DEBUG] Fetch response data:", data);
+
+    document.getElementById("message").innerText = data.message || "保存しました";
+    setTimeout(() => document.getElementById("message").innerText = "", 3000);
+    document.getElementById("command-id")?.remove();
+    loadCommands();
+  } catch (error) {
+    console.error("--- [ERROR] Fetch failed:", error);
+    document.getElementById("message").innerText = "エラーが発生しました。コンソールを確認してください。";
+  }
+}
+
+async function loadCommands() {
+  console.log("--- [DEBUG] loadCommands called ---");
+  try {
+    const res = await fetch("/api/custom_orders");
+    console.log("--- [DEBUG] loadCommands fetch response status:", res.status);
+    if (!res.ok) {
+      console.error("--- [ERROR] Fetch failed with status:", res.status);
+      const errorText = await res.text();
+      console.error("--- [ERROR] Fetch error response text:", errorText);
+      document.getElementById("command-list").innerHTML = `<p style="color:red;">一覧の読み込みに失敗しました。</p>`;
+      return;
+    }
+    const list = await res.json();
+    console.log("--- [DEBUG] loadCommands received list:", list);
+
+    const container = document.getElementById("command-list");
+    container.innerHTML = "";
+    if (!list || !list.length) {
+      container.innerHTML = "<p>登録された命令はありません。</p>";
+      return;
+    }
+    list.forEach(cmd => {
+      const div = document.createElement("div");
+      div.className = "item";
+      // nameプロパティが存在しない場合も考慮
+      div.innerHTML = `<b>${cmd.name || '名前なし'}</b> (ID:${cmd.id})`;
+      const editBtn = document.createElement("button");
+      editBtn.className = "nest-button";
+      editBtn.innerText = "編集";
+      editBtn.onclick = () => loadCommandToForm(cmd);
+      const delBtn = document.createElement("button");
+      delBtn.className = "remove";
+      delBtn.innerText = "削除";
+      delBtn.onclick = async () => {
+        if (confirm("削除しますか？")) {
+          await fetch(`/api/custom_orders/${cmd.id}`, {
+            method: "DELETE"
+          });
+          loadCommands();
+        }
+      };
+      div.appendChild(editBtn);
+      div.appendChild(delBtn);
+      container.appendChild(div);
+    });
+  } catch (error) {
+    console.error("--- [ERROR] loadCommands failed:", error);
+    document.getElementById("command-list").innerHTML = `<p style="color:red;">一覧の読み込み中にエラーが発生しました。</p>`;
+  }
+}
+
+document.addEventListener("DOMContentLoaded",()=>{
+  populateSelect("trigger_category",TRIGGER_CATEGORIES);
+  populateSelect("action_category",ACTION_CATEGORIES);
+  document.getElementById("trigger_category").addEventListener("change",()=>updateSubOptions("trigger_category","trigger_sub",TRIGGER_CATEGORIES));
+  document.getElementById("action_category").addEventListener("change",()=>updateSubOptions("action_category","action_sub",ACTION_CATEGORIES));
+  document.getElementById("add-condition").addEventListener("click",()=>addConditionBlock());
+  document.getElementById("register-btn").addEventListener("click",registerCommand);
+  loadCommands();
+});
+</script>
 </body>
 </html>

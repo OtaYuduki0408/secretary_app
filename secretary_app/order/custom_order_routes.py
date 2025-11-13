@@ -1,155 +1,123 @@
-from flask import Blueprint, request, jsonify
-from datetime import datetime
-from models import db, CustomOrder, CustomTrigger, CustomCondition, CustomAction
+from flask import Blueprint, request, jsonify, session
+from supabase_client import supabase
+from postgrest.exceptions import APIError
+import json
 
-# Blueprint 登録
 custom_order_bp = Blueprint("custom_order", __name__)
 
 # ======================================================
-# 📌 カスタムオーダー登録API（複数トリガー対応）
+# 📌 カスタムオーダー登録API (Supabase版 - user_id対応)
 # ======================================================
-@custom_order_bp.route("/api/custom_orders", methods=["POST"])
+@custom_order_bp.route("/custom_orders", methods=["POST"], endpoint="register_custom_order")
 def register_order():
+    print("--- [DEBUG] /api/custom_orders POST request received ---")
+    
+    user = session.get('user')
+    if not user or not user.get('id'):
+        print("--- [DEBUG] User not found in session. Returning 401. ---")
+        return jsonify({"error": "User not authenticated"}), 401
+    user_id = user.get('id')
+
     data = request.json
+    print(f"--- [DEBUG] Request data: {data} ---")
+    if not data or 'name' not in data or not data['name']:
+        return jsonify({"error": "Invalid data: name is required"}), 400
 
+    supabase_data = {
+        'name': data.get('name'),
+        'user_id': user_id
+    }
+    
     try:
-        # --- 基本情報を登録 ---
-        order = CustomOrder(
-            name=data.get("name"),
-            repeat_enabled=False,
-            created_at=datetime.now()
-        )
-        db.session.add(order)
-        db.session.flush()  # order.idを確定させる
-
-        # --- トリガー登録 ---
-        triggers = data.get("triggers", [])
-        for t in triggers:
-            trigger = CustomTrigger(
-                order_id=order.id,
-                trigger_type=t.get("trigger_type"),
-                trigger_value=t.get("trigger_value")
-            )
-            db.session.add(trigger)
-
-        # --- 条件登録 ---
-        conditions = data.get("conditions", [])
-        for c in conditions:
-            condition = CustomCondition(
-                order_id=order.id,
-                condition_type=c.get("condition_type"),
-                condition_value=c.get("condition_value")
-            )
-            db.session.add(condition)
-
-        # --- アクション登録 ---
-        actions = data.get("actions", [])
-        for a in actions:
-            action = CustomAction(
-                order_id=order.id,
-                action_type=a.get("action_type"),
-                action_content=a.get("action_content"),
-                order_index=a.get("order_index", 1)
-            )
-            db.session.add(action)
-
-        db.session.commit()
-        return jsonify({"message": "✅ カスタムオーダー登録完了", "order_id": order.id}), 201
-
+        print(f"--- [DEBUG] Inserting simplified data into Supabase: {supabase_data} ---")
+        response = supabase.table("custom_orders").insert(supabase_data).execute()
+        print(f"--- [DEBUG] Supabase response: {response} ---")
+        inserted_data = response.data[0] if response.data else None
+        return jsonify({"message": "✅ カスタムオーダー登録完了 (nameのみ)", "data": inserted_data}), 201
+    except APIError as e:
+        print(f"--- [ERROR] Supabase API Error: {e.message} ---")
+        return jsonify({"error": e.message}), 500
     except Exception as e:
-        db.session.rollback()
-        print("登録エラー:", e)
+        print(f"--- [ERROR] General Error in register_order: {e} ---")
         return jsonify({"error": str(e)}), 500
 
 
 # ======================================================
-# 📋 登録済みオーダー一覧取得
+# 📋 登録済みオーダー一覧取得 (Supabase版 - user_id対応)
 # ======================================================
-@custom_order_bp.route("/api/custom_orders", methods=["GET"])
+@custom_order_bp.route("/custom_orders", methods=["GET"], endpoint="list_custom_orders")
 def list_orders():
-    orders = CustomOrder.query.all()
-    result = []
-    for o in orders:
-        # 各オーダーに紐づく情報を取得
-        triggers = CustomTrigger.query.filter_by(order_id=o.id).all()
-        conditions = CustomCondition.query.filter_by(order_id=o.id).all()
-        actions = CustomAction.query.filter_by(order_id=o.id).all()
-        result.append({
-            "id": o.id,
-            "name": o.name,
-            "created_at": o.created_at.strftime("%Y-%m-%d %H:%M:%S") if o.created_at else None,
-            "triggers": [{"trigger_value": t.trigger_value} for t in triggers],
-            "conditions": [{"condition_type": c.condition_type} for c in conditions],
-            "actions": [{"action_type": a.action_type} for a in actions]
-        })
-    return jsonify(result)
+    print("--- [DEBUG] /api/custom_orders GET request received ---")
+    
+    user = session.get('user')
+    if not user or not user.get('id'):
+        print("--- [DEBUG] User not found in session. Returning empty list. ---")
+        return jsonify([]) # 認証されていなければ空のリストを返す
+    user_id = user.get('id')
 
-
-# ======================================================
-# 🧩 オーダー詳細取得（トリガー・条件・アクション含む）
-# ======================================================
-@custom_order_bp.route("/api/custom_orders/<int:order_id>", methods=["GET"])
-def get_order(order_id):
-    order = CustomOrder.query.get(order_id)
-    if not order:
-        return jsonify({"error": "指定されたIDのオーダーが存在しません"}), 404
-
-    triggers = CustomTrigger.query.filter_by(order_id=order_id).all()
-    conditions = CustomCondition.query.filter_by(order_id=order_id).all()
-    actions = CustomAction.query.filter_by(order_id=order_id).order_by(CustomAction.order_index).all()
-
-    return jsonify({
-        "id": order.id,
-        "name": order.name,
-        "repeat_enabled": order.repeat_enabled,
-        "created_at": order.created_at.strftime("%Y-%m-%d %H:%M:%S"),
-        "triggers": [
-            {"id": t.id, "type": t.trigger_type, "value": t.trigger_value}
-            for t in triggers
-        ],
-        "conditions": [
-            {"id": c.id, "type": c.condition_type, "value": c.condition_value}
-            for c in conditions
-        ],
-        "actions": [
-            {"id": a.id, "type": a.action_type, "content": a.action_content, "index": a.order_index}
-            for a in actions
-        ]
-    })
-
+    try:
+        print(f"--- [DEBUG] Selecting 'id, name' from Supabase for user_id: {user_id} ---")
+        response = supabase.table("custom_orders").select("id, name").eq("user_id", user_id).order("id", desc=True).execute()
+        print(f"--- [DEBUG] Supabase response in list_orders: {response} ---")
+        return jsonify(response.data)
+    except APIError as e:
+        print(f"--- [ERROR] Supabase API Error in list_orders: {e.message} ---")
+        return jsonify({"error": e.message}), 500
+    except Exception as e:
+        print(f"--- [ERROR] General Error in list_orders: {e} ---")
+        return jsonify({"error": str(e)}), 500
 
 # ======================================================
-# 🗑 オーダー削除
+# 🔄 カスタムオーダー更新API (Supabase版 - user_id対応)
 # ======================================================
-@custom_order_bp.route("/api/custom_orders/<int:order_id>", methods=["DELETE"])
-def delete_order(order_id):
-    order = CustomOrder.query.get(order_id)
-    if not order:
-        return jsonify({"error": "指定されたIDのオーダーが存在しません"}), 404
+@custom_order_bp.route("/custom_orders/<int:order_id>", methods=["PUT"], endpoint="update_custom_order")
+def update_order(order_id):
+    user = session.get('user')
+    if not user or not user.get('id'):
+        return jsonify({"error": "User not authenticated"}), 401
+    user_id = user.get('id')
 
-    # 子テーブル（トリガー・条件・アクション）も削除
-    CustomTrigger.query.filter_by(order_id=order_id).delete()
-    CustomCondition.query.filter_by(order_id=order_id).delete()
-    CustomAction.query.filter_by(order_id=order_id).delete()
-    db.session.delete(order)
-    db.session.commit()
-
-    return jsonify({"message": f"🗑 オーダー（ID: {order_id}）を削除しました"})
-
-
-# ======================================================
-# 🧠 トリガー判定API（将来拡張用）
-# ======================================================
-@custom_order_bp.route("/api/custom_orders/check_trigger", methods=["POST"])
-def check_trigger():
-    """
-    発話や時間などのイベントから、対応する命令を取得する（将来用）
-    """
     data = request.json
-    trigger_type = data.get("type")
-    trigger_value = data.get("value")
+    if not data or 'name' not in data or not data['name']:
+        return jsonify({"error": "Invalid data: name is required"}), 400
+    
+    supabase_data = {'name': data.get('name')}
 
-    matched_triggers = CustomTrigger.query.filter_by(trigger_type=trigger_type, trigger_value=trigger_value).all()
-    matched_orders = list({t.order_id for t in matched_triggers})
+    try:
+        # 更新前に、対象のレコードが本当にこのユーザーのものであることを確認
+        response = supabase.table("custom_orders").update(supabase_data).match({'id': order_id, 'user_id': user_id}).execute()
+        updated_data = response.data[0] if response.data else None
+        if not updated_data:
+            return jsonify({"error": "Order not found or permission denied"}), 404
+        return jsonify({"message": f"✅ カスタムオーダー(ID: {order_id})を更新しました", "data": updated_data}), 200
+    except APIError as e:
+        print(f"--- [ERROR] Supabase API Error in update_order: {e.message} ---")
+        return jsonify({"error": e.message}), 500
+    except Exception as e:
+        print(f"--- [ERROR] General Error in update_order: {e} ---")
+        return jsonify({"error": str(e)}), 500
 
-    return jsonify({"matched_order_ids": matched_orders})
+
+# ======================================================
+# 🗑️ カスタムオーダー削除API (Supabase版 - user_id対応)
+# ======================================================
+@custom_order_bp.route("/custom_orders/<int:order_id>", methods=["DELETE"], endpoint="delete_custom_order")
+def delete_order(order_id):
+    user = session.get('user')
+    if not user or not user.get('id'):
+        return jsonify({"error": "User not authenticated"}), 401
+    user_id = user.get('id')
+
+    try:
+        # 削除前に、対象のレコードが本当にこのユーザーのものであることを確認
+        response = supabase.table("custom_orders").delete().match({'id': order_id, 'user_id': user_id}).execute()
+        deleted_data = response.data[0] if response.data else None
+        if not deleted_data:
+            return jsonify({"error": "Order not found or permission denied"}), 404
+        return jsonify({"message": f"✅ カスタムオーダー(ID: {order_id})を削除しました", "data": deleted_data}), 200
+    except APIError as e:
+        print(f"--- [ERROR] Supabase API Error in delete_order: {e.message} ---")
+        return jsonify({"error": e.message}), 500
+    except Exception as e:
+        print(f"--- [ERROR] General Error in delete_order: {e} ---")
+        return jsonify({"error": str(e)}), 500

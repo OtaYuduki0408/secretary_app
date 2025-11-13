@@ -48,7 +48,6 @@ pydantic==2.12.4
 pydantic_core==2.41.5
 PyJWT==2.10.1
 pyparsing==3.2.5
-python-dotenv==1.2.1
 pytz==2024.1
 realtime==2.24.0
 redis==7.0.1

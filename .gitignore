@@ -1,6 +1,11 @@
 /github_tokens.txt
 venv/
-C:\Users\y_oota\Documents\secretary_app\secretary_app\services\client_secret.json
-C:\Users\y_oota\Documents\secretary_app\secretary_app\token.json
-C:\Users\y_oota\Documents\secretary_app\secretary_app\.env
+
+# Project-local secrets & artifacts inside secretary_app
 secretary_app/.env
+secretary_app/.cache
+secretary_app/credentials.json
+secretary_app/services/client_secret.json
+secretary_app/token.json
+secretary_app/instance/orders.db
+secretary_app/order/commands.db

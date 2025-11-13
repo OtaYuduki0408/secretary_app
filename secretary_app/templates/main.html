@@ -95,7 +95,7 @@
  
     <div aria-hidden="true"></div>
  
-    <button id="authorize-button" class="btn btn-success">Googleログイン</button>
+    <a href="{{ url_for('google_login') }}" id="authorize-button" class="btn btn-success">Googleログイン</a>
  
     <div class="fab-group">
       <a class="stats-btn fab" href="{{ url_for('login') }}" aria-label="ログイン画面を開く" title="ログイン">

@@ -8,12 +8,15 @@ TABLE_NAME = "finance"
 # --------------------------------------------------------------------------
 # すべてのレコード取得 (★関数名を get_all_expenses に修正)
 # --------------------------------------------------------------------------
-def get_all_expenses():
+def get_all_expenses(user_id: str | None = None):
     """
     Supabaseから全収支データを取得する。
     """
     try:
-        response = supabase.table(TABLE_NAME).select("*").order("date", desc=True).execute()
+        q = supabase.table(TABLE_NAME).select("*").order("date", desc=True)
+        if user_id:
+            q = q.eq("user_id", user_id)
+        response = q.execute()
         return response.data or []
     except (APIError, Exception) as e:
         print(f"[ERROR] get_all_expenses: {e}")
@@ -22,7 +25,7 @@ def get_all_expenses():
 # --------------------------------------------------------------------------
 # データの登録
 # --------------------------------------------------------------------------
-def add_finance_record(record: dict):
+def add_finance_record(record: dict, user_id: str):
     """
     新しい収支レコードを登録する。
     """
@@ -30,6 +33,7 @@ def add_finance_record(record: dict):
         # 日付がない場合は自動で今日の日付を設定
         if "date" not in record or not record["date"]:
             record["date"] = datetime.now().strftime("%Y-%m-%d")
+        record["user_id"] = user_id
 
         response = supabase.table(TABLE_NAME).insert(record).execute()
         return {"message": "Finance record added", "data": response.data}
@@ -40,12 +44,18 @@ def add_finance_record(record: dict):
 # --------------------------------------------------------------------------
 # レコード削除
 # --------------------------------------------------------------------------
-def delete_finance_record(record_id: str):
+def delete_finance_record(record_id: str, user_id: str):
     """
     指定したIDの収支データを削除する。
     """
     try:
-        response = supabase.table(TABLE_NAME).delete().eq("id", record_id).execute()
+        response = (
+            supabase.table(TABLE_NAME)
+            .delete()
+            .eq("id", record_id)
+            .eq("user_id", user_id)
+            .execute()
+        )
         return {"message": "Finance record deleted", "data": response.data}
     except (APIError, Exception) as e:
         print(f"[ERROR] delete_finance_record: {e}")

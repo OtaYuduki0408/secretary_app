@@ -1,63 +1,97 @@
 from supabase_client import supabase
-from werkzeug.security import generate_password_hash, check_password_hash
+from datetime import datetime
 
-TABLE_USERS = "users"  
-TABLE_AUTH = "auth"    
-
-
-# ✅ ユーザー登録
-def register_user(name, email, password):
-    # 既に登録済みか確認
-    exists = supabase.table(TABLE_USERS).select("email").eq("email", email).execute()
-    if exists.data:
-        return {"error": "このメールアドレスはすでに登録されています。"}
-
-    # users に登録
-    user_res = supabase.table(TABLE_USERS).insert({
-        "name": name,
-        "email": email
-    }).execute()
-
-    if not user_res.data:
-        return {"error": "ユーザー登録に失敗しました。"}
-
-    user_id = user_res.data[0]["id"]
-
-    # パスワードをハッシュ化
-    hashed_password = generate_password_hash(password)
-
-    # auth に登録
-    auth_res = supabase.table(TABLE_AUTH).insert({
-        "user_id": user_id,
-        "password_hash": hashed_password,
-        "salt": ""  # werkzeug では内部でソルトを扱うため空文字でもOK
-    }).execute()
-
-    if not auth_res.data:
-        return {"error": "認証情報の登録に失敗しました。"}
-
-    return {"message": "登録完了", "user_id": user_id}
+# プロフィールテーブル（public.users）
+TABLE_PROFILES = "users"
 
 
-# ✅ ログイン
-def login_user(email, password):
-    # email から users を検索
-    user_res = supabase.table(TABLE_USERS).select("*").eq("email", email).execute()
-    if not user_res.data:
-        return {"error": "ユーザーが見つかりません。"}
+def register_user(name: str, email: str, password: str):
+    """
+    Supabase Auth でユーザーを作成し、public.users にプロフィールを作成する。
+    - auth.users.id を public.users.id として参照整合させる
+    - email は auth 側で管理し、profiles には name のみ保存
+    """
+    try:
+        # 既存ユーザー確認（Admin API）
+        try:
+            exist = supabase.auth.admin.get_user_by_email(email)
+            if exist and getattr(exist, "user", None):
+                return {"error": "このメールアドレスは既に登録されています。"}
+        except Exception:
+            # 見つからない場合は続行
+            pass
 
-    user = user_res.data[0]
-    user_id = user["id"]
+        # 管理者としてユーザー作成（メール確認済みにする）
+        created = supabase.auth.admin.create_user({
+            "email": email,
+            "password": password,
+            "email_confirm": True,
+        })
 
-    # auth テーブルから password_hash を取得
-    auth_res = supabase.table(TABLE_AUTH).select("password_hash").eq("user_id", user_id).execute()
-    if not auth_res.data:
-        return {"error": "パスワード情報が見つかりません。"}
+        user_obj = getattr(created, "user", None) or created
+        user_id = getattr(user_obj, "id", None)
+        if not user_id:
+            return {"error": "ユーザー作成に失敗しました。"}
 
-    stored_hash = auth_res.data[0]["password_hash"]
+        # プロフィール新規作成（id は auth.users の id）
+        prof = supabase.table(TABLE_PROFILES).insert({
+            "id": user_id,
+            "name": name,
+        }).execute()
 
-    # パスワード照合
-    if not check_password_hash(stored_hash, password):
-        return {"error": "パスワードが正しくありません。"}
+        if getattr(prof, "error", None):
+            # プロフィール作成失敗時は auth 側をクリーンアップ
+            try:
+                supabase.auth.admin.delete_user(user_id)
+            except Exception:
+                pass
+            return {"error": f"プロフィール作成に失敗しました: {getattr(prof, 'error', '')}"}
 
-    return {"message": "ログイン成功", "user": user}
+        return {"message": "登録完了", "user_id": user_id}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+def login_user(email: str, password: str):
+    """
+    Supabase Auth でログインし、プロフィール情報を返す。
+    セッション自体はフロントで保持せず、サーバー側セッションに最低限の情報を格納。
+    """
+    try:
+        res = supabase.auth.sign_in_with_password({
+            "email": email,
+            "password": password,
+        })
+
+        user_obj = getattr(res, "user", None)
+        session = getattr(res, "session", None)
+        if not user_obj:
+            return {"error": "認証に失敗しました。"}
+
+        user_id = getattr(user_obj, "id", None)
+        if not user_id:
+            return {"error": "ユーザーIDを取得できませんでした。"}
+
+        # プロフィール取得（存在しない場合は最小限で自動作成）
+        prof_res = supabase.table(TABLE_PROFILES).select("*").eq("id", user_id).execute()
+        profile = prof_res.data[0] if prof_res.data else None
+        if not profile:
+            fallback_name = (getattr(user_obj, "user_metadata", {}) or {}).get("name") or ""
+            supabase.table(TABLE_PROFILES).insert({
+                "id": user_id,
+                "name": fallback_name,
+            }).execute()
+            profile = {"id": user_id, "name": fallback_name}
+
+        return {
+            "message": "ログイン成功",
+            "user": {
+                "id": user_id,
+                "email": getattr(user_obj, "email", email),
+                "name": profile.get("name", ""),
+            },
+            "session": bool(session),
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
