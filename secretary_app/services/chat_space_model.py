@@ -12,141 +12,137 @@ from services.MemoManager import MemoManager
 
 
 class ChatSpaceModel:
-    """
-    ユーザー入力に基づぁE��LLMを介して意図を解析し、E
-    カレンダー操作を実行するコアモチE��クラス、E
-    """
     
-    # 意図判定�Eロンプト
+    # 意図判定プロンプト
     PURPOSE_PROMPT_TEMPLATE = """
-    以下�EチE��スト�E目皁E��刁E��し、対応する機�Eを大斁E��、対応する行動を小文字で返してください、E
-    命令を確実に実現できる機�EがなぁE��合、機�Eを使わず、最適と思われる解答をしてください。その場合、返答�E最大30斁E��以冁E��なるべく少なくしてください、E
-    -機�E-
+    以下のリストの目的と照合し、対応する機能を大文字、対応する行動を小文字で返してください。
+    命令を確実に実現できる機能がない場合、機能を使わず、最適と思われる解答をしてください。その場合、返答は最大30文字以内となるべく少なくしてください。
+    -機能-
     C:カレンダー
-    I:収支管琁E
+    I:収支管理
     M:メモ帳
-    T:時刻、年月日、曜日確誁E行動はn)
+    T:時刻、年月日、曜日確認(行動はn)
     R:過去の命令の修正(行動はn)
     -行動-
     a:追加
     d:削除
     c:変更
-    g:取征E
+    g:取得
     s:検索
-    例：カレンダーへの追加がユーザーの目皁E��ら、Caを返す、E
-    -惁E��-
-    ユーザーの入劁E{input_value}
+    例：カレンダーへの追加がユーザーの目的から、Caを返す。
+    -入力-
+    ユーザーの入力: {input_value}
     """
     
     # 予定追加プロンプト
     ADD_CALENDAR_PROMPT_TEMPLATE = """
-    目樁E ユーザーが追加したぁE��定�E抽出
-    抽出忁E��頁E��:
-    - name�E�予定名�E�E
-    - start_time�E�未持E��時は当日/推測時刻�E�E
-    - end_time�E�未持E��時は開姁EH後！E
+    目的: ユーザーが追加したい予定の抽出
+    抽出項目:
+    - name (予定名)
+    - start_time (未指定時は当日/推測時刻)
+    - end_time (未指定時は開始1時間後)
     timeはYYYY-MM-DD HH:MM:SS
-    出力�EJSON配�Eのみ、他テキスト禁止。単独でも褁E��あってめE次允E��ストで返す、E
+    出力はJSON配列のみ、他テキスト禁止。単独でも複数あっても二次配列で返す。
     現在時刻:{current_time}
-    ユーザー入劁E{input_value}
+    ユーザー入力: {input_value}
     """
     
-    # 予定取得�Eロンプト
+    # 予定取得プロンプト
     GET_CALENDAR_PROMPT_TEMPLATE = """
-    目樁E ユーザーが取得、操作したい惁E��が存在するであろぁE��間�E篁E��の抽出。褁E��日の場合もある、E
-    抽出忁E��頁E��:
+    目的: ユーザーが取得、操作したい情報が存在するであろう期間(日付)の抽出。単日の場合もある。
+    抽出項目:
     - start_time
     - end_time
     timeはYYYY-MM-DD HH:MM:SS
-    出力�EJSON配�Eのみ、最小篁E��は1日、最大篁E��は半年で、一つの辞書で渡して。他テキスト禁止、E
+    出力はJSON配列のみ、最小期間は1日、最大期間は半年で、一つの辞書で渡して。他テキスト禁止。
     現在時刻は{current_time}
-    ユーザー入劁E{input_value}
+    ユーザー入力: {input_value}
     """
-    
+        
     # 予定削除プロンプト
     REMOVE_CALENDAR_PROMPT_TEMPLATE = """
-    目樁E ユーザーはカレンダーから予定を削除しよぁE��してぁE��す。以下�E「予定一覧」から、ユーザーが削除しよぁE��してぁE��予定を抽出してください、E
-    抽出忁E��頁E��:
-    - name�E�予定名�E�E
-    - start_time�E�予定一覧から正確なYYYY-MM-DD HH:MM:SS形式�E値を引用�E�E
-    - end_time�E�予定一覧から正確なYYYY-MM-DD HH:MM:SS形式�E値を引用�E�E
-    出力�EJSON配�Eのみ、他テキスト禁止。褁E��頁E��があろうが無かろぁE��2次允E��ストで返す、E
+    目的: ユーザーはカレンダーから予定を削除しようとしています。以下の「予定一覧」から、ユーザーが削除しようとしている予定を抽出してください。
+    抽出項目:
+    - name (予定名)
+    - start_time (予定一覧から正確なYYYY-MM-DD HH:MM:SS形式の値を引用)
+    - end_time (予定一覧から正確なYYYY-MM-DD HH:MM:SS形式の値を引用)
+    出力はJSON配列のみ、他テキスト禁止。単一項目があろうが無かろうと二次配列で返す。
     現在時刻は{current_time}
     予定一覧:{task_list_json}
-    ユーザー入劁E{input_value}
+    ユーザー入力: {input_value}
     """
     
     # 予定変更プロンプト
     CHANGE_CALENDAR_PROMPT_TEMPLATE = """
-    目樁Eユーザーが変更したぁE��定�E惁E��の抽出
-    抽出忁E��頁E��:
-    - before_name�E�変更前�E予定名�E�E
-    - before_start_time�E�変更前�E正確な時刻を予定一覧から引用 YYYY-MM-DD HH:MM:SS�E�E
-    - before_end_time�E�変更前�E正確な時刻を予定一覧から引用 YYYY-MM-DD HH:MM:SS�E�E
-    - after_name (変更後�E予定名。変更がなければbefore_nameを引用)
-    - after_start_time (変更後�E開始時刻 YYYY-MM-DD HH:MM:SS)
-    - after_end_time (変更後�E終亁E��刻 YYYY-MM-DD HH:MM:SS)
-    出力�EJSON配�Eのみ、他テキスト禁止。単独でも褁E��あっても２次允E��ストで返す
+    目的: ユーザーが変更したい予定の情報の抽出
+    抽出項目:
+    - before_name (変更前の予定名)
+    - before_start_time (変更前の正確な時刻を予定一覧から引用 YYYY-MM-DD HH:MM:SS)
+    - before_end_time (変更前の正確な時刻を予定一覧から引用 YYYY-MM-DD HH:MM:SS)
+    - after_name (変更後の予定名。変更がなければbefore_nameを引用)
+    - after_start_time (変更後の開始時刻 YYYY-MM-DD HH:MM:SS)
+    - after_end_time (変更後の終了時刻 YYYY-MM-DD HH:MM:SS)
+    出力はJSON配列のみ、他テキスト禁止。単独でも複数あっても２次配列で返す
     現在時刻は{current_time}
     予定一覧:{task_list_json}
-    ユーザー入劁E{input_value}
+    ユーザー入力: {input_value}
     """
     
-    #時刻確認�Eロンプト
+    #時刻確認プロンプト
     TIME_GET_PROMPT_TEMPLATE = """
-    目標：ユーザーが求めてぁE��ように、以下�E時刻惁E��を編雁E��て返してください、E
-    例：何年�E��E20xx年、令和x年です。　何時�E�：午後xx時xx刁Ex秒です。　何日�E�！E0xx年xx朁Ex日です、E
-    無駁E��惁E��を含めず、的確にユーザーが求めてぁE��返答を返してください。返答�E最大20斁E��以冁E��してください、E
-    曜日はチE��ラーの公式などを使って計算してください、E
+    目標：ユーザーが求めているように、以下の時刻情報を編集して返してください。
+    例：何年？→20xx年、令和x年です。　何時？：午後xx時xx分xx秒です。　何日？：20xx年xx月xx日です。
+    無駄な情報を含めず、的確にユーザーが求めている返答を返してください。返答は最大20文字以内でしてください。
+    曜日はツェラーの公式などを使って計算してください。
     現在時刻は{current_time}
-    ユーザー入劁E{input_value}
+    ユーザー入力: {input_value}
     """
-
+        
     # 収支登録プロンプト
     ADD_INCOME_EXPENSE_PROMPT_TEMPLATE = """
-    目樁E ユーザーが登録したぁE��支惁E��を抽出
-    抽出忁E��頁E��:
-    - type�E�収入また�E支出�E�E
-    - category�E�カチE��リ、侁E 食費、交通費、給与など�E�E
-    - amount�E���額！E
-    - date�E�日付、未持E��時は当日/推測日仁EYYYY-MM-DD�E�E
-    出力�EJSON配�Eのみ、他テキスト禁止。単独でも褁E��あってめE次允E��ストで返す、E
+    目的: ユーザーが登録したい収支情報を抽出
+    抽出項目:
+    - type (収入または支出)
+    - category (カテゴリ、例: 食費、交通費、給与など)
+    - amount (金額)
+    - date (日付、未指定時は当日/推測日付 YYYY-MM-DD)
+    出力はJSON配列のみ、他テキスト禁止。単独でも複数あっても二次配列で返す。
     現在時刻:{current_time}
-    ユーザー入劁E{input_value}
+    ユーザー入力: {input_value}
     """
 
-    # 収支取得�Eロンプト
+    # 収支取得プロンプト
     GET_INCOME_EXPENSE_PROMPT_TEMPLATE = """
-    目樁E ユーザーが取得したい収支惁E��の期間とカチE��リを抽出、E
-    抽出忁E��頁E��:
-    - start_date�E�未持E��時は当月1日 YYYY-MM-DD�E�E
-    - end_date�E�未持E��時は当月末日 YYYY-MM-DD�E�E
-    - category�E�任意、未持E��時は全て�E�E
-    出力�EJSON配�Eのみ、他テキスト禁止。一つの辞書で渡して、E
+    目的: ユーザーが取得したい収支情報の期間とカテゴリを抽出。
+    抽出項目:
+    - start_date (未指定時は当月1日 YYYY-MM-DD)
+    - end_date (未指定時は当月末日 YYYY-MM-DD)
+    - category (任意、未指定時は全て)
+    出力はJSON配列のみ、他テキスト禁止。一つの辞書で渡して。
     現在時刻:{current_time}
-    ユーザー入劁E{input_value}
+    ユーザー入力: {input_value}
     """
-
+    
     # メモ追加プロンプト
     ADD_MEMO_PROMPT_TEMPLATE = """
-    目樁E ユーザーが追加したぁE��モの冁E��とタイトルを抽出
-    抽出忁E��頁E��:
-    - title�E�メモのタイトル�E�E
-    - content�E�メモの冁E���E�E
-    出力�EJSON配�Eのみ、他テキスト禁止。単独でも褁E��あってめE次允E��ストで返す、E
+    目的: ユーザーが追加したいメモの内容とタイトルを抽出
+    抽出項目:
+    - title (メモのタイトル)
+    - content (メモの内容)
+    出力はJSON配列のみ、他テキスト禁止。単独でも複数あっても二次配列で返す。
     現在時刻:{current_time}
-    ユーザー入劁E{input_value}
+    ユーザー入力: {input_value}
     """
-
-    # メモ検索/取得�Eロンプト
+    
+    # メモ検索/取得プロンプト
     GET_MEMO_PROMPT_TEMPLATE = """
-    目樁E ユーザーが検索また�E取得したいメモのキーワードまた�Eタイトルを抽出
-    抽出忁E��頁E��:
-    - keyword�E�検索キーワード、任意！E
-    - title�E�メモのタイトル、任意！E
-    出力�EJSON配�Eのみ、他テキスト禁止。一つの辞書で渡して、E
+    目的: ユーザーが検索または取得したいメモのキーワードまたはタイトルを抽出
+    抽出項目:
+    - keyword (検索キーワード、任意)
+    - title (メモのタイトル、任意)
+    出力はJSON配列のみ、他テキスト禁止。一つの辞書で渡して。
     現在時刻:{current_time}
-    ユーザー入劁E{input_value}
+    ユーザー入力: {input_value}
     """
 
 
@@ -170,6 +166,17 @@ class ChatSpaceModel:
         except Exception as e:
             print(f"Geminiリクエストエラー: {e}")
             return ""
+
+    def _format_event_time(self, iso_time: str) -> str:
+        """ISO形式の時刻文字列を「〇月〇日〇時〇分」形式に整形する"""
+        if not iso_time:
+            return ""
+        try:
+            dt_object = datetime.fromisoformat(iso_time.replace('Z', '+00:00'))
+            dt_jst = dt_object.astimezone(JST)
+            return dt_jst.strftime('%m月%d日%H時%M分')
+        except ValueError:
+            return iso_time # パースできない場合はそのまま返す
 
     def _parse_calendar_list(self, text: str) -> list:
         if not text: return []
@@ -343,7 +350,15 @@ class ChatSpaceModel:
         
         print(f"DEBUG: _add_calendar finished. added_events_info={added_events_info}")
         if added_events_info:
-            message = f"{len(added_events_info)}件の予定を追加しました。"
+            # 読み上げメッセージを生成
+            event_details = []
+            for i, event in enumerate(added_events_info):
+                if i >= 5: # 最大5件に制限
+                    break
+                start_time_str = self._format_event_time(event.get("start_time"))
+                event_details.append(f"{start_time_str}に{event.get('name')}の予定")
+            
+            message = f"{'、'.join(event_details)}。以上{len(added_events_info)}件の予定を追加しました。"
             return added_events_info, message
         
         return None, "予定を追加できませんでした。もう一度お試しください。"
@@ -408,7 +423,14 @@ class ChatSpaceModel:
             events = self.schedule_manager.list_events(user_id, time_min=start_time_iso, time_max=end_time_iso)
             
             if events:
-                message = f"{len(events)}件の予定が見つかりました。"
+                # 読み上げメッセージを生成 (すべてのイベントを読み上げる)
+                event_details = []
+                for event in events:
+                    start_time_str = self._format_event_time(event.get("start", {}).get("dateTime"))
+                    event_details.append(f"{start_time_str}に{event.get('summary')}の予定")
+                
+                message = f"{'、'.join(event_details)}。以上{len(events)}件の予定が見つかりました。"
+
                 # イベント情報を整形して返す
                 formatted_events = []
                 for event in events:
@@ -465,15 +487,29 @@ class ChatSpaceModel:
                     break
             if target_event_id:
                 try:
-                    self.schedule_manager.delete_event(user_id, target_event_id)
-                    deleted_events_info.append(event_to_delete)
+                    # ScheduleManagerのdelete_eventを呼び出し、返り値を利用
+                    delete_result = self.schedule_manager.delete_event(user_id, target_event_id)
+                    deleted_events_info.append({
+                        "name": delete_result["event"].get("summary"),
+                        "start_time": delete_result["event"].get("start", {}).get("dateTime"),
+                        "end_time": delete_result["event"].get("end", {}).get("dateTime"),
+                        "id": delete_result["event"].get("id")
+                    })
                 except Exception as e:
                     print(f"予定削除エラー: {e}")
             else:
-                print(f"削除対象のイベンチEDが見つかりませんでした: {event_to_delete}")
+                print(f"削除対象のイベントIDが見つかりませんでした: {event_to_delete}")
         
         if deleted_events_info:
-            message = f"{len(deleted_events_info)}件の予定を削除しました。"
+            # 読み上げメッセージを生成
+            event_details = []
+            for i, event in enumerate(deleted_events_info):
+                if i >= 5: # 最大5件に制限
+                    break
+                start_time_str = self._format_event_time(event.get("start_time"))
+                event_details.append(f"{start_time_str}の{event.get('name')}の予定")
+            
+            message = f"{'、'.join(event_details)}。以上{len(deleted_events_info)}件の予定を削除しました。"
             return deleted_events_info, message
         
         return None, "削除対象の予定が見つかりませんでした。"
@@ -495,36 +531,79 @@ class ChatSpaceModel:
         raw = self._gemini_request(prompt)
         events_to_change = self._parse_calendar_list(raw)
         changed_events_info = []
+        if not events_to_change:
+            return None, "変更対象の予定を特定できませんでした。"
+
         for event_to_change in events_to_change:
-            try:
-                target_event_id = event_to_change.get("id")
-                if not target_event_id:
-                    continue
-                updated_event = self.schedule_manager.update_event(
-                    user_id,
-                    target_event_id,
-                    new_start_iso=event_to_change.get("after_start_time"),
-                    new_end_iso=event_to_change.get("after_end_time"),
-                    new_summary=event_to_change.get("after_name")
-                )
-                changed_events_info.append({
-                    "before_name": event_to_change.get("before_name"),
-                    "after_name": (updated_event or {}).get("summary"),
-                    "before_start_time": event_to_change.get("before_start_time"),
-                    "after_start_time": (updated_event or {}).get("start", {}).get("dateTime"),
-                    "after_end_time": (updated_event or {}).get("end", {}).get("dateTime"),
-                    "id": (updated_event or {}).get("id")
-                })
-            except Exception as e:
-                print(f"イベント変更エラー: {e}")
+            target_event_id = None
+            # LLMが返した変更前の情報と、取得したタスクリストを比較してIDを特定
+            for task in task_list:
+                task_name = task.get("name")
+                task_start = self._normalize_time_for_compare(task.get("start_time"))
+                task_end = self._normalize_time_for_compare(task.get("end_time"))
+                
+                before_name = event_to_change.get("before_name")
+                before_start = self._normalize_time_for_compare(event_to_change.get("before_start_time"))
+                before_end = self._normalize_time_for_compare(event_to_change.get("before_end_time"))
+
+                if task_name == before_name and task_start == before_start and task_end == before_end:
+                    target_event_id = task.get("id")
+                    break
+            
+            if target_event_id:
+                try:
+                    update_result = self.schedule_manager.update_event(
+                        user_id,
+                        target_event_id,
+                        new_start_iso=event_to_change.get("after_start_time"),
+                        new_end_iso=event_to_change.get("after_end_time"),
+                        new_summary=event_to_change.get("after_name"),
+                        new_description=event_to_change.get("after_description") # descriptionも考慮
+                    )
+                    changed_events_info.append({
+                        "original_event": {
+                            "name": update_result["original_event"].get("summary"),
+                            "start_time": update_result["original_event"].get("start", {}).get("dateTime"),
+                            "end_time": update_result["original_event"].get("end", {}).get("dateTime"),
+                        },
+                        "updated_event": {
+                            "name": update_result["updated_event"].get("summary"),
+                            "start_time": update_result["updated_event"].get("start", {}).get("dateTime"),
+                            "end_time": update_result["updated_event"].get("end", {}).get("dateTime"),
+                        },
+                        "id": update_result["updated_event"].get("id")
+                    })
+                except Exception as e:
+                    print(f"イベント変更エラー: {e}")
+            else:
+                print(f"変更対象のイベントIDが見つかりませんでした: {event_to_change}")
+
         if changed_events_info:
-            message = f"{len(changed_events_info)}件の予定を変更しました。"
+            # 読み上げメッセージを生成
+            event_details = []
+            for i, event in enumerate(changed_events_info):
+                if i >= 5: # 最大5件に制限
+                    break
+                original_start_str = self._format_event_time(event["original_event"].get("start_time"))
+                updated_start_str = self._format_event_time(event["updated_event"].get("start_time"))
+                
+                detail_str = f"{original_start_str}の{event['original_event'].get('name')}の予定を"
+                if event['original_event'].get('name') != event['updated_event'].get('name'):
+                    detail_str += f"{event['updated_event'].get('name')}に、"
+                if original_start_str != updated_start_str:
+                    detail_str += f"{updated_start_str}に変更"
+                else:
+                    detail_str += "変更"
+                event_details.append(detail_str)
+            
+            message = f"{'、'.join(event_details)}。以上{len(changed_events_info)}件の予定を変更しました。"
             return changed_events_info, message
+        
         return None, "変更対象の予定が見つかりませんでした。"
 
     def _add_income_expense(self, text: str):
         """収支の追加"""
-        """収支の追加"""
+        current_time = datetime.now(JST).strftime('%Y-%m-%d %H:%M:%S')
         prompt = self.ADD_INCOME_EXPENSE_PROMPT_TEMPLATE.format(
             current_time=current_time,
             input_value=text
@@ -551,7 +630,7 @@ class ChatSpaceModel:
 
     def _get_income_expense(self, text: str):
         """収支の取得"""
-        """収支の取得"""
+        current_time = datetime.now(JST).strftime('%Y-%m-%d %H:%M:%S')
         prompt = self.GET_INCOME_EXPENSE_PROMPT_TEMPLATE.format(
             current_time=current_time,
             input_value=text
@@ -591,7 +670,7 @@ class ChatSpaceModel:
 
     def _add_memo(self, text: str):
         """メモ追加"""
-        """メモ追加"""
+        current_time = datetime.now(JST).strftime('%Y-%m-%d %H:%M:%S')
         prompt = self.ADD_MEMO_PROMPT_TEMPLATE.format(
             current_time=current_time,
             input_value=text

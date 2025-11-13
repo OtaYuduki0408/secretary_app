@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 from functools import wraps
 
 from flask import (
-    Flask, render_template, jsonify, request, redirect, url_for, session, abort,
+    Flask, render_template, jsonify, request, redirect, url_for, session, abort, g,
     send_from_directory,
 )
 from spotipy.oauth2 import SpotifyOAuth
@@ -42,7 +42,7 @@ app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{os.path.join(instance_path,
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db.init_app(app)
 
-# Blueprint逋ｻ骭ｲ
+# Blueprint登録
 app.register_blueprint(custom_order_bp, url_prefix='/api')
 app.register_blueprint(command_bp, url_prefix='/api')
 
@@ -131,7 +131,7 @@ def get_spotify_oauth():
         cache_path=None,
     )
 
-# 繝倥Ν繝代・
+# トークン情報
 def _get_token_info():
     return session.get('spotify_token_info')
 
@@ -154,7 +154,7 @@ def _has_required_scopes(token_info, required_scope: str) -> bool:
     return need.issubset(cur)
 
 
-# ============== 隱崎ｨｼ繝・さ繝ｬ繝ｼ繧ｿ ==============
+# ============== 認証デコレータ ==============
 def login_required(view_func):
     @wraps(view_func)
     def wrapper(*args, **kwargs):
@@ -163,8 +163,32 @@ def login_required(view_func):
         return view_func(*args, **kwargs)
     return wrapper
 
+def api_login_required(view_func):
+    @wraps(view_func)
+    def wrapper(*args, **kwargs):
+        email = request.headers.get('X-User-Email')
+        password = request.headers.get('X-User-Password')
 
-# ============== 繝壹・繧ｸ邉ｻ ==============
+        if not email or not password:
+            # JSONボディからも試行
+            data = request.get_json(silent=True)
+            if data:
+                email = data.get('email')
+                password = data.get('password')
+
+        if not email or not password:
+            return jsonify({'message': 'Error: Email and password are required for API authentication.'}), 401
+
+        login_result = login_user(email, password)
+        if 'error' in login_result:
+            return jsonify({'message': f'Error: {login_result["error"]}'}), 401
+
+        g.user_id = login_result['user']['id']
+        return view_func(*args, **kwargs)
+    return wrapper
+
+
+# ============== トップページ ==============
 @app.route('/')
 @login_required
 def main():
@@ -201,7 +225,7 @@ def calender_page():
     return render_template('calender.html')
 
 
-# ============== Google OAuth 繝ｫ繝ｼ繝・==============
+# ============== Google OAuth ログイン ==============
 @app.route('/google-login')
 def google_login():
     flow = build_web_flow(
@@ -239,13 +263,13 @@ def oauth_callback():
     user = session.get('user') or {}
     user_id = user.get('id')
     if not user_id:
-        return render_template('oauth-callback.html', error='繝ｦ繝ｼ繧ｶ繝ｼ譛ｪ繝ｭ繧ｰ繧､繝ｳ縺ｮ縺溘ａ縲∬ｪ崎ｨｼ諠・ｱ繧剃ｿ晏ｭ倥〒縺阪∪縺帙ｓ')
+        return render_template('oauth-callback.html', error='ユーザー未ログインのため、認証情報が取得できません')
     sm.set_credentials_from_info(user_id, creds_info)
 
     return render_template('oauth-callback.html', token=creds.token)
 
 
-# ============== Finance 逕ｻ髱｢ ==============
+# ============== Finance 画面 ==============
 @app.route('/finance')
 @login_required
 def finance():
@@ -260,7 +284,7 @@ def finance():
     )
 
 
-# ============== 隱崎ｨｼ邉ｻ ==============
+# ============== 認証関連 ==============
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     if request.method == 'POST':
@@ -292,7 +316,7 @@ def logout():
     return redirect(url_for('login'))
 
 
-# ============== REST API: 繧ｫ繝・ざ繝ｪ/蜿取髪/繝ｦ繝ｼ繧ｶ繝ｼ ==============
+# ============== REST API: カテゴリ/収支/ユーザー ==============
 @app.route('/api/categories', methods=['GET'])
 def get_categories_route():
     return jsonify(get_all_categories())
@@ -356,7 +380,7 @@ def delete_user_route():
     return jsonify(delete_user(email))
 
 
-# ============== Spotify 隱崎ｨｼ/繝壹・繧ｸ ==============
+# ============== Spotify 認証/ページ ==============
 @app.route('/spotify-login')
 def spotify_login():
     session.pop('spotify_token_info', None)
@@ -375,14 +399,14 @@ def spotify_callback():
     if request.args.get('error'):
         err = request.args.get('error')
         return render_template('spotify.html', is_authenticated=False,
-                               error_message=f'Spotify隱崎ｨｼ繧ｨ繝ｩ繝ｼ: {err}')
+                               error_message=f'Spotify認証エラー: {err}')
     code = request.args.get('code')
     try:
         token_info = sp_oauth.get_access_token(code)
         session['spotify_token_info'] = token_info
     except Exception as e:
         return render_template('spotify.html', is_authenticated=False,
-                               error_message=f'繝医・繧ｯ繝ｳ莠､謠帙お繝ｩ繝ｼ: {e}')
+                               error_message=f'トークン取得エラー: {e}')
     return redirect(url_for('spotify_page'))
 
 @app.route('/spotify')
@@ -398,7 +422,7 @@ def spotify_page():
             _save_token_info(token_info)
         except Exception as e:
             return render_template('spotify.html', is_authenticated=False,
-                                   error_message=f'繝医・繧ｯ繝ｳ譖ｴ譁ｰ縺ｫ螟ｱ謨・ {e}')
+                                   error_message=f'トークン更新に失敗: {e}')
     if not _has_required_scopes(token_info, REQUIRED_SPOTIFY_SCOPE):
         return redirect(url_for('spotify_relogin'))
     try:
@@ -420,10 +444,10 @@ def spotify_page():
         )
     except spotipy.exceptions.SpotifyException as e:
         return render_template('spotify.html', is_authenticated=False,
-                               error_message=f'Spotify API 繧ｨ繝ｩ繝ｼ: {e}')
+                               error_message=f'Spotify API エラー: {e}')
     except Exception as e:
         return render_template('spotify.html', is_authenticated=False,
-                               error_message=f'荳肴・縺ｪ繧ｨ繝ｩ繝ｼ: {e}')
+                               error_message=f'予期せぬエラー: {e}')
 
 @app.route('/api/spotify/token')
 def api_spotify_token():
@@ -450,7 +474,7 @@ def spotify_scope():
                     'has_all_required': _has_required_scopes(token_info, REQUIRED_SPOTIFY_SCOPE)})
 
 
-# ============== Spotify 繝励Ξ繧､繝､繝ｼ繝舌・謖ｿ蜈･ ==============
+# ============== Spotify プレイヤーバー挿入 ==============
 PLAYER_BAR_SNIPPET = """
   <div id="vs-playerbar" hidden>
     <div class="vs-section vs-main-controls">
@@ -492,7 +516,7 @@ def ensure_spotify_playerbar(response):
     return response
 
 
-# ============== Chat API・・witchBot/繧ｫ繝ｬ繝ｳ繝繝ｼ譖ｴ譁ｰ繧貞ｧ碑ｭｲ・・==============
+# ============== Chat API・SwitchBot/カレンダー更新処理 ==============
 import time
 import hashlib
 import hmac
@@ -535,11 +559,11 @@ def control_switchbot():
     return jsonify(result), status_code
 
 @app.route('/api/chat', methods=['POST'])
-def chat_api():
+@api_login_required
+def chat_api_external():
     data = request.get_json() or {}
     user_input = data.get('inputValue', '')
-    user = session.get('user') or {}
-    user_id = user.get('id') or data.get('user_id')
+    user_id = g.user_id
     response_data = chat_space_model.check_chat_space(user_input, user_id=user_id)
 
     action = response_data.get('action')
@@ -552,13 +576,63 @@ def chat_api():
                 response_data['message'] = 'SwitchBotを' + str(command) + 'しました'
                 response_data['status'] = 'success'
             else:
-                response_data['message'] = 'SwitchBot縺ｮ謫堺ｽ懊↓螟ｱ謨励＠縺ｾ縺励◆'
+                response_data['message'] = 'SwitchBotの操作に失敗しました'                
+                response_data['status'] = 'error'
+
+        elif action == 'calendar_update':
+            sm = ScheduleManager()
+        # 外部APIからのアクセスなので、user_idはg.user_idから取得
+        if user_id and sm.is_google_linked(user_id):
+            try:
+                calendar_id = response_data.get('calendar_id')
+                event_id = response_data.get('event_id')
+                changes = response_data.get('changes', {})
+                if calendar_id and event_id and changes:
+                    ok = sm.update_event(user_id, calendar_id, event_id, changes)
+                    if ok:
+                        response_data['message'] = 'Googleカレンダーのイベントを更新しました'
+                        response_data['status'] = 'success'
+                    else:
+                        response_data['message'] = 'Googleカレンダーの更新に失敗しました'
+                        response_data['status'] = 'error'
+                else:
+                    response_data['message'] = '変更必須のイベントIDが欠落しています'
+                    response_data['status'] = 'error'
+            except Exception as e:
+                response_data['message'] = f'Google繧ｫ繝ｬ繝ｳ繝繝ｼ縺ｮ莠亥ｮ壼､画峩縺ｫ螟ｱ謨励＠縺ｾ縺励◆: {str(e)}'
+                response_data['status'] = 'error'
+        else:
+            # 外部APIからのアクセスなので、リダイレクトではなくエラーを返す
+            response_data['message'] = 'Googleアカウントがリンクされていません。'
+            response_data['status'] = 'needs_link'
+            return jsonify(response_data), 401
+
+    return jsonify(response_data)
+
+@app.route('/web_api/chat', methods=['POST'])
+@login_required # セッションベース認証
+def chat_api_web():
+    data = request.get_json() or {}
+    user_input = data.get('inputValue', '')
+    user_id = session.get('user', {}).get('id') # セッションからuser_idを取得
+    response_data = chat_space_model.check_chat_space(user_input, user_id=user_id)
+
+    action = response_data.get('action')
+
+    if action == 'switchbot_control':
+        command = response_data.get('data', {}).get('command')
+        if command:
+            switchbot_result, status_code = execute_switchbot_command(command)
+            if status_code == 200 and switchbot_result.get('statusCode') == 100:
+                response_data['message'] = 'SwitchBotを' + str(command) + 'しました'
+                response_data['status'] = 'success'
+            else:
+                response_data['message'] = 'SwitchBotの操作に失敗しました'
                 response_data['status'] = 'error'
 
     elif action == 'calendar_update':
         sm = ScheduleManager()
-        user = session.get('user') or {}
-        user_id = user.get('id')
+        # Webブラウザからのアクセスなので、user_idはsessionから取得
         if user_id and sm.is_google_linked(user_id):
             try:
                 calendar_id = response_data.get('calendar_id')
@@ -579,22 +653,20 @@ def chat_api():
                 response_data['message'] = f'Google繧ｫ繝ｬ繝ｳ繝繝ｼ縺ｮ莠亥ｮ壼､画峩縺ｫ螟ｱ謨励＠縺ｾ縺励◆: {str(e)}'
                 response_data['status'] = 'error'
         else:
+            # Webブラウザからのアクセスなので、GoogleログインページへのURLを返す
             purpose = response_data.get('purpose', '')
             if isinstance(purpose, str) and purpose.startswith('C'):
                 oauth_url = url_for('google_login')
-                response_data['message'] = f'Google騾｣謳ｺ縺梧悴螳御ｺ・〒縺吶ゅ％縺｡繧峨°繧蛾｣謳ｺ縺励※縺上□縺輔＞: {oauth_url}'
+                response_data['message'] = f'Googleアカウントがリンクされていません。こちらからリンクしてください: {oauth_url}'
                 response_data['status'] = 'needs_link'
                 return jsonify(response_data), 401
             response_data['status'] = 'error'
-
     return jsonify(response_data)
-
-
-# 繝｡繝｢API縺ｮBlueprint
+# メモAPIのBlueprint
 app.register_blueprint(memo_bp, url_prefix='/api/memos')
 
 
-# ============== DB蛻晄悄蛹悶→繧ｨ繝ｳ繝医Μ繝昴う繝ｳ繝・==============
+# ============== DB初期化と起動 ==============
 with app.app_context():
     db.create_all()
 

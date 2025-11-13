@@ -61,7 +61,7 @@ export async function check_chat_Space(inputValue) {
   reader.speak(`${inputValue}でございますね。かしこまりました。`);
 
   try {
-    const response = await fetch('/api/chat', {
+    const response = await fetch('/web_api/chat', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

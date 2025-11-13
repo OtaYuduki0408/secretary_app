@@ -124,8 +124,9 @@ class ScheduleManager:
 
     def delete_event(self, user_id: str, event_id: str):
         service = self._build_service(user_id)
+        event_to_delete = service.events().get(calendarId="primary", eventId=event_id).execute()
         service.events().delete(calendarId="primary", eventId=event_id).execute()
-        return {"status": "deleted", "id": event_id}
+        return {"status": "deleted", "id": event_id, "event": event_to_delete}
 
     def list_events(self, user_id: str, time_min: str | None = None, time_max: str | None = None, max_results: int = 50):
         service = self._build_service(user_id)
@@ -157,4 +158,4 @@ class ScheduleManager:
         if new_end_iso:
             event["end"] = {"dateTime": new_end_iso}
         updated = service.events().update(calendarId="primary", eventId=event_id, body=event).execute()
-        return updated
+        return {"status": "updated", "original_event": original_event, "updated_event": updated}
