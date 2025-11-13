@@ -97,3 +97,16 @@ def get_finance_summary():
     expense_stats = aggregate_monthly(expenses)
 
     return income_stats, expense_stats
+
+def get_unique_categories(user_id: str | None = None):
+    """
+    Supabaseからユニークなカテゴリのリストを取得する。
+    """
+    try:
+        q = supabase.table(TABLE_NAME).select("category").eq("user_id", user_id)
+        response = q.execute()
+        categories = sorted(list(set([item["category"] for item in response.data if "category" in item])))
+        return categories
+    except (APIError, Exception) as e:
+        print(f"[ERROR] get_unique_categories: {e}")
+        return []

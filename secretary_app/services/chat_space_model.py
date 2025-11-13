@@ -108,9 +108,11 @@ class ChatSpaceModel:
     目的: ユーザーが登録したい収支情報を抽出
     抽出項目:
     - type (収入または支出)
-    - category (カテゴリ、例: 食費、交通費、給与など)
+    - category (カテゴリ、例: 食費、交通費、給与など。以下の利用可能なカテゴリから選択してください。もし適切なカテゴリがない場合は「その他支出」または「その他収入」を選択してください。)
     - amount (金額)
     - date (日付、未指定時は当日/推測日付 YYYY-MM-DD)
+    - memo (使った内容)
+    利用可能なカテゴリ: {available_categories}
     出力はJSON配列のみ、他テキスト禁止。単独でも複数あっても二次配列で返す。
     現在時刻:{current_time}
     ユーザー入力: {input_value}
@@ -123,6 +125,7 @@ class ChatSpaceModel:
     - start_date (未指定時は当月1日 YYYY-MM-DD)
     - end_date (未指定時は当月末日 YYYY-MM-DD)
     - category (任意、未指定時は全て)
+    - memo (任意、メモの内容、未指定時は全て)
     出力はJSON配列のみ、他テキスト禁止。一つの辞書で渡して。
     現在時刻:{current_time}
     ユーザー入力: {input_value}
@@ -237,7 +240,8 @@ class ChatSpaceModel:
                 'type': x.get('type') or '',
                 'category': x.get('category') or '',
                 'amount': x.get('amount') or 0,
-                'date': x.get('date') or ''
+                'date': x.get('date') or '',
+                'memo': x.get('memo') or ''
             }
             if item['type'] and item['category'] and item['amount']:
                  parsed_list.append(item)
@@ -300,7 +304,7 @@ class ChatSpaceModel:
         elif purpose == "Cc":
             result["data"], result["message"] = self._change_calendar(input_value, user_id)
         elif purpose == "Ia": # 収支管琁E�E登録
-            result["data"], result["message"] = self._add_income_expense(input_value)
+            result["data"], result["message"] = self._add_income_expense(input_value, user_id)
         elif purpose == "Ig": # 収支管琁E�E取征E
             result["data"], result["message"] = self._get_income_expense(input_value, user_id)
         elif purpose == "Ma": # メモ帳の追加
@@ -611,9 +615,22 @@ class ChatSpaceModel:
         if not user_id:
             return None, "ユーザー未ログイン"
         current_time = datetime.now(JST).strftime('%Y-%m-%d %H:%M:%S')
+
+        # expense_serviceからカテゴリ一覧を取得
+        from services.expense_service import add_finance_record, get_unique_categories
+        available_categories = get_unique_categories(user_id)
+        
+        # デフォルトカテゴリ
+        if not available_categories:
+            available_categories = [
+                "食費", "交通費", "娯楽費", "日用品", "家賃", "水道光熱費", "通信費",
+                "給与", "副業収入", "臨時収入", "その他支出", "その他収入"
+            ]
+
         prompt = self.ADD_INCOME_EXPENSE_PROMPT_TEMPLATE.format(
             current_time=current_time,
-            input_value=text
+            input_value=text,
+            available_categories=", ".join(available_categories)
         )
         raw = self._gemini_request(prompt)
         income_expenses_to_add = self._parse_income_expense_list(raw)
@@ -624,30 +641,13 @@ class ChatSpaceModel:
 
         for ie in income_expenses_to_add:
             try:
-                # finance_serviceのadd_finance_recordを呼び出す
-                # add_finance_recordはapp.pyでインポートされているが、ここでは直接呼び出せないため、
-                # finance_serviceにadd_recordのような関数を追加するか、
-                # ここで直接supabaseクライアントを呼び出す必要がある。
-                # 今回は、add_finance_recordがuser_idを引数に取ることを考慮し、
-                # finance_serviceに新しい関数を追加する前提で進める。
-                # 仮に、finance_service.add_finance_record(data, user_id) のような関数があると仮定する。
-                # dataは辞書形式でtype, category, amount, dateを含む。
                 data = {
-                    "type": ie['type'],
+                    "type": "income" if ie['type'] == "収入" else "expense",
                     "category": ie['category'],
                     "amount": ie['amount'],
                     "date": ie['date'],
-                    "user_id": user_id # user_idを追加
+                    "user_id": user_id
                 }
-                # finance_serviceにadd_finance_recordを直接呼び出す関数がないため、
-                #
-                # 実際には、app.pyのadd_finance_record_routeが呼び出すadd_finance_record関数を
-                # chat_space_modelから直接呼び出すのは適切ではない。
-                # finance_serviceに新しい関数を追加して、それを呼び出すのが良い。
-                # 例: created_record = finance_service.add_finance_record_from_chat(data, user_id)
-                # しかし、今回は既存のadd_finance_recordを直接呼び出す形にする。
-                # そのためには、add_finance_recordをchat_space_model.pyでインポートする必要がある。
-                from services.expense_service import add_finance_record
                 created_record = add_finance_record(data, user_id)
                 added_info.append(created_record)
             except Exception as e:
@@ -674,7 +674,7 @@ class ChatSpaceModel:
             monthly_expense = get_monthly_expense(user_id)
             message = f"今月の合計支出額は{monthly_expense}円です。"
             return {"monthly_expense": monthly_expense}, message
-        elif "今日の使用額" in text or "今日の支出" in text:
+        elif "今日の使用額" in text or "今日の支出" in text or "今日いくら使った" in text:
             daily_expense = get_daily_expense(user_id)
             message = f"今日の合計支出額は{daily_expense}円です。"
             return {"daily_expense": daily_expense}, message
@@ -715,9 +715,19 @@ class ChatSpaceModel:
                     if not category or record.get("category") == category:
                         filtered_records.append(record)
 
+            print(f"--- [DEBUG] _get_income_expense: Filtered records: {filtered_records} ---")
             if filtered_records:
-                message = f"{len(filtered_records)}件の収支が見つかりました。"
-                return filtered_records, message
+                total_income = sum(r.get("amount", 0) for r in filtered_records if r.get("type") == "income")
+                total_expense = sum(r.get("amount", 0) for r in filtered_records if r.get("type") == "expense")
+                net_balance = total_income - total_expense
+
+                message = (
+                    f"期間内の収支が見つかりました。\n"
+                    f"収入: {total_income}円\n"
+                    f"支出: {total_expense}円\n"
+                    f"収支: {net_balance}円"
+                )
+                return {"filtered_records": filtered_records, "summary": {"income": total_income, "expense": total_expense, "balance": net_balance}}, message
             else:
                 message = "該当する収支は見つかりませんでした。"
                 return [], message
@@ -759,8 +769,11 @@ class ChatSpaceModel:
             current_time=current_time,
             input_value=text
         )
+        print(f"--- [DEBUG] _get_memo: Prompt for Gemini: {prompt} ---")
         raw = self._gemini_request(prompt)
+        print(f"--- [DEBUG] _get_memo: Gemini raw response: {raw} ---")
         search_info = self._parse_memo_list(raw)
+        print(f"--- [DEBUG] _get_memo: Parsed memo search info: {search_info} ---")
 
         keyword = None
         title = None
@@ -773,7 +786,9 @@ class ChatSpaceModel:
             return None, "メモの検索に必要なキーワードまたはタイトルが指定されていません。"
 
         try:
+            print(f"--- [DEBUG] _get_memo: Calling MemoManager.search_memos with keyword='{keyword}', title='{title}' ---")
             memos = self.memo_manager.search_memos(keyword=keyword, title=title)
+            print(f"--- [DEBUG] _get_memo: MemoManager.search_memos returned: {memos} ---")
             
             if memos:
                 message = f"{len(memos)}件のメモが見つかりました。"
@@ -782,7 +797,7 @@ class ChatSpaceModel:
                 message = "該当するメモは見つかりませんでした。"
                 return [], message
         except Exception as e:
-            print(f"メモ検索/取得エラー: {e}")
+            print(f"--- [ERROR] _get_memo: メモ検索/取得エラー: {e} ---")
             return None, "メモの取得中にエラーが発生しました。"
 
 
