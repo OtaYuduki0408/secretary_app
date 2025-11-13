@@ -152,10 +152,8 @@ PLAYER_BAR_SNIPPET = """
 # ====================================================================
 # ✅ Spotify 認証情報
 # ====================================================================
-SPOTIPY_CLIENT_ID = os.environ.get('SPOTIPY_CLIENT_ID')
-SPOTIPY_CLIENT_SECRET = os.environ.get('SPOTIPY_CLIENT_SECRET')
-if not SPOTIPY_CLIENT_ID or not SPOTIPY_CLIENT_SECRET:
-    print("Warning: SPOTIPY_CLIENT_ID and SPOTIPY_CLIENT_SECRET environment variables are not set. Spotify integration will be disabled.")
+SPOTIPY_CLIENT_ID = os.environ.get('SPOTIPY_CLIENT_ID')  
+SPOTIPY_CLIENT_SECRET = os.environ.get('SPOTIPY_CLIENT_SECRET') 
 
 # ✅ HTTPS コールバック（Dashboard側にも完全一致で登録）
 SPOTIPY_REDIRECT_URI = "https://127.0.0.1:5000/spotify-callback"
