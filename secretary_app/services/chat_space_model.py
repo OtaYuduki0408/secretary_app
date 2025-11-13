@@ -2,6 +2,8 @@ import os
 import re
 import json
 from datetime import datetime, timedelta
+import pytz
+JST = pytz.timezone('Asia/Tokyo')
 import google.generativeai as genai # 変更
 from services.ScheduleManager import ScheduleManager
 
@@ -153,7 +155,7 @@ class ChatSpaceModel:
     def check_chat_space(self, input_value: str) -> dict:
         """ユーザー入力を解析・処理するメインエントリポイント"""
         print("--- [DEBUG] check_chat_space: Starting ---")
-        current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        current_time = datetime.now(JST).strftime('%Y-%m-%d %H:%M:%S')
         
         # 1. 目的判定 (第一解析)
         purpose_prompt = self.PURPOSE_PROMPT_TEMPLATE.format(
@@ -190,7 +192,7 @@ class ChatSpaceModel:
 
     def _add_calendar(self, text: str):
         """予定追加（Ca）"""
-        current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        current_time = datetime.now(JST).strftime('%Y-%m-%d %H:%M:%S')
         prompt = self.ADD_CALENDAR_PROMPT_TEMPLATE.format(
             current_time=current_time,
             input_value=text
@@ -232,7 +234,7 @@ class ChatSpaceModel:
 
     def _get_calender(self, text: str, is_silent: bool):
         """予定取得（Cg）"""
-        current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        current_time = datetime.now(JST).strftime('%Y-%m-%d %H:%M:%S')
         prompt = self.GET_CALENDAR_PROMPT_TEMPLATE.format(
             current_time=current_time,
             input_value=text
@@ -248,7 +250,7 @@ class ChatSpaceModel:
             end_time_iso = range_info[0]['end_time']
         else:
             # LLMが有効な時間範囲を返さなかった場合、デフォルトで今日1日を取得
-            start = datetime.now()
+            start = datetime.now(JST)
             end = start + timedelta(days=1)
             start_time_iso = start.isoformat() + "Z"
             end_time_iso = end.isoformat() + "Z"
@@ -284,7 +286,7 @@ class ChatSpaceModel:
         if not task_list:
             return None, "カレンダーに該当する予定が見つからなかったため、削除処理を中断します。"
 
-        current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        current_time = datetime.now(JST).strftime('%Y-%m-%d %H:%M:%S')
         prompt = self.REMOVE_CALENDAR_PROMPT_TEMPLATE.format(
             current_time=current_time,
             task_list_json=task_list_json,
@@ -332,7 +334,7 @@ class ChatSpaceModel:
         if not task_list:
             return None, "カレンダーに該当する予定が見つからなかったため、変更処理を中断します。"
 
-        current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        current_time = datetime.now(JST).strftime('%Y-%m-%d %H:%M:%S')
         prompt = self.CHANGE_CALENDAR_PROMPT_TEMPLATE.format(
             current_time=current_time,
             task_list_json=task_list_json,

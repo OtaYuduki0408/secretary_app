@@ -5,6 +5,9 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'order'))
 
 from flask import Flask, render_template, jsonify, request, redirect, url_for, session
 from datetime import datetime, timedelta
+import pytz
+
+JST = pytz.timezone('Asia/Tokyo')
 from services.user_service import (
     get_all_users, get_user_by_email, add_user, update_user, delete_user)
 from services.category_service import (
@@ -894,8 +897,11 @@ def chat_api():
         try:
             for event_to_add in calendar_event_data:
                 # YYYY-MM-DD HH:MM:SS 形式をISO 8601形式に変換
-                start_iso = datetime.strptime(event_to_add.get('start_time'), '%Y-%m-%d %H:%M:%S').isoformat() if event_to_add.get('start_time') else None
-                end_iso = datetime.strptime(event_to_add.get('end_time'), '%Y-%m-%d %H:%M:%S').isoformat() if event_to_add.get('end_time') else None
+                start_dt = datetime.strptime(event_to_add.get('start_time'), '%Y-%m-%d %H:%M:%S') if event_to_add.get('start_time') else None
+                end_dt = datetime.strptime(event_to_add.get('end_time'), '%Y-%m-%d %H:%M:%S') if event_to_add.get('end_time') else None
+                
+                start_iso = start_dt.replace(tzinfo=JST).astimezone(pytz.utc).isoformat() if start_dt else None
+                end_iso = end_dt.replace(tzinfo=JST).astimezone(pytz.utc).isoformat() if end_dt else None
                 
                 calendar_manager.add_event(
                     event_to_add.get('name'),
@@ -917,11 +923,13 @@ def chat_api():
 
             start_iso = None
             if start_time_str:
-                start_iso = datetime.strptime(start_time_str, '%Y-%m-%d %H:%M:%S').isoformat() + 'Z'
+                start_dt = datetime.strptime(start_time_str, '%Y-%m-%d %H:%M:%S')
+                start_iso = start_dt.replace(tzinfo=JST).astimezone(pytz.utc).isoformat()
             
             end_iso = None
             if end_time_str:
-                end_iso = datetime.strptime(end_time_str, '%Y-%m-%d %H:%M:%S').isoformat() + 'Z'
+                end_dt = datetime.strptime(end_time_str, '%Y-%m-%d %H:%M:%S')
+                end_iso = end_dt.replace(tzinfo=JST).astimezone(pytz.utc).isoformat()
             
             events = calendar_manager.list_events(start_iso, end_iso)
             if events:
@@ -960,8 +968,11 @@ def chat_api():
                 # 実際には、before_name, before_start_time, before_end_timeを使ってlist_eventsで検索し、eventIdを取得する必要がある
                 event_id = event_to_change.get('id') # または検索して取得
                 if event_id:
-                    new_start_iso = datetime.strptime(event_to_change.get('after_start_time'), '%Y-%m-%d %H:%M:%S').isoformat() if event_to_change.get('after_start_time') else None
-                    new_end_iso = datetime.strptime(event_to_change.get('after_end_time'), '%Y-%m-%d %H:%M:%S').isoformat() if event_to_change.get('after_end_time') else None
+                    new_start_dt = datetime.strptime(event_to_change.get('after_start_time'), '%Y-%m-%d %H:%M:%S') if event_to_change.get('after_start_time') else None
+                    new_end_dt = datetime.strptime(event_to_change.get('after_end_time'), '%Y-%m-%d %H:%M:%S') if event_to_change.get('after_end_time') else None
+
+                    new_start_iso = new_start_dt.replace(tzinfo=JST).astimezone(pytz.utc).isoformat() if new_start_dt else None
+                    new_end_iso = new_end_dt.replace(tzinfo=JST).astimezone(pytz.utc).isoformat() if new_end_dt else None
                     new_summary = event_to_change.get('after_name')
                     
                     calendar_manager.update_event(
