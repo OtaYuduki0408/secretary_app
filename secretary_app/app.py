@@ -55,10 +55,8 @@ PLAYER_BAR_SNIPPET = """
 # ====================================================================
 # ✅ Spotify 認証情報
 # ====================================================================
-_DEFAULT_CLIENT_ID = '6e488b5a5d3045089c2764317b756eee'
-_DEFAULT_CLIENT_SECRET = 'd4f1f05bcaa4472bba1ce6bae2455eb8'
-SPOTIPY_CLIENT_ID = os.environ.get('SPOTIPY_CLIENT_ID') or _DEFAULT_CLIENT_ID
-SPOTIPY_CLIENT_SECRET = os.environ.get('SPOTIPY_CLIENT_SECRET') or _DEFAULT_CLIENT_SECRET
+SPOTIPY_CLIENT_ID = os.environ.get('SPOTIPY_CLIENT_ID')  
+SPOTIPY_CLIENT_SECRET = os.environ.get('SPOTIPY_CLIENT_SECRET') 
 
 # ✅ HTTPS コールバック（Dashboard側にも完全一致で登録）
 SPOTIPY_REDIRECT_URI = "https://127.0.0.1:5000/spotify-callback"
