@@ -53,6 +53,54 @@ def get_finance_summary(user_id: str | None = None):
 
     return income_stats, expense_stats
 
+def get_current_balance(user_id: str | None = None):
+    """
+    現在の所持金を計算して返す。
+    """
+    finance_data = get_all_finance_records(user_id)
+    
+    if not finance_data:
+        return 0.0
+    
+    total_income = sum(item.get("amount", 0) for item in finance_data if item.get("type") == "income")
+    total_expense = sum(item.get("amount", 0) for item in finance_data if item.get("type") == "expense")
+    
+    return total_income - total_expense
+
+def get_monthly_expense(user_id: str | None = None):
+    """
+    今月の合計支出額を計算して返す。
+    """
+    finance_data = get_all_finance_records(user_id)
+    
+    if not finance_data:
+        return 0.0
+    
+    current_month = datetime.now().strftime("%Y-%m")
+    monthly_expense = sum(
+        item.get("amount", 0) for item in finance_data 
+        if item.get("type") == "expense" and datetime.fromisoformat(item["date"]).strftime("%Y-%m") == current_month
+    )
+    
+    return monthly_expense
+
+def get_daily_expense(user_id: str | None = None):
+    """
+    今日の合計支出額を計算して返す。
+    """
+    finance_data = get_all_finance_records(user_id)
+    
+    if not finance_data:
+        return 0.0
+    
+    today = datetime.now().strftime("%Y-%m-%d")
+    daily_expense = sum(
+        item.get("amount", 0) for item in finance_data 
+        if item.get("type") == "expense" and datetime.fromisoformat(item["date"]).strftime("%Y-%m-%d") == today
+    )
+    
+    return daily_expense
+
 # --------------------------------------------------------------------------
 # 補足: Flaskのビュー関数 (app.py) のコード例
 # --------------------------------------------------------------------------

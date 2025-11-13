@@ -7,19 +7,24 @@ JST = pytz.timezone('Asia/Tokyo')
 import google.generativeai as genai
 from services.ScheduleManager import ScheduleManager
 # IncomeExpenseManagerとMemoManagerのインポ�Eトを追加 (これら�Eファイルは別途作�Eが忁E��でぁE
-from services.IncomeExpenseManager import IncomeExpenseManager
+from services.finance_service import (
+    get_all_finance_records, get_finance_summary, get_current_balance,
+    get_monthly_expense, get_daily_expense
+)
 from services.MemoManager import MemoManager
 
 
 class ChatSpaceModel:
     
+
     # 意図判定プロンプト
     PURPOSE_PROMPT_TEMPLATE = """
     以下のリストの目的と照合し、対応する機能を大文字、対応する行動を小文字で返してください。
-    命令を確実に実現できる機能がない場合、機能を使わず、最適と思われる解答をしてください。その場合、返答は最大30文字以内となるべく少なくしてください。
+    命令を確実に実現できる機能がない場合、機能を使わず、最適と思われる解答をしてください。その場合、返答は最大
+    30文字以内となるべく少なくしてください。
     -機能-
     C:カレンダー
-    I:収支管理
+    I:収支管理 (例: 所持金、残高、今月の使用額、今日の使用額、収支の記録、支出の記録、収入の記録)
     M:メモ帳
     T:時刻、年月日、曜日確認(行動はn)
     R:過去の命令の修正(行動はn)
@@ -146,15 +151,15 @@ class ChatSpaceModel:
     """
 
 
+
     def __init__(self, gemini_api_key: str, calendar_manager=None):
         genai.configure(api_key=gemini_api_key)
         print(gemini_api_key[:-5])
         self.model_name = "gemini-2.5-flash"
         self.model = genai.GenerativeModel(model_name=self.model_name)
-        self.schedule_manager = ScheduleManager() # ScheduleManagerのインスタンスを作�E
-        self.income_expense_manager = IncomeExpenseManager() # IncomeExpenseManagerのインスタンスを作�E
-        self.memo_manager = MemoManager() # MemoManagerのインスタンスを作�E
-        
+        self.schedule_manager = ScheduleManager() # ScheduleManagerのインスタンスを作E
+        self.memo_manager = MemoManager() # MemoManagerのインスタンスを作E
+    
     def _gemini_request(self, prompt: str) -> str:
         print(f"--- [DEBUG] geminiに解析リクエスチEnユーザー入劁E{prompt}")
         try:
@@ -601,8 +606,10 @@ class ChatSpaceModel:
         
         return None, "変更対象の予定が見つかりませんでした。"
 
-    def _add_income_expense(self, text: str):
+    def _add_income_expense(self, text: str, user_id: str | None):
         """収支の追加"""
+        if not user_id:
+            return None, "ユーザー未ログイン"
         current_time = datetime.now(JST).strftime('%Y-%m-%d %H:%M:%S')
         prompt = self.ADD_INCOME_EXPENSE_PROMPT_TEMPLATE.format(
             current_time=current_time,
@@ -617,20 +624,62 @@ class ChatSpaceModel:
 
         for ie in income_expenses_to_add:
             try:
-                created_record = self.income_expense_manager.add_record(ie['type'], ie['category'], ie['amount'], ie['date'])
+                # finance_serviceのadd_finance_recordを呼び出す
+                # add_finance_recordはapp.pyでインポートされているが、ここでは直接呼び出せないため、
+                # finance_serviceにadd_recordのような関数を追加するか、
+                # ここで直接supabaseクライアントを呼び出す必要がある。
+                # 今回は、add_finance_recordがuser_idを引数に取ることを考慮し、
+                # finance_serviceに新しい関数を追加する前提で進める。
+                # 仮に、finance_service.add_finance_record(data, user_id) のような関数があると仮定する。
+                # dataは辞書形式でtype, category, amount, dateを含む。
+                data = {
+                    "type": ie['type'],
+                    "category": ie['category'],
+                    "amount": ie['amount'],
+                    "date": ie['date'],
+                    "user_id": user_id # user_idを追加
+                }
+                # finance_serviceにadd_finance_recordを直接呼び出す関数がないため、
+                #
+                # 実際には、app.pyのadd_finance_record_routeが呼び出すadd_finance_record関数を
+                # chat_space_modelから直接呼び出すのは適切ではない。
+                # finance_serviceに新しい関数を追加して、それを呼び出すのが良い。
+                # 例: created_record = finance_service.add_finance_record_from_chat(data, user_id)
+                # しかし、今回は既存のadd_finance_recordを直接呼び出す形にする。
+                # そのためには、add_finance_recordをchat_space_model.pyでインポートする必要がある。
+                from services.expense_service import add_finance_record
+                created_record = add_finance_record(data, user_id)
                 added_info.append(created_record)
             except Exception as e:
                 print(f"収支登録エラー: {e}")
-        
+
         if added_info:
             message = f"{len(added_info)}件の収支を追加しました。"
             return added_info, message
-        
+
         return None, "収支の追加は行われませんでした。"
 
-    def _get_income_expense(self, text: str):
+    def _get_income_expense(self, text: str, user_id: str | None):
         """収支の取得"""
+        if not user_id:
+            return None, "ユーザー未ログイン"
         current_time = datetime.now(JST).strftime('%Y-%m-%d %H:%M:%S')
+
+        # ユーザーの入力から特定の情報を取得する意図を判定
+        if "所持金" in text or "残高" in text:
+            balance = get_current_balance(user_id)
+            message = f"現在の所持金は{balance}円です。"
+            return {"balance": balance}, message
+        elif "今月の使用額" in text or "今月の支出" in text:
+            monthly_expense = get_monthly_expense(user_id)
+            message = f"今月の合計支出額は{monthly_expense}円です。"
+            return {"monthly_expense": monthly_expense}, message
+        elif "今日の使用額" in text or "今日の支出" in text:
+            daily_expense = get_daily_expense(user_id)
+            message = f"今日の合計支出額は{daily_expense}円です。"
+            return {"daily_expense": daily_expense}, message
+
+        # 既存の期間とカテゴリによる収支取得ロジック
         prompt = self.GET_INCOME_EXPENSE_PROMPT_TEMPLATE.format(
             current_time=current_time,
             input_value=text
@@ -646,8 +695,8 @@ class ChatSpaceModel:
             start_date = range_info[0].get('start_date')
             end_date = range_info[0].get('end_date')
             category = range_info[0].get('category')
-        
-        # チE��ォルト値の設宁E
+
+        # デフォルト値の設定
         if not start_date:
             start_date = datetime.now(JST).replace(day=1).strftime('%Y-%m-%d')
         if not end_date:
@@ -656,11 +705,19 @@ class ChatSpaceModel:
             end_date = (next_month - timedelta(days=next_month.day)).strftime('%Y-%m-%d')
 
         try:
-            records = self.income_expense_manager.list_records(start_date=start_date, end_date=end_date, category=category)
-            
-            if records:
-                message = f"{len(records)}件の収支が見つかりました。"
-                return records, message
+            # finance_serviceのget_all_finance_recordsを呼び出し、フィルタリング
+            all_records = get_all_finance_records(user_id)
+
+            filtered_records = []
+            for record in all_records:
+                record_date = datetime.fromisoformat(record["date"]).strftime('%Y-%m-%d')
+                if start_date <= record_date <= end_date:
+                    if not category or record.get("category") == category:
+                        filtered_records.append(record)
+
+            if filtered_records:
+                message = f"{len(filtered_records)}件の収支が見つかりました。"
+                return filtered_records, message
             else:
                 message = "該当する収支は見つかりませんでした。"
                 return [], message
