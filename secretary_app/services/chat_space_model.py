@@ -302,7 +302,7 @@ class ChatSpaceModel:
         elif purpose == "Ia": # 収支管琁E�E登録
             result["data"], result["message"] = self._add_income_expense(input_value)
         elif purpose == "Ig": # 収支管琁E�E取征E
-            result["data"], result["message"] = self._get_income_expense(input_value)
+            result["data"], result["message"] = self._get_income_expense(input_value, user_id)
         elif purpose == "Ma": # メモ帳の追加
             result["data"], result["message"] = self._add_memo(input_value)
         elif purpose == "Mg": # メモ帳の検索/取征E
