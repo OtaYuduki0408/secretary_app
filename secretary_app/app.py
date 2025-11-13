@@ -358,7 +358,7 @@ def spotify_page():
                                    error_message=f'トークン更新に失敗: {e}')
 
     # ✅ 必須スコープが無ければ強制再同意へ
-    if not _has_required_scopes(token_info, SCOPE):
+    if not _has_required_scopes(token_info, SCOPES):
         return redirect(url_for('spotify_relogin'))
 
     try:
@@ -813,7 +813,7 @@ def api_spotify_token():
             session['spotify_token_info'] = token_info
         except Exception:
             return jsonify({"error": "refresh_failed"}), 401
-    if not _has_required_scopes(token_info, SCOPE):
+    if not _has_required_scopes(token_info, SCOPES):
         return jsonify({"error": "invalid_scopes",
                         "scope": token_info.get("scope","")}), 403
     return jsonify({"access_token": token_info["access_token"],
