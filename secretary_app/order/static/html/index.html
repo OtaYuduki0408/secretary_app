@@ -1,83 +1,111 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-<meta charset="UTF-8">
-<title>カスタム命令</title>
-<style>
-  body { font-family:"Segoe UI","Noto Sans JP",sans-serif; background:#f6f8fa; margin:0; padding:20px; color:#333; }
-  .container { max-width:1000px; margin:40px auto; background:#fff; padding:2em; border-radius:12px; box-shadow:0 4px 12px rgba(0,0,0,0.1);}
-  h2 { text-align:center; margin-bottom:1.2em; }
-  .block { margin-bottom:25px; }
-  label { display:block; font-weight:bold; margin-bottom:6px; }
-  input[type="text"], select, textarea { width:100%; padding:8px; border-radius:6px; border:1px solid #ccc; box-sizing:border-box; font-size:14px; }
-  textarea { resize: vertical; height:70px; }
-  .add-button, .save-button, .remove, .nest-button { background:#007bff; color:#fff; border:none; border-radius:6px; padding:6px 10px; margin-top:6px; cursor:pointer; }
-  .remove { background:#dc3545; }
-  .remove:hover { background:#b02a37; }
-  .nest-button { background:#17a2b8; }
-  .nest-button:hover { background:#10707e; }
-  .save-button:hover, .add-button:hover { background:#0056b3; }
-  .msg { margin-top:10px; color:green; font-weight:bold; }
-  .item { background:#f9f9f9; padding:10px; border-radius:8px; border:1px solid #ddd; margin-bottom:8px; }
-  .nested-conditions, .nested-actions { margin-left:20px; margin-top:5px; }
-  .condition-block { background:#f0f0f0; padding:8px; border-radius:6px; margin-bottom:8px; }
-</style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>カスタム命令 | Secretary Automation</title>
+  <link rel="stylesheet" href="/custom_order/static/css/index.css">
 </head>
-<body>
-<div class="container">
-  <a href="/" style="text-decoration:none;color:#007bff;">← 戻る</a>
-  <h2>カスタム命令</h2>
+<body class="co-body">
+  <div class="co-shell">
+    <header class="co-header">
+      <a href="/" class="co-link-btn">← メインに戻る</a>
+      <div class="co-header-copy">
+        <p class="co-eyebrow">Automation Studio</p>
+        <h1>カスタム命令</h1>
+        <p class="co-subtitle">収支やカレンダーイベントをトリガーに、日々のルーティンを自動化しましょう。</p>
+      </div>
+    </header>
 
-  <!-- 命令名 -->
-  <div class="block">
-    <label>命令名</label>
-    <input type="text" id="name" placeholder="例：朝の通知">
+    <main class="co-layout">
+      <section class="co-card co-form-card">
+        <div class="co-section-head">
+          <div>
+            <p class="co-eyebrow">Flow Builder</p>
+            <h2 class="co-section-title">命令の設定</h2>
+          </div>
+          <p class="co-section-desc">条件とアクションを組み合わせて理想のワークフローを構築します。</p>
+        </div>
+
+        <div class="co-fieldset">
+          <label for="name">命令名</label>
+          <input type="text" id="name" class="co-input" placeholder="例：朝の通知">
+        </div>
+
+        <div class="co-fieldset">
+          <div class="co-fieldset-head">
+            <h3>トリガー設定</h3>
+            <p>カレンダーや収支状況など開始条件を選択します</p>
+          </div>
+          <div class="co-grid-two">
+            <div class="co-field">
+              <label for="trigger_category">カテゴリ</label>
+              <select id="trigger_category" class="co-select"></select>
+            </div>
+            <div class="co-field">
+              <label for="trigger_sub">詳細</label>
+              <select id="trigger_sub" class="co-select"></select>
+            </div>
+          </div>
+          <div id="trigger_value_container" class="co-dynamic-field">
+            <input type="text" id="trigger_value" class="co-input" placeholder="値を入力（例：◯◯に到着）">
+          </div>
+        </div>
+
+        <div class="co-fieldset">
+          <div class="co-fieldset-head">
+            <h3>条件設定</h3>
+            <p>必要に応じて複数条件を積み上げられます</p>
+          </div>
+          <div id="condition_blocks" class="co-stack"></div>
+          <button class="co-btn ghost add-button" id="add-condition" type="button">＋ 条件を追加</button>
+        </div>
+
+        <div class="co-fieldset">
+          <div class="co-fieldset-head">
+            <h3>アクション設定</h3>
+            <p>実行タイミングと内容を調整</p>
+          </div>
+          <div class="co-grid-two">
+            <div class="co-field">
+              <label for="action_category">カテゴリ</label>
+              <select id="action_category" class="co-select"></select>
+            </div>
+            <div class="co-field">
+              <label for="action_sub">詳細</label>
+              <select id="action_sub" class="co-select"></select>
+            </div>
+          </div>
+          <div class="co-field co-action-timing">
+            <label>実行タイミング <span>（空欄の場合は即時実行）</span></label>
+            <div class="co-timing-grid">
+              <input type="date" id="action_timing_date_abs" class="co-input" title="実行日（絶対）">
+              <input type="number" id="action_timing_date_rel" class="co-input co-input--compact" placeholder="+n 日" title="実行日（相対）">
+              <input type="time" id="action_timing_time_abs" class="co-input" title="実行時刻（絶対）">
+              <input type="text" id="action_timing_time_rel" class="co-input co-input--compact" placeholder="+HH:MM:SS" title="実行時刻（相対）">
+            </div>
+          </div>
+          <div id="action_detail_container" class="co-dynamic-field"></div>
+        </div>
+
+        <div class="co-actions">
+          <button class="co-btn primary save-button" id="register-btn" type="button">💾 保存する</button>
+          <p id="message" class="co-inline-message" role="status"></p>
+        </div>
+      </section>
+
+      <section class="co-card co-list-card">
+        <div class="co-section-head">
+          <div>
+            <p class="co-eyebrow">Library</p>
+            <h2 class="co-section-title">既存命令一覧</h2>
+          </div>
+          <p class="co-section-desc">登録済みのフローをリアルタイムで編集・削除できます。</p>
+        </div>
+        <div id="command-list" class="co-command-list"></div>
+      </section>
+    </main>
   </div>
-
-  <!-- トリガー設定 -->
-  <div class="block">
-    <label>トリガー設定</label>
-    <select id="trigger_category"></select>
-    <select id="trigger_sub"></select>
-    <div id="trigger_value_container">
-      <input type="text" id="trigger_value" placeholder="値（例: ◯◯に到着）">
-    </div>
-  </div>
-
-  <!-- 条件設定 -->
-  <div class="block">
-    <label>条件設定</label>
-    <div id="condition_blocks"></div>
-    <button class="add-button" id="add-condition">＋ 条件追加</button>
-  </div>
-
-  <!-- アクション設定 -->
-  <div class="block">
-    <label>トップレベルアクション</label>
-    <select id="action_category"></select>
-    <select id="action_sub"></select>
-    <div class="action-timing-container" style="margin-top: 10px;">
-      <label style="font-size:0.9em; opacity:0.8;">実行タイミング（無入力で即時実行）</label>
-      <input type="date" id="action_timing_date_abs" title="実行日（絶対）">
-      <input type="number" id="action_timing_date_rel" placeholder="+n 日" title="実行日（相対）" style="width: 80px;">
-      <input type="time" id="action_timing_time_abs" title="実行時刻（絶対）">
-      <input type="text" id="action_timing_time_rel" placeholder="+HH:MM:SS" title="実行時刻（相対）" style="width: 120px;">
-    </div>
-    <div id="action_detail_container" style="margin-top: 10px;">
-      <!-- ここに動的UIが挿入される -->
-    </div>
-  </div>
-
-  <button class="save-button" id="register-btn">💾 保存</button>
-  <div id="message" class="msg"></div>
-
-  <!-- 既存命令一覧 -->
-  <div class="block">
-    <h2>既存命令一覧</h2>
-    <div id="command-list"></div>
-  </div>
-</div>
-
 <script>
 const TRIGGER_CATEGORIES = {
   "場所": [],
