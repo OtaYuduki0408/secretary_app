@@ -1053,48 +1053,73 @@ def control_switchbot():
 with app.app_context():
     db.create_all()
 
-
 @app.route('/api/chatspace', methods=['POST'])
 def receive_chatspace_trigger():
     data = request.get_json()
-    if not data or 'command' not in data:
-        return jsonify({'error': 'Invalid request'}), 400
-    
-    chatspace_state['command'] = data['command']
-    print(f"🎤 ChatSpace トリガー受信: {data['command']}")
-    print(app.url_map)
+    print(f"🎤 ChatSpace トリガー受信: {data}")
     return jsonify({'status': 'ok'}), 200
+@app.route('/api/chatspace/voice', methods=['POST'])
+def receive_chatspace_voice():
+    """
+    Windows音声デーモンなどから送信される音声起動トリガー
+    例: {"command": "start_voice"}
+    """
+    data = request.get_json() or {}
+    command = data.get("command")
+    if not command:
+        return jsonify({"error": "Missing 'command' field"}), 400
+
+    chatspace_state["command"] = command
+    print(f"🎤 ChatSpace トリガー受信: {command}")
+    return jsonify({"status": "ok"}), 200
+
 
 @app.route('/api/chatspace/state', methods=['GET'])
 def get_chatspace_state():
-    """ChatSpace.js 用于轮询当前状态"""
+    """ChatSpace.js が2秒ごとに状態をポーリング"""
     return jsonify(chatspace_state)
+
 
 @app.route('/api/chatspace/clear', methods=['POST'])
 def clear_chatspace_state():
-    """ChatSpace.js 在执行完毕后重置命令"""
-    chatspace_state['command'] = None
-    return jsonify({'status': 'cleared'})
+    """ChatSpace.js 側で受信後、状態をリセット"""
+    chatspace_state["command"] = None
+    return jsonify({"status": "cleared"}), 200
 
-@app.route('/api/chatspace/voice', methods=['POST'])
-def chat_apispace():
-    data = request.get_json()
-    user_input = data.get("inputValue", "")
-    print(f"🗣️ ChatSpaceから受信: {user_input}")
-    if "何時" in user_input:
+
+@app.route('/api/chatspace/text', methods=['POST'])
+def chatspace_text_api():
+    """
+    テキスト解析API
+    Windowsのvoice_daemonや外部ツールから
+    テキストを送ると、ChatSpaceエンジンが返答を生成
+    """
+    data = request.get_json() or {}
+    user_input = data.get("inputValue", "").strip()
+
+    if not user_input:
+        return jsonify({
+            "status": "error",
+            "message": "入力が空です。"
+        }), 400
+
+    print(f"🗣️ ChatSpace テキスト受信: {user_input}")
+
+    # 簡単なテキスト応答（Gemini連携で置き換え可）
+    if "何時" in user_input or "時間" in user_input:
         import datetime
-        now = datetime.datetime.now().strftime("%p %I:%M:%S").replace("AM", "午前").replace("PM", "午後")
+        now = datetime.datetime.now().strftime("%p %I:%M:%S") \
+            .replace("AM", "午前").replace("PM", "午後")
         message = f"{now}です。"
     else:
-        message = "了解しました。"
+        message = f"「{user_input}」を受け取りました。"
 
     return jsonify({
         "status": "success",
         "purpose": "Tn",
         "data": None,
         "message": message
-    })
-
+    }), 200
 
 if __name__ == '__main__':
     app.run(
