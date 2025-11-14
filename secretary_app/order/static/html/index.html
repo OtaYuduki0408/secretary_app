@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<title>命令編集（if/elif/else＋ネスト条件・アクション）</title>
+<title>カスタム命令</title>
 <style>
   body { font-family:"Segoe UI","Noto Sans JP",sans-serif; background:#f6f8fa; margin:0; padding:20px; color:#333; }
   .container { max-width:1000px; margin:40px auto; background:#fff; padding:2em; border-radius:12px; box-shadow:0 4px 12px rgba(0,0,0,0.1);}
@@ -26,7 +26,7 @@
 <body>
 <div class="container">
   <a href="/" style="text-decoration:none;color:#007bff;">← 戻る</a>
-  <h2>命令編集（if/elif/else＋ネスト条件・アクション）</h2>
+  <h2>カスタム命令</h2>
 
   <!-- 命令名 -->
   <div class="block">
@@ -39,7 +39,9 @@
     <label>トリガー設定</label>
     <select id="trigger_category"></select>
     <select id="trigger_sub"></select>
-    <input type="text" id="trigger_value" placeholder="値（例: ◯◯に到着）">
+    <div id="trigger_value_container">
+      <input type="text" id="trigger_value" placeholder="値（例: ◯◯に到着）">
+    </div>
   </div>
 
   <!-- 条件設定 -->
@@ -69,11 +71,37 @@
 
 <script>
 const TRIGGER_CATEGORIES = {
-  "場所": ["現在地が◯◯", "特定エリアに入った", "特定エリアを出た"],
-  "カレンダー": ["特定日付", "曜日", "予定がある", "予定がない"],
-  "収支管理": ["残高が◯◯円以下", "出費が◯◯円を超えた", "収入があった"],
-  "メモ": ["メモに◯◯が追加された", "特定キーワードが含まれた"],
-  "時間": ["特定時刻", "一定時間ごと"]
+  "場所": [],
+  "カレンダー": ["入力があったら", "予定の時間になったら"],
+  "収支管理": ["入力があったら", "特定金額になったら"],
+  "メモ": ["入力があったら", "特定のメモが追加されたら"],
+  "時間": ["特定時刻になったら"]
+};
+console.log("TRIGGER_CATEGORIES:", TRIGGER_CATEGORIES);
+
+const TRIGGER_VALUE_PLACEHOLDERS = {
+  "場所": {
+    "特定場所に近づいたら": "例: 東京駅",
+  },
+  "カレンダー": {
+    "特定日付": "例: 2025-12-25",
+    "曜日": "例: 月曜日",
+    "予定がある": "例: 会議",
+    "予定がない": "例: 終日"
+  },
+  "収支管理": {
+    "残高が◯◯円以下": "例: 10000",
+    "出費が◯◯円を超えた": "例: 5000",
+    "収入があった": "例: 給料"
+  },
+  "メモ": {
+    "メモに◯◯が追加された": "例: 買い物リスト",
+    "特定キーワードが含まれた": "例: 重要"
+  },
+  "時間": {
+    "特定時刻": "例: 07:00",
+    "一定時間ごと": "例: 60 (分)"
+  }
 };
 console.log("TRIGGER_CATEGORIES:", TRIGGER_CATEGORIES);
 const ACTION_CATEGORIES = {
@@ -100,6 +128,238 @@ function updateSubOptions(categoryId, subId, data) {
   const sub = document.getElementById(subId);
   sub.innerHTML = "<option value=''>選択してください</option>";
   if (data[cat]) data[cat].forEach(v=>{ const o=document.createElement("option"); o.value=v;o.textContent=v; sub.appendChild(o); });
+
+  // 「場所」カテゴリが選択された場合、trigger_sub を非表示にする
+  if (cat === "場所") {
+    sub.style.display = 'none';
+  } else {
+    sub.style.display = 'block';
+  }
+
+  updateTriggerInputFields();
+}
+
+function updateTriggerInputFields() {
+  console.log("updateTriggerInputFields called.");
+  const category = document.getElementById("trigger_category").value;
+  const sub = document.getElementById("trigger_sub").value;
+  console.log("Category:", category, "Sub:", sub);
+  const triggerValueContainer = document.getElementById("trigger_value_container");
+  triggerValueContainer.innerHTML = ''; // コンテナをクリア
+
+  // デフォルトのプレースホルダー
+  let defaultPlaceholder = "値";
+
+  if (category) {
+    switch (category) {
+      case "場所":
+        // (既存のコードを流用)
+        triggerValueContainer.innerHTML = `
+          <input type="text" id="trigger_value_address" class="trigger-input" placeholder="住所を入力してください" required>
+          <button type="button" id="open_google_map_btn">Googleマップで選択</button>
+          <input type="text" id="trigger_value_latitude" class="trigger-input" placeholder="緯度" readonly>
+          <input type="text" id="trigger_value_longitude" class="trigger-input" placeholder="経度" readonly>
+          <input type="number" id="trigger_value_range" class="trigger-input" placeholder="許容範囲 (m)" required>
+          <small>注意: 許容範囲はなるべく幅広くしてください。(例：1000m等)</small>
+          <div id="location_error_message" style="color: red; display: none;">緯度経度が取得できませんでした。再入力してください。</div>
+        `;
+        document.getElementById("trigger_value_address").addEventListener("change", async (event) => {
+          const address = event.target.value;
+          if (address) {
+            const coords = await geocodeAddress(address);
+            if (coords) {
+              document.getElementById("trigger_value_latitude").value = coords.lat;
+              document.getElementById("trigger_value_longitude").value = coords.lng;
+              document.getElementById("location_error_message").style.display = 'none';
+            } else {
+              document.getElementById("trigger_value_latitude").value = '';
+              document.getElementById("trigger_value_longitude").value = '';
+              document.getElementById("location_error_message").style.display = 'block';
+            }
+          }
+        });
+        document.getElementById("open_google_map_btn").addEventListener("click", () => {
+          alert("Googleマップを開く処理を実装してください。");
+        });
+        break;
+      case "カレンダー":
+        // (既存のコードを流用)
+        if (sub === "入力があったら") {
+          triggerValueContainer.innerHTML = `
+            <label>アクション (複数選択可)</label>
+            <div id="trigger_value_calendar_actions">
+              <input type="checkbox" id="cal_action_add" value="追加"><label for="cal_action_add">追加</label>
+              <input type="checkbox" id="cal_action_modify" value="変更"><label for="cal_action_modify">変更</label>
+              <input type="checkbox" id="cal_action_get" value="取得"><label for="cal_action_get">取得</label>
+              <input type="checkbox" id="cal_action_delete" value="削除"><label for="cal_action_delete">削除</label>
+            </div>
+            <label>フィルター (任意)</label>
+            <div id="trigger_value_calendar_filters">
+              <button type="button" class="add_filter_btn">フィルターを追加</button>
+            </div>
+            <small>注意: フィルターとは、各アクションのタイトルにフィルターの単語が含まれている場合のみこのアクションを起動します。</small>
+          `;
+          const addFilterBtn = triggerValueContainer.querySelector(".add_filter_btn");
+          if (addFilterBtn) {
+            addFilterBtn.addEventListener("click", () => {
+              const filterDiv = document.createElement("div");
+              filterDiv.className = "filter-item";
+              filterDiv.innerHTML = `
+                <input type="text" class="calendar_filter_text trigger-input" placeholder="フィルター内容">
+                <select class="calendar_filter_logic trigger-input">
+                  <option value="AND">AND</option><option value="OR">OR</option><option value="NOT">NOT</option><option value="NAND">NAND</option><option value="NOR">NOR</option>
+                </select>
+                <input type="number" class="calendar_filter_priority trigger-input" placeholder="優先順位">
+                <button type="button" class="remove_filter_btn">削除</button>
+              `;
+              filterDiv.querySelector(".remove_filter_btn").addEventListener("click", (e) => e.target.parentNode.remove());
+              triggerValueContainer.querySelector("#trigger_value_calendar_filters").appendChild(filterDiv);
+            });
+          }
+        } else if (sub === "予定の時間になったら") {
+          triggerValueContainer.innerHTML = `
+            <input type="text" id="trigger_value_cal_title" class="trigger-input" placeholder="タイトル (任意)">
+            <label>日付[開始] (任意)</label><input type="date" id="trigger_value_cal_date_start" class="trigger-input">
+            <label>日付[終了] (任意)</label><input type="date" id="trigger_value_cal_date_end" class="trigger-input">
+            <label>曜日 (任意)</label>
+            <select id="trigger_value_cal_day_of_week" class="trigger-input" multiple>
+              <option value="月">月</option><option value="火">火</option><option value="水">水</option>
+              <option value="木">木</option><option value="金">金</option><option value="土">土</option>
+              <option value="日">日</option>
+            </select>
+            <label>時間[開始] (任意)</label><input type="time" id="trigger_value_cal_time_start" class="trigger-input">
+            <label>時間[終了] (任意)</label><input type="time" id="trigger_value_cal_time_end" class="trigger-input">
+          `;
+        }
+        break;
+      case "収支管理":
+        if (sub === "入力があったら") {
+          triggerValueContainer.innerHTML = `
+            <label>アクション (複数選択可)</label>
+            <div id="trigger_value_finance_actions">
+              <input type="checkbox" id="finance_action_add" value="追加"><label for="finance_action_add">追加</label>
+              <input type="checkbox" id="finance_action_modify" value="変更"><label for="finance_action_modify">変更</label>
+              <input type="checkbox" id="finance_action_get" value="取得"><label for="finance_action_get">取得</label>
+              <input type="checkbox" id="finance_action_delete" value="削除"><label for="finance_action_delete">削除</label>
+            </div>
+            <label>フィルター (任意)</label>
+            <div id="trigger_value_finance_filters">
+              <button type="button" class="add_filter_btn">フィルターを追加</button>
+            </div>
+          `;
+          triggerValueContainer.querySelector(".add_filter_btn").addEventListener("click", () => {
+            const filterDiv = document.createElement("div");
+            filterDiv.className = "filter-item";
+            filterDiv.innerHTML = `
+              <input type="text" class="finance_filter_text trigger-input" placeholder="フィルター内容">
+              <select class="finance_filter_logic trigger-input">
+                <option value="AND">AND</option><option value="OR">OR</option><option value="NOT">NOT</option><option value="NAND">NAND</option><option value="NOR">NOR</option>
+              </select>
+              <input type="number" class="finance_filter_priority trigger-input" placeholder="優先順位">
+              <button type="button" class="remove_filter_btn">削除</button>
+            `;
+            filterDiv.querySelector(".remove_filter_btn").addEventListener("click", (e) => e.target.parentNode.remove());
+            triggerValueContainer.querySelector("#trigger_value_finance_filters").appendChild(filterDiv);
+          });
+        } else if (sub === "特定金額になったら") {
+          triggerValueContainer.innerHTML = `
+            <label>項目</label>
+            <select id="trigger_value_finance_item" class="trigger-input" required>
+              <option value="total_balance">総所持金</option>
+              <option value="remaining_to_target">目標金額までの残金</option>
+              <option value="monthly_expense">今月の支出</option>
+              <option value="monthly_expense_no_necessities">今月の支出(必需品なし)</option>
+              <option value="monthly_income">今月の収入</option>
+              <option value="daily_expense">今日の支出</option>
+              <option value="daily_expense_no_necessities">今日の支出(必需品なし)</option>
+            </select>
+            <label>金額</label>
+            <input type="number" id="trigger_value_finance_amount" class="trigger-input" placeholder="金額 (円)">
+            <label>または</label>
+            <input type="number" id="trigger_value_finance_percentage" class="trigger-input" placeholder="目標額のn%">
+            <small>金額と目標額のn%はどちらか一方を入力してください。</small>
+          `;
+        }
+        break;
+      case "メモ":
+        if (sub === "入力があったら") {
+          triggerValueContainer.innerHTML = `
+            <label>アクション (複数選択可)</label>
+            <div id="trigger_value_memo_actions">
+              <input type="checkbox" id="memo_action_add" value="追加"><label for="memo_action_add">追加</label>
+              <input type="checkbox" id="memo_action_modify" value="変更"><label for="memo_action_modify">変更</label>
+              <input type="checkbox" id="memo_action_get" value="取得"><label for="memo_action_get">取得</label>
+              <input type="checkbox" id="memo_action_delete" value="削除"><label for="memo_action_delete">削除</label>
+            </div>
+            <label>フィルター (任意)</label>
+            <div id="trigger_value_memo_filters">
+              <button type="button" class="add_filter_btn">フィルターを追加</button>
+            </div>
+          `;
+          triggerValueContainer.querySelector(".add_filter_btn").addEventListener("click", () => {
+            const filterDiv = document.createElement("div");
+            filterDiv.className = "filter-item";
+            filterDiv.innerHTML = `
+              <input type="text" class="memo_filter_text trigger-input" placeholder="フィルター内容">
+              <select class="memo_filter_logic trigger-input">
+                <option value="AND">AND</option><option value="OR">OR</option><option value="NOT">NOT</option><option value="NAND">NAND</option><option value="NOR">NOR</option>
+              </select>
+              <input type="number" class="memo_filter_priority trigger-input" placeholder="優先順位">
+              <button type="button" class="remove_filter_btn">削除</button>
+            `;
+            filterDiv.querySelector(".remove_filter_btn").addEventListener("click", (e) => e.target.parentNode.remove());
+            triggerValueContainer.querySelector("#trigger_value_memo_filters").appendChild(filterDiv);
+          });
+        } else if (sub === "特定のメモが追加されたら") {
+          triggerValueContainer.innerHTML = `
+            <label>フィルター (必須)</label>
+            <div id="trigger_value_memo_filters_required">
+              <button type="button" class="add_filter_btn">フィルターを追加</button>
+            </div>
+          `;
+          // 最初に一つフィルターを追加しておく
+          const addFilter = () => {
+            const filterDiv = document.createElement("div");
+            filterDiv.className = "filter-item";
+            filterDiv.innerHTML = `
+              <input type="text" class="memo_filter_text trigger-input" placeholder="フィルター内容" required>
+              <select class="memo_filter_logic trigger-input">
+                <option value="AND">AND</option><option value="OR">OR</option><option value="NOT">NOT</option><option value="NAND">NAND</option><option value="NOR">NOR</option>
+              </select>
+              <input type="number" class="memo_filter_priority trigger-input" placeholder="優先順位">
+              <button type="button" class="remove_filter_btn">削除</button>
+            `;
+            filterDiv.querySelector(".remove_filter_btn").addEventListener("click", (e) => e.target.parentNode.remove());
+            triggerValueContainer.querySelector("#trigger_value_memo_filters_required").appendChild(filterDiv);
+          };
+          triggerValueContainer.querySelector(".add_filter_btn").addEventListener("click", addFilter);
+          addFilter(); // 初期表示で一つ追加
+        }
+        break;
+      case "時間":
+        if (sub === "特定時刻になったら") {
+          triggerValueContainer.innerHTML = `
+            <input type="text" id="trigger_value_time_title" class="trigger-input" placeholder="タイトル (任意)">
+            <label>日付[開始] (任意)</label><input type="date" id="trigger_value_time_date_start" class="trigger-input">
+            <label>日付[終了] (任意)</label><input type="date" id="trigger_value_time_date_end" class="trigger-input">
+            <label>曜日 (任意)</label>
+            <select id="trigger_value_time_day_of_week" class="trigger-input" multiple>
+              <option value="月">月</option><option value="火">火</option><option value="水">水</option>
+              <option value="木">木</option><option value="金">金</option><option value="土">土</option>
+              <option value="日">日</option>
+            </select>
+            <label>時間[開始] (任意)</label><input type="time" id="trigger_value_time_time_start" class="trigger-input">
+            <label>時間[終了] (任意)</label><input type="time" id="trigger_value_time_time_end" class="trigger-input">
+          `;
+        }
+        break;
+      default:
+        triggerValueContainer.innerHTML = `<input type="text" id="trigger_value" placeholder="${defaultPlaceholder}">`;
+        break;
+    }
+  } else {
+    triggerValueContainer.innerHTML = `<input type="text" id="trigger_value" placeholder="${defaultPlaceholder}">`;
+  }
 }
 
 function addConditionBlock(parent=document.getElementById("condition_blocks"), data={}) {
@@ -107,23 +367,79 @@ function addConditionBlock(parent=document.getElementById("condition_blocks"), d
   block.className = "condition-block";
   block.innerHTML = `
     <select class="condition-logic">
-      <option value="">(最初)</option><option value="AND">AND</option><option value="OR">OR</option>
+      <option value="">(先頭)</option>
+      <option value="NOT">NOT</option>
+      <option value="AND">AND (かつ)</option>
+      <option value="OR">OR (または)</option>
+      <option value="NAND">NAND (両方が違うなら)</option>
+      <option value="NOR">NOR (どちらかが違うなら)</option>
+      <option value="XOR">XOR (どちらかが違く、かつ両方が正しくも違くもないのなら)</option>
+      <option value="XNOR">XNOR (両方が正しい、または両方が違うなら)</option>
     </select>
-    <select class="condition-type"><option value="if">if</option><option value="elif">elif</option><option value="else">else</option></select>
+    <select class="condition-type">
+      <option value="if">if (この条件を満たしたなら)</option>
+      <option value="else">else (上の条件を満たしてないのなら)</option>
+    </select>
     <input type="text" class="condition-expr" placeholder="例: x > 5" />
-    <button class="add-nested-condition">＋ ネスト条件追加</button>
-    <button class="add-nested-action">＋ ネストアクション追加</button>
-    <button class="remove-condition">削除</button>
+    <button class="add-sibling-condition add-button">＋ 条件追加</button>
+    <button class="add-nested-condition nest-button">＋ ネスト条件</button>
+    <button class="add-nested-action nest-button">＋ ネストアクション</button>
+    <button class="remove-condition remove">削除</button>
     <div class="nested-conditions"></div>
     <div class="nested-actions"></div>
   `;
   parent.appendChild(block);
 
+  const logicSelect = block.querySelector(".condition-logic");
   const typeSelect = block.querySelector(".condition-type");
   const exprInput = block.querySelector(".condition-expr");
-  typeSelect.value = data.type || "if";
+  const isToplevel = parent.id === "condition_blocks";
+
+  // 同階層追加ボタンの制御
+  const siblingButton = block.querySelector(".add-sibling-condition");
+  if (isToplevel) {
+    siblingButton.style.display = "none";
+  }
+  siblingButton.addEventListener("click", () => {
+    addConditionBlock(parent);
+  });
+
+  // ロジック選択の制御
+  if (parent.children.length === 1) { // 先頭ブロックの場合
+    logicSelect.querySelector('option[value="AND"]').remove();
+    logicSelect.querySelector('option[value="OR"]').remove();
+    logicSelect.querySelector('option[value="NAND"]').remove();
+    logicSelect.querySelector('option[value="NOR"]').remove();
+    logicSelect.querySelector('option[value="XOR"]').remove();
+    logicSelect.querySelector('option[value="XNOR"]').remove();
+    logicSelect.value = data.logic || "";
+  } else { // 接続ブロックの場合
+    logicSelect.querySelector('option[value=""]').remove();
+    logicSelect.querySelector('option[value="NOT"]').remove();
+    logicSelect.value = data.logic || "AND";
+  }
+
+  // タイプ選択の制御
+  if (parent.children.length === 1) { // 先頭ブロック
+    typeSelect.querySelector('option[value="else"]').remove();
+    typeSelect.value = "if";
+  } else { // 接続ブロック
+    typeSelect.value = data.type || "if";
+  }
+  
+  // 共通の処理
   exprInput.value = data.expr || "";
-  typeSelect.addEventListener("change",()=>{ if(typeSelect.value==="else"){exprInput.disabled=true;exprInput.value="";}else exprInput.disabled=false; });
+  const handleElseState = () => {
+    if (typeSelect.value === "else") {
+      exprInput.disabled = true;
+      exprInput.value = "";
+    } else {
+      exprInput.disabled = false;
+    }
+  };
+  typeSelect.addEventListener("change", handleElseState);
+  handleElseState(); // 初期ロード時にも適用
+
   block.querySelector(".remove-condition").onclick = ()=>block.remove();
   block.querySelector(".add-nested-condition").onclick = ()=>addConditionBlock(block.querySelector(".nested-conditions"));
   block.querySelector(".add-nested-action").onclick = ()=>addAction(block.querySelector(".nested-actions"));
@@ -161,11 +477,141 @@ function parseConditions(root){
 }
 
 function loadCommandToForm(cmd){
+  // フォームをリセット
+  document.getElementById("name").value = "";
+  document.getElementById("trigger_category").value = "";
+  document.getElementById("trigger_sub").innerHTML = "<option value=''>選択してください</option>";
+  document.getElementById("trigger_value_container").innerHTML = '<input type="text" id="trigger_value" placeholder="値">';
+  document.getElementById("condition_blocks").innerHTML = "";
+  document.getElementById("action_category").value = "";
+  document.getElementById("action_sub").innerHTML = "<option value=''>選択してください</option>";
+  document.getElementById("action_detail").value = "";
+  document.getElementById("command-id")?.remove();
+
+
+  // データをフォームに設定
   document.getElementById("name").value = cmd.name;
-  document.getElementById("trigger_category").value = cmd.triggers?.[0]?.type?.split(":")[0]||"";
-  updateSubOptions("trigger_category","trigger_sub",TRIGGER_CATEGORIES);
-  document.getElementById("trigger_sub").value = cmd.triggers?.[0]?.type?.split(":")[1]||"";
-  document.getElementById("trigger_value").value = cmd.triggers?.[0]?.value||"";
+  
+  if (cmd.triggers && cmd.triggers.length > 0) {
+    const trigger = cmd.triggers[0];
+    const [category, sub] = trigger.type.split(":");
+    
+    document.getElementById("trigger_category").value = category || "";
+    updateSubOptions("trigger_category", "trigger_sub", TRIGGER_CATEGORIES);
+    document.getElementById("trigger_sub").value = sub || "";
+    
+    // UIを構築
+    updateTriggerInputFields();
+
+    // 構築されたUIに値をセットする
+    const triggerValue = trigger.value;
+    const container = document.getElementById("trigger_value_container");
+
+    // UIの構築が完了するのを待つ
+    setTimeout(() => {
+      if (!triggerValue) return;
+
+      switch (category) {
+        case "収支管理":
+          if (sub === "入力があったら") {
+            (triggerValue.actions || []).forEach(action => {
+              const cb = container.querySelector(`input[value="${action}"]`);
+              if (cb) cb.checked = true;
+            });
+            // フィルターを復元
+            const filtersContainer = container.querySelector("#trigger_value_finance_filters");
+            const addFilterBtn = filtersContainer.querySelector('.add_filter_btn');
+            (triggerValue.filters || []).forEach(filter => {
+              addFilterBtn.click(); // 新しいフィルター欄を追加
+              const newItem = filtersContainer.lastElementChild;
+              newItem.querySelector(".finance_filter_text").value = filter.text || "";
+              newItem.querySelector(".finance_filter_logic").value = filter.logic || "AND";
+              newItem.querySelector(".finance_filter_priority").value = filter.priority || "";
+            });
+          } else if (sub === "特定金額になったら") {
+            container.querySelector("#trigger_value_finance_item").value = triggerValue.item || "total_balance";
+            container.querySelector("#trigger_value_finance_amount").value = triggerValue.amount || "";
+            container.querySelector("#trigger_value_finance_percentage").value = triggerValue.percentage || "";
+          }
+          break;
+        case "メモ":
+           if (sub === "入力があったら") {
+            (triggerValue.actions || []).forEach(action => {
+              const cb = container.querySelector(`input[value="${action}"]`);
+              if (cb) cb.checked = true;
+            });
+            const filtersContainer = container.querySelector("#trigger_value_memo_filters");
+            const addFilterBtn = filtersContainer.querySelector('.add_filter_btn');
+            (triggerValue.filters || []).forEach(filter => {
+              addFilterBtn.click();
+              const newItem = filtersContainer.lastElementChild;
+              newItem.querySelector(".memo_filter_text").value = filter.text || "";
+              newItem.querySelector(".memo_filter_logic").value = filter.logic || "AND";
+              newItem.querySelector(".memo_filter_priority").value = filter.priority || "";
+            });
+          } else if (sub === "特定のメモが追加されたら") {
+            const filtersContainer = container.querySelector("#trigger_value_memo_filters_required");
+            const addFilterBtn = filtersContainer.querySelector('.add_filter_btn');
+            // 最初に表示されている空のフィルターを削除
+            if(filtersContainer.querySelector('.filter-item')) filtersContainer.querySelector('.filter-item').remove();
+            (triggerValue.filters || []).forEach(filter => {
+              addFilterBtn.click();
+              const newItem = filtersContainer.lastElementChild;
+              newItem.querySelector(".memo_filter_text").value = filter.text || "";
+              newItem.querySelector(".memo_filter_logic").value = filter.logic || "AND";
+              newItem.querySelector(".memo_filter_priority").value = filter.priority || "";
+            });
+          }
+          break;
+        case "時間":
+          if (sub === "特定時刻になったら") {
+            container.querySelector("#trigger_value_time_title").value = triggerValue.title || "";
+            container.querySelector("#trigger_value_time_date_start").value = triggerValue.date_start || "";
+            container.querySelector("#trigger_value_time_date_end").value = triggerValue.date_end || "";
+            (triggerValue.day_of_week || []).forEach(day => {
+                const opt = container.querySelector(`#trigger_value_time_day_of_week option[value="${day}"]`);
+                if(opt) opt.selected = true;
+            });
+            container.querySelector("#trigger_value_time_time_start").value = triggerValue.time_start || "";
+            container.querySelector("#trigger_value_time_time_end").value = triggerValue.time_end || "";
+          }
+          break;
+        case "カレンダー":
+            if (sub === "入力があったら") {
+                (triggerValue.actions || []).forEach(action => {
+                    const cb = container.querySelector(`input[value="${action}"]`);
+                    if (cb) cb.checked = true;
+                });
+                const filtersContainer = container.querySelector("#trigger_value_calendar_filters");
+                const addFilterBtn = filtersContainer.querySelector('.add_filter_btn');
+                (triggerValue.filters || []).forEach(filter => {
+                    addFilterBtn.click();
+                    const newItem = filtersContainer.lastElementChild;
+                    newItem.querySelector(".calendar_filter_text").value = filter.text || "";
+                    newItem.querySelector(".calendar_filter_logic").value = filter.logic || "AND";
+                    newItem.querySelector(".calendar_filter_priority").value = filter.priority || "";
+                });
+            } else if (sub === "予定の時間になったら") {
+                container.querySelector("#trigger_value_cal_title").value = triggerValue.title || "";
+                container.querySelector("#trigger_value_cal_date_start").value = triggerValue.date_start || "";
+                container.querySelector("#trigger_value_cal_date_end").value = triggerValue.date_end || "";
+                (triggerValue.day_of_week || []).forEach(day => {
+                    const opt = container.querySelector(`#trigger_value_cal_day_of_week option[value="${day}"]`);
+                    if(opt) opt.selected = true;
+                });
+                container.querySelector("#trigger_value_cal_time_start").value = triggerValue.time_start || "";
+                container.querySelector("#trigger_value_cal_time_end").value = triggerValue.time_end || "";
+            }
+            break;
+        case "場所":
+            container.querySelector("#trigger_value_address").value = triggerValue.address || "";
+            container.querySelector("#trigger_value_latitude").value = triggerValue.latitude || "";
+            container.querySelector("#trigger_value_longitude").value = triggerValue.longitude || "";
+            container.querySelector("#trigger_value_range").value = triggerValue.range || "";
+            break;
+      }
+    }, 100);
+  }
 
   document.getElementById("condition_blocks").innerHTML="";
   (cmd.conditions||[]).forEach(c=>addConditionBlockFromData(c, document.getElementById("condition_blocks")));
@@ -173,6 +619,7 @@ function loadCommandToForm(cmd){
   if(cmd.actions?.length>0){
     const a=cmd.actions[0];
     document.getElementById("action_category").value=a.category;
+    updateSubOptions("action_category","action_sub",ACTION_CATEGORIES);
     document.getElementById("action_sub").value=a.sub;
     document.getElementById("action_detail").value=a.detail||"";
   }
@@ -183,7 +630,7 @@ function loadCommandToForm(cmd){
 }
 
 function addConditionBlockFromData(data,parent){
-  addConditionBlock(parent,{type:data.type,expr:data.expr});
+  addConditionBlock(parent, data);
   const b=parent.lastElementChild;
   if(data.nested?.length) data.nested.forEach(n=>addConditionBlockFromData(n,b.querySelector(".nested-conditions")));
   if(data.actions?.length) data.actions.forEach(a=>addAction(b.querySelector(".nested-actions"),a));
@@ -192,9 +639,95 @@ function addConditionBlockFromData(data,parent){
 async function registerCommand(){
   console.log("--- [DEBUG] registerCommand called ---");
   const id=document.getElementById("command-id")?.value||null;
+  const category = document.getElementById("trigger_category").value;
+  const sub = document.getElementById("trigger_sub").value;
+
+  // trigger_value を動的に構築
+  let triggerValue = {};
+  const container = document.getElementById("trigger_value_container");
+
+  switch (category) {
+    case "収支管理":
+      if (sub === "入力があったら") {
+        triggerValue.actions = [...container.querySelectorAll("#trigger_value_finance_actions input:checked")].map(cb => cb.value);
+        triggerValue.filters = [...container.querySelectorAll("#trigger_value_finance_filters .filter-item")].map(item => ({
+          text: item.querySelector(".finance_filter_text").value,
+          logic: item.querySelector(".finance_filter_logic").value,
+          priority: item.querySelector(".finance_filter_priority").value
+        }));
+      } else if (sub === "特定金額になったら") {
+        triggerValue.item = container.querySelector("#trigger_value_finance_item").value;
+        triggerValue.amount = container.querySelector("#trigger_value_finance_amount").value;
+        triggerValue.percentage = container.querySelector("#trigger_value_finance_percentage").value;
+      }
+      break;
+    case "メモ":
+      if (sub === "入力があったら") {
+        triggerValue.actions = [...container.querySelectorAll("#trigger_value_memo_actions input:checked")].map(cb => cb.value);
+        triggerValue.filters = [...container.querySelectorAll("#trigger_value_memo_filters .filter-item")].map(item => ({
+          text: item.querySelector(".memo_filter_text").value,
+          logic: item.querySelector(".memo_filter_logic").value,
+          priority: item.querySelector(".memo_filter_priority").value
+        }));
+      } else if (sub === "特定のメモが追加されたら") {
+        triggerValue.filters = [...container.querySelectorAll("#trigger_value_memo_filters_required .filter-item")].map(item => ({
+          text: item.querySelector(".memo_filter_text").value,
+          logic: item.querySelector(".memo_filter_logic").value,
+          priority: item.querySelector(".memo_filter_priority").value
+        }));
+      }
+      break;
+    case "時間":
+      if (sub === "特定時刻になったら") {
+        triggerValue.title = container.querySelector("#trigger_value_time_title").value;
+        triggerValue.date_start = container.querySelector("#trigger_value_time_date_start").value;
+        triggerValue.date_end = container.querySelector("#trigger_value_time_date_end").value;
+        triggerValue.day_of_week = [...container.querySelectorAll("#trigger_value_time_day_of_week option:checked")].map(opt => opt.value);
+        triggerValue.time_start = container.querySelector("#trigger_value_time_time_start").value;
+        triggerValue.time_end = container.querySelector("#trigger_value_time_time_end").value;
+      }
+      break;
+    // カレンダーや場所など、他のカテゴリも同様に値を取得するロジックを追加
+    case "カレンダー":
+       if (sub === "入力があったら") {
+         triggerValue.actions = [...container.querySelectorAll("#trigger_value_calendar_actions input:checked")].map(cb => cb.value);
+         triggerValue.filters = [...container.querySelectorAll("#trigger_value_calendar_filters .filter-item")].map(item => ({
+          text: item.querySelector(".calendar_filter_text").value,
+          logic: item.querySelector(".calendar_filter_logic").value,
+          priority: item.querySelector(".calendar_filter_priority").value
+        }));
+       } else if (sub === "予定の時間になったら") {
+        triggerValue.title = container.querySelector("#trigger_value_cal_title").value;
+        triggerValue.date_start = container.querySelector("#trigger_value_cal_date_start").value;
+        triggerValue.date_end = container.querySelector("#trigger_value_cal_date_end").value;
+        triggerValue.day_of_week = [...container.querySelectorAll("#trigger_value_cal_day_of_week option:checked")].map(opt => opt.value);
+        triggerValue.time_start = container.querySelector("#trigger_value_cal_time_start").value;
+        triggerValue.time_end = container.querySelector("#trigger_value_cal_time_end").value;
+       }
+      break;
+    case "場所":
+      triggerValue.address = container.querySelector("#trigger_value_address").value;
+      triggerValue.latitude = container.querySelector("#trigger_value_latitude").value;
+      triggerValue.longitude = container.querySelector("#trigger_value_longitude").value;
+      triggerValue.range = container.querySelector("#trigger_value_range").value;
+      break;
+    default:
+      // 既存の単一のinputの場合
+      const singleInput = document.getElementById("trigger_value");
+      if (singleInput) {
+        triggerValue = singleInput.value;
+      }
+      break;
+  }
+
+
   const payload={
     name:document.getElementById("name").value,
-    triggers:[{type:`${document.getElementById("trigger_category").value}:${document.getElementById("trigger_sub").value}`, value:document.getElementById("trigger_value").value}],
+    triggers:[{
+      type:`${category}:${sub}`, 
+      // valueはオブジェクトまたは単一の値
+      value: triggerValue
+    }],
     conditions:parseConditions(document.getElementById("condition_blocks")),
     actions:[{category:document.getElementById("action_category").value, sub:document.getElementById("action_sub").value, detail:document.getElementById("action_detail").value}]
   };
@@ -272,15 +805,41 @@ async function loadCommands() {
   }
 }
 
+async function geocodeAddress(address) {
+  console.log("Geocoding address:", address);
+  // ここにGoogle Geocoding APIなどの呼び出しロジックを実装
+  // 例:
+  // const response = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=YOUR_API_KEY`);
+  // const data = await response.json();
+  // if (data.results && data.results.length > 0) {
+  //   const location = data.results[0].geometry.location;
+  //   return { lat: location.lat, lng: location.lng };
+  // }
+  // return null;
+
+  // ダミーの実装
+  if (address.includes("東京駅")) {
+    return { lat: 35.681236, lng: 139.767125 }; // 東京駅の緯度経度
+  } else if (address.includes("エラー")) {
+    return null;
+  }
+  return { lat: 35.000000, lng: 135.000000 }; // 仮の緯度経度
+}
+
 document.addEventListener("DOMContentLoaded",()=>{
   console.log("DOMContentLoaded event fired.");
   populateSelect("trigger_category",TRIGGER_CATEGORIES);
   populateSelect("action_category",ACTION_CATEGORIES);
-  document.getElementById("trigger_category").addEventListener("change",()=>updateSubOptions("trigger_category","trigger_sub",TRIGGER_CATEGORIES));
+  document.getElementById("trigger_category").addEventListener("change",()=>{
+    updateSubOptions("trigger_category","trigger_sub",TRIGGER_CATEGORIES);
+    updateTriggerInputFields(); // ここを追加
+  });
+  document.getElementById("trigger_sub").addEventListener("change",()=>updateTriggerInputFields()); // ここを追加
   document.getElementById("action_category").addEventListener("change",()=>updateSubOptions("action_category","action_sub",ACTION_CATEGORIES));
   document.getElementById("add-condition").addEventListener("click",()=>addConditionBlock());
   document.getElementById("register-btn").addEventListener("click",registerCommand);
   loadCommands();
+  updateTriggerInputFields(); // 初期表示のためにここに追加
 });
 </script>
 </body>

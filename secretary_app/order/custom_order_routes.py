@@ -23,20 +23,27 @@ def register_order():
     if not data or 'name' not in data or not data['name']:
         return jsonify({"error": "Invalid data: name is required"}), 400
 
+    # 送られてきたデータ全体を保存する
+    # triggers, conditions, actions はJSONB型カラムに保存することを想定
     supabase_data = {
         'name': data.get('name'),
-        'user_id': user_id
+        'user_id': user_id,
+        'triggers': data.get('triggers'), # SupabaseのJSONB型はdictを直接受け入れられる
+        'conditions': data.get('conditions'),
+        'actions': data.get('actions')
     }
     
     try:
-        print(f"--- [DEBUG] Inserting simplified data into Supabase: {supabase_data} ---")
+        print(f"--- [DEBUG] Inserting full data into Supabase: {supabase_data} ---")
         response = supabase.table("custom_orders").insert(supabase_data).execute()
         print(f"--- [DEBUG] Supabase response: {response} ---")
         inserted_data = response.data[0] if response.data else None
-        return jsonify({"message": "✅ カスタムオーダー登録完了 (nameのみ)", "data": inserted_data}), 201
+        return jsonify({"message": "✅ カスタムオーダー登録完了", "data": inserted_data}), 201
     except APIError as e:
         print(f"--- [ERROR] Supabase API Error: {e.message} ---")
-        return jsonify({"error": e.message}), 500
+        # エラーメッセージに、スキーマが一致しない可能性を示唆する文言を追加
+        error_message = f"Supabase API Error: {e.message}. テーブルのスキーマが古い可能性があります。triggers, conditions, actionsカラムが存在するか確認してください。"
+        return jsonify({"error": error_message}), 500
     except Exception as e:
         print(f"--- [ERROR] General Error in register_order: {e} ---")
         return jsonify({"error": str(e)}), 500
@@ -56,8 +63,8 @@ def list_orders():
     user_id = user.get('id')
 
     try:
-        print(f"--- [DEBUG] Selecting 'id, name' from Supabase for user_id: {user_id} ---")
-        response = supabase.table("custom_orders").select("id, name").eq("user_id", user_id).order("id", desc=True).execute()
+        print(f"--- [DEBUG] Selecting '*' from Supabase for user_id: {user_id} ---")
+        response = supabase.table("custom_orders").select("*").eq("user_id", user_id).order("id", desc=True).execute()
         print(f"--- [DEBUG] Supabase response in list_orders: {response} ---")
         return jsonify(response.data)
     except APIError as e:
@@ -81,7 +88,12 @@ def update_order(order_id):
     if not data or 'name' not in data or not data['name']:
         return jsonify({"error": "Invalid data: name is required"}), 400
     
-    supabase_data = {'name': data.get('name')}
+    supabase_data = {
+        'name': data.get('name'),
+        'triggers': data.get('triggers'),
+        'conditions': data.get('conditions'),
+        'actions': data.get('actions')
+    }
 
     try:
         # 更新前に、対象のレコードが本当にこのユーザーのものであることを確認
@@ -92,7 +104,8 @@ def update_order(order_id):
         return jsonify({"message": f"✅ カスタムオーダー(ID: {order_id})を更新しました", "data": updated_data}), 200
     except APIError as e:
         print(f"--- [ERROR] Supabase API Error in update_order: {e.message} ---")
-        return jsonify({"error": e.message}), 500
+        error_message = f"Supabase API Error: {e.message}. テーブルのスキーマが古い可能性があります。triggers, conditions, actionsカラムが存在するか確認してください。"
+        return jsonify({"error": error_message}), 500
     except Exception as e:
         print(f"--- [ERROR] General Error in update_order: {e} ---")
         return jsonify({"error": str(e)}), 500
