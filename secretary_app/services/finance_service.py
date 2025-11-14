@@ -3,6 +3,9 @@ from supabase_client import supabase # 外部で定義されたsupabaseクライ
 from datetime import datetime
 from postgrest.exceptions import APIError 
 
+TABLE_FINANCE = "finance"
+TABLE_FINANCE_GOALS = "finance_goals"
+
 def get_all_finance_records(user_id: str | None = None):
     """
     Supabaseから全レコードを取得する。
@@ -10,7 +13,7 @@ def get_all_finance_records(user_id: str | None = None):
     """
     try:
         # DBから全データを取得
-        q = supabase.table("finance").select("*")
+        q = supabase.table(TABLE_FINANCE).select("*")
         if user_id:
             q = q.eq("user_id", user_id)
         all_records = q.execute().data
@@ -100,6 +103,58 @@ def get_daily_expense(user_id: str | None = None):
     )
     
     return daily_expense
+
+def get_monthly_goal(user_id: str | None = None, year_month: str | None = None):
+    """
+    指定したユーザーと年月の目標額レコードを取得する。
+    """
+    if not user_id:
+        return None
+    target_month = year_month or datetime.now().strftime("%Y-%m")
+    try:
+        resp = (
+            supabase.table(TABLE_FINANCE_GOALS)
+            .select("*")
+            .eq("user_id", user_id)
+            .eq("year_month", target_month)
+            .limit(1)
+            .execute()
+        )
+        data = resp.data or []
+        return data[0] if data else None
+    except (APIError, Exception) as e:
+        print(f"ERROR: Failed to fetch finance goal: {e}")
+        return None
+
+
+def upsert_monthly_goal(user_id: str, goal_amount: float, year_month: str | None = None):
+    """
+    月次目標額を保存（存在すれば更新）する。
+    """
+    if not user_id:
+        return {"error": "user_id is required"}
+    target_month = year_month or datetime.now().strftime("%Y-%m")
+    try:
+        payload = {
+            "user_id": user_id,
+            "year_month": target_month,
+            "goal_amount": goal_amount,
+            "updated_at": datetime.utcnow().isoformat()
+        }
+        resp = (
+            supabase.table(TABLE_FINANCE_GOALS)
+            .upsert(payload, on_conflict="user_id,year_month")
+            .execute()
+        )
+        data = resp.data or [payload]
+        record = data[0]
+        return {
+            "goal_amount": record.get("goal_amount"),
+            "year_month": record.get("year_month", target_month),
+        }
+    except (APIError, Exception) as e:
+        print(f"ERROR: Failed to upsert finance goal: {e}")
+        return {"error": str(e)}
 
 # --------------------------------------------------------------------------
 # 補足: Flaskのビュー関数 (app.py) のコード例

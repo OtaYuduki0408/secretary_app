@@ -23,7 +23,15 @@ from services.category_service import (
 )
 from services.auth_service import register_user, login_user
 from services.expense_service import add_finance_record, delete_finance_record
-from services.finance_service import get_finance_summary, get_all_finance_records
+from services.finance_service import (
+    get_finance_summary,
+    get_all_finance_records,
+    get_current_balance,
+    get_monthly_expense,
+    get_daily_expense,
+    get_monthly_goal,
+    upsert_monthly_goal,
+)
 from services.chat_space_model import ChatSpaceModel
 from services.memo_routes import memo_bp
 from services.ScheduleManager import ScheduleManager
@@ -84,6 +92,7 @@ SECRET_KEY = os.getenv('SECRET_KEY')
 if not SECRET_KEY:
     raise RuntimeError('SECRET_KEY 環境変数を設定してください。')
 app.secret_key = SECRET_KEY
+app.permanent_session_lifetime = timedelta(days=30)  # �ԑ˃Z�b�V�������炩�����g�p�Ԋm�点
 
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
 if not GEMINI_API_KEY:
@@ -192,12 +201,23 @@ def api_login_required(view_func):
 @app.route('/')
 @login_required
 def main():
-    return render_template('main.html')
+    user = session.get('user') or {}
+    user_name = user.get('name') or user.get('email') or 'ユーザー'
+    return render_template('main.html', user=user, user_name=user_name)
 
 @app.route('/expense')
 @login_required
 def expense():
-    return render_template('expense.html')
+    user_id = session.get('user', {}).get('id')
+    balance = get_current_balance(user_id)
+    monthly_expense = get_monthly_expense(user_id)
+    daily_expense = get_daily_expense(user_id)
+    return render_template(
+        'expense.html',
+        balance=balance,
+        monthly_expense=monthly_expense,
+        daily_expense=daily_expense,
+    )
 
 @app.route('/categories')
 @login_required
@@ -276,11 +296,14 @@ def finance():
     user_id = session.get('user', {}).get('id')
     income_stats, expense_stats = get_finance_summary(user_id)
     all_records = get_all_finance_records(user_id)
+    goal_record = get_monthly_goal(user_id)
+    goal_amount = (goal_record or {}).get('goal_amount')
     return render_template(
         'finance.html',
         income_stats=income_stats,
         expense_stats=expense_stats,
         all_records=all_records,
+        goal_amount=goal_amount,
     )
 
 
@@ -294,7 +317,15 @@ def register():
         result = register_user(name, email, password)
         if 'error' in result:
             return render_template('register.html', error=result['error'])
-        return redirect(url_for('login'))
+        login_result = login_user(email, password)  # �F�؂��Ă���ԑ˃��O�C�����s��
+        if 'error' in login_result:
+            return render_template(
+                'register.html',
+                error='登録は完了しましたが自動ログインに失敗しました。ログイン画面から再度お試しください。'
+            )
+        session.permanent = True
+        session['user'] = login_result['user']
+        return redirect(url_for('main'))
     return render_template('register.html')
 
 @app.route('/login', methods=['GET', 'POST'])
@@ -305,6 +336,7 @@ def login():
         result = login_user(email, password)
         if 'error' in result:
             return render_template('login.html', error=result['error'])
+        session.permanent = True
         session['user'] = result['user']
         return redirect(url_for('main'))
     return render_template('login.html')
@@ -356,6 +388,45 @@ def add_finance_record_route():
 def delete_finance_record_route(record_id):
     user_id = session.get('user', {}).get('id')
     return jsonify(delete_finance_record(record_id, user_id))
+
+@app.route('/api/finance/summary', methods=['GET'])
+@login_required
+def get_finance_summary_route():
+    user_id = session.get('user', {}).get('id')
+    return jsonify({
+        'balance': get_current_balance(user_id),
+        'monthly_expense': get_monthly_expense(user_id),
+        'daily_expense': get_daily_expense(user_id),
+    })
+
+@app.route('/api/finance/goal', methods=['GET'])
+@login_required
+def get_finance_goal_route():
+    user_id = session.get('user', {}).get('id')
+    record = get_monthly_goal(user_id)
+    current_month = datetime.now().strftime('%Y-%m')
+    return jsonify({
+        'goal_amount': (record or {}).get('goal_amount'),
+        'year_month': (record or {}).get('year_month', current_month),
+    })
+
+@app.route('/api/finance/goal', methods=['POST'])
+@login_required
+def upsert_finance_goal_route():
+    user_id = session.get('user', {}).get('id')
+    data = request.get_json() or {}
+    try:
+        goal_amount = float(data.get('goal_amount'))
+        if goal_amount < 0:
+            raise ValueError
+    except (TypeError, ValueError):
+        return jsonify({'error': 'Invalid goal amount'}), 400
+
+    year_month = data.get('year_month')
+    result = upsert_monthly_goal(user_id, goal_amount, year_month)
+    if 'error' in result:
+        return jsonify({'error': result['error']}), 500
+    return jsonify(result)
 
 @app.route('/users', methods=['GET'])
 def get_users_route():

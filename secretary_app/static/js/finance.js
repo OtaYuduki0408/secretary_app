@@ -251,44 +251,91 @@ document.addEventListener("DOMContentLoaded", () => {
 
   updateSummary();
 
-  // ---------- 設定（目標金額） ----------
-  const inputGoal = document.getElementById("inputGoal");
-  const goalAmountDisplay = document.getElementById("goal-amount");
-  const settingsForm = document.getElementById("settingsForm");
+  // ---------- 設定（目標金額） ----------
+  const inputGoal = document.getElementById("inputGoal");
+  const goalAmountDisplay = document.getElementById("goal-amount");
+  const settingsForm = document.getElementById("settingsForm");
 
-  const savedGoal = localStorage.getItem("financeGoalAmount");
-  if (savedGoal) {
-    goalAmountDisplay.textContent = `${Number(savedGoal).toLocaleString()} 円`;
-    inputGoal.value = savedGoal;
-  } else {
-    goalAmountDisplay.textContent = `-- 円`;
-  }
+  const renderGoalAmount = (amount) => {
+    if (typeof amount === "number" && !Number.isNaN(amount)) {
+      goalAmountDisplay.textContent = `${amount.toLocaleString()} 円`;
+      if (inputGoal) inputGoal.value = amount;
+    } else {
+      goalAmountDisplay.textContent = `-- 円`;
+      if (inputGoal) inputGoal.value = "";
+    }
+  };
 
-  if (settingsForm) {
-    settingsForm.addEventListener("submit", (e) => {
-      e.preventDefault();
-      const goalNum = Number(inputGoal.value);
-      if (!isNaN(goalNum) && goalNum >= 0) {
-        localStorage.setItem("financeGoalAmount", goalNum);
-        goalAmountDisplay.textContent = `${goalNum.toLocaleString()} 円`;
-        alert("目標金額を保存しました。");
-      } else {
-        alert("有効な目標金額を入力してください。");
-      }
-    });
-  }
+  async function fetchGoalAmount() {
+    try {
+      const res = await fetch("/api/finance/goal");
+      if (!res.ok) throw new Error("failed to fetch goal");
+      const data = await res.json();
+      const amount = data.goal_amount;
+      if (amount === undefined || amount === null) {
+        renderGoalAmount(null);
+      } else {
+        renderGoalAmount(Number(amount));
+      }
+    } catch (err) {
+      console.warn("[finance] goal fetch failed", err);
+    }
+  }
+
+  async function saveGoalAmount(goalNum) {
+    const payload = {
+      goal_amount: goalNum,
+      year_month: new Date().toISOString().slice(0, 7),
+    };
+    const res = await fetch("/api/finance/goal", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      let errMsg = "failed to save goal";
+      try {
+        const errData = await res.json();
+        errMsg = errData.error || errMsg;
+      } catch (_) {
+        // ignore
+      }
+      throw new Error(errMsg);
+    }
+    return res.json();
+  }
+
+  if (settingsForm) {
+    settingsForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const goalNum = Number(inputGoal.value);
+      if (Number.isNaN(goalNum) || goalNum < 0) {
+        alert("有効な目標金額を入力してください。");
+        return;
+      }
+      try {
+        const result = await saveGoalAmount(goalNum);
+        renderGoalAmount(Number(result.goal_amount));
+        alert("目標金額を保存しました。");
+      } catch (error) {
+        console.error(error);
+        alert("目標金額の保存に失敗しました。");
+      }
+    });
+  }
 
   // ---------- イベント ----------
   searchInput.addEventListener("input", applyFiltersAndSort);
   sortSelect.addEventListener("change", applyFiltersAndSort);
   filterCategory.addEventListener("change", applyFiltersAndSort);
   filterType.addEventListener("change", applyFiltersAndSort);
-  // ブラウザのピッカー/手入力どちらでも拾う
-  startDateInput.addEventListener("input", applyFiltersAndSort);
-  endDateInput.addEventListener("input", applyFiltersAndSort);
+  // ブラウザのピッカー/手入力どちらでも拾う
+  startDateInput.addEventListener("input", applyFiltersAndSort);
+  endDateInput.addEventListener("input", applyFiltersAndSort);
 
-  // 初期描画
-  applyFiltersAndSort();
+  fetchGoalAmount();
+  // 初期描画
+  applyFiltersAndSort();
 });
 
 
