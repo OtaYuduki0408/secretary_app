@@ -5,6 +5,11 @@ document.addEventListener("DOMContentLoaded", () => {
   const noCatEl = document.getElementById("no-cat");
   const saveBtn = document.getElementById("save");
   const tbody = document.querySelector("#records tbody");
+  const balanceEl = document.getElementById("balance");
+  const monthlyEl = document.getElementById("monthly");
+  const dailyEl = document.getElementById("daily");
+
+  const formatYen = (value) => Number(value || 0).toLocaleString();
 
   // --- カテゴリ読み込み ---
   async function loadCategories() {
@@ -26,6 +31,20 @@ document.addEventListener("DOMContentLoaded", () => {
       opt.textContent = c.name;
       catEl.appendChild(opt);
     });
+  }
+
+  // --- サマリ読み込み ---
+  async function loadSummary() {
+    try {
+      const res = await fetch("/api/finance/summary");
+      if (!res.ok) throw new Error("failed to fetch summary");
+      const data = await res.json();
+      balanceEl.textContent = formatYen(data.balance);
+      monthlyEl.textContent = formatYen(data.monthly_expense);
+      dailyEl.textContent = formatYen(data.daily_expense);
+    } catch (err) {
+      console.warn("[expense] summary fetch failed", err);
+    }
   }
 
   // --- 収支一覧読み込み ---
@@ -78,6 +97,7 @@ document.addEventListener("DOMContentLoaded", () => {
       amountEl.value = "";
       memoEl.value = "";
       loadRecords();
+      loadSummary();
     }
   }
 
@@ -86,4 +106,5 @@ document.addEventListener("DOMContentLoaded", () => {
   // 初期ロード
   loadCategories();
   loadRecords();
+  loadSummary();
 });

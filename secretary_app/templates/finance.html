@@ -25,7 +25,13 @@
             </div>
             <div class="fd-kpi">
               <h3>今月の目標額</h3>
-              <p id="goal-amount" class="fd-num">-- 円</p>
+              <p id="goal-amount" class="fd-num">
+                {% if goal_amount is not none %}
+                  {{ '{:,.0f}'.format(goal_amount) }} 円
+                {% else %}
+                  -- 円
+                {% endif %}
+              </p>
             </div>
             <div class="fd-kpi">
               <h3>今月の収入</h3>
@@ -115,7 +121,12 @@
       <h2 class="fd-title">設定</h2>
       <form id="settingsForm" class="fd-form">
         <label>目標金額
-          <input id="inputGoal" type="number" placeholder="例: 100000" />
+          <input
+            id="inputGoal"
+            type="number"
+            placeholder="例: 100000"
+            value="{{ goal_amount or '' }}"
+          />
         </label>
         <label>通知設定
           <select id="notifySetting">
