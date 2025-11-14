@@ -157,7 +157,6 @@ class ChatSpaceModel:
 
     def __init__(self, gemini_api_key: str, calendar_manager=None):
         genai.configure(api_key=gemini_api_key)
-        print(gemini_api_key[:-5])
         self.model_name = "gemini-2.5-flash"
         self.model = genai.GenerativeModel(model_name=self.model_name)
         self.schedule_manager = ScheduleManager() # ScheduleManagerのインスタンスを作E
