@@ -72,8 +72,10 @@ const TRIGGER_CATEGORIES = {
   "場所": ["現在地が◯◯", "特定エリアに入った", "特定エリアを出た"],
   "カレンダー": ["特定日付", "曜日", "予定がある", "予定がない"],
   "収支管理": ["残高が◯◯円以下", "出費が◯◯円を超えた", "収入があった"],
-  "メモ": ["メモに◯◯が追加された", "特定キーワードが含まれた"]
+  "メモ": ["メモに◯◯が追加された", "特定キーワードが含まれた"],
+  "時間": ["特定時刻", "一定時間ごと"]
 };
+console.log("TRIGGER_CATEGORIES:", TRIGGER_CATEGORIES);
 const ACTION_CATEGORIES = {
   "収支管理": ["登録", "削除", "変更", "取得"],
   "カレンダー": ["登録", "削除", "変更", "取得"],
@@ -82,6 +84,7 @@ const ACTION_CATEGORIES = {
 };
 
 function populateSelect(selectId, options) {
+  console.log(`populateSelect called for ${selectId} with options:`, options);
   const select = document.getElementById(selectId);
   select.innerHTML = "<option value=''>選択してください</option>";
   for (const key in options) {
@@ -270,6 +273,7 @@ async function loadCommands() {
 }
 
 document.addEventListener("DOMContentLoaded",()=>{
+  console.log("DOMContentLoaded event fired.");
   populateSelect("trigger_category",TRIGGER_CATEGORIES);
   populateSelect("action_category",ACTION_CATEGORIES);
   document.getElementById("trigger_category").addEventListener("change",()=>updateSubOptions("trigger_category","trigger_sub",TRIGGER_CATEGORIES));
