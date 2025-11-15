@@ -767,7 +767,7 @@ S:SwitchBot iot等。例:電気を消す、エアコンを付ける、鍵を掛�
             return None, "収支の取得中にエラーが発生しました。"
 
     def _add_memo(self, text: str):
-        """メモ追加"""
+        """メFモ追加"""
         current_time = datetime.now(JST).strftime('%Y-%m-%d %H:%M:%S')
         prompt = self.ADD_MEMO_PROMPT_TEMPLATE.format(
             current_time=current_time,
@@ -847,14 +847,13 @@ S:SwitchBot iot等。例:電気を消す、エアコンを付ける、鍵を掛�
 
     def _get_switchbot_devices(self, text: str, user_id: str | None):
         """SwitchBotデバイス情報を取得し、ユーザーの操作意図を特定する"""
-        switchbot_api_token = os.getenv("SWITCHBOT_API_TOKEN")
-        switchbot_api_secret = os.getenv("SWITCHBOT_SECRET") # SECRETも取得
+        switchbot_api_token = os.getenv("SWITCHBOT_TOKEN")
+        switchbot_api_secret = os.getenv("SWITCHBOT_SECRET")
 
-        # ここにprint文を追加
         if switchbot_api_token:
-            print(f"DEBUG: SWITCHBOT_API_TOKEN: {switchbot_api_token[:5]}...{switchbot_api_token[-5:]}")
+            print(f"DEBUG: SWITCHBOT_TOKEN: {switchbot_api_token[:5]}...{switchbot_api_token[-5:]}")
         else:
-            print("DEBUG: SWITCHBOT_API_TOKEN is not set.")
+            print("DEBUG: SWITCHBOT_TOKEN is not set.")
         if switchbot_api_secret:
             print(f"DEBUG: SWITCHBOT_SECRET: {switchbot_api_secret[:5]}...{switchbot_api_secret[-5:]}")
         else:
@@ -920,7 +919,7 @@ S:SwitchBot iot等。例:電気を消す、エアコンを付ける、鍵を掛�
                     return results, "、".join(feedback_messages)
                 else:
                     # 操作意図が特定できなかった場合
-                    message = f"{len(formatted_devices)}件のSwitchBotデバイスが見つかりました。どのデバイスをどのように操作しますか？"
+                    message = f"{len(formatted_devices)}件のSwitchBotデバイスが見つかりました。が、命令を読み解けませんでした。"
                     return formatted_devices, message
             else:
                 return None, "SwitchBotデバイスの取得に失敗しました。"
@@ -942,19 +941,7 @@ S:SwitchBot iot等。例:電気を消す、エアコンを付ける、鍵を掛�
             print(f"SwitchBot操作エラー: {e}")
             return None, "SwitchBotの操作中にエラーが発生しました。"
 
-    def _operate_switchbot(self, api_token: str, device_id: str, command_type: str, command: str, parameter: str = "default"):
-        """
-        SwitchBotデバイスを操作する。
-        """
-        try:
-            response = switchbot_service.send_device_command(api_token, device_id, command_type, command, parameter)
-            if response and response.get("statusCode") == 100:
-                return response, "操作に成功しました。"
-            else:
-                return response, f"操作に失敗しました: {response.get('message', '不明なエラー')}"
-        except Exception as e:
-            print(f"SwitchBot操作エラー: {e}")
-            return None, "SwitchBotの操作中にエラーが発生しました。"
+
 
 
 

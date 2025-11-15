@@ -8,6 +8,7 @@ import { ScheduleManager } from "/static/js/ScheduleManager.js"; // Googleカレ
 console.log("✅ ChatSpace.js ロード完了 (トースト機能付き)");
 
 const reader = new TextToSpeechReader(); // 音声読み上げ
+console.log(`DEBUG: TextToSpeechReader初期化。利用可能な音声数: ${reader.voices.length}`);
 // window.managerが存在しない場合のフォールバック（ChatSpace.jsのロジックを維持）
 const manager = window.manager || new ScheduleManager(); 
 
@@ -58,6 +59,7 @@ export async function check_chat_Space(inputValue) {
   fire('analysis:start', { steps: ['処理開始'] });
   console.time("チャット解析 総所要時間");
   console.log("入力検知:", inputValue);
+  console.log(`DEBUG: ユーザー入力読み上げ: "${inputValue}でございますね。かしこまりました。"`);
   reader.speak(`${inputValue}でございますね。かしこまりました。`);
 
   try {
@@ -74,11 +76,25 @@ export async function check_chat_Space(inputValue) {
     }
 
     const result = await response.json();
-    console.log("APIからの応答:", result);
+    console.log("DEBUG: APIからの最終応答:", result); // ここにresultオブジェクト全体をログ出力
     fire('analysis:step', { index: 1, label: '処理完了' });
 
     if (result.message) {
+      console.log(`DEBUG: API応答メッセージ読み上げ: "${result.message}"`);
       reader.speak(result.message);
+    }
+
+    // クイックコマンドからボイスメイトへのフォールバック処理
+    if (result.fallback_to_voicemate) {
+      console.log("DEBUG: クイックコマンド失敗、ボイスメイトにフォールバックします。");
+      // アナウンスを読み上げた後、少し待機
+      await new Promise(resolve => setTimeout(resolve, 2000)); // 2秒待機
+
+      // 元のinputValueから「クイックコマンド」の部分を削除して、再度check_chat_Spaceを呼び出す
+      const originalCommand = inputValue.replace(/^クイックコマンド\s*/, '');
+      console.log(`DEBUG: フォールバック後の入力: "${originalCommand}"`);
+      await check_chat_Space(originalCommand);
+      return; // フォールバック処理が完了したら、以降の処理はスキップ
     }
 
     // Python側から返された action に応じてカレンダー操作を実行

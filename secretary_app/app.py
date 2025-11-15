@@ -15,6 +15,7 @@ from services.google_oauth import build_web_flow, get_google_redirect_uri
 # order配下のモジュール/ルートを使うためにパス追加
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'order'))
 
+import json
 from services.user_service import (
     get_all_users, get_user_by_email, add_user, update_user, delete_user
 )
@@ -99,6 +100,16 @@ if not GEMINI_API_KEY:
     print('Warning: GEMINI_API_KEY not set. ChatSpaceModel may not work.')
 chat_space_model = ChatSpaceModel(gemini_api_key=GEMINI_API_KEY)
 calendar_manager = ScheduleManager()
+
+QUICK_COMMANDS_FILE = os.path.join(os.path.dirname(__file__), 'quick_commands.json')
+
+def load_quick_commands():
+    if os.path.exists(QUICK_COMMANDS_FILE):
+        with open(QUICK_COMMANDS_FILE, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    return []
+
+quick_commands = load_quick_commands()
 
 
 # ============== Google OAuth ==============
@@ -588,39 +599,7 @@ def ensure_spotify_playerbar(response):
 
 
 # ============== Chat API・SwitchBot/カレンダー更新処理 ==============
-import time
-import hashlib
-import hmac
-import base64
-import requests
 
-def execute_switchbot_command(command: str):
-    if command not in ['turnOn', 'turnOff']:
-        return {'error': 'Invalid command'}, 400
-    token = os.getenv('SWITCHBOT_TOKEN')
-    secret = os.getenv('SWITCHBOT_SECRET')
-    device_id = os.getenv('SWITCHBOT_DEVICE_ID')
-    if not token or not secret or not device_id:
-        return {'error': 'SwitchBot API credentials missing'}, 500
-    t = int(round(time.time() * 1000))
-    nonce = str(t)
-    string_to_sign = f"{token}{t}{nonce}"
-    sign = base64.b64encode(hmac.new(bytes(secret, 'utf-8'), bytes(string_to_sign, 'utf-8'), hashlib.sha256).digest()).decode('utf-8')
-    url = f'https://api.switch-bot.com/v1.1/devices/{device_id}/commands'
-    headers = {
-        'Authorization': token,
-        'sign': sign,
-        't': str(t),
-        'nonce': nonce,
-        'Content-Type': 'application/json; charset=utf8',
-    }
-    body = {'command': command, 'parameter': 'default', 'commandType': 'command'}
-    try:
-        resp = requests.post(url, headers=headers, json=body)
-        resp.raise_for_status()
-        return resp.json(), resp.status_code
-    except requests.exceptions.RequestException as e:
-        return {'error': str(e)}, 500
 
 @app.route('/api/switchbot', methods=['POST'])
 def control_switchbot():
@@ -686,6 +665,88 @@ def chat_api_web():
     data = request.get_json() or {}
     user_input = data.get('inputValue', '')
     user_id = session.get('user', {}).get('id') # セッションからuser_idを取得
+    response_data = {"status": "success", "message": ""}
+
+    # クイックコマンドのチェック
+    if user_input.startswith("クイックコマンド"):
+        print(f"DEBUG: クイックコマンド検出: {user_input}")
+        for qc in quick_commands:
+            if user_input == qc["pattern"]:
+                print(f"DEBUG: クイックコマンドパターン一致: {qc['pattern']}")
+                action = qc["action"]
+                if action["type"] == "switchbot_command":
+                    print(f"DEBUG: SwitchBotコマンド実行: {action}")
+                    # SwitchBot操作を直接実行
+                    device_name = action.get("device_name")
+                    command_type = action.get("command_type")
+                    command = action.get("command")
+                    parameter = action.get("parameter", "default")
+
+                    from services import switchbot_service
+                    switchbot_api_token = os.getenv("SWITCHBOT_TOKEN")
+                    switchbot_api_secret = os.getenv("SWITCHBOT_SECRET")
+
+                    if not switchbot_api_token or not switchbot_api_secret:
+                        print("ERROR: SwitchBot APIトークンまたはシークレットが設定されていません。")
+                        response_data['message'] = "SwitchBot APIトークンまたはシークレットが設定されていません。"
+                        response_data['status'] = 'error'
+                        return jsonify(response_data)
+                    
+                    try:
+                        devices_data = switchbot_service.get_switchbot_devices(switchbot_api_token, switchbot_api_secret)
+                        if devices_data and devices_data.get("statusCode") == 100:
+                            device_list = devices_data["body"].get("deviceList", [])
+                            infrared_remote_list = devices_data["body"].get("infraredRemoteList", [])
+                            
+                            target_device_id = None
+                            for device in device_list + infrared_remote_list:
+                                if device.get("deviceName") == device_name:
+                                    target_device_id = device.get("deviceId")
+                                    break
+                            
+                            if target_device_id:
+                                print(f"DEBUG: デバイスID取得成功: {target_device_id} for {device_name}")
+                                switchbot_result, switchbot_message = chat_space_model._operate_switchbot(
+                                    switchbot_api_token,
+                                    switchbot_api_secret,
+                                    target_device_id,
+                                    command_type,
+                                    command,
+                                    parameter
+                                )
+                                if switchbot_result and switchbot_result.get("statusCode") == 100:
+                                    response_data['message'] = f"クイックコマンドで{device_name}を{command}しました。"
+                                    response_data['status'] = 'success'
+                                    print(f"DEBUG: SwitchBot操作成功: {response_data['message']}")
+                                else:
+                                    response_data['message'] = f"クイックコマンドの実行に失敗しました。通常処理として実行します。"
+                                    response_data['status'] = 'error'
+                                    response_data['fallback_to_voicemate'] = True # フォールバックフラグ
+                                    print(f"ERROR: SwitchBot操作失敗、フォールバック: {switchbot_message}")
+                            else:
+                                response_data['message'] = f"クイックコマンドの実行に失敗しました。通常処理として実行します。"
+                                response_data['status'] = 'error'
+                                response_data['fallback_to_voicemate'] = True # フォールバックフラグ
+                                print(f"ERROR: デバイス'{device_name}'が見つかりませんでした。フォールバック。")
+                        else:
+                            response_data['message'] = "クイックコマンドの実行に失敗しました。通常処理として実行します。"
+                            response_data['status'] = 'error'
+                            response_data['fallback_to_voicemate'] = True # フォールバックフラグ
+                            print(f"ERROR: SwitchBotデバイスの取得に失敗しました。フォールバック。")
+                    except Exception as e:
+                        print(f"ERROR: クイックコマンド SwitchBot操作エラー、フォールバック: {e}")
+                        response_data['message'] = "クイックコマンドの実行に失敗しました。通常処理として実行します。"
+                        response_data['status'] = 'error'
+                        response_data['fallback_to_voicemate'] = True # フォールバックフラグ
+                return jsonify(response_data)
+        
+        # クイックコマンドパターンに一致しなかった場合
+        print(f"DEBUG: クイックコマンドパターン不一致: {user_input}")
+        # クイックコマンドとして認識されたが、パターンに一致しなかった場合は、通常の処理にフォールバック
+        # その際、特別なメッセージは出さず、通常のLLM処理に任せる
+        # ここではreturnしないことで、下の通常のchat_space_model処理に進む
+    
+    # クイックコマンドに一致しない場合、通常のchat_space_model処理
     response_data = chat_space_model.check_chat_space(user_input, user_id=user_id)
 
     action = response_data.get('action')
@@ -693,13 +754,35 @@ def chat_api_web():
     if action == 'switchbot_control':
         command = response_data.get('data', {}).get('command')
         if command:
-            switchbot_result, status_code = execute_switchbot_command(command)
-            if status_code == 200 and switchbot_result.get('statusCode') == 100:
+            # chat_space_model._operate_switchbotはapi_secretも受け取るように修正されている
+            switchbot_api_token = os.getenv("SWITCHBOT_TOKEN")
+            switchbot_api_secret = os.getenv("SWITCHBOT_SECRET")
+            device_id = response_data.get('data', {}).get('device_id') # LLMから取得したdevice_idを使用
+            command_type = response_data.get('data', {}).get('command_type')
+            parameter = response_data.get('data', {}).get('parameter', 'default')
+
+            if not switchbot_api_token or not switchbot_api_secret:
+                response_data['message'] = "SwitchBot APIトークンまたはシークレットが設定されていません。"
+                response_data['status'] = 'error'
+                print(f"DEBUG: APIトークンまたはシークレットが設定されていません。response_data: {response_data}")
+                return jsonify(response_data)
+
+            switchbot_result, switchbot_message = chat_space_model._operate_switchbot(
+                switchbot_api_token,
+                switchbot_api_secret,
+                device_id,
+                command_type,
+                command,
+                parameter
+            )
+            if switchbot_result and switchbot_result.get('statusCode') == 100:
                 response_data['message'] = 'SwitchBotを' + str(command) + 'しました'
                 response_data['status'] = 'success'
+                print(f"DEBUG: SwitchBot操作成功。response_data: {response_data}")
             else:
-                response_data['message'] = 'SwitchBotの操作に失敗しました'
+                response_data['message'] = 'SwitchBotの操作に失敗しました: ' + switchbot_message
                 response_data['status'] = 'error'
+                print(f"DEBUG: SwitchBot操作失敗。response_data: {response_data}")
 
     elif action == 'calendar_update':
         sm = ScheduleManager()
@@ -712,16 +795,16 @@ def chat_api_web():
                 if calendar_id and event_id and changes:
                     ok = sm.update_event(user_id, calendar_id, event_id, changes)
                     if ok:
-                        response_data['message'] = 'Google繧ｫ繝ｬ繝ｳ繝繝ｼ縺ｮ莠亥ｮ壹ｒ譖ｴ譁ｰ縺励∪縺励◆'
+                        response_data['message'] = 'Googleカレンダーのイベントを更新しました'
                         response_data['status'] = 'success'
                     else:
-                        response_data['message'] = 'Google繧ｫ繝ｬ繝ｳ繝繝ｼ縺ｮ譖ｴ譁ｰ縺ｫ螟ｱ謨励＠縺ｾ縺励◆'
+                        response_data['message'] = 'Googleカレンダーの更新に失敗しました'
                         response_data['status'] = 'error'
                 else:
-                    response_data['message'] = '螟画峩蟇ｾ雎｡縺ｮ繧､繝吶Φ繝・D縺梧欠螳壹＆繧後※縺・∪縺帙ｓ'
+                    response_data['message'] = '変更必須のイベントIDが欠落しています'
                     response_data['status'] = 'error'
             except Exception as e:
-                response_data['message'] = f'Google繧ｫ繝ｬ繝ｳ繝繝ｼ縺ｮ莠亥ｮ壼､画峩縺ｫ螟ｱ謨励＠縺ｾ縺励◆: {str(e)}'
+                response_data['message'] = f'Googleカレンダーのイベント更新に失敗しました: {str(e)}'
                 response_data['status'] = 'error'
         else:
             # Webブラウザからのアクセスなので、GoogleログインページへのURLを返す
@@ -730,10 +813,11 @@ def chat_api_web():
                 oauth_url = url_for('google_login')
                 response_data['message'] = f'Googleアカウントがリンクされていません。こちらからリンクしてください: {oauth_url}'
                 response_data['status'] = 'needs_link'
+                print(f"DEBUG: Googleアカウントがリンクされていません。response_data: {response_data}")
                 return jsonify(response_data), 401
             response_data['status'] = 'error'
-    return jsonify(response_data)
-# メモAPIのBlueprint
+    print(f"DEBUG: chat_api_webからの最終レスポンス: {response_data}")
+    return jsonify(response_data)# メモAPIのBlueprint
 app.register_blueprint(memo_bp, url_prefix='/api/memos')
 
 
