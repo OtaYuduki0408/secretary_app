@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Keepメモ</title>
+<style>
+    body {
+      font-family: "Segoe UI", sans-serif;
+      background-color: #f5f5f5;
+      margin: 0;
+      padding: 20px;
+    }
+    h1 {
+      text-align: center;
+      color: #333;
+    }
+    .container {
+      max-width: 600px;
+      background: white;
+      margin: 20px auto;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+    }
+    input, textarea, button {
+      width: 100%;
+      margin-bottom: 10px;
+      padding: 8px;
+      font-size: 16px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+    }
+    button {
+      background-color: #007bff;
+      color: white;
+      cursor: pointer;
+      transition: background 0.3s;
+    }
+    button:hover {
+      background-color: #0056b3;
+    }
+    .memo {
+      border: 1px solid #ddd;
+      padding: 10px;
+      margin-top: 10px;
+      border-radius: 6px;
+      background: #fafafa;
+      word-wrap: break-word; /* 内容が長い場合の折り返し */
+    }
+    .memo-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .delete-btn {
+      color: red;
+      cursor: pointer;
+      font-weight: bold;
+      margin-left: 10px;
+    }
+    .search-bar {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 15px;
+    }
+    .search-bar input {
+      flex: 1;
+    }
+</style>
+</head>
+<body>
+<h1>Keepメモ</h1>
+<div class="container">
+<h2>メモを追加</h2>
+<input id="title" type="text" placeholder="タイトル" />
+<textarea id="content" rows="4" placeholder="内容"></textarea>
+<button onclick="addMemo()">追加</button>
+<div class="search-bar">
+<input id="search" type="text" placeholder="キーワード検索" />
+<button onclick="searchMemos()">検索</button>
+</div>
+<h2>メモ一覧</h2>
+<div id="memo-list"></div>
+</div>
+<script>
+    // Flaskのルーティングに対応するため、相対パスを使用
+    const API_URL_BASE = "/api/memos"; 
+    // メモ一覧の取得と表示
+    async function fetchMemos(keyword = "") {
+      // created_at が新しい順に取得するため、ソートパラメータを追加 (Flask側で処理)
+      const res = await fetch(`${API_URL_BASE}?q=${keyword}`);
+ 
+      if (!res.ok) {
+        console.error("Failed to fetch memos:", res.status);
+        document.getElementById("memo-list").innerHTML = "<p>メモの読み込みに失敗しました。</p>";
+        return;
+      }
+      const memos = await res.json();
+      const list = document.getElementById("memo-list");
+      list.innerHTML = "";
+      if (memos.length === 0) {
+        list.innerHTML = "<p>メモがありません。</p>";
+        return;
+      }
+      memos.forEach(memo => {
+        const div = document.createElement("div");
+        div.className = "memo";
+        // created_atを読みやすい形式に整形
+        const date = memo.created_at ? new Date(memo.created_at).toLocaleString() : '日付不明';
+ 
+        // memo.idはSupabaseのUUID (文字列)
+        div.innerHTML = `
+<div class="memo-header">
+<strong>${memo.title}</strong>
+<span class="delete-btn" onclick="deleteMemo('${memo.id}')">×</span>
+</div>
+<p>${memo.content}</p>
+<small>作成日時: ${date}</small>
+        `;
+        list.appendChild(div);
+      });
+    }
+    // メモの追加
+    async function addMemo() {
+      const title = document.getElementById("title").value.trim();
+      const content = document.getElementById("content").value.trim();
+      if (!title || !content) {
+        alert("タイトルと内容を入力してください。");
+        return;
+      }
+      const res = await fetch(API_URL_BASE, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title, content })
+      });
+      if (res.ok) {
+        document.getElementById("title").value = "";
+        document.getElementById("content").value = "";
+        fetchMemos(); // 成功したら再読み込み
+      } else {
+        const err = await res.json();
+        alert(err.error || "メモ追加に失敗しました。");
+      }
+    }
+    // メモの削除
+    async function deleteMemo(id) {
+      if (!confirm("このメモを削除しますか？")) return;
+      const res = await fetch(`${API_URL_BASE}/${id}`, { method: "DELETE" });
+      if (res.ok) {
+        fetchMemos(); // 成功したら再読み込み
+      } else {
+        const err = await res.json();
+        alert(err.error || "メモ削除に失敗しました。");
+      }
+    }
+    // メモの検索
+    function searchMemos() {
+      const keyword = document.getElementById("search").value.trim();
+      fetchMemos(keyword);
+    }
+    // ページ読み込み時に一覧表示
+    fetchMemos();
+    // Enterキーで検索
+    document.getElementById("search").addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            searchMemos();
+        }
+    });
+</script>
+</body>
+</html>
