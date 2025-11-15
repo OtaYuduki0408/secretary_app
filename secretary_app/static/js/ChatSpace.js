@@ -59,8 +59,8 @@ export async function check_chat_Space(inputValue) {
   fire('analysis:start', { steps: ['処理開始'] });
   console.time("チャット解析 総所要時間");
   console.log("入力検知:", inputValue);
-  console.log(`DEBUG: ユーザー入力読み上げ: "${inputValue}でございますね。かしこまりました。"`);
-  reader.speak(`${inputValue}でございますね。かしこまりました。`);
+  // console.log(`DEBUG: ユーザー入力読み上げ: "${inputValue}でございますね。かしこまりました。"`); // デバッグログ削除
+  reader.speak(`${inputValue}ですね。`);
 
   try {
     const response = await fetch('/web_api/chat', {

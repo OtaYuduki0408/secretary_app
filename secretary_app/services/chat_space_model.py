@@ -174,7 +174,7 @@ S:SwitchBot iot等。例:電気を消す、エアコンを付ける、鍵を掛�
             return response.text.strip()
         except Exception as e:
             print(f"Geminiリクエストエラー: {e}")
-            return ""
+            return "Gemini AIとの通信中にエラーが発生しました。"
 
     def _format_event_time(self, iso_time: str) -> str:
         """ISO形式の時刻文字列を「〇月〇日〇時〇分」形式に整形する"""
@@ -349,7 +349,10 @@ S:SwitchBot iot等。例:電気を消す、エアコンを付ける、鍵を掛�
         elif purpose == "Sn": # SwitchBot機能
             result["data"], result["message"] = self._get_switchbot_devices(input_value, user_id)
         else:
-            result["message"] = purpose
+            # 意図が特定できなかった場合のメッセージをよりユーザーフレンドリーにする
+            result["message"] = "申し訳ございません。お客様の意図を特定できませんでした。"
+            # 必要であれば、ここでpurposeをログに出力してデバッグに役立てる
+            print(f"DEBUG: 意図不明なpurpose: {purpose}")
             
         return result
 

@@ -780,7 +780,7 @@ def chat_api_web():
                 response_data['status'] = 'success'
                 print(f"DEBUG: SwitchBot操作成功。response_data: {response_data}")
             else:
-                response_data['message'] = 'SwitchBotの操作に失敗しました: ' + switchbot_message
+                response_data['message'] = 'SwitchBotの操作に失敗しました。' # メッセージを修正
                 response_data['status'] = 'error'
                 print(f"DEBUG: SwitchBot操作失敗。response_data: {response_data}")
 

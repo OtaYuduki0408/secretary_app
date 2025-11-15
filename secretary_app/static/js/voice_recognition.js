@@ -1,3 +1,9 @@
+// 音声ファイルを再生する関数
+function playSound(filename) {
+    const audio = new Audio(`/static/voice/${filename}`);
+    audio.play().catch(e => console.error("音声再生エラー:", e));
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     console.log("DEBUG: DOMContentLoaded fired.");
     const micButton = document.querySelector('.mic-btn');
@@ -23,6 +29,27 @@ document.addEventListener('DOMContentLoaded', () => {
     let mode = 'waiting'; // 'waiting' or 'listening'
     let recognitionTimeout;
 
+    // アラート音を鳴らす関数
+    function playWakeWordSound() {
+        try {
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+
+            oscillator.type = 'sine'; // サイン波
+            oscillator.frequency.value = 440; // 440Hz (A4)
+            gainNode.gain.value = 0.1; // 音量
+
+            oscillator.start();
+            oscillator.stop(audioContext.currentTime + 0.1); // 0.1秒後に停止
+        } catch (e) {
+            console.warn("アラート音の再生に失敗しました:", e);
+        }
+    }
+
     function setMode(newMode) {
         console.log(`DEBUG: setMode called with: ${newMode}, current mode: ${mode}`);
         if (mode === newMode) return;
@@ -34,6 +61,7 @@ document.addEventListener('DOMContentLoaded', () => {
             micButton.classList.add('active');
             searchBox.placeholder = "お話しください...";
             searchBox.value = ''; // 入力欄をクリア
+            playSound('voice_wate.mp3'); // ★追加: 音声入力オン時に再生
             recognitionTimeout = setTimeout(() => {
                 if (mode === 'listening') {
                     console.log("コマンド入力タイムアウト。待機モードに戻ります。");
@@ -67,6 +95,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const lowerTranscript = (finalTranscript + interimTranscript).toLowerCase();
             if (wakeWords.some(word => lowerTranscript.includes(word))) {
                 console.log("DEBUG: ウェイクワードを検出");
+                playWakeWordSound(); // アラート音を鳴らす
+                searchBox.value = ''; // searchBoxをクリア
                 setMode('listening');
             }
         } else if (mode === 'listening') {
@@ -74,8 +104,9 @@ document.addEventListener('DOMContentLoaded', () => {
             if (finalTranscript.trim()) {
                 console.log(`DEBUG: コマンドを確定: "${finalTranscript}"`);
                 searchBox.value = finalTranscript.trim() + ';';
-                searchBox.dispatchEvent(new Event('input', { bubbles: true }));
-                setMode('waiting');
+                searchBox.dispatchEvent(new Event('input', { bubbles: true })); // listeningモードで確定したコマンドのみ処理
+                playSound('relode.mp3'); // ★追加: 音声確定時に再生
+                setMode('waiting'); // 処理後、待機モードに戻る
             }
         }
     };
