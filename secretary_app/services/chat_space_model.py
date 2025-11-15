@@ -29,7 +29,7 @@ class ChatSpaceModel:
     M:メモ帳
     T:時刻、年月日、曜日確認(行動はn)
     R:過去の命令の修正(行動はn)
-    S:SwitchBot iot等。(例:電気を消す、エアコンを付ける、鍵を掛ける)(行動はn)
+S:SwitchBot iot等。例:電気を消す、エアコンを付ける、鍵を掛ける)(行動はn)
     -行動-
     a:追加
     d:削除
@@ -847,14 +847,14 @@ class ChatSpaceModel:
 
     def _get_switchbot_devices(self, text: str, user_id: str | None):
         """SwitchBotデバイス情報を取得し、ユーザーの操作意図を特定する"""
-        switchbot_api_token = os.getenv("SWITCHBOT_TOKEN") # ここを修正
+        switchbot_api_token = os.getenv("SWITCHBOT_API_TOKEN")
         switchbot_api_secret = os.getenv("SWITCHBOT_SECRET") # SECRETも取得
 
         # ここにprint文を追加
         if switchbot_api_token:
-            print(f"DEBUG: SWITCHBOT_TOKEN: {switchbot_api_token[:5]}...{switchbot_api_token[-5:]}") # print文も修正
+            print(f"DEBUG: SWITCHBOT_API_TOKEN: {switchbot_api_token[:5]}...{switchbot_api_token[-5:]}")
         else:
-            print("DEBUG: SWITCHBOT_TOKEN is not set.") # print文も修正
+            print("DEBUG: SWITCHBOT_API_TOKEN is not set.")
         if switchbot_api_secret:
             print(f"DEBUG: SWITCHBOT_SECRET: {switchbot_api_secret[:5]}...{switchbot_api_secret[-5:]}")
         else:
@@ -942,7 +942,19 @@ class ChatSpaceModel:
             print(f"SwitchBot操作エラー: {e}")
             return None, "SwitchBotの操作中にエラーが発生しました。"
 
-
+    def _operate_switchbot(self, api_token: str, device_id: str, command_type: str, command: str, parameter: str = "default"):
+        """
+        SwitchBotデバイスを操作する。
+        """
+        try:
+            response = switchbot_service.send_device_command(api_token, device_id, command_type, command, parameter)
+            if response and response.get("statusCode") == 100:
+                return response, "操作に成功しました。"
+            else:
+                return response, f"操作に失敗しました: {response.get('message', '不明なエラー')}"
+        except Exception as e:
+            print(f"SwitchBot操作エラー: {e}")
+            return None, "SwitchBotの操作中にエラーが発生しました。"
 
 
 
