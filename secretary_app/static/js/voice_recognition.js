@@ -1,137 +1,116 @@
 document.addEventListener('DOMContentLoaded', () => {
-    // ----------------------------------------------------------------------
-    // 1. 各要素の取得
-    // ----------------------------------------------------------------------
     const micButton = document.querySelector('.mic-btn');
     const searchBox = document.getElementById('searchbox');
-
-    // Web Speech APIの互換性チェック
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
     if (!SpeechRecognition) {
-        // APIがサポートされていない場合の処理
         console.error("Web Speech API はこのブラウザでサポートされていません。");
         micButton.disabled = true;
-        micButton.ariaLabel = "音声入力は非対応です";
-        searchBox.placeholder = "入力 (音声認識非対応)";
-        return; // サポートされていない場合は以降の処理を中断
+        searchBox.placeholder = "音声認識非対応";
+        return;
     }
 
-    // ----------------------------------------------------------------------
-    // 2. 音声認識オブジェクトの初期化
-    // ----------------------------------------------------------------------
     const recognition = new SpeechRecognition();
-
-    // 言語設定を日本語に
     recognition.lang = 'ja-JP';
-    // 連続認識をOFFに設定。発話完了（一定の無音時間）で自動的に終了する。
-    recognition.continuous = false;
-    // 中間的な結果 (in-flight text) も表示する
+    recognition.continuous = true;
     recognition.interimResults = true;
 
-    // 認識中かどうかを管理するフラグ
-    let isRecognizing = false;
+    const wakeWords = ['ボイスメイト', 'ぼいすめいと', 'voicemate'];
+    let mode = 'waiting'; // 'waiting' or 'listening'
+    let recognitionTimeout;
 
-    // ----------------------------------------------------------------------
-    // 3. イベントハンドラの設定
-    // ----------------------------------------------------------------------
+    function setMode(newMode) {
+        if (mode === newMode) return;
+        console.log(`モード変更: ${mode} -> ${newMode}`);
+        mode = newMode;
+        clearTimeout(recognitionTimeout);
 
-    /**
-     * 音声が認識された時のイベントハンドラ
-     * @param {SpeechRecognitionEvent} event
-     */
+        if (mode === 'listening') {
+            micButton.classList.add('active');
+            searchBox.placeholder = "お話しください...";
+            searchBox.value = ''; // 入力欄をクリア
+            // 10秒後に自動的に待機モードに戻るタイムアウト
+            recognitionTimeout = setTimeout(() => {
+                if (mode === 'listening') {
+                    console.log("コマンド入力タイムアウト。待機モードに戻ります。");
+                    setMode('waiting');
+                }
+            }, 10000);
+        } else { // 'waiting'
+            micButton.classList.remove('active');
+            searchBox.placeholder = "「ボイスメイト」と呼びかけてください";
+            searchBox.value = '';
+        }
+    }
+
     recognition.onresult = (event) => {
-        let interimTranscript = ''; // 中間的な認識結果
-        let finalTranscript = '';   // 確定した認識結果
-        let hasFinalResult = false; // 確定結果があったかどうかのフラグ
+        let finalTranscript = '';
+        let interimTranscript = '';
 
-        // イベント結果をループして、中間結果と確定結果を分ける
-        for (let i = event.resultIndex; i < event.results.length; i++) {
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
             const transcript = event.results[i][0].transcript;
             if (event.results[i].isFinal) {
-                // 確定した結果 (句読点や最終的な単語の修正後)
-                // 【✅ 修正点1】確定結果の末尾に確定シグナルの「;」を付与します。
-                finalTranscript += transcript + ';'; 
-                hasFinalResult = true;
+                finalTranscript += transcript;
             } else {
-                // 中間的な結果 (まだ変化する可能性のあるテキスト)
                 interimTranscript += transcript;
             }
         }
 
-        // searchboxの内容を更新
-        // 確定結果があればそれを優先し、なければ中間結果を表示
-        searchBox.value = finalTranscript + interimTranscript; 
+        if (mode === 'waiting') {
+            const lowerTranscript = (finalTranscript + interimTranscript).toLowerCase();
+            if (wakeWords.some(word => lowerTranscript.includes(word))) {
+                console.log("ウェイクワードを検出");
+                // ウェイクワードを検出したら、次の認識サイクルからコマンドを受け付ける
+                // この時点のトランスクリプトはクリアされる
+                setMode('listening');
+            }
+        } else if (mode === 'listening') {
+            // listeningモードでは、中間結果をボックスに表示
+            searchBox.value = finalTranscript + interimTranscript;
 
-        // 【✅ 修正点2】スクリプトによる値の変更後、手動で input イベントを発火させる
-        // これにより、外部のコマンド処理リスナーが触発されます。
-        searchBox.dispatchEvent(new Event('input', { bubbles: true }));
-
-        // 確定結果が挿入された場合、認識を停止します (continuous: false のため onend が発火)
-        if (hasFinalResult) {
-            recognition.stop();
+            // 確定したコマンドがあれば処理
+            if (finalTranscript.trim()) {
+                console.log(`コマンドを確定: ${finalTranscript}`);
+                searchBox.value = finalTranscript.trim() + ';';
+                searchBox.dispatchEvent(new Event('input', { bubbles: true }));
+                setMode('waiting'); // 処理後、待機モードに戻る
+            }
         }
     };
 
-    /**
-     * 認識が終了した時 (continuous: false の場合は、発話完了または手動停止で停止した時)
-     */
     recognition.onend = () => {
-        // continuous = false のため、自動再起動のロジックを削除
-        isRecognizing = false;
-        console.log("認識処理が停止しました (発話完了または手動停止)。");
-        micButton.classList.remove('active');
-        searchBox.placeholder = "入力 (発話完了)"; // 終了がユーザーに分かるようにプレースホルダを変更
-    };
-
-    /**
-     * エラーが発生した時のイベントハンドラ
-     * @param {SpeechRecognitionErrorEvent} event
-     */
-    recognition.onerror = (event) => {
-        console.error('音声認識エラー:', event.error);
-        isRecognizing = false; // 認識フラグをリセット
-        micButton.classList.remove('active');
-
-        // エラーメッセージをユーザーに通知
-        searchBox.placeholder = `エラー: ${event.error}`;
+        console.log("認識セッション終了。1秒後に再開します。");
         setTimeout(() => {
-            searchBox.placeholder = "入力";
-        }, 3000);
+            try {
+                recognition.start();
+            } catch(e) {
+                // 'start' already called エラーなどを避ける
+                console.error("認識の再開に失敗:", e);
+            }
+        }, 1000); // エラー多発を防ぐため少し間を置く
+    };
+    
+    recognition.onerror = (event) => {
+        if (event.error === 'no-speech') {
+            // 無音は continuous モードなので無視
+            return;
+        }
+        console.error('音声認識エラー:', event.error);
     };
 
-
-    // ----------------------------------------------------------------------
-    // 4. マイクボタンのクリック処理
-    // ----------------------------------------------------------------------
     micButton.addEventListener('click', () => {
-        if (isRecognizing) {
-            // 認識中の場合は停止
-            isRecognizing = false;
-            recognition.stop();
-            micButton.classList.remove('active');
-            searchBox.placeholder = "入力 (認識停止)";
-            console.log("音声認識を停止しました。");
+        if (mode === 'listening') {
+            setMode('waiting');
         } else {
-            // 停止中の場合は開始
-            try {
-                // 認識開始前に、入力欄をクリア
-                searchBox.value = '';
-                searchBox.placeholder = "お話しください...";
-                recognition.start();
-                isRecognizing = true;
-                micButton.classList.add('active'); // ボタンに視覚的な変化を与えるCSSクラス
-                console.log("音声認識を開始しました。");
-
-                // ※初回起動時にマイクの許可ダイアログが表示されます。
-            } catch (e) {
-                console.error("認識開始中にエラーが発生しました:", e);
-                isRecognizing = false;
-                micButton.classList.remove('active');
-            }
+            setMode('listening');
         }
     });
 
-    // 初期状態のボタン表示設定
-    micButton.classList.remove('active');
+    // 初期起動
+    setMode('waiting');
+    try {
+        recognition.start();
+    } catch(e) {
+        console.error("初期認識開始に失敗", e);
+    }
 });
