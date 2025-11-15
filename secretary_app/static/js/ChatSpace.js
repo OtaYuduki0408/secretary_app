@@ -84,14 +84,14 @@ export async function check_chat_Space(inputValue) {
       reader.speak(result.message);
     }
 
-    // クイックコマンドからボイスメイトへのフォールバック処理
+    // シーシーへのフォールバック処理
     if (result.fallback_to_voicemate) {
-      console.log("DEBUG: クイックコマンド失敗、ボイスメイトにフォールバックします。");
+      console.log("DEBUG: シーシートにフォールバックします。");
       // アナウンスを読み上げた後、少し待機
       await new Promise(resolve => setTimeout(resolve, 2000)); // 2秒待機
 
-      // 元のinputValueから「クイックコマンド」の部分を削除して、再度check_chat_Spaceを呼び出す
-      const originalCommand = inputValue.replace(/^クイックコマンド\s*/, '');
+      // 元のinputValueから「シーシーて、再度check_chat_Spaceを呼び出す
+      const originalCommand = inputValue.replace(シーシー);
       console.log(`DEBUG: フォールバック後の入力: "${originalCommand}"`);
       await check_chat_Space(originalCommand);
       return; // フォールバック処理が完了したら、以降の処理はスキップ
