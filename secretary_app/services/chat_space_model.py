@@ -12,6 +12,7 @@ from services.finance_service import (
     get_monthly_expense, get_daily_expense
 )
 from services.MemoManager import MemoManager
+from services import switchbot_service
 
 
 class ChatSpaceModel:
@@ -28,6 +29,7 @@ class ChatSpaceModel:
     M:メモ帳
     T:時刻、年月日、曜日確認(行動はn)
     R:過去の命令の修正(行動はn)
+    S:SwitchBot iot等。(例:電気を消す、エアコンを付ける、鍵を掛ける)(行動はn)
     -行動-
     a:追加
     d:削除
@@ -274,6 +276,34 @@ class ChatSpaceModel:
                  
         return parsed_list
 
+    def _parse_switchbot_operation_list(self, text: str) -> list:
+        if not text: return []
+        match = re.search(r"```json\s*([\s\S]*?)\s*```", text, re.I)
+        s = match.group(1) if match else text
+        
+        data = None
+        try:
+            data = json.loads(s)
+        except json.JSONDecodeError:
+            print("JSON解析失敗: LLMが出力したJSON形式が不正です")
+            return []
+
+        list_data = data if isinstance(data, list) else [data] if data else []
+        
+        parsed_list = []
+        for x in list_data:
+            if not isinstance(x, dict): continue
+            item = {
+                'device_id': x.get('device_id') or '',
+                'command_type': x.get('command_type') or '',
+                'command': x.get('command') or '',
+                'parameter': x.get('parameter') or 'default'
+            }
+            if item['device_id'] and item['command'] and item['command_type']:
+                 parsed_list.append(item)
+                 
+        return parsed_list
+
 
     def check_chat_space(self, input_value: str, user_id: str | None = None) -> dict:
         # (docstring removed due to mojibake)
@@ -316,6 +346,8 @@ class ChatSpaceModel:
                 input_value=input_value
             )
             result["message"] = self._gemini_request(time_prompt)
+        elif purpose == "Sn": # SwitchBot機能
+            result["data"], result["message"] = self._get_switchbot_devices(input_value, user_id)
         else:
             result["message"] = purpose
             
@@ -798,6 +830,119 @@ class ChatSpaceModel:
         except Exception as e:
             print(f"--- [ERROR] _get_memo: メモ検索/取得エラー: {e} ---")
             return None, "メモの取得中にエラーが発生しました。"
+
+    # SwitchBot操作プロンプト
+    SWITCHBOT_OPERATION_PROMPT_TEMPLATE = """
+    目的: ユーザーが操作したいSwitchBotデバイスと、そのデバイスに対して実行したいコマンドを抽出。
+    利用可能なデバイスと機能のリスト: {available_devices_json}
+    抽出項目:
+    - device_id (操作対象のデバイスID)
+    - command_type (コマンドタイプ。例: "command", "customize")
+    - command (実行するコマンド。例: "turnOn", "turnOff", "press")
+    - parameter (コマンドのパラメータ。例: "default", "25", "on")
+    出力はJSON配列のみ、他テキスト禁止。単独でも複数あっても二次配列で返す。
+    現在時刻:{current_time}
+    ユーザー入力: {input_value}
+    """
+
+    def _get_switchbot_devices(self, text: str, user_id: str | None):
+        """SwitchBotデバイス情報を取得し、ユーザーの操作意図を特定する"""
+        switchbot_api_token = os.getenv("SWITCHBOT_TOKEN") # ここを修正
+        switchbot_api_secret = os.getenv("SWITCHBOT_SECRET") # SECRETも取得
+
+        # ここにprint文を追加
+        if switchbot_api_token:
+            print(f"DEBUG: SWITCHBOT_TOKEN: {switchbot_api_token[:5]}...{switchbot_api_token[-5:]}") # print文も修正
+        else:
+            print("DEBUG: SWITCHBOT_TOKEN is not set.") # print文も修正
+        if switchbot_api_secret:
+            print(f"DEBUG: SWITCHBOT_SECRET: {switchbot_api_secret[:5]}...{switchbot_api_secret[-5:]}")
+        else:
+            print("DEBUG: SWITCHBOT_SECRET is not set.")
+
+        if not switchbot_api_token or not switchbot_api_secret:
+            return None, "SwitchBot APIトークンまたはシークレットが設定されていません。"
+
+        try:
+            devices_data = switchbot_service.get_switchbot_devices(switchbot_api_token, switchbot_api_secret) # SECRETを渡す
+            if devices_data and devices_data.get("statusCode") == 100:
+                device_list = devices_data["body"].get("deviceList", [])
+                infrared_remote_list = devices_data["body"].get("infraredRemoteList", [])
+
+                # LLMに渡すための情報を整形
+                formatted_devices = []
+                for device in device_list:
+                    formatted_devices.append({
+                        "name": device.get("deviceName"),
+                        "type": device.get("deviceType"),
+                        "id": device.get("deviceId")
+                    })
+                for remote in infrared_remote_list:
+                    formatted_devices.append({
+                        "name": remote.get("deviceName"),
+                        "type": remote.get("remoteType"), # IR_Remoteの場合はremoteTypeを使う
+                        "id": remote.get("deviceId")
+                    })
+                
+                # デバイスリストをJSON文字列に変換
+                available_devices_json = json.dumps(formatted_devices, ensure_ascii=False)
+
+                # LLMに操作意図を特定させるプロンプトを生成
+                current_time = datetime.now(JST).strftime('%Y-%m-%d %H:%M:%S')
+                operation_prompt = self.SWITCHBOT_OPERATION_PROMPT_TEMPLATE.format(
+                    available_devices_json=available_devices_json,
+                    current_time=current_time,
+                    input_value=text
+                )
+                raw_operation = self._gemini_request(operation_prompt)
+                operations_to_perform = self._parse_switchbot_operation_list(raw_operation)
+
+                if operations_to_perform:
+                    # ユーザーの意図が特定できた場合、操作を実行
+                    results = []
+                    for op in operations_to_perform:
+                        op_result, op_message = self._operate_switchbot(
+                            switchbot_api_token,
+                            switchbot_api_secret, # SECRETを渡す
+                            op['device_id'],
+                            op['command_type'],
+                            op['command'],
+                            op['parameter']
+                        )
+                        results.append({"operation": op, "result": op_result, "message": op_message})
+                    
+                    # ユーザーへのフィードバックメッセージを生成
+                    feedback_messages = []
+                    for res in results:
+                        device_name = next((d['name'] for d in formatted_devices if d['id'] == res['operation']['device_id']), "不明なデバイス")
+                        feedback_messages.append(f"{device_name}に対して'{res['operation']['command']}'を実行しました。結果: {res['message']}")
+                    
+                    return results, "、".join(feedback_messages)
+                else:
+                    # 操作意図が特定できなかった場合
+                    message = f"{len(formatted_devices)}件のSwitchBotデバイスが見つかりました。どのデバイスをどのように操作しますか？"
+                    return formatted_devices, message
+            else:
+                return None, "SwitchBotデバイスの取得に失敗しました。"
+        except Exception as e:
+            print(f"SwitchBotデバイス取得エラー: {e}")
+            return None, "SwitchBotデバイスの取得中にエラーが発生しました。"
+
+    def _operate_switchbot(self, api_token: str, api_secret: str, device_id: str, command_type: str, command: str, parameter: str = "default"):
+        """
+        SwitchBotデバイスを操作する。
+        """
+        try:
+            response = switchbot_service.send_device_command(api_token, api_secret, device_id, command_type, command, parameter) # SECRETを渡す
+            if response and response.get("statusCode") == 100:
+                return response, "操作に成功しました。"
+            else:
+                return response, f"操作に失敗しました: {response.get('message', '不明なエラー')}"
+        except Exception as e:
+            print(f"SwitchBot操作エラー: {e}")
+            return None, "SwitchBotの操作中にエラーが発生しました。"
+
+
 
 
 
