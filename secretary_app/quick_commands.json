@@ -1,17 +1,6 @@
 [
     {
-        "pattern": "シーシー 部屋の電気を消して",
-        "action": {
-            "type": "switchbot_command",
-            "device_name": "照明",
-            "command_type": "command",
-            "command": "turnOff",
-            "parameter": "default"
-        }
-    },
-
-    {
-        "pattern": "シーシー 部屋の電気をつけて",
+        "pattern": "クイックコマンド 部屋の電気をつけて",
         "action": {
             "type": "switchbot_command",
             "device_name": "照明",
@@ -21,7 +10,7 @@
         }
     },
     {
-        "pattern": "シーシー 部屋の電気を付けて",
+        "pattern": "クイックコマンド 部屋の電気を付けて",
         "action": {
             "type": "switchbot_command",
             "device_name": "照明",
@@ -31,7 +20,19 @@
         }
     },    
     {
-        "pattern": "シーシー 電気をつけて",
+        "pattern": "クイックコマンド 部屋の電気を消して",
+        "action": {
+            "type": "switchbot_command",
+            "device_name": "照明",
+            "command_type": "command",
+            "command": "turnOff",
+            "parameter": "default"
+        }
+    },
+
+
+    {
+        "pattern": "クイックコマンド 電気をつけて",
         "action": {
             "type": "switchbot_command",
             "device_name": "照明",
@@ -41,7 +42,18 @@
         }
     },
     {
-        "pattern": "シーシー 電気を消して",
+        "pattern": "クイックコマンド 電気をつけて",
+        "action": {
+            "type": "switchbot_command",
+            "device_name": "照明",
+            "command_type": "command",
+            "command": "turnOn",
+            "parameter": "default"
+        }
+    },
+
+    {
+        "pattern": "クイックコマンド 電気を消して",
         "action": {
             "type": "switchbot_command",
             "device_name": "照明",

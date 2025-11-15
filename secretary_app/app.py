@@ -667,12 +667,12 @@ def chat_api_web():
     user_id = session.get('user', {}).get('id') # セッションからuser_idを取得
     response_data = {"status": "success", "message": ""}
 
-    # シーシーのチェック
+    # 高速実行のチェック
     if user_input.startswith("クイックコマンド"):
-        print(f"DEBUG: シーシー検出: {user_input}")
+        print(f"DEBUG: 高速実行検出: {user_input}")
         for qc in quick_commands:
             if user_input == qc["pattern"]:
-                print(f"DEBUG: シーシーパターン一致: {qc['pattern']}")
+                print(f"DEBUG: クイックコマンドパターン一致: {qc['pattern']}")
                 action = qc["action"]
                 if action["type"] == "switchbot_command":
                     print(f"DEBUG: SwitchBotコマンド実行: {action}")
@@ -715,38 +715,38 @@ def chat_api_web():
                                     parameter
                                 )
                                 if switchbot_result and switchbot_result.get("statusCode") == 100:
-                                    response_data['message'] = f"シーシーで「{device_name}を{command}」を実行します。"
+                                    response_data['message'] = f"高速実行で「{device_name}を{command}」を実行します。"
                                     response_data['status'] = 'success'
                                     print(f"DEBUG: SwitchBot操作成功: {response_data['message']}")
                                 else:
-                                    response_data['message'] = f"シーシーの実行に失敗しました。通常処理として実行します。"
+                                    response_data['message'] = f"高速実行の実行に失敗しました。通常処理として実行します。"
                                     response_data['status'] = 'error'
                                     response_data['fallback_to_voicemate'] = True # フォールバックフラグ
                                     print(f"ERROR: SwitchBot操作失敗、フォールバック: {switchbot_message}")
                             else:
-                                response_data['message'] = f"シーシーの実行に失敗しました。通常処理として実行します。"
+                                response_data['message'] = f"高速実行の実行に失敗しました。通常処理として実行します。"
                                 response_data['status'] = 'error'
                                 response_data['fallback_to_voicemate'] = True # フォールバックフラグ
                                 print(f"ERROR: デバイス'{device_name}'が見つかりませんでした。フォールバック。")
                         else:
-                            response_data['message'] = "シーシーの実行に失敗しました。通常処理として実行します。"
+                            response_data['message'] = "高速実行の実行に失敗しました。通常処理として実行します。"
                             response_data['status'] = 'error'
                             response_data['fallback_to_voicemate'] = True # フォールバックフラグ
                             print(f"ERROR: SwitchBotデバイスの取得に失敗しました。フォールバック。")
                     except Exception as e:
-                        print(f"ERROR: シーシー SwitchBot操作エラー、フォールバック: {e}")
-                        response_data['message'] = "シーシーの実行に失敗しました。通常処理として実行します。"
+                        print(f"ERROR: 高速実行 SwitchBot操作エラー、フォールバック: {e}")
+                        response_data['message'] = "高速実行の実行に失敗しました。通常処理として実行します。"
                         response_data['status'] = 'error'
                         response_data['fallback_to_voicemate'] = True # フォールバックフラグ
                 return jsonify(response_data)
         
-        # シーシーパターンに一致しなかった場合
-        print(f"DEBUG: シーシーパターン不一致: {user_input}")
-        # シーシーとして認識されたが、パターンに一致しなかった場合は、通常の処理にフォールバック
+        # 高速実行パターンに一致しなかった場合
+        print(f"DEBUG: 高速実行パターン不一致: {user_input}")
+        # 高速実行として認識されたが、パターンに一致しなかった場合は、通常の処理にフォールバック
         # その際、特別なメッセージは出さず、通常のLLM処理に任せる
         # ここではreturnしないことで、下の通常のchat_space_model処理に進む
     
-    # シーシーに一致しない場合、通常のchat_space_model処理
+    # 高速実行に一致しない場合、通常のchat_space_model処理
     response_data = chat_space_model.check_chat_space(user_input, user_id=user_id)
 
     action = response_data.get('action')

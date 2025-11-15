@@ -84,14 +84,14 @@ export async function check_chat_Space(inputValue) {
       reader.speak(result.message);
     }
 
-    // シーシーへのフォールバック処理
+    // 高速実行へのフォールバック処理
     if (result.fallback_to_voicemate) {
-      console.log("DEBUG: シーシートにフォールバックします。");
+      console.log("DEBUG: 高速実行トにフォールバックします。");
       // アナウンスを読み上げた後、少し待機
       await new Promise(resolve => setTimeout(resolve, 2000)); // 2秒待機
 
-      // 元のinputValueから「シーシーて、再度check_chat_Spaceを呼び出す
-      const originalCommand = inputValue.replace(シーシー);
+      // 元のinputValueから「高速実行て、再度check_chat_Spaceを呼び出す
+      const originalCommand = inputValue.replace(高速実行);
       console.log(`DEBUG: フォールバック後の入力: "${originalCommand}"`);
       await check_chat_Space(originalCommand);
       return; // フォールバック処理が完了したら、以降の処理はスキップ

@@ -1,7 +1,7 @@
 // ============================================================================
 // グローバル変数と定数
 // ============================================================================
-const WAKE_WORDS = ['ボイスメイト', 'ぼいすめいと', 'voicemate', 'シーシー', 'クイックコマンド'];
+const WAKE_WORDS = ['ボイスメイト', 'ぼいすめいと', 'voicemate', '高速実行', 'クイックコマンド'];
 const VOICE_WATE_SOUND_PATH = '/static/voice/voice_wate.mp3';
 const RELODE_SOUND_PATH = '/static/voice/relode.mp3';
 const ERROR_SOUND_PATH = '/static/voice/error.mp3';
@@ -23,6 +23,8 @@ speechUtterance.volume = 1;
 speechUtterance.rate = 1;
 speechUtterance.pitch = 1;
 
+let userInteracted = false; // ユーザーがページとインタラクトしたかどうかのフラグ
+
 // ============================================================================
 // ヘルパー関数
 // ============================================================================
@@ -32,6 +34,10 @@ speechUtterance.pitch = 1;
  * @param {string} filename - 再生する音声ファイルのパス
  */
 function playSound(filename) {
+    if (!userInteracted) {
+        console.warn("ユーザーインタラクションがないため、音声再生をスキップしました。");
+        return;
+    }
     const audio = new Audio(filename);
     audio.play().catch(e => console.error("音声再生エラー:", e));
 }
@@ -41,6 +47,10 @@ function playSound(filename) {
  * @param {string} text - 読み上げるテキスト
  */
 function speakText(text) {
+    if (!userInteracted) {
+        console.warn("ユーザーインタラクションがないため、TTSをスキップしました。");
+        return;
+    }
     if (speechSynth && speechUtterance) {
         speechSynth.cancel(); // 以前の発話を中断
         speechUtterance.text = text;
@@ -54,8 +64,19 @@ function speakText(text) {
  * アラート音を鳴らす (ウェイクワード検出時)
  */
 function playWakeWordSound() {
+    if (!userInteracted) {
+        console.warn("ユーザーインタラクションがないため、アラート音再生をスキップしました。");
+        return;
+    }
     try {
         const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        // AudioContextがsuspended状態であればresumeする
+        if (audioContext.state === 'suspended') {
+            audioContext.resume().then(() => {
+                console.log('AudioContext resumed successfully');
+            }).catch(e => console.error('Failed to resume AudioContext:', e));
+        }
+
         const oscillator = audioContext.createOscillator();
         const gainNode = audioContext.createGain();
 
@@ -102,7 +123,7 @@ function setMode(newMode) {
         }, 10000);
     } else { // 'waiting'
         micButton.classList.remove('active');
-        searchBox.placeholder = "「ボイスメイト」または「シーシー」と呼びかけてください";
+        searchBox.placeholder = "「ボイスメイト」または「クイックコマンド」と呼びかけてください";
         searchBox.value = '';
     }
 }
@@ -140,6 +161,7 @@ async function sendCommandToBackend(command) {
         // ここで必要に応じてUIを更新する処理を追加
     } catch (error) {
         console.error('DEBUG: コマンド送信エラー:', error);
+        playSound(ERROR_SOUND_PATH); // ★追加: コマンド送信エラー時にもエラー音を再生
         // エラー処理
     } finally {
         isBackendProcessing = false; // バックエンド処理終了
@@ -196,6 +218,10 @@ document.addEventListener('DOMContentLoaded', () => {
             const lowerTranscript = (finalTranscript + interimTranscript).toLowerCase();
             if (WAKE_WORDS.some(word => lowerTranscript.includes(word))) {
                 console.log("DEBUG: ウェイクワードを検出");
+                if (!userInteracted) {
+                    userInteracted = true; // ウェイクワード検出時にもフラグを立てる
+                    new Audio().play().catch(e => console.log("ダミー音声再生エラー (無視可能):", e));
+                }
                 playWakeWordSound(); // アラート音を鳴らす
                 setMode('listening'); // listeningモードに切り替え
                 // ウェイクワード検出時は、searchBoxはクリアされるので、ここでfinalTranscriptを処理しない
@@ -243,6 +269,12 @@ document.addEventListener('DOMContentLoaded', () => {
     // 音声入力ボタンクリック
     micButton.addEventListener('click', () => {
         console.log("DEBUG: micButton clicked.");
+        if (!userInteracted) {
+            userInteracted = true; // 最初のクリックでフラグを立てる
+            // ここでダミーの音声再生を試みることで、AudioContextをアクティブにする
+            new Audio().play().catch(e => console.log("ダミー音声再生エラー (無視可能):", e));
+        }
+
         if (currentMode === 'listening') {
             setMode('waiting');
         } else {
@@ -253,6 +285,10 @@ document.addEventListener('DOMContentLoaded', () => {
     // テキストフォーム送信 (Enterキー)
     searchForm.addEventListener('submit', (event) => {
         event.preventDefault(); // フォームのデフォルト送信を防止
+        if (!userInteracted) {
+            userInteracted = true; // テキスト入力時にもフラグを立てる
+            new Audio().play().catch(e => console.log("ダミー音声再生エラー (無視可能):", e));
+        }
         const inputText = searchBox.value.trim();
         if (inputText) {
             console.log(`DEBUG: テキスト入力確定: "${inputText}"`);
@@ -335,11 +371,20 @@ document.addEventListener('DOMContentLoaded', () => {
         const lowerFinalCommand = finalCommand.toLowerCase();
         // WAKE_WORDSに"クイックコマンド"が含まれているか、かつ入力が"クイックコマンド"で始まるか
         if (WAKE_WORDS.includes('クイックコマンド') && lowerFinalCommand.startsWith('クイックコマンド')) {
-            feedbackMessage = `シーシーで${finalCommand}を実行します`;
+            feedbackMessage = `${finalCommand}を実行完了しました`;
         } else {
             feedbackMessage = `${finalCommand}でございますね。かしこまりました`;
         }
-        speakText(feedbackMessage);
+        
+        // ★追加: フィードバックテキストからウェイクワードを削除
+        let cleanedFeedbackMessage = feedbackMessage;
+        WAKE_WORDS.forEach(word => {
+            // 大文字小文字を区別しない置換
+            const regex = new RegExp(word, 'gi');
+            cleanedFeedbackMessage = cleanedFeedbackMessage.replace(regex, '');
+        });
+
+        speakText(cleanedFeedbackMessage); // 修正後のメッセージを発話
 
         // 5. バックエンド送信
         sendCommandToBackend(finalCommand);
