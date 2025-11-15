@@ -917,8 +917,7 @@ S:SwitchBot iot等。例:電気を消す、エアコンを付ける、鍵を掛�
                     feedback_messages = []
                     for res in results:
                         device_name = next((d['name'] for d in formatted_devices if d['id'] == res['operation']['device_id']), "不明なデバイス")
-                        feedback_messages.append(f"{device_name}に対して'{res['operation']['command']}'を実行しました。結果: {res['message']}")
-                    
+                        feedback_messages.append(f"{device_name}に対して'{res['operation']['command']}'を実行しました。")
                     return results, "、".join(feedback_messages)
                 else:
                     # 操作意図が特定できなかった場合

@@ -52,8 +52,10 @@ function speakText(text) {
         return;
     }
     if (speechSynth && speechUtterance) {
+        // ★追加: シングルクォーテーションを削除
+        const cleanedText = text.replace(/'/g, ''); 
         speechSynth.cancel(); // 以前の発話を中断
-        speechUtterance.text = text;
+        speechUtterance.text = cleanedText; // 修正後のテキストを設定
         speechSynth.speak(speechUtterance);
     } else {
         console.warn("TTS機能が利用できません。");
