@@ -3,6 +3,8 @@ import re
 import json
 from datetime import datetime, timedelta
 import pytz
+import functools # 追加
+import csv # 追加
 JST = pytz.timezone('Asia/Tokyo')
 import google.generativeai as genai
 from services.ScheduleManager import ScheduleManager
@@ -15,13 +17,28 @@ from services.MemoManager import MemoManager
 from services import switchbot_service
 
 
+# キャッシュを適用する関数をクラスの外に定義
+@functools.lru_cache(maxsize=128) # キャッシュサイズは適宜調整
+def _cached_gemini_request_impl(model_instance, prompt: str) -> str:
+    print(f"--- [DEBUG] geminiに解析リクエスト (キャッシュなし) ---")
+    try:
+        response = model_instance.generate_content(
+            contents=prompt
+        )
+        print(f"--- [DEBUG] Geminiの回答: {response.text} ---")
+        return response.text.strip()
+    except Exception as e:
+        print(f"Geminiリクエストエラー: {e}")
+        return "Gemini AIとの通信中にエラーが発生しました。"
+
+
 class ChatSpaceModel:
     
 
     # 意図判定プロンプト
     PURPOSE_PROMPT_TEMPLATE = """
     以下のリストの目的と照合し、対応する機能を大文字、対応する行動を小文字で返してください。
-    命令を確実に実現できる機能がない場合、機能を使わず、最適と思われる解答をしてください。その場合、返答は最大
+    命令を確実に実現できる機能がない場合、Fnを返す。
     30文字以内となるべく少なくしてください。
     -機能-
     C:カレンダー
@@ -29,7 +46,7 @@ class ChatSpaceModel:
     M:メモ帳
     T:時刻、年月日、曜日確認(行動はn)
     R:過去の命令の修正(行動はn)
-S:SwitchBot iot等。例:電気を消す、エアコンを付ける、鍵を掛ける)(行動はn)
+    S:SwitchBot iot等。例:電気を消す、エアコンを付ける、鍵を掛ける)(行動はn)
     -行動-
     a:追加
     d:削除
@@ -161,20 +178,39 @@ S:SwitchBot iot等。例:電気を消す、エアコンを付ける、鍵を掛�
         genai.configure(api_key=gemini_api_key)
         self.model_name = "gemini-2.5-flash"
         self.model = genai.GenerativeModel(model_name=self.model_name)
-        self.schedule_manager = ScheduleManager() # ScheduleManagerのインスタンスを作E
-        self.memo_manager = MemoManager() # MemoManagerのインスタンスを作E
+        self.schedule_manager = ScheduleManager() # ScheduleManagerのインスタンスを作成
+        self.memo_manager = MemoManager() # MemoManagerのインスタンスを作成
+
+    def _log_gemini_request(self, timestamp: str, input_content: str, process_type: str, output_content: str):
+        log_file_path = os.getenv("GEMINI_LOG_FILE", "gemini_requests.csv")
+        
+        # ファイルが存在しない場合はヘッダーを書き込む
+        file_exists = os.path.exists(log_file_path)
+        with open(log_file_path, 'a', newline='', encoding='utf-8') as f:
+            writer = csv.writer(f)
+            if not file_exists:
+                writer.writerow(["Timestamp", "Input Content", "Process Type", "Output Content"])
+            writer.writerow([timestamp, input_content, process_type, output_content])
+        print(f"--- [DEBUG] Geminiリクエストログを記録: {process_type} ---")
     
     def _gemini_request(self, prompt: str) -> str:
-        print(f"--- [DEBUG] geminiに解析リクエスチEnユーザー入劁E{prompt}")
-        try:
-            response = self.model.generate_content(
-                contents=prompt
-            )
-            print(f"--- [DEBUG] Geminiの解筁E {response.text} ---")
-            return response.text.strip()
-        except Exception as e:
-            print(f"Geminiリクエストエラー: {e}")
-            return "Gemini AIとの通信中にエラーが発生しました。"
+        print(f"--- [DEBUG] geminiに解析リクエスト (ユーザー入力: {prompt}) ---")
+        
+        timestamp = datetime.now(JST).isoformat()
+        
+        # キャッシュヒットを検出するために、呼び出し前のキャッシュヒット数を取得
+        initial_hits = _cached_gemini_request_impl.cache_info().hits
+        
+        response_text = _cached_gemini_request_impl(self.model, prompt)
+        
+        # 呼び出し後のキャッシュヒット数を取得
+        final_hits = _cached_gemini_request_impl.cache_info().hits
+        
+        process_type = "CACHE_HIT" if final_hits > initial_hits else "API_CALL"
+        
+        self._log_gemini_request(timestamp, prompt, process_type, response_text)
+        
+        return response_text
 
     def _format_event_time(self, iso_time: str) -> str:
         """ISO形式の時刻文字列を「〇月〇日〇時〇分」形式に整形する"""
