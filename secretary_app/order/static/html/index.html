@@ -179,8 +179,8 @@ function updateSubOptions(categoryId, subId, data) {
   }
 }
 
-function createActionUI(prefix = '') {
-  console.log(`createActionUI called with prefix: '${prefix}'`);
+function createActionUI(prefix = '', initialValue = {}) {
+  console.log(`createActionUI called with prefix: '${prefix}', initialValue:`, initialValue);
   const category = document.getElementById(`${prefix}action_category`).value;
   const sub = document.getElementById(`${prefix}action_sub`).value;
   const detailContainer = document.getElementById(`${prefix}action_detail_container`);
@@ -189,15 +189,15 @@ function createActionUI(prefix = '') {
   switch (category) {
     case "カレンダー":
       if (sub === "追加" || sub === "削除") {
-        detailContainer.innerHTML = `<textarea class="action-detail-cal-text" placeholder="内容"></textarea>`;
+        detailContainer.innerHTML = `<textarea class="action-detail-cal-text" placeholder="内容">${initialValue.text || ''}</textarea>`;
       } else if (sub === "読み上げ") {
         detailContainer.innerHTML = `
           <label>読み上げ範囲(開始)</label>
-          <input type="date" class="action-detail-cal-read-start-abs" title="開始日（絶対）">
-          <input type="number" class="action-detail-cal-read-start-rel" placeholder="+n 日" title="開始日（相対）">
+          <input type="date" class="action-detail-cal-read-start-abs" title="開始日（絶対）" value="${initialValue.start_abs || ''}">
+          <input type="number" class="action-detail-cal-read-start-rel" placeholder="+n 日" title="開始日（相対）" value="${initialValue.start_rel || ''}">
           <label>読み上げ範囲(終了)</label>
-          <input type="date" class="action-detail-cal-read-end-abs" title="終了日（絶対）">
-          <input type="number" class="action-detail-cal-read-end-rel" placeholder="+n 日" title="終了日（相対）">
+          <input type="date" class="action-detail-cal-read-end-abs" title="終了日（絶対）" value="${initialValue.end_abs || ''}">
+          <input type="number" class="action-detail-cal-read-end-rel" placeholder="+n 日" title="終了日（相対）" value="${initialValue.end_rel || ''}">
         `;
       }
       break;
@@ -206,27 +206,27 @@ function createActionUI(prefix = '') {
         detailContainer.innerHTML = `
           <label>読み上げ項目</label>
           <select class="action-detail-fin-read-item">
-            <option value="total_balance">総所持金</option>
-            <option value="remaining_to_target">目標金額までの残金</option>
-            <option value="monthly_expense">今月の支出</option>
-            <option value="monthly_expense_no_necessities">今月の支出(必需品なし)</option>
-            <option value="monthly_income">今月の収入</option>
-            <option value="daily_expense">今日の支出</option>
-            <option value="daily_expense_no_necessities">今日の支出(必需品なし)</option>
+            <option value="total_balance" ${initialValue.item === 'total_balance' ? 'selected' : ''}>総所持金</option>
+            <option value="remaining_to_target" ${initialValue.item === 'remaining_to_target' ? 'selected' : ''}>目標金額までの残金</option>
+            <option value="monthly_expense" ${initialValue.item === 'monthly_expense' ? 'selected' : ''}>今月の支出</option>
+            <option value="monthly_expense_no_necessities" ${initialValue.item === 'monthly_expense_no_necessities' ? 'selected' : ''}>今月の支出(必需品なし)</option>
+            <option value="monthly_income" ${initialValue.item === 'monthly_income' ? 'selected' : ''}>今月の収入</option>
+            <option value="daily_expense" ${initialValue.item === 'daily_expense' ? 'selected' : ''}>今日の支出</option>
+            <option value="daily_expense_no_necessities" ${initialValue.item === 'daily_expense_no_necessities' ? 'selected' : ''}>今日の支出(必需品なし)</option>
           </select>
           <label>読み上げ形式</label>
           <select class="action-detail-fin-read-format">
-            <option value="individual">個別</option>
-            <option value="expense">支出</option>
-            <option value="income">収入</option>
-            <option value="balance">収支</option>
+            <option value="individual" ${initialValue.format === 'individual' ? 'selected' : ''}>個別</option>
+            <option value="expense" ${initialValue.format === 'expense' ? 'selected' : ''}>支出</option>
+            <option value="income" ${initialValue.format === 'income' ? 'selected' : ''}>収入</option>
+            <option value="balance" ${initialValue.format === 'balance' ? 'selected' : ''}>収支</option>
           </select>
           <label>選択範囲(開始)</label>
-          <input type="date" class="action-detail-fin-read-start-abs" title="開始日（絶対）">
-          <input type="number" class="action-detail-fin-read-start-rel" placeholder="+n 日" title="開始日（相対）">
+          <input type="date" class="action-detail-fin-read-start-abs" title="開始日（絶対）" value="${initialValue.start_abs || ''}">
+          <input type="number" class="action-detail-fin-read-start-rel" placeholder="+n 日" title="開始日（相対）" value="${initialValue.start_rel || ''}">
           <label>選択範囲(終了)</label>
-          <input type="date" class="action-detail-fin-read-end-abs" title="終了日（絶対）">
-          <input type="number" class="action-detail-fin-read-end-rel" placeholder="+n 日" title="終了日（相対）">
+          <input type="date" class="action-detail-fin-read-end-abs" title="終了日（絶対）" value="${initialValue.end_abs || ''}">
+          <input type="number" class="action-detail-fin-read-end-rel" placeholder="+n 日" title="終了日（相対）" value="${initialValue.end_rel || ''}">
         `;
       }
       break;
@@ -234,11 +234,11 @@ function createActionUI(prefix = '') {
       if (sub === "読み上げ") {
         detailContainer.innerHTML = `
           <label>読み上げ範囲(開始)</label>
-          <input type="date" class="action-detail-memo-read-start-abs" title="開始日（絶対）">
-          <input type="number" class="action-detail-memo-read-start-rel" placeholder="+n 日" title="開始日（相対）">
+          <input type="date" class="action-detail-memo-read-start-abs" title="開始日（絶対）" value="${initialValue.start_abs || ''}">
+          <input type="number" class="action-detail-memo-read-start-rel" placeholder="+n 日" title="開始日（相対）" value="${initialValue.start_rel || ''}">
           <label>読み上げ範囲(終了)</label>
-          <input type="date" class="action-detail-memo-read-end-abs" title="終了日（絶対）">
-          <input type="number" class="action-detail-memo-read-end-rel" placeholder="+n 日" title="終了日（相対）">
+          <input type="date" class="action-detail-memo-read-end-abs" title="終了日（絶対）" value="${initialValue.end_abs || ''}">
+          <input type="number" class="action-detail-memo-read-end-rel" placeholder="+n 日" title="終了日（相対）" value="${initialValue.end_rel || ''}">
         `;
       }
       break;
@@ -246,9 +246,9 @@ function createActionUI(prefix = '') {
       if (sub === "送信") {
         detailContainer.innerHTML = `
           <label>件名</label>
-          <input type="text" class="action-detail-mail-subject" placeholder="メールの件名">
+          <input type="text" class="action-detail-mail-subject" placeholder="メールの件名" value="${initialValue.subject || ''}">
           <label>本文</label>
-          <textarea class="action-detail-mail-body" placeholder="メールの本文"></textarea>
+          <textarea class="action-detail-mail-body" placeholder="メールの本文">${initialValue.body || ''}</textarea>
           <label>付与情報</label>
           <div class="action-detail-mail-attachment">
             <!-- ここにさらにUIが追加される -->
@@ -261,8 +261,8 @@ function createActionUI(prefix = '') {
   }
 }
 
-function createTriggerUI(prefix = '') {
-  console.log(`createTriggerUI called with prefix: '${prefix}'`);
+function createTriggerUI(prefix = '', initialValue = {}) {
+  console.log(`createTriggerUI called with prefix: '${prefix}', initialValue:`, initialValue);
   const category = document.getElementById(`${prefix}trigger_category`).value;
   const sub = document.getElementById(`${prefix}trigger_sub`).value;
   const triggerValueContainer = document.getElementById(`${prefix}trigger_value_container`);
@@ -274,11 +274,11 @@ function createTriggerUI(prefix = '') {
     switch (category) {
       case "場所":
         triggerValueContainer.innerHTML = `
-          <input type="text" id="${prefix}trigger_value_address" class="trigger-input" placeholder="住所を入力してください" required>
+          <input type="text" id="${prefix}trigger_value_address" class="trigger-input" placeholder="住所を入力してください" required value="${initialValue.address || ''}">
           <button type="button" id="${prefix}open_google_map_btn">Googleマップで選択</button>
-          <input type="text" id="${prefix}trigger_value_latitude" class="trigger-input" placeholder="緯度" readonly>
-          <input type="text" id="${prefix}trigger_value_longitude" class="trigger-input" placeholder="経度" readonly>
-          <input type="number" id="${prefix}trigger_value_range" class="trigger-input" placeholder="許容範囲 (m)" required>
+          <input type="text" id="${prefix}trigger_value_latitude" class="trigger-input" placeholder="緯度" readonly value="${initialValue.latitude || ''}">
+          <input type="text" id="${prefix}trigger_value_longitude" class="trigger-input" placeholder="経度" readonly value="${initialValue.longitude || ''}">
+          <input type="number" id="${prefix}trigger_value_range" class="trigger-input" placeholder="許容範囲 (m)" required value="${initialValue.range || ''}">
           <small>注意: 許容範囲はなるべく幅広くしてください。(例：1000m等)</small>
           <div id="${prefix}location_error_message" style="color: red; display: none;">緯度経度が取得できませんでした。再入力してください。</div>
         `;
@@ -306,10 +306,10 @@ function createTriggerUI(prefix = '') {
           triggerValueContainer.innerHTML = `
             <label>アクション (複数選択可)</label>
             <div id="${prefix}trigger_value_calendar_actions">
-              <input type="checkbox" id="${prefix}cal_action_add" value="追加"><label for="${prefix}cal_action_add">追加</label>
-              <input type="checkbox" id="${prefix}cal_action_modify" value="変更"><label for="${prefix}cal_action_modify">変更</label>
-              <input type="checkbox" id="${prefix}cal_action_get" value="取得"><label for="${prefix}cal_action_get">取得</label>
-              <input type="checkbox" id="${prefix}cal_action_delete" value="削除"><label for="${prefix}cal_action_delete">削除</label>
+              <input type="checkbox" id="${prefix}cal_action_add" value="追加" ${initialValue.actions?.includes('追加') ? 'checked' : ''}><label for="${prefix}cal_action_add">追加</label>
+              <input type="checkbox" id="${prefix}cal_action_modify" value="変更" ${initialValue.actions?.includes('変更') ? 'checked' : ''}><label for="${prefix}cal_action_modify">変更</label>
+              <input type="checkbox" id="${prefix}cal_action_get" value="取得" ${initialValue.actions?.includes('取得') ? 'checked' : ''}><label for="${prefix}cal_action_get">取得</label>
+              <input type="checkbox" id="${prefix}cal_action_delete" value="削除" ${initialValue.actions?.includes('削除') ? 'checked' : ''}><label for="${prefix}cal_action_delete">削除</label>
             </div>
             <label>フィルター (任意)</label>
             <div id="${prefix}trigger_value_calendar_filters">
@@ -318,37 +318,40 @@ function createTriggerUI(prefix = '') {
             <small>注意: フィルターとは、各アクションのタイトルにフィルターの単語が含まれている場合のみこのアクションを起動します。</small>
           `;
           const addFilterBtn = triggerValueContainer.querySelector(".add_filter_btn");
+          const filterContainer = triggerValueContainer.querySelector(`#${prefix}trigger_value_calendar_filters`);
           if (addFilterBtn) {
-            addFilterBtn.addEventListener("click", () => {
+            const addFilter = (filter = {}) => {
               const filterDiv = document.createElement("div");
               filterDiv.className = "filter-item";
               filterDiv.innerHTML = `
-                <input type="text" class="calendar_filter_text trigger-input" placeholder="フィルター内容">
+                <input type="text" class="calendar_filter_text trigger-input" placeholder="フィルター内容" value="${filter.text || ''}">
                 <select class="calendar_filter_logic trigger-input">
-                  <option value="AND">AND</option><option value="OR">OR</option><option value="NOT">NOT</option><option value="NAND">NAND</option><option value="NOR">NOR</option>
+                  <option value="AND" ${filter.logic === 'AND' ? 'selected' : ''}>AND</option><option value="OR" ${filter.logic === 'OR' ? 'selected' : ''}>OR</option><option value="NOT" ${filter.logic === 'NOT' ? 'selected' : ''}>NOT</option><option value="NAND" ${filter.logic === 'NAND' ? 'selected' : ''}>NAND</option><option value="NOR" ${filter.logic === 'NOR' ? 'selected' : ''}>NOR</option>
                 </select>
-                <input type="number" class="calendar_filter_priority trigger-input" placeholder="優先順位">
+                <input type="number" class="calendar_filter_priority trigger-input" placeholder="優先順位" value="${filter.priority || ''}">
                 <button type="button" class="remove_filter_btn">削除</button>
               `;
               filterDiv.querySelector(".remove_filter_btn").addEventListener("click", (e) => e.target.parentNode.remove());
-              triggerValueContainer.querySelector(`#${prefix}trigger_value_calendar_filters`).appendChild(filterDiv);
-            });
+              filterContainer.appendChild(filterDiv);
+            };
+            addFilterBtn.addEventListener("click", () => addFilter());
+            initialValue.filters?.forEach(filter => addFilter(filter));
           }
         } else if (sub === "予定の時間になったら") {
           let html = `
-            <input type="text" id="${prefix}trigger_value_cal_title" class="trigger-input" placeholder="タイトル (任意)">
-            <label>日付[開始] (任意)</label><input type="date" id="${prefix}trigger_value_cal_date_start" class="trigger-input">
+            <input type="text" id="${prefix}trigger_value_cal_title" class="trigger-input" placeholder="タイトル (任意)" value="${initialValue.title || ''}">
+            <label>日付[開始] (任意)</label><input type="date" id="${prefix}trigger_value_cal_date_start" class="trigger-input" value="${initialValue.date_start || ''}">
             <label>曜日 (任意)</label>
             <select id="${prefix}trigger_value_cal_day_of_week" class="trigger-input" multiple>
-              <option value="月">月</option><option value="火">火</option><option value="水">水</option>
-              <option value="木">木</option><option value="金">金</option><option value="土">土</option><option value="日">日</option>
+              <option value="月" ${initialValue.day_of_week?.includes('月') ? 'selected' : ''}>月</option><option value="火" ${initialValue.day_of_week?.includes('火') ? 'selected' : ''}>火</option><option value="水" ${initialValue.day_of_week?.includes('水') ? 'selected' : ''}>水</option>
+              <option value="木" ${initialValue.day_of_week?.includes('木') ? 'selected' : ''}>木</option><option value="金" ${initialValue.day_of_week?.includes('金') ? 'selected' : ''}>金</option><option value="土" ${initialValue.day_of_week?.includes('土') ? 'selected' : ''}>土</option><option value="日" ${initialValue.day_of_week?.includes('日') ? 'selected' : ''}>日</option>
             </select>
-            <label>時間[開始] (任意)</label><input type="time" id="${prefix}trigger_value_cal_time_time_start" class="trigger-input">
+            <label>時間[開始] (任意)</label><input type="time" id="${prefix}trigger_value_cal_time_time_start" class="trigger-input" value="${initialValue.time_start || ''}">
           `;
           if (prefix) { // 条件ブロック内でのみ終了日時を表示
             html += `
-              <label>日付[終了] (任意)</label><input type="date" id="${prefix}trigger_value_cal_date_end" class="trigger-input">
-              <label>時間[終了] (任意)</label><input type="time" id="${prefix}trigger_value_cal_time_time_end" class="trigger-input">
+              <label>日付[終了] (任意)</label><input type="date" id="${prefix}trigger_value_cal_date_end" class="trigger-input" value="${initialValue.date_end || ''}">
+              <label>時間[終了] (任意)</label><input type="time" id="${prefix}trigger_value_cal_time_time_end" class="trigger-input" value="${initialValue.time_end || ''}">
             `;
           }
           triggerValueContainer.innerHTML = html;
@@ -359,46 +362,52 @@ function createTriggerUI(prefix = '') {
           triggerValueContainer.innerHTML = `
             <label>アクション (複数選択可)</label>
             <div id="${prefix}trigger_value_finance_actions">
-              <input type="checkbox" id="${prefix}finance_action_add" value="追加"><label for="${prefix}finance_action_add">追加</label>
-              <input type="checkbox" id="${prefix}finance_action_modify" value="変更"><label for="${prefix}finance_action_modify">変更</label>
-              <input type="checkbox" id="${prefix}finance_action_get" value="取得"><label for="${prefix}finance_action_get">取得</label>
-              <input type="checkbox" id="${prefix}finance_action_delete" value="削除"><label for="${prefix}finance_action_delete">削除</label>
+              <input type="checkbox" id="${prefix}finance_action_add" value="追加" ${initialValue.actions?.includes('追加') ? 'checked' : ''}><label for="${prefix}finance_action_add">追加</label>
+              <input type="checkbox" id="${prefix}finance_action_modify" value="変更" ${initialValue.actions?.includes('変更') ? 'checked' : ''}><label for="${prefix}finance_action_modify">変更</label>
+              <input type="checkbox" id="${prefix}finance_action_get" value="取得" ${initialValue.actions?.includes('取得') ? 'checked' : ''}><label for="${prefix}finance_action_get">取得</label>
+              <input type="checkbox" id="${prefix}finance_action_delete" value="削除" ${initialValue.actions?.includes('削除') ? 'checked' : ''}><label for="${prefix}finance_action_delete">削除</label>
             </div>
             <label>フィルター (任意)</label>
             <div id="${prefix}trigger_value_finance_filters">
               <button type="button" class="add_filter_btn">フィルターを追加</button>
             </div>
           `;
-          triggerValueContainer.querySelector(".add_filter_btn").addEventListener("click", () => {
-            const filterDiv = document.createElement("div");
-            filterDiv.className = "filter-item";
-            filterDiv.innerHTML = `
-              <input type="text" class="finance_filter_text trigger-input" placeholder="フィルター内容">
-              <select class="finance_filter_logic trigger-input">
-                <option value="AND">AND</option><option value="OR">OR</option><option value="NOT">NOT</option><option value="NAND">NAND</option><option value="NOR">NOR</option>
-              </select>
-              <input type="number" class="finance_filter_priority trigger-input" placeholder="優先順位">
-              <button type="button" class="remove_filter_btn">削除</button>
-            `;
-            filterDiv.querySelector(".remove_filter_btn").addEventListener("click", (e) => e.target.parentNode.remove());
-            triggerValueContainer.querySelector(`#${prefix}trigger_value_finance_filters`).appendChild(filterDiv);
-          });
+          const addFilterBtn = triggerValueContainer.querySelector(".add_filter_btn");
+          const filterContainer = triggerValueContainer.querySelector(`#${prefix}trigger_value_finance_filters`);
+          if (addFilterBtn) {
+            const addFilter = (filter = {}) => {
+              const filterDiv = document.createElement("div");
+              filterDiv.className = "filter-item";
+              filterDiv.innerHTML = `
+                <input type="text" class="finance_filter_text trigger-input" placeholder="フィルター内容" value="${filter.text || ''}">
+                <select class="finance_filter_logic trigger-input">
+                  <option value="AND" ${filter.logic === 'AND' ? 'selected' : ''}>AND</option><option value="OR" ${filter.logic === 'OR' ? 'selected' : ''}>OR</option><option value="NOT" ${filter.logic === 'NOT' ? 'selected' : ''}>NOT</option><option value="NAND" ${filter.logic === 'NAND' ? 'selected' : ''}>NAND</option><option value="NOR" ${filter.logic === 'NOR' ? 'selected' : ''}>NOR</option>
+                </select>
+                <input type="number" class="finance_filter_priority trigger-input" placeholder="優先順位" value="${filter.priority || ''}">
+                <button type="button" class="remove_filter_btn">削除</button>
+              `;
+              filterDiv.querySelector(".remove_filter_btn").addEventListener("click", (e) => e.target.parentNode.remove());
+              filterContainer.appendChild(filterDiv);
+            };
+            addFilterBtn.addEventListener("click", () => addFilter());
+            initialValue.filters?.forEach(filter => addFilter(filter));
+          }
         } else if (sub === "特定金額になったら") {
           triggerValueContainer.innerHTML = `
             <label>項目</label>
             <select id="${prefix}trigger_value_finance_item" class="trigger-input" required>
-              <option value="total_balance">総所持金</option>
-              <option value="remaining_to_target">目標金額までの残金</option>
-              <option value="monthly_expense">今月の支出</option>
-              <option value="monthly_expense_no_necessities">今月の支出(必需品なし)</option>
-              <option value="monthly_income">今月の収入</option>
-              <option value="daily_expense">今日の支出</option>
-              <option value="daily_expense_no_necessities">今日の支出(必需品なし)</option>
+              <option value="total_balance" ${initialValue.item === 'total_balance' ? 'selected' : ''}>総所持金</option>
+              <option value="remaining_to_target" ${initialValue.item === 'remaining_to_target' ? 'selected' : ''}>目標金額までの残金</option>
+              <option value="monthly_expense" ${initialValue.item === 'monthly_expense' ? 'selected' : ''}>今月の支出</option>
+              <option value="monthly_expense_no_necessities" ${initialValue.item === 'monthly_expense_no_necessities' ? 'selected' : ''}>今月の支出(必需品なし)</option>
+              <option value="monthly_income" ${initialValue.item === 'monthly_income' ? 'selected' : ''}>今月の収入</option>
+              <option value="daily_expense" ${initialValue.item === 'daily_expense' ? 'selected' : ''}>今日の支出</option>
+              <option value="daily_expense_no_necessities" ${initialValue.item === 'daily_expense_no_necessities' ? 'selected' : ''}>今日の支出(必需品なし)</option>
             </select>
             <label>金額</label>
-            <input type="number" id="${prefix}trigger_value_finance_amount" class="trigger-input" placeholder="金額 (円)">
+            <input type="number" id="${prefix}trigger_value_finance_amount" class="trigger-input" placeholder="金額 (円)" value="${initialValue.amount || ''}">
             <label>または</label>
-            <input type="number" id="${prefix}trigger_value_finance_percentage" class="trigger-input" placeholder="目標額のn%">
+            <input type="number" id="${prefix}trigger_value_finance_percentage" class="trigger-input" placeholder="目標額のn%" value="${initialValue.percentage || ''}">
             <small>金額と目標額のn%はどちらか一方を入力してください。</small>
           `;
         }
@@ -408,30 +417,36 @@ function createTriggerUI(prefix = '') {
           triggerValueContainer.innerHTML = `
             <label>アクション (複数選択可)</label>
             <div id="${prefix}trigger_value_memo_actions">
-              <input type="checkbox" id="${prefix}memo_action_add" value="追加"><label for="${prefix}memo_action_add">追加</label>
-              <input type="checkbox" id="${prefix}memo_action_modify" value="変更"><label for="${prefix}memo_action_modify">変更</label>
-              <input type="checkbox" id="${prefix}memo_action_get" value="取得"><label for="${prefix}memo_action_get">取得</label>
-              <input type="checkbox" id="${prefix}memo_action_delete" value="削除"><label for="${prefix}memo_action_delete">削除</label>
+              <input type="checkbox" id="${prefix}memo_action_add" value="追加" ${initialValue.actions?.includes('追加') ? 'checked' : ''}><label for="${prefix}memo_action_add">追加</label>
+              <input type="checkbox" id="${prefix}memo_action_modify" value="変更" ${initialValue.actions?.includes('変更') ? 'checked' : ''}><label for="${prefix}memo_action_modify">変更</label>
+              <input type="checkbox" id="${prefix}memo_action_get" value="取得" ${initialValue.actions?.includes('取得') ? 'checked' : ''}><label for="${prefix}memo_action_get">取得</label>
+              <input type="checkbox" id="${prefix}memo_action_delete" value="削除" ${initialValue.actions?.includes('削除') ? 'checked' : ''}><label for="${prefix}memo_action_delete">削除</label>
             </div>
             <label>フィルター (任意)</label>
             <div id="${prefix}trigger_value_memo_filters">
               <button type="button" class="add_filter_btn">フィルターを追加</button>
             </div>
           `;
-          triggerValueContainer.querySelector(".add_filter_btn").addEventListener("click", () => {
-            const filterDiv = document.createElement("div");
-            filterDiv.className = "filter-item";
-            filterDiv.innerHTML = `
-              <input type="text" class="memo_filter_text trigger-input" placeholder="フィルター内容">
-              <select class="memo_filter_logic trigger-input">
-                <option value="AND">AND</option><option value="OR">OR</option><option value="NOT">NOT</option><option value="NAND">NAND</option><option value="NOR">NOR</option>
-              </select>
-              <input type="number" class="memo_filter_priority trigger-input" placeholder="優先順位">
-              <button type="button" class="remove_filter_btn">削除</button>
-            `;
-            filterDiv.querySelector(".remove_filter_btn").addEventListener("click", (e) => e.target.parentNode.remove());
-            triggerValueContainer.querySelector(`#${prefix}trigger_value_memo_filters`).appendChild(filterDiv);
-          });
+          const addFilterBtn = triggerValueContainer.querySelector(".add_filter_btn");
+          const filterContainer = triggerValueContainer.querySelector(`#${prefix}trigger_value_memo_filters`);
+          if (addFilterBtn) {
+            const addFilter = (filter = {}) => {
+              const filterDiv = document.createElement("div");
+              filterDiv.className = "filter-item";
+              filterDiv.innerHTML = `
+                <input type="text" class="memo_filter_text trigger-input" placeholder="フィルター内容" value="${filter.text || ''}">
+                <select class="memo_filter_logic trigger-input">
+                  <option value="AND" ${filter.logic === 'AND' ? 'selected' : ''}>AND</option><option value="OR" ${filter.logic === 'OR' ? 'selected' : ''}>OR</option><option value="NOT" ${filter.logic === 'NOT' ? 'selected' : ''}>NOT</option><option value="NAND" ${filter.logic === 'NAND' ? 'selected' : ''}>NAND</option><option value="NOR" ${filter.logic === 'NOR' ? 'selected' : ''}>NOR</option>
+                </select>
+                <input type="number" class="memo_filter_priority trigger-input" placeholder="優先順位" value="${filter.priority || ''}">
+                <button type="button" class="remove_filter_btn">削除</button>
+              `;
+              filterDiv.querySelector(".remove_filter_btn").addEventListener("click", (e) => e.target.parentNode.remove());
+              filterContainer.appendChild(filterDiv);
+            };
+            addFilterBtn.addEventListener("click", () => addFilter());
+            initialValue.filters?.forEach(filter => addFilter(filter));
+          }
         } else if (sub === "特定のメモが追加されたら") {
           triggerValueContainer.innerHTML = `
             <label>フィルター (必須)</label>
@@ -439,51 +454,110 @@ function createTriggerUI(prefix = '') {
               <button type="button" class="add_filter_btn">フィルターを追加</button>
             </div>
           `;
-          const addFilter = () => {
+          const addFilterBtn = triggerValueContainer.querySelector(".add_filter_btn");
+          const filterContainer = triggerValueContainer.querySelector(`#${prefix}trigger_value_memo_filters_required`);
+          const addFilter = (filter = {}) => {
             const filterDiv = document.createElement("div");
             filterDiv.className = "filter-item";
             filterDiv.innerHTML = `
-              <input type="text" class="memo_filter_text trigger-input" placeholder="フィルター内容" required>
+              <input type="text" class="memo_filter_text trigger-input" placeholder="フィルター内容" required value="${filter.text || ''}">
               <select class="memo_filter_logic trigger-input">
-                <option value="AND">AND</option><option value="OR">OR</option><option value="NOT">NOT</option><option value="NAND">NAND</option><option value="NOR">NOR</option>
+                <option value="AND" ${filter.logic === 'AND' ? 'selected' : ''}>AND</option><option value="OR" ${filter.logic === 'OR' ? 'selected' : ''}>OR</option><option value="NOT" ${filter.logic === 'NOT' ? 'selected' : ''}>NOT</option><option value="NAND" ${filter.logic === 'NAND' ? 'selected' : ''}>NAND</option><option value="NOR" ${filter.logic === 'NOR' ? 'selected' : ''}>NOR</option>
               </select>
-              <input type="number" class="memo_filter_priority trigger-input" placeholder="優先順位">
+              <input type="number" class="memo_filter_priority trigger-input" placeholder="優先順位" value="${filter.priority || ''}">
               <button type="button" class="remove_filter_btn">削除</button>
             `;
             filterDiv.querySelector(".remove_filter_btn").addEventListener("click", (e) => e.target.parentNode.remove());
-            triggerValueContainer.querySelector(`#${prefix}trigger_value_memo_filters_required`).appendChild(filterDiv);
+            filterContainer.appendChild(filterDiv);
           };
-          triggerValueContainer.querySelector(".add_filter_btn").addEventListener("click", addFilter);
-          addFilter();
+          addFilterBtn.addEventListener("click", () => addFilter());
+          initialValue.filters?.forEach(filter => addFilter(filter));
+          if (!initialValue.filters || initialValue.filters.length === 0) {
+            addFilter(); // 初期表示で空のフィルターを1つ追加
+          }
         }
         break;
       case "時間":
         if (sub === "特定時刻になったら") {
           let html = `
-            <input type="text" id="${prefix}trigger_value_time_title" class="trigger-input" placeholder="タイトル (任意)">
-            <label>日付[開始] (任意)</label><input type="date" id="${prefix}trigger_value_time_date_start" class="trigger-input">
-            <label>曜日 (任意)</label>
-            <select id="${prefix}trigger_value_time_day_of_week" class="trigger-input" multiple>
-              <option value="月">月</option><option value="火">火</option><option value="水">水</option>
-              <option value="木">木</option><option value="金">金</option><option value="土">土</option><option value="日">日</option>
-            </select>
-            <label>時間[開始] (任意)</label><input type="time" id="${prefix}trigger_value_time_time_start" class="trigger-input">
+            <small><b>注意：以下の全ての条件を満たす時にトリガーが発動します。</b><br>以下の全ての条件を満たす時にトリガーが発動します。</small>
+            <label>年 (任意)</label><input type="number" id="${prefix}trigger_value_time_year" class="trigger-input" placeholder="例: 2025" value="${initialValue.year || ''}">
+            <label>月 (任意)</label><input type="number" id="${prefix}trigger_value_time_month" class="trigger-input" placeholder="例: 1" value="${initialValue.month || ''}">
+            <label>日 (任意)</label><input type="number" id="${prefix}trigger_value_time_day" class="trigger-input" placeholder="例: 15" value="${initialValue.day || ''}">
+            <label>曜日 (任意)(複数選択可)</label>
+            <div id="${prefix}trigger_value_time_day_of_week_buttons" class="co-day-of-week-selector">
+              <button type="button" data-value="月">月</button>
+              <button type="button" data-value="火">火</button>
+              <button type="button" data-value="水">水</button>
+              <button type="button" data-value="木">木</button>
+              <button type="button" data-value="金">金</button>
+              <button type="button" data-value="土">土</button>
+              <button type="button" data-value="日">日</button>
+            </div>
+            <label>時刻 (必須)</label>
+            <input type="text" id="${prefix}trigger_value_time_start" class="trigger-input" list="${prefix}time_options_start" value="${initialValue.time_start || ''}" placeholder="例: 07:30" required>
+            <datalist id="${prefix}time_options_start">
+              ${(() => {
+                let options = '';
+                for (let h = 0; h < 24; h++) {
+                  for (let m = 0; m < 60; m += 15) {
+                    const hour = String(h).padStart(2, '0');
+                    const minute = String(m).padStart(2, '0');
+                    options += `<option value="${hour}:${minute}">`;
+                  }
+                }
+                return options;
+              })()}
+            </datalist>
           `;
           if (prefix) { // 条件ブロック内でのみ終了日時を表示
             html += `
-              <label>日付[終了] (任意)</label><input type="date" id="${prefix}trigger_value_time_date_end" class="trigger-input">
-              <label>時間[終了] (任意)</label><input type="time" id="${prefix}trigger_value_time_time_end" class="trigger-input">
+              <label>日付[終了] (任意)</label><input type="date" id="${prefix}trigger_value_time_date_end" class="trigger-input" value="${initialValue.date_end || ''}">
+              <label>時間[終了] (任意)</label>
+              <input type="text" id="${prefix}trigger_value_time_time_end" class="trigger-input" list="${prefix}time_options_end" value="${initialValue.time_end || ''}" placeholder="例: 18:00">
+              <datalist id="${prefix}time_options_end">
+                ${(() => {
+                  let options = '';
+                  for (let h = 0; h < 24; h++) {
+                    for (let m = 0; m < 60; m += 15) {
+                      const hour = String(h).padStart(2, '0');
+                      const minute = String(m).padStart(2, '0');
+                      options += `<option value="${hour}:${minute}">`;
+                    }
+                  }
+                  return options;
+                })()}
+              </datalist>
             `;
           }
           triggerValueContainer.innerHTML = html;
+
+          // 曜日選択ボタンのロジックと復元
+          const dayOfWeekButtonsContainer = document.getElementById(`${prefix}trigger_value_time_day_of_week_buttons`);
+          if (dayOfWeekButtonsContainer) {
+            dayOfWeekButtonsContainer.addEventListener('click', (event) => {
+              if (event.target.tagName === 'BUTTON') {
+                event.target.classList.toggle('selected');
+              }
+            });
+            // 復元
+            if (initialValue.day_of_week && Array.isArray(initialValue.day_of_week)) {
+              initialValue.day_of_week.forEach(day => {
+                const button = dayOfWeekButtonsContainer.querySelector(`button[data-value="${day}"]`);
+                if (button) {
+                  button.classList.add('selected');
+                }
+              });
+            }
+          }
         }
         break;
       default:
-        triggerValueContainer.innerHTML = `<input type="text" id="${prefix}trigger_value" placeholder="${defaultPlaceholder}">`;
+        triggerValueContainer.innerHTML = `<input type="text" id="${prefix}trigger_value" placeholder="${defaultPlaceholder}" value="${initialValue.value || ''}">`;
         break;
     }
   } else {
-    triggerValueContainer.innerHTML = `<input type="text" id="${prefix}trigger_value" placeholder="${defaultPlaceholder}">`;
+    triggerValueContainer.innerHTML = `<input type="text" id="${prefix}trigger_value" placeholder="${defaultPlaceholder}" value="${initialValue.value || ''}">`;
   }
 }
 
@@ -580,7 +654,7 @@ function addConditionBlock(parent=document.getElementById("condition_blocks"), d
         if (exprData) {
           subSelect.value = exprData.sub || '';
         }
-        createTriggerUI(prefix);
+        createTriggerUI(prefix, exprData.value);
 
         if (exprData && exprData.value) {
           setTimeout(() => {
@@ -706,7 +780,7 @@ function addAction(parent, data={}) {
   if (data.sub) {
     subSelect.value = data.sub;
   }
-  createActionUI(prefix);
+  createActionUI(prefix, data.detail);
 
   setTimeout(() => {
     if (data.timing) {
@@ -714,13 +788,6 @@ function addAction(parent, data={}) {
       el.querySelector(".action-timing-date-rel").value = data.timing.date_rel || "";
       el.querySelector(".action-timing-time-abs").value = data.timing.time_abs || "";
       el.querySelector(".action-timing-time-rel").value = data.timing.time_rel || "";
-    }
-    if (data.detail) {
-      const detailContainer = el.querySelector(".action-detail-container");
-      for(const key in data.detail) {
-        const input = detailContainer.querySelector(`[class*="${key}"]`);
-        if(input) input.value = data.detail[key];
-      }
     }
   }, 100);
   
@@ -746,7 +813,77 @@ function parseConditions(root){
         let value = {};
 
         if (valueContainer) {
-            // (Triggerのデータ収集ロジックは変更なし)
+            const category = categorySelect.value;
+            const sub = subSelect.value;
+
+            switch (category) {
+              case "場所":
+                value.address = valueContainer.querySelector(`[id$="trigger_value_address"]`)?.value;
+                value.latitude = valueContainer.querySelector(`[id$="trigger_value_latitude"]`)?.value;
+                value.longitude = valueContainer.querySelector(`[id$="trigger_value_longitude"]`)?.value;
+                value.range = valueContainer.querySelector(`[id$="trigger_value_range"]`)?.value;
+                break;
+              case "カレンダー":
+                if (sub === "入力があったら") {
+                  value.actions = [...valueContainer.querySelectorAll(`[id$="cal_action_add"]:checked, [id$="cal_action_modify"]:checked, [id$="cal_action_get"]:checked, [id$="cal_action_delete"]:checked`)].map(cb => cb.value);
+                  value.filters = [...valueContainer.querySelectorAll(".filter-item")].map(item => ({
+                    text: item.querySelector(".calendar_filter_text")?.value,
+                    logic: item.querySelector(".calendar_filter_logic")?.value,
+                    priority: item.querySelector(".calendar_filter_priority")?.value
+                  }));
+                } else if (sub === "予定の時間になったら") {
+                  value.title = valueContainer.querySelector(`[id$="trigger_value_cal_title"]`)?.value;
+                  value.date_start = valueContainer.querySelector(`[id$="trigger_value_cal_date_start"]`)?.value;
+                  value.date_end = valueContainer.querySelector(`[id$="trigger_value_cal_date_end"]`)?.value;
+                  value.day_of_week = [...valueContainer.querySelector(`[id$="trigger_value_cal_day_of_week"]`)?.selectedOptions].map(option => option.value);
+                  value.time_start = valueContainer.querySelector(`[id$="trigger_value_cal_time_time_start"]`)?.value;
+                  value.time_end = valueContainer.querySelector(`[id$="trigger_value_cal_time_time_end"]`)?.value;
+                }
+                break;
+              case "収支管理":
+                if (sub === "入力があったら") {
+                  value.actions = [...valueContainer.querySelectorAll(`[id$="finance_action_add"]:checked, [id$="finance_action_modify"]:checked, [id$="finance_action_get"]:checked, [id$="finance_action_delete"]:checked`)].map(cb => cb.value);
+                  value.filters = [...valueContainer.querySelectorAll(".filter-item")].map(item => ({
+                    text: item.querySelector(".finance_filter_text")?.value,
+                    logic: item.querySelector(".finance_filter_logic")?.value,
+                    priority: item.querySelector(".finance_filter_priority")?.value
+                  }));
+                } else if (sub === "特定金額になったら") {
+                  value.item = valueContainer.querySelector(`[id$="trigger_value_finance_item"]`)?.value;
+                  value.amount = valueContainer.querySelector(`[id$="trigger_value_finance_amount"]`)?.value;
+                  value.percentage = valueContainer.querySelector(`[id$="trigger_value_finance_percentage"]`)?.value;
+                }
+                break;
+              case "メモ":
+                if (sub === "入力があったら") {
+                  value.actions = [...valueContainer.querySelectorAll(`[id$="memo_action_add"]:checked, [id$="memo_action_modify"]:checked, [id$="memo_action_get"]:checked, [id$="memo_action_delete"]:checked`)].map(cb => cb.value);
+                  value.filters = [...valueContainer.querySelectorAll(".filter-item")].map(item => ({
+                    text: item.querySelector(".memo_filter_text")?.value,
+                    logic: item.querySelector(".memo_filter_logic")?.value,
+                    priority: item.querySelector(".memo_filter_priority")?.value
+                  }));
+                } else if (sub === "特定のメモが追加されたら") {
+                  value.filters = [...valueContainer.querySelectorAll(".filter-item")].map(item => ({
+                    text: item.querySelector(".memo_filter_text")?.value,
+                    logic: item.querySelector(".memo_filter_logic")?.value,
+                    priority: item.querySelector(".memo_filter_priority")?.value
+                  }));
+                }
+                break;
+              case "時間":
+                if (sub === "特定時刻になったら") {
+                  value.year = valueContainer.querySelector(`[id$="trigger_value_time_year"]`)?.value;
+                  value.month = valueContainer.querySelector(`[id$="trigger_value_time_month"]`)?.value;
+                  value.day = valueContainer.querySelector(`[id$="trigger_value_time_day"]`)?.value;
+                  value.day_of_week = [...valueContainer.querySelectorAll(`[id$="trigger_value_time_day_of_week_buttons"] button.selected`)].map(btn => btn.dataset.value);
+                  value.time_start = valueContainer.querySelector(`[id$="trigger_value_time_start"]`)?.value;
+                  value.time_end = valueContainer.querySelector(`[id$="trigger_value_time_time_end"]`)?.value;
+                }
+                break;
+              default:
+                value.value = valueContainer.querySelector(`[id$="trigger_value"]`)?.value;
+                break;
+            }
         }
 
         expr = {
@@ -786,7 +923,30 @@ function parseConditions(root){
               detail.end_rel = detailContainer.querySelector(".action-detail-cal-read-end-rel")?.value;
             }
             break;
-          // ... 他のアクションカテゴリも同様に ...
+          case "収支管理":
+            if (sub === "読み上げ") {
+              detail.item = detailContainer.querySelector(".action-detail-fin-read-item")?.value;
+              detail.format = detailContainer.querySelector(".action-detail-fin-read-format")?.value;
+              detail.start_abs = detailContainer.querySelector(".action-detail-fin-read-start-abs")?.value;
+              detail.start_rel = detailContainer.querySelector(".action-detail-fin-read-start-rel")?.value;
+              detail.end_abs = detailContainer.querySelector(".action-detail-fin-read-end-abs")?.value;
+              detail.end_rel = detailContainer.querySelector(".action-detail-fin-read-end-rel")?.value;
+            }
+            break;
+          case "メモ":
+            if (sub === "読み上げ") {
+              detail.start_abs = detailContainer.querySelector(".action-detail-memo-read-start-abs")?.value;
+              detail.start_rel = detailContainer.querySelector(".action-detail-memo-read-start-rel")?.value;
+              detail.end_abs = detailContainer.querySelector(".action-detail-memo-read-end-abs")?.value;
+              detail.end_rel = detailContainer.querySelector(".action-detail-memo-read-end-rel")?.value;
+            }
+            break;
+          case "メール":
+            if (sub === "送信") {
+              detail.subject = detailContainer.querySelector(".action-detail-mail-subject")?.value;
+              detail.body = detailContainer.querySelector(".action-detail-mail-body")?.value;
+            }
+            break;
         }
 
         return { category, sub, timing, detail };
@@ -825,70 +985,8 @@ function loadCommandToForm(cmd){
     // createTriggerUI(''); // ここでUIを再生成すると、setTimeoutの前にinnerHTMLがクリアされる可能性がある
 
     // 動的に生成されたトリガー詳細UIに値を設定
-    setTimeout(() => { // UI生成後に値を設定するためsetTimeout
-      // ここでcreateTriggerUIを呼び出すことで、triggerValueが利用可能な状態でUIが生成される
-      createTriggerUI(''); // UIを再生成
-
-      const triggerValue = trigger.value;
-      console.log("--- [DEBUG] Restoring triggerValue:", triggerValue); // デバッグログ追加
-      const triggerValueContainer = document.getElementById("trigger_value_container");
-      if (!triggerValueContainer) {
-        console.log("--- [DEBUG] triggerValueContainer not found."); // デバッグログ追加
-        return;
-      }
-
-      for (const key in triggerValue) {
-        const input = triggerValueContainer.querySelector(`[id$="${key}"]`);
-        console.log(`--- [DEBUG] Querying for key "${key}", found input:`, input); // デバッグログ追加
-        if (input) {
-          if (input.type === 'checkbox') {
-            input.checked = triggerValue[key];
-          } else if (input.tagName === 'SELECT' && input.multiple) {
-            // 複数選択のselect要素の復元
-            const selectedValues = Array.isArray(triggerValue[key]) ? triggerValue[key] : [triggerValue[key]];
-            Array.from(input.options).forEach(option => {
-              option.selected = selectedValues.includes(option.value);
-            });
-          } else {
-            input.value = triggerValue[key];
-          }
-        }
-      }
-      // フィルターの復元 (カレンダー、収支管理、メモ)
-      if (triggerValue.filters && Array.isArray(triggerValue.filters)) {
-        const addFilterBtn = triggerValueContainer.querySelector('.add_filter_btn');
-        if (addFilterBtn) {
-          // 既存の空フィルターを削除する場合 (createTriggerUIで生成される可能性のあるもの)
-          const existingFilter = triggerValueContainer.querySelector('.filter-item');
-          if(existingFilter && !existingFilter.querySelector('input[type="text"]').value) {
-              existingFilter.remove();
-          }
-
-          triggerValue.filters.forEach(filter => {
-            addFilterBtn.click(); // フィルター追加ボタンをクリックしてUIを生成
-            const newItem = triggerValueContainer.querySelector('.filter-item:last-child');
-            if (newItem) {
-              const textInput = newItem.querySelector('input[type="text"]');
-              const logicSelect = newItem.querySelector('select');
-              const priorityInput = newItem.querySelector('input[type="number"]');
-              if (textInput) textInput.value = filter.text || '';
-              if (logicSelect) logicSelect.value = filter.logic || 'AND';
-              if (priorityInput) priorityInput.value = filter.priority || '';
-            }
-          });
-        }
-      }
-      // アクションチェックボックスの復元 (カレンダー、収支管理、メモ)
-      if (triggerValue.actions && Array.isArray(triggerValue.actions)) {
-        triggerValue.actions.forEach(actionVal => {
-          const checkbox = triggerValueContainer.querySelector(`input[type="checkbox"][value="${actionVal}"]`);
-          if (checkbox) {
-            checkbox.checked = true;
-          }
-        });
-      }
-
-    }, 100);
+    // createTriggerUIにtrigger.valueを渡してUI生成と値の設定を一度に行う
+    createTriggerUI('', trigger.value);
   }
 
   document.getElementById("condition_blocks").innerHTML="";
@@ -1016,17 +1114,16 @@ async function registerCommand(){
         }));
       }
       break;
-    case "時間":
-      if (triggerSub === "特定時刻になったら") {
-        triggerValue.title = triggerContainer.querySelector("#trigger_value_time_title")?.value;
-        triggerValue.date_start = triggerContainer.querySelector("#trigger_value_time_date_start")?.value;
-        triggerValue.date_end = triggerContainer.querySelector("#trigger_value_time_date_end")?.value;
-        triggerValue.day_of_week = [...triggerContainer.querySelector("#trigger_value_time_day_of_week")?.selectedOptions].map(option => option.value);
-        triggerValue.time_start = triggerContainer.querySelector("#trigger_value_time_time_start")?.value;
-        triggerValue.time_end = triggerContainer.querySelector("#trigger_value_time_time_end")?.value;
-      }
-      break;
-    default:
+                case "時間":
+                  if (triggerSub === "特定時刻になったら") {
+                    triggerValue.year = triggerContainer.querySelector("#trigger_value_time_year")?.value;
+                    triggerValue.month = triggerContainer.querySelector("#trigger_value_time_month")?.value;
+                    triggerValue.day = triggerContainer.querySelector("#trigger_value_time_day")?.value;
+                    triggerValue.day_of_week = [...triggerContainer.querySelectorAll("#trigger_value_time_day_of_week_buttons button.selected")].map(btn => btn.dataset.value);
+                    triggerValue.time_start = triggerContainer.querySelector("#trigger_value_time_start")?.value;
+                    triggerValue.time_end = triggerContainer.querySelector("#trigger_value_time_time_end")?.value;
+                  }
+                  break;    default:
       triggerValue.value = triggerContainer.querySelector("#trigger_value")?.value;
       break;
   }

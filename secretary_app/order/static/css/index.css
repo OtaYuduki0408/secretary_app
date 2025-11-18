@@ -195,6 +195,37 @@ body.co-body {
   font-weight: 600;
 }
 
+.co-day-of-week-selector {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+.co-day-of-week-selector button {
+  flex: 1;
+  min-width: 40px;
+  padding: 8px 0;
+  border-radius: 8px;
+  border: 1px solid var(--co-border);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--co-text);
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--co-transition);
+}
+
+.co-day-of-week-selector button:hover {
+  border-color: var(--co-border-strong);
+  color: var(--co-accent);
+}
+
+.co-day-of-week-selector button.selected {
+  background: linear-gradient(135deg, #34c6ff, #7b61ff);
+  color: #fff;
+  border-color: transparent;
+}
+
 .co-input--compact {
   max-width: 140px;
 }
