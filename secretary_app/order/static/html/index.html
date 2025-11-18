@@ -112,7 +112,7 @@ const TRIGGER_CATEGORIES = {
   "カレンダー": ["入力があったら", "予定の時間になったら"],
   "収支管理": ["入力があったら", "特定金額になったら"],
   "メモ": ["入力があったら", "特定のメモが追加されたら"],
-  "時間": ["特定時刻になったら"]
+  "時間": []
 };
 console.log("TRIGGER_CATEGORIES:", TRIGGER_CATEGORIES);
 
@@ -169,6 +169,8 @@ function updateSubOptions(categoryId, subId, data) {
 
   if (categoryId.includes('trigger')) {
     if (cat === "場所") {
+      sub.style.display = 'none';
+    } else if (cat === "時間") {
       sub.style.display = 'none';
     } else {
       sub.style.display = 'block';
@@ -478,25 +480,74 @@ function createTriggerUI(prefix = '', initialValue = {}) {
         }
         break;
       case "時間":
-        if (sub === "特定時刻になったら") {
-          let html = `
-            <small><b>注意：以下の全ての条件を満たす時にトリガーが発動します。</b><br>以下の全ての条件を満たす時にトリガーが発動します。</small>
-            <label>年 (任意)</label><input type="number" id="${prefix}trigger_value_time_year" class="trigger-input" placeholder="例: 2025" value="${initialValue.year || ''}">
-            <label>月 (任意)</label><input type="number" id="${prefix}trigger_value_time_month" class="trigger-input" placeholder="例: 1" value="${initialValue.month || ''}">
-            <label>日 (任意)</label><input type="number" id="${prefix}trigger_value_time_day" class="trigger-input" placeholder="例: 15" value="${initialValue.day || ''}">
-            <label>曜日 (任意)(複数選択可)</label>
-            <div id="${prefix}trigger_value_time_day_of_week_buttons" class="co-day-of-week-selector">
-              <button type="button" data-value="月">月</button>
-              <button type="button" data-value="火">火</button>
-              <button type="button" data-value="水">水</button>
-              <button type="button" data-value="木">木</button>
-              <button type="button" data-value="金">金</button>
-              <button type="button" data-value="土">土</button>
-              <button type="button" data-value="日">日</button>
-            </div>
-            <label>時刻 (必須)</label>
-            <input type="text" id="${prefix}trigger_value_time_start" class="trigger-input" list="${prefix}time_options_start" value="${initialValue.time_start || ''}" placeholder="例: 07:30" required>
-            <datalist id="${prefix}time_options_start">
+        let html = `
+          <small><b>注意：以下の全ての条件を満たす時にトリガーが発動します。</b><br></small>
+          <label>年 (任意)</label>
+          <input type="text" id="${prefix}trigger_value_time_year" class="trigger-input" list="${prefix}year_options" value="${initialValue.year || ''}" placeholder="例: 2025" onfocus="this.setAttribute('data-prev-value', this.value); this.value='';" onblur="if(this.value==='') this.value=this.getAttribute('data-prev-value');">
+          <datalist id="${prefix}year_options">
+            ${(() => {
+              let options = '';
+              const currentYear = new Date().getFullYear();
+              for (let y = currentYear; y <= currentYear + 20; y++) {
+                options += `<option value="${y}">`;
+              }
+              return options;
+            })()}
+          </datalist>
+          <label>月 (任意)</label>
+          <input type="text" id="${prefix}trigger_value_time_month" class="trigger-input" list="${prefix}month_options" value="${initialValue.month || ''}" placeholder="例: 1" onfocus="this.setAttribute('data-prev-value', this.value); this.value='';" onblur="if(this.value==='') this.value=this.getAttribute('data-prev-value');">
+          <datalist id="${prefix}month_options">
+            ${(() => {
+              let options = '';
+              for (let m = 1; m <= 12; m++) {
+                options += `<option value="${m}">`;
+              }
+              return options;
+            })()}
+          </datalist>
+          <label>日 (任意)</label>
+          <input type="text" id="${prefix}trigger_value_time_day" class="trigger-input" list="${prefix}day_options" value="${initialValue.day || ''}" placeholder="例: 15" onfocus="this.setAttribute('data-prev-value', this.value); this.value='';" onblur="if(this.value==='') this.value=this.getAttribute('data-prev-value');">
+          <datalist id="${prefix}day_options">
+            ${(() => {
+              let options = '';
+              for (let d = 1; d <= 31; d++) {
+                options += `<option value="${d}">`;
+              }
+              return options;
+            })()}
+          </datalist>
+          <label>曜日 (任意)(複数選択可)</label>
+          <div id="${prefix}trigger_value_time_day_of_week_buttons" class="co-day-of-week-selector">
+            <button type="button" data-value="月">月</button>
+            <button type="button" data-value="火">火</button>
+            <button type="button" data-value="水">水</button>
+            <button type="button" data-value="木">木</button>
+            <button type="button" data-value="金">金</button>
+            <button type="button" data-value="土">土</button>
+            <button type="button" data-value="日">日</button>
+          </div>
+          <label>時刻 (必須)</label>
+          <input type="text" id="${prefix}trigger_value_time_start" class="trigger-input" list="${prefix}time_options_start" value="${initialValue.time_start || ''}" placeholder="例: 07:30" required onfocus="this.setAttribute('data-prev-value', this.value); this.value='';" onblur="if(this.value==='') this.value=this.getAttribute('data-prev-value');">
+          <datalist id="${prefix}time_options_start">
+            ${(() => {
+              let options = '';
+              for (let h = 0; h < 24; h++) {
+                for (let m = 0; m < 60; m += 15) {
+                  const hour = String(h).padStart(2, '0');
+                  const minute = String(m).padStart(2, '0');
+                  options += `<option value="${hour}:${minute}">`;
+                }
+              }
+              return options;
+            })()}
+          </datalist>
+        `;
+        if (prefix) { // 条件ブロック内でのみ終了日時を表示
+          html += `
+            <label>日付[終了] (任意)</label><input type="date" id="${prefix}trigger_value_time_date_end" class="trigger-input" value="${initialValue.date_end || ''}">
+            <label>時間[終了] (任意)</label>
+            <input type="text" id="${prefix}trigger_value_time_time_end" class="trigger-input" list="${prefix}time_options_end" value="${initialValue.time_end || ''}" placeholder="例: 18:00" onfocus="this.setAttribute('data-prev-value', this.value); this.value='';" onblur="if(this.value==='') this.value=this.getAttribute('data-prev-value');">
+            <datalist id="${prefix}time_options_end">
               ${(() => {
                 let options = '';
                 for (let h = 0; h < 24; h++) {
@@ -510,45 +561,25 @@ function createTriggerUI(prefix = '', initialValue = {}) {
               })()}
             </datalist>
           `;
-          if (prefix) { // 条件ブロック内でのみ終了日時を表示
-            html += `
-              <label>日付[終了] (任意)</label><input type="date" id="${prefix}trigger_value_time_date_end" class="trigger-input" value="${initialValue.date_end || ''}">
-              <label>時間[終了] (任意)</label>
-              <input type="text" id="${prefix}trigger_value_time_time_end" class="trigger-input" list="${prefix}time_options_end" value="${initialValue.time_end || ''}" placeholder="例: 18:00">
-              <datalist id="${prefix}time_options_end">
-                ${(() => {
-                  let options = '';
-                  for (let h = 0; h < 24; h++) {
-                    for (let m = 0; m < 60; m += 15) {
-                      const hour = String(h).padStart(2, '0');
-                      const minute = String(m).padStart(2, '0');
-                      options += `<option value="${hour}:${minute}">`;
-                    }
-                  }
-                  return options;
-                })()}
-              </datalist>
-            `;
-          }
-          triggerValueContainer.innerHTML = html;
+        }
+        triggerValueContainer.innerHTML = html;
 
-          // 曜日選択ボタンのロジックと復元
-          const dayOfWeekButtonsContainer = document.getElementById(`${prefix}trigger_value_time_day_of_week_buttons`);
-          if (dayOfWeekButtonsContainer) {
-            dayOfWeekButtonsContainer.addEventListener('click', (event) => {
-              if (event.target.tagName === 'BUTTON') {
-                event.target.classList.toggle('selected');
+        // 曜日選択ボタンのロジックと復元
+        const dayOfWeekButtonsContainer = document.getElementById(`${prefix}trigger_value_time_day_of_week_buttons`);
+        if (dayOfWeekButtonsContainer) {
+          dayOfWeekButtonsContainer.addEventListener('click', (event) => {
+            if (event.target.tagName === 'BUTTON') {
+              event.target.classList.toggle('selected');
+            }
+          });
+          // 復元
+          if (initialValue.day_of_week && Array.isArray(initialValue.day_of_week)) {
+            initialValue.day_of_week.forEach(day => {
+              const button = dayOfWeekButtonsContainer.querySelector(`button[data-value="${day}"]`);
+              if (button) {
+                button.classList.add('selected');
               }
             });
-            // 復元
-            if (initialValue.day_of_week && Array.isArray(initialValue.day_of_week)) {
-              initialValue.day_of_week.forEach(day => {
-                const button = dayOfWeekButtonsContainer.querySelector(`button[data-value="${day}"]`);
-                if (button) {
-                  button.classList.add('selected');
-                }
-              });
-            }
           }
         }
         break;
@@ -871,14 +902,12 @@ function parseConditions(root){
                 }
                 break;
               case "時間":
-                if (sub === "特定時刻になったら") {
-                  value.year = valueContainer.querySelector(`[id$="trigger_value_time_year"]`)?.value;
-                  value.month = valueContainer.querySelector(`[id$="trigger_value_time_month"]`)?.value;
-                  value.day = valueContainer.querySelector(`[id$="trigger_value_time_day"]`)?.value;
-                  value.day_of_week = [...valueContainer.querySelectorAll(`[id$="trigger_value_time_day_of_week_buttons"] button.selected`)].map(btn => btn.dataset.value);
-                  value.time_start = valueContainer.querySelector(`[id$="trigger_value_time_start"]`)?.value;
-                  value.time_end = valueContainer.querySelector(`[id$="trigger_value_time_time_end"]`)?.value;
-                }
+                value.year = valueContainer.querySelector(`[id$="trigger_value_time_year"]`)?.value;
+                value.month = valueContainer.querySelector(`[id$="trigger_value_time_month"]`)?.value;
+                value.day = valueContainer.querySelector(`[id$="trigger_value_time_day"]`)?.value;
+                value.day_of_week = [...valueContainer.querySelectorAll(`[id$="trigger_value_time_day_of_week_buttons"] button.selected`)].map(btn => btn.dataset.value);
+                value.time_start = valueContainer.querySelector(`[id$="trigger_value_time_start"]`)?.value;
+                value.time_end = valueContainer.querySelector(`[id$="trigger_value_time_time_end"]`)?.value;
                 break;
               default:
                 value.value = valueContainer.querySelector(`[id$="trigger_value"]`)?.value;
@@ -1114,16 +1143,14 @@ async function registerCommand(){
         }));
       }
       break;
-                case "時間":
-                  if (triggerSub === "特定時刻になったら") {
-                    triggerValue.year = triggerContainer.querySelector("#trigger_value_time_year")?.value;
-                    triggerValue.month = triggerContainer.querySelector("#trigger_value_time_month")?.value;
-                    triggerValue.day = triggerContainer.querySelector("#trigger_value_time_day")?.value;
-                    triggerValue.day_of_week = [...triggerContainer.querySelectorAll("#trigger_value_time_day_of_week_buttons button.selected")].map(btn => btn.dataset.value);
-                    triggerValue.time_start = triggerContainer.querySelector("#trigger_value_time_start")?.value;
-                    triggerValue.time_end = triggerContainer.querySelector("#trigger_value_time_time_end")?.value;
-                  }
-                  break;    default:
+                                  case "時間":
+                                    triggerValue.year = triggerContainer.querySelector("#trigger_value_time_year")?.value;
+                                    triggerValue.month = triggerContainer.querySelector("#trigger_value_time_month")?.value;
+                                    triggerValue.day = triggerContainer.querySelector("#trigger_value_time_day")?.value;
+                                    triggerValue.day_of_week = [...triggerContainer.querySelectorAll("#trigger_value_time_day_of_week_buttons button.selected")].map(btn => btn.dataset.value);
+                                    triggerValue.time_start = triggerContainer.querySelector("#trigger_value_time_start")?.value;
+                                    triggerValue.time_end = triggerContainer.querySelector("#trigger_value_time_time_end")?.value;
+                                    break;    default:
       triggerValue.value = triggerContainer.querySelector("#trigger_value")?.value;
       break;
   }
