@@ -165,8 +165,8 @@ body.co-body {
   padding: 12px 14px;
   border-radius: 12px;
   border: 1px solid var(--co-border);
-  background: rgba(255, 255, 255, 0.04);
-  color: var(--co-text);
+  background: var(--co-card-bg); /* 背景色をカード背景に合わせる */
+  color: var(--co-text); /* 文字色をテーマの基本テキスト色に */
   font-size: 0.95rem;
   transition: var(--co-transition);
 }
@@ -177,6 +177,22 @@ body.co-body {
   outline: none;
   border-color: var(--co-border-strong);
   box-shadow: 0 0 0 2px rgba(101, 214, 255, 0.25);
+}
+
+.co-card select[multiple] {
+  height: auto;
+  background: rgba(255, 255, 255, 0.02);
+  padding: 8px;
+}
+.co-card select[multiple] option {
+  padding: 8px 12px;
+  border-radius: 8px;
+  margin-top: 4px;
+}
+.co-card select[multiple] option:checked {
+  background: linear-gradient(135deg, var(--co-accent), var(--co-accent-strong));
+  color: var(--co-bg);
+  font-weight: 600;
 }
 
 .co-input--compact {

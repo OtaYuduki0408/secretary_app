@@ -335,18 +335,23 @@ function createTriggerUI(prefix = '') {
             });
           }
         } else if (sub === "予定の時間になったら") {
-          triggerValueContainer.innerHTML = `
+          let html = `
             <input type="text" id="${prefix}trigger_value_cal_title" class="trigger-input" placeholder="タイトル (任意)">
             <label>日付[開始] (任意)</label><input type="date" id="${prefix}trigger_value_cal_date_start" class="trigger-input">
-            <label>日付[終了] (任意)</label><input type="date" id="${prefix}trigger_value_cal_date_end" class="trigger-input">
             <label>曜日 (任意)</label>
             <select id="${prefix}trigger_value_cal_day_of_week" class="trigger-input" multiple>
               <option value="月">月</option><option value="火">火</option><option value="水">水</option>
               <option value="木">木</option><option value="金">金</option><option value="土">土</option><option value="日">日</option>
             </select>
-            <label>時間[開始] (任意)</label><input type="time" id="${prefix}trigger_value_cal_time_start" class="trigger-input">
-            <label>時間[終了] (任意)</label><input type="time" id="${prefix}trigger_value_cal_time_end" class="trigger-input">
+            <label>時間[開始] (任意)</label><input type="time" id="${prefix}trigger_value_cal_time_time_start" class="trigger-input">
           `;
+          if (prefix) { // 条件ブロック内でのみ終了日時を表示
+            html += `
+              <label>日付[終了] (任意)</label><input type="date" id="${prefix}trigger_value_cal_date_end" class="trigger-input">
+              <label>時間[終了] (任意)</label><input type="time" id="${prefix}trigger_value_cal_time_time_end" class="trigger-input">
+            `;
+          }
+          triggerValueContainer.innerHTML = html;
         }
         break;
       case "収支管理":
@@ -454,18 +459,23 @@ function createTriggerUI(prefix = '') {
         break;
       case "時間":
         if (sub === "特定時刻になったら") {
-          triggerValueContainer.innerHTML = `
+          let html = `
             <input type="text" id="${prefix}trigger_value_time_title" class="trigger-input" placeholder="タイトル (任意)">
             <label>日付[開始] (任意)</label><input type="date" id="${prefix}trigger_value_time_date_start" class="trigger-input">
-            <label>日付[終了] (任意)</label><input type="date" id="${prefix}trigger_value_time_date_end" class="trigger-input">
             <label>曜日 (任意)</label>
             <select id="${prefix}trigger_value_time_day_of_week" class="trigger-input" multiple>
               <option value="月">月</option><option value="火">火</option><option value="水">水</option>
               <option value="木">木</option><option value="金">金</option><option value="土">土</option><option value="日">日</option>
             </select>
             <label>時間[開始] (任意)</label><input type="time" id="${prefix}trigger_value_time_time_start" class="trigger-input">
-            <label>時間[終了] (任意)</label><input type="time" id="${prefix}trigger_value_time_time_end" class="trigger-input">
           `;
+          if (prefix) { // 条件ブロック内でのみ終了日時を表示
+            html += `
+              <label>日付[終了] (任意)</label><input type="date" id="${prefix}trigger_value_time_date_end" class="trigger-input">
+              <label>時間[終了] (任意)</label><input type="time" id="${prefix}trigger_value_time_time_end" class="trigger-input">
+            `;
+          }
+          triggerValueContainer.innerHTML = html;
         }
         break;
       default:
@@ -584,6 +594,12 @@ function addConditionBlock(parent=document.getElementById("condition_blocks"), d
               if (input) {
                 if (input.type === 'checkbox') {
                   input.checked = value[key];
+                } else if (input.tagName === 'SELECT' && input.multiple) {
+                  // 複数選択のselect要素の復元
+                  const selectedValues = Array.isArray(value[key]) ? value[key] : [value[key]];
+                  Array.from(input.options).forEach(option => {
+                    option.selected = selectedValues.includes(option.value);
+                  });
                 } else {
                   input.value = value[key];
                 }
@@ -593,15 +609,14 @@ function addConditionBlock(parent=document.getElementById("condition_blocks"), d
             if (value.filters && Array.isArray(value.filters)) {
               const addFilterBtn = valueContainer.querySelector('.add_filter_btn');
               if (addFilterBtn) {
-                const filterContainer = addFilterBtn.parentNode;
-                // 既存の空フィルターを削除する場合
+                // 既存の空フィルターを削除する場合 (createTriggerUIで生成される可能性のあるもの)
                 const existingFilter = filterContainer.querySelector('.filter-item');
                 if(existingFilter && !existingFilter.querySelector('input[type="text"]').value) {
                     existingFilter.remove();
                 }
 
                 value.filters.forEach(filter => {
-                  addFilterBtn.click();
+                  addFilterBtn.click(); // フィルター追加ボタンをクリックしてUIを生成
                   const newItem = filterContainer.querySelector('.filter-item:last-child');
                   if (newItem) {
                     const textInput = newItem.querySelector('input[type="text"]');
@@ -613,6 +628,15 @@ function addConditionBlock(parent=document.getElementById("condition_blocks"), d
                   }
                 });
               }
+            }
+            // アクションチェックボックスの復元 (カレンダー、収支管理、メモ)
+            if (value.actions && Array.isArray(value.actions)) {
+              value.actions.forEach(actionVal => {
+                const checkbox = valueContainer.querySelector(`input[type="checkbox"][value="${actionVal}"]`);
+                if (checkbox) {
+                  checkbox.checked = true;
+                }
+              });
             }
           }, 100);
         }
@@ -772,6 +796,7 @@ function parseConditions(root){
 }
 
 function loadCommandToForm(cmd){
+  console.log("--- [DEBUG] loadCommandToForm called with cmd:", cmd); // デバッグログ追加
   // フォームをリセット
   document.getElementById("name").value = "";
   document.getElementById("trigger_category").value = "";
@@ -787,9 +812,83 @@ function loadCommandToForm(cmd){
   // データをフォームに設定
   document.getElementById("name").value = cmd.name;
   
-  // (Triggerの復元ロジックは変更なし)
+  // Triggerの復元
   if (cmd.triggers && cmd.triggers.length > 0) {
-    // ...
+    const trigger = cmd.triggers[0];
+    console.log("--- [DEBUG] Restoring trigger:", trigger); // デバッグログ追加
+    const triggerCategorySelect = document.getElementById("trigger_category");
+    const triggerSubSelect = document.getElementById("trigger_sub");
+
+    triggerCategorySelect.value = trigger.category || "";
+    updateSubOptions(triggerCategorySelect.id, triggerSubSelect.id, TRIGGER_CATEGORIES);
+    triggerSubSelect.value = trigger.sub || "";
+    // createTriggerUI(''); // ここでUIを再生成すると、setTimeoutの前にinnerHTMLがクリアされる可能性がある
+
+    // 動的に生成されたトリガー詳細UIに値を設定
+    setTimeout(() => { // UI生成後に値を設定するためsetTimeout
+      // ここでcreateTriggerUIを呼び出すことで、triggerValueが利用可能な状態でUIが生成される
+      createTriggerUI(''); // UIを再生成
+
+      const triggerValue = trigger.value;
+      console.log("--- [DEBUG] Restoring triggerValue:", triggerValue); // デバッグログ追加
+      const triggerValueContainer = document.getElementById("trigger_value_container");
+      if (!triggerValueContainer) {
+        console.log("--- [DEBUG] triggerValueContainer not found."); // デバッグログ追加
+        return;
+      }
+
+      for (const key in triggerValue) {
+        const input = triggerValueContainer.querySelector(`[id$="${key}"]`);
+        console.log(`--- [DEBUG] Querying for key "${key}", found input:`, input); // デバッグログ追加
+        if (input) {
+          if (input.type === 'checkbox') {
+            input.checked = triggerValue[key];
+          } else if (input.tagName === 'SELECT' && input.multiple) {
+            // 複数選択のselect要素の復元
+            const selectedValues = Array.isArray(triggerValue[key]) ? triggerValue[key] : [triggerValue[key]];
+            Array.from(input.options).forEach(option => {
+              option.selected = selectedValues.includes(option.value);
+            });
+          } else {
+            input.value = triggerValue[key];
+          }
+        }
+      }
+      // フィルターの復元 (カレンダー、収支管理、メモ)
+      if (triggerValue.filters && Array.isArray(triggerValue.filters)) {
+        const addFilterBtn = triggerValueContainer.querySelector('.add_filter_btn');
+        if (addFilterBtn) {
+          // 既存の空フィルターを削除する場合 (createTriggerUIで生成される可能性のあるもの)
+          const existingFilter = triggerValueContainer.querySelector('.filter-item');
+          if(existingFilter && !existingFilter.querySelector('input[type="text"]').value) {
+              existingFilter.remove();
+          }
+
+          triggerValue.filters.forEach(filter => {
+            addFilterBtn.click(); // フィルター追加ボタンをクリックしてUIを生成
+            const newItem = triggerValueContainer.querySelector('.filter-item:last-child');
+            if (newItem) {
+              const textInput = newItem.querySelector('input[type="text"]');
+              const logicSelect = newItem.querySelector('select');
+              const priorityInput = newItem.querySelector('input[type="number"]');
+              if (textInput) textInput.value = filter.text || '';
+              if (logicSelect) logicSelect.value = filter.logic || 'AND';
+              if (priorityInput) priorityInput.value = filter.priority || '';
+            }
+          });
+        }
+      }
+      // アクションチェックボックスの復元 (カレンダー、収支管理、メモ)
+      if (triggerValue.actions && Array.isArray(triggerValue.actions)) {
+        triggerValue.actions.forEach(actionVal => {
+          const checkbox = triggerValueContainer.querySelector(`input[type="checkbox"][value="${actionVal}"]`);
+          if (checkbox) {
+            checkbox.checked = true;
+          }
+        });
+      }
+
+    }, 100);
   }
 
   document.getElementById("condition_blocks").innerHTML="";
@@ -816,7 +915,18 @@ function loadCommandToForm(cmd){
         const detailContainer = document.getElementById("action_detail_container");
         for(const key in a.detail) {
           const input = detailContainer.querySelector(`[class*="${key}"]`);
-          if(input) input.value = a.detail[key];
+          if(input) {
+            if (input.type === 'checkbox') {
+              input.checked = a.detail[key];
+            } else if (input.tagName === 'SELECT' && input.multiple) {
+              const selectedValues = Array.isArray(a.detail[key]) ? a.detail[key] : [a.detail[key]];
+              Array.from(input.options).forEach(option => {
+                option.selected = selectedValues.includes(option.value);
+              });
+            } else {
+              input.value = a.detail[key];
+            }
+          }
         }
       }
     }, 100);
@@ -838,41 +948,102 @@ async function registerCommand(){
   console.log("--- [DEBUG] registerCommand called ---");
   const id=document.getElementById("command-id")?.value||null;
   
+  // バリデーション: 命令名が空の場合はアラートを出して処理を中断
+  const commandName = document.getElementById("name").value;
+  if (!commandName || !commandName.trim()) {
+    alert("命令名を入力してください。");
+    return;
+  }
+
   // Trigger
   const triggerCategory = document.getElementById("trigger_category").value;
   const triggerSub = document.getElementById("trigger_sub").value;
   let triggerValue = {};
   const triggerContainer = document.getElementById("trigger_value_container");
-  // (Triggerのデータ収集ロジックは変更なし)
+
+  // Triggerのデータ収集ロジック
   switch (triggerCategory) {
-    case "収支管理":
+    case "場所":
+      triggerValue.address = triggerContainer.querySelector("#trigger_value_address")?.value;
+      triggerValue.latitude = triggerContainer.querySelector("#trigger_value_latitude")?.value;
+      triggerValue.longitude = triggerContainer.querySelector("#trigger_value_longitude")?.value;
+      triggerValue.range = triggerContainer.querySelector("#trigger_value_range")?.value;
+      break;
+    case "カレンダー":
       if (triggerSub === "入力があったら") {
-        triggerValue.actions = [...triggerContainer.querySelectorAll("#trigger_value_finance_actions input:checked")].map(cb => cb.value);
-        triggerValue.filters = [...triggerContainer.querySelectorAll("#trigger_value_finance_filters .filter-item")].map(item => ({
-          text: item.querySelector(".finance_filter_text").value,
-          logic: item.querySelector(".finance_filter_logic").value,
-          priority: item.querySelector(".finance_filter_priority").value
+        triggerValue.actions = [...triggerContainer.querySelectorAll("input[id^='cal_action_']:checked")].map(cb => cb.value);
+        triggerValue.filters = [...triggerContainer.querySelectorAll(".filter-item")].map(item => ({
+          text: item.querySelector(".calendar_filter_text")?.value,
+          logic: item.querySelector(".calendar_filter_logic")?.value,
+          priority: item.querySelector(".calendar_filter_priority")?.value
         }));
-      } else if (triggerSub === "特定金額になったら") {
-        triggerValue.item = triggerContainer.querySelector("#trigger_value_finance_item").value;
-        triggerValue.amount = triggerContainer.querySelector("#trigger_value_finance_amount").value;
-        triggerValue.percentage = triggerContainer.querySelector("#trigger_value_finance_percentage").value;
+      } else if (triggerSub === "予定の時間になったら") {
+        triggerValue.title = triggerContainer.querySelector("#trigger_value_cal_title")?.value;
+        triggerValue.date_start = triggerContainer.querySelector("#trigger_value_cal_date_start")?.value;
+        triggerValue.date_end = triggerContainer.querySelector("#trigger_value_cal_date_end")?.value;
+        triggerValue.day_of_week = [...triggerContainer.querySelector("#trigger_value_cal_day_of_week")?.selectedOptions].map(option => option.value);
+        triggerValue.time_start = triggerContainer.querySelector("#trigger_value_cal_time_start")?.value;
+        triggerValue.time_end = triggerContainer.querySelector("#trigger_value_cal_time_end")?.value;
       }
       break;
-    // ... 他のトリガーカテゴリ ...
+    case "収支管理":
+      if (triggerSub === "入力があったら") {
+        triggerValue.actions = [...triggerContainer.querySelectorAll("input[id^='finance_action_']:checked")].map(cb => cb.value);
+        triggerValue.filters = [...triggerContainer.querySelectorAll(".filter-item")].map(item => ({
+          text: item.querySelector(".finance_filter_text")?.value,
+          logic: item.querySelector(".finance_filter_logic")?.value,
+          priority: item.querySelector(".finance_filter_priority")?.value
+        }));
+      } else if (triggerSub === "特定金額になったら") {
+        triggerValue.item = triggerContainer.querySelector("#trigger_value_finance_item")?.value;
+        triggerValue.amount = triggerContainer.querySelector("#trigger_value_finance_amount")?.value;
+        triggerValue.percentage = triggerContainer.querySelector("#trigger_value_finance_percentage")?.value;
+      }
+      break;
+    case "メモ":
+      if (triggerSub === "入力があったら") {
+        triggerValue.actions = [...triggerContainer.querySelectorAll("input[id^='memo_action_']:checked")].map(cb => cb.value);
+        triggerValue.filters = [...triggerContainer.querySelectorAll(".filter-item")].map(item => ({
+          text: item.querySelector(".memo_filter_text")?.value,
+          logic: item.querySelector(".memo_filter_logic")?.value,
+          priority: item.querySelector(".memo_filter_priority")?.value
+        }));
+      } else if (triggerSub === "特定のメモが追加されたら") {
+        triggerValue.filters = [...triggerContainer.querySelectorAll(".filter-item")].map(item => ({
+          text: item.querySelector(".memo_filter_text")?.value,
+          logic: item.querySelector(".memo_filter_logic")?.value,
+          priority: item.querySelector(".memo_filter_priority")?.value
+        }));
+      }
+      break;
+    case "時間":
+      if (triggerSub === "特定時刻になったら") {
+        triggerValue.title = triggerContainer.querySelector("#trigger_value_time_title")?.value;
+        triggerValue.date_start = triggerContainer.querySelector("#trigger_value_time_date_start")?.value;
+        triggerValue.date_end = triggerContainer.querySelector("#trigger_value_time_date_end")?.value;
+        triggerValue.day_of_week = [...triggerContainer.querySelector("#trigger_value_time_day_of_week")?.selectedOptions].map(option => option.value);
+        triggerValue.time_start = triggerContainer.querySelector("#trigger_value_time_time_start")?.value;
+        triggerValue.time_end = triggerContainer.querySelector("#trigger_value_time_time_end")?.value;
+      }
+      break;
+    default:
+      triggerValue.value = triggerContainer.querySelector("#trigger_value")?.value;
+      break;
   }
 
   // Action
   const actionCategory = document.getElementById("action_category").value;
   const actionSub = document.getElementById("action_sub").value;
   const actionTiming = {
-    date_abs: document.getElementById("action_timing_date_abs").value,
-    date_rel: document.getElementById("action_timing_date_rel").value,
-    time_abs: document.getElementById("action_timing_time_abs").value,
-    time_rel: document.getElementById("action_timing_time_rel").value,
+    date_abs: document.getElementById("action_timing_date_abs")?.value,
+    date_rel: document.getElementById("action_timing_date_rel")?.value,
+    time_abs: document.getElementById("action_timing_time_abs")?.value,
+    time_rel: document.getElementById("action_timing_time_rel")?.value,
   };
   let actionDetail = {};
   const detailContainer = document.getElementById("action_detail_container");
+
+  // Actionのデータ収集ロジック
   switch (actionCategory) {
     case "カレンダー":
       if (actionSub === "追加" || actionSub === "削除") {
@@ -884,13 +1055,38 @@ async function registerCommand(){
         actionDetail.end_rel = detailContainer.querySelector(".action-detail-cal-read-end-rel")?.value;
       }
       break;
-    // ... 他のアクションカテゴリも同様に ...
+    case "収支管理":
+      if (actionSub === "読み上げ") {
+        actionDetail.item = detailContainer.querySelector(".action-detail-fin-read-item")?.value;
+        actionDetail.format = detailContainer.querySelector(".action-detail-fin-read-format")?.value;
+        actionDetail.start_abs = detailContainer.querySelector(".action-detail-fin-read-start-abs")?.value;
+        actionDetail.start_rel = detailContainer.querySelector(".action-detail-fin-read-start-rel")?.value;
+        actionDetail.end_abs = detailContainer.querySelector(".action-detail-fin-read-end-abs")?.value;
+        actionDetail.end_rel = detailContainer.querySelector(".action-detail-fin-read-end-rel")?.value;
+      }
+      break;
+    case "メモ":
+      if (actionSub === "読み上げ") {
+        actionDetail.start_abs = detailContainer.querySelector(".action-detail-memo-read-start-abs")?.value;
+        actionDetail.start_rel = detailContainer.querySelector(".action-detail-memo-read-start-rel")?.value;
+        actionDetail.end_abs = detailContainer.querySelector(".action-detail-memo-read-end-abs")?.value;
+        actionDetail.end_rel = detailContainer.querySelector(".action-detail-memo-read-end-rel")?.value;
+      }
+      break;
+    case "メール":
+      if (actionSub === "送信") {
+        actionDetail.subject = detailContainer.querySelector(".action-detail-mail-subject")?.value;
+        actionDetail.body = detailContainer.querySelector(".action-detail-mail-body")?.value;
+        // TODO: 付与情報 (attachment) の収集ロジック
+      }
+      break;
   }
 
   const payload={
     name:document.getElementById("name").value,
     triggers:[{
-      type:`${triggerCategory}:${triggerSub}`, 
+      category: triggerCategory,
+      sub: triggerSub,
       value: triggerValue
     }],
     conditions:parseConditions(document.getElementById("condition_blocks")),
