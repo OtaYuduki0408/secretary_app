@@ -276,31 +276,46 @@ function createTriggerUI(prefix = '', initialValue = {}) {
     switch (category) {
       case "場所":
         triggerValueContainer.innerHTML = `
+          <label for="${prefix}trigger_value_address">住所</label>
           <input type="text" id="${prefix}trigger_value_address" class="trigger-input" placeholder="住所を入力してください" required value="${initialValue.address || ''}">
-          <button type="button" id="${prefix}open_google_map_btn">Googleマップで選択</button>
+          <button type="button" id="${prefix}get_coords_btn" class="co-btn ghost" style="margin-top: 10px;">住所から緯度経度を取得</button>
+          <label for="${prefix}trigger_value_latitude">緯度</label>
           <input type="text" id="${prefix}trigger_value_latitude" class="trigger-input" placeholder="緯度" readonly value="${initialValue.latitude || ''}">
+          <label for="${prefix}trigger_value_longitude">経度</label>
           <input type="text" id="${prefix}trigger_value_longitude" class="trigger-input" placeholder="経度" readonly value="${initialValue.longitude || ''}">
+          <label for="${prefix}trigger_value_range">許容範囲 (m)</label>
           <input type="number" id="${prefix}trigger_value_range" class="trigger-input" placeholder="許容範囲 (m)" required value="${initialValue.range || ''}">
           <small>注意: 許容範囲はなるべく幅広くしてください。(例：1000m等)</small>
-          <div id="${prefix}location_error_message" style="color: red; display: none;">緯度経度が取得できませんでした。再入力してください。</div>
+          <div id="${prefix}location_message" style="color: green; margin-top: 5px;"></div>
+          <div id="${prefix}location_error_message" style="color: red; display: none;">住所が特定できませんでした。都道府県、市区町村、番地までなど、より簡潔な形式でお試しください。</div>
         `;
-        document.getElementById(`${prefix}trigger_value_address`).addEventListener("change", async (event) => {
-          const address = event.target.value;
-          if (address) {
-            const coords = await geocodeAddress(address);
-            if (coords) {
-              document.getElementById(`${prefix}trigger_value_latitude`).value = coords.lat;
-              document.getElementById(`${prefix}trigger_value_longitude`).value = coords.lng;
+        document.getElementById(`${prefix}get_coords_btn`).addEventListener("click", async () => {
+          const addressInput = document.getElementById(`${prefix}trigger_value_address`);
+          console.log("--- [DEBUG] addressInput element:", addressInput); // デバッグログ追加
+          const address = addressInput ? addressInput.value : '';
+          console.log("--- [DEBUG] Address input value:", address); // デバッグログ追加
+
+          if (address && address.trim() !== '') { // 空白のみの場合も考慮
+            document.getElementById(`${prefix}location_message`).textContent = "緯度経度を取得中...";
+            document.getElementById(`${prefix}location_error_message`).style.display = 'none';
+            const result = await geocodeAddress(address); // 国土地理院APIを呼び出す
+            if (result) {
+              document.getElementById(`${prefix}trigger_value_latitude`).value = result.lat;
+              document.getElementById(`${prefix}trigger_value_longitude`).value = result.lng;
+              document.getElementById(`${prefix}location_message`).textContent = "緯度経度を正常に取得しました。";
               document.getElementById(`${prefix}location_error_message`).style.display = 'none';
             } else {
               document.getElementById(`${prefix}trigger_value_latitude`).value = '';
               document.getElementById(`${prefix}trigger_value_longitude`).value = '';
+              document.getElementById(`${prefix}location_message`).textContent = "";
+              document.getElementById(`${prefix}location_error_message`).textContent = "住所が特定できませんでした。都道府県、市区町村、番地までなど、より簡潔な形式でお試しください。"; // エラーメッセージを更新
               document.getElementById(`${prefix}location_error_message`).style.display = 'block';
             }
+          } else {
+            document.getElementById(`${prefix}location_error_message`).textContent = "住所を入力してください。";
+            document.getElementById(`${prefix}location_error_message`).style.display = 'block';
+            document.getElementById(`${prefix}location_message`).textContent = "";
           }
-        });
-        document.getElementById(`${prefix}open_google_map_btn`).addEventListener("click", () => {
-          alert("Googleマップを開く処理を実装してください。");
         });
         break;
       case "カレンダー":
@@ -1296,24 +1311,23 @@ async function loadCommands() {
 }
 
 async function geocodeAddress(address) {
-  console.log("Geocoding address:", address);
-  // ここにGoogle Geocoding APIなどの呼び出しロジックを実装
-  // 例:
-  // const response = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=YOUR_API_KEY`);
-  // const data = await response.json();
-  // if (data.results && data.results.length > 0) {
-  //   const location = data.results[0].geometry.location;
-  //   return { lat: location.lat, lng: location.lng };
-  // }
-  // return null;
-
-  // ダミーの実装
-  if (address.includes("東京駅")) {
-    return { lat: 35.681236, lng: 139.767125 }; // 東京駅の緯度経度
-  } else if (address.includes("エラー")) {
+  console.log("Geocoding address using GSI API:", address);
+  const GeospatialUrl = "https://msearch.gsi.go.jp/address-search/AddressSearch?q=";
+  try {
+    const response = await fetch(GeospatialUrl + encodeURIComponent(address) + "&json=true"); // &json=true を追加
+    const data = await response.json();
+    console.log("--- [DEBUG] GSI API response:", data); // デバッグログ追加
+    if (data && data.length > 0 && data[0].geometry && data[0].geometry.coordinates) {
+      // 国土地理院APIの座標は [経度, 緯度] の順
+      const lng = data[0].geometry.coordinates[0];
+      const lat = data[0].geometry.coordinates[1];
+      return { lat: lat, lng: lng, display_name: address }; // display_nameは元の住所を使用
+    }
+    return null;
+  } catch (error) {
+    console.error("Error geocoding address with GSI API:", error);
     return null;
   }
-  return { lat: 35.000000, lng: 135.000000 }; // 仮の緯度経度
 }
 
 document.addEventListener("DOMContentLoaded",()=>{
