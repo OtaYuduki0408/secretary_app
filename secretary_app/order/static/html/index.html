@@ -112,7 +112,7 @@ const TRIGGER_CATEGORIES = {
   "場所": [],
   "カレンダー": ["入力があったら", "予定の時間になったら"],
   "収支管理": ["入力があったら", "特定金額になったら"],
-  "メモ": ["入力があったら", "特定のメモが追加されたら"],
+  "メモ": ["入力があったら"],
   "時間": []
 };
 console.log("TRIGGER_CATEGORIES:", TRIGGER_CATEGORIES);
@@ -169,7 +169,7 @@ function updateSubOptions(categoryId, subId, data) {
   if (data[cat]) data[cat].forEach(v=>{ const o=document.createElement("option"); o.value=v;o.textContent=v; sub.appendChild(o); });
 
   if (categoryId.includes('trigger')) {
-    if (cat === "場所") {
+    if (cat === "場所" || cat === "メモ") {
       sub.style.display = 'none';
     } else if (cat === "時間") {
       sub.style.display = 'none';
@@ -579,37 +579,81 @@ function createTriggerUI(prefix = '', initialValue = {}) {
         if (sub === "入力があったら") {
           triggerValueContainer.innerHTML = `
             <label>アクション (複数選択可)</label>
-            <div id="${prefix}trigger_value_finance_actions">
-              <input type="checkbox" id="${prefix}finance_action_add" value="追加" ${initialValue.actions?.includes('追加') ? 'checked' : ''}><label for="${prefix}finance_action_add">追加</label>
-              <input type="checkbox" id="${prefix}finance_action_modify" value="変更" ${initialValue.actions?.includes('変更') ? 'checked' : ''}><label for="${prefix}finance_action_modify">変更</label>
-              <input type="checkbox" id="${prefix}finance_action_get" value="取得" ${initialValue.actions?.includes('取得') ? 'checked' : ''}><label for="${prefix}finance_action_get">取得</label>
-              <input type="checkbox" id="${prefix}finance_action_delete" value="削除" ${initialValue.actions?.includes('削除') ? 'checked' : ''}><label for="${prefix}finance_action_delete">削除</label>
+            <div id="${prefix}trigger_value_finance_actions" class="co-day-of-week-selector">
+              <button type="button" data-value="追加">追加</button>
+              <button type="button" data-value="変更">変更</button>
+              <button type="button" data-value="取得">取得</button>
+              <button type="button" data-value="削除">削除</button>
             </div>
-            <label>フィルター (任意)</label>
-            <div id="${prefix}trigger_value_finance_filters">
-              <button type="button" class="add_filter_btn">フィルターを追加</button>
+            <div id="${prefix}trigger_value_finance_genres_container" style="display: none; margin-top: 15px;">
+              <label>ジャンル (複数選択可)</label>
+              <div id="${prefix}trigger_value_finance_genres" class="co-day-of-week-selector">
+                <p>ジャンルを読み込み中...</p>
+              </div>
             </div>
           `;
-          const addFilterBtn = triggerValueContainer.querySelector(".add_filter_btn");
-          const filterContainer = triggerValueContainer.querySelector(`#${prefix}trigger_value_finance_filters`);
-          if (addFilterBtn) {
-            const addFilter = (filter = {}) => {
-              const filterDiv = document.createElement("div");
-              filterDiv.className = "filter-item";
-              filterDiv.innerHTML = `
-                <input type="text" class="finance_filter_text trigger-input" placeholder="フィルター内容" value="${filter.text || ''}">
-                <select class="finance_filter_logic trigger-input">
-                  <option value="AND" ${filter.logic === 'AND' ? 'selected' : ''}>AND</option><option value="OR" ${filter.logic === 'OR' ? 'selected' : ''}>OR</option><option value="NOT" ${filter.logic === 'NOT' ? 'selected' : ''}>NOT</option><option value="NAND" ${filter.logic === 'NAND' ? 'selected' : ''}>NAND</option><option value="NOR" ${filter.logic === 'NOR' ? 'selected' : ''}>NOR</option>
-                </select>
-                <input type="number" class="finance_filter_priority trigger-input" placeholder="優先順位" value="${filter.priority || ''}">
-                <button type="button" class="remove_filter_btn">削除</button>
-              `;
-              filterDiv.querySelector(".remove_filter_btn").addEventListener("click", (e) => e.target.parentNode.remove());
-              filterContainer.appendChild(filterDiv);
-            };
-            addFilterBtn.addEventListener("click", () => addFilter());
-            initialValue.filters?.forEach(filter => addFilter(filter));
+
+          const actionButtonsContainer = triggerValueContainer.querySelector(`#${prefix}trigger_value_finance_actions`);
+          const genresContainer = triggerValueContainer.querySelector(`#${prefix}trigger_value_finance_genres_container`);
+          const genresButtonsContainer = triggerValueContainer.querySelector(`#${prefix}trigger_value_finance_genres`);
+
+          const populateGenres = async () => {
+            const genres = await fetchGenres();
+            genresButtonsContainer.innerHTML = '';
+            if (genres.length === 0) {
+                genresButtonsContainer.innerHTML = '<p>ジャンルが登録されていません。</p>';
+                return;
+            }
+            genres.forEach(genre => {
+              const button = document.createElement('button');
+              button.type = 'button';
+              button.dataset.value = genre.name;
+              button.textContent = genre.name;
+              genresButtonsContainer.appendChild(button);
+            });
+
+            if (initialValue.genres && Array.isArray(initialValue.genres)) {
+              initialValue.genres.forEach(genreName => {
+                const button = genresButtonsContainer.querySelector(`button[data-value="${genreName}"]`);
+                if (button) button.classList.add('selected');
+              });
+            }
+          };
+
+          const toggleGenresUI = () => {
+            const addButton = actionButtonsContainer.querySelector('button[data-value="追加"]');
+            if (addButton && addButton.classList.contains('selected')) {
+              genresContainer.style.display = 'block';
+            } else {
+              genresContainer.style.display = 'none';
+            }
+          };
+
+          if (actionButtonsContainer) {
+            actionButtonsContainer.addEventListener('click', (event) => {
+              if (event.target.tagName === 'BUTTON') {
+                event.target.classList.toggle('selected');
+                toggleGenresUI();
+              }
+            });
+            if (initialValue.actions && Array.isArray(initialValue.actions)) {
+              initialValue.actions.forEach(action => {
+                const button = actionButtonsContainer.querySelector(`button[data-value="${action}"]`);
+                if (button) button.classList.add('selected');
+              });
+            }
           }
+          
+          if (genresButtonsContainer) {
+            genresButtonsContainer.addEventListener('click', (event) => {
+              if (event.target.tagName === 'BUTTON') {
+                event.target.classList.toggle('selected');
+              }
+            });
+          }
+          
+          populateGenres();
+          toggleGenresUI();
         } else if (sub === "特定金額になったら") {
           triggerValueContainer.innerHTML = `
             <label>項目</label>
@@ -631,68 +675,77 @@ function createTriggerUI(prefix = '', initialValue = {}) {
         }
         break;
       case "メモ":
-        if (sub === "入力があったら") {
-          triggerValueContainer.innerHTML = `
-            <label>アクション (複数選択可)</label>
-            <div id="${prefix}trigger_value_memo_actions">
-              <input type="checkbox" id="${prefix}memo_action_add" value="追加" ${initialValue.actions?.includes('追加') ? 'checked' : ''}><label for="${prefix}memo_action_add">追加</label>
-              <input type="checkbox" id="${prefix}memo_action_modify" value="変更" ${initialValue.actions?.includes('変更') ? 'checked' : ''}><label for="${prefix}memo_action_modify">変更</label>
-              <input type="checkbox" id="${prefix}memo_action_get" value="取得" ${initialValue.actions?.includes('取得') ? 'checked' : ''}><label for="${prefix}memo_action_get">取得</label>
-              <input type="checkbox" id="${prefix}memo_action_delete" value="削除" ${initialValue.actions?.includes('削除') ? 'checked' : ''}><label for="${prefix}memo_action_delete">削除</label>
-            </div>
-            <label>フィルター (任意)</label>
-            <div id="${prefix}trigger_value_memo_filters">
-              <button type="button" class="add_filter_btn">フィルターを追加</button>
-            </div>
-          `;
-          const addFilterBtn = triggerValueContainer.querySelector(".add_filter_btn");
-          const filterContainer = triggerValueContainer.querySelector(`#${prefix}trigger_value_memo_filters`);
-          if (addFilterBtn) {
-            const addFilter = (filter = {}) => {
-              const filterDiv = document.createElement("div");
-              filterDiv.className = "filter-item";
-              filterDiv.innerHTML = `
-                <input type="text" class="memo_filter_text trigger-input" placeholder="フィルター内容" value="${filter.text || ''}">
-                <select class="memo_filter_logic trigger-input">
-                  <option value="AND" ${filter.logic === 'AND' ? 'selected' : ''}>AND</option><option value="OR" ${filter.logic === 'OR' ? 'selected' : ''}>OR</option><option value="NOT" ${filter.logic === 'NOT' ? 'selected' : ''}>NOT</option><option value="NAND" ${filter.logic === 'NAND' ? 'selected' : ''}>NAND</option><option value="NOR" ${filter.logic === 'NOR' ? 'selected' : ''}>NOR</option>
-                </select>
-                <input type="number" class="memo_filter_priority trigger-input" placeholder="優先順位" value="${filter.priority || ''}">
-                <button type="button" class="remove_filter_btn">削除</button>
-              `;
-              filterDiv.querySelector(".remove_filter_btn").addEventListener("click", (e) => e.target.parentNode.remove());
-              filterContainer.appendChild(filterDiv);
-            };
-            addFilterBtn.addEventListener("click", () => addFilter());
-            initialValue.filters?.forEach(filter => addFilter(filter));
+        // メモカテゴリは詳細がないので、subを見ずにUIを生成
+        triggerValueContainer.innerHTML = `
+          <label>アクション (複数選択可)</label>
+          <div id="${prefix}trigger_value_memo_actions" class="co-day-of-week-selector">
+            <button type="button" data-value="追加">追加</button>
+            <button type="button" data-value="変更">変更</button>
+            <button type="button" data-value="取得">取得</button>
+            <button type="button" data-value="削除">削除</button>
+          </div>
+          <label>フィルター (任意)</label><br>
+          <small>単語を指定して、検知するアクションにフィルターを掛けれます。</small>
+          <div id="${prefix}trigger_value_memo_filters">
+            <button type="button" class="add_filter_btn co-btn ghost">フィルターを追加</button>
+          </div>
+        `;
+
+        const actionButtonsContainer = triggerValueContainer.querySelector(`#${prefix}trigger_value_memo_actions`);
+        if (actionButtonsContainer) {
+          actionButtonsContainer.addEventListener('click', (event) => {
+            if (event.target.tagName === 'BUTTON') {
+              event.target.classList.toggle('selected');
+            }
+          });
+          if (initialValue.actions && Array.isArray(initialValue.actions)) {
+            initialValue.actions.forEach(action => {
+              const button = actionButtonsContainer.querySelector(`button[data-value="${action}"]`);
+              if (button) {
+                button.classList.add('selected');
+              }
+            });
           }
-        } else if (sub === "特定のメモが追加されたら") {
-          triggerValueContainer.innerHTML = `
-            <label>フィルター (必須)</label>
-            <div id="${prefix}trigger_value_memo_filters_required">
-              <button type="button" class="add_filter_btn">フィルターを追加</button>
-            </div>
-          `;
-          const addFilterBtn = triggerValueContainer.querySelector(".add_filter_btn");
-          const filterContainer = triggerValueContainer.querySelector(`#${prefix}trigger_value_memo_filters_required`);
+        }
+        const addFilterBtn = triggerValueContainer.querySelector(".add_filter_btn");
+        const filterContainer = triggerValueContainer.querySelector(`#${prefix}trigger_value_memo_filters`);
+        if (addFilterBtn) {
           const addFilter = (filter = {}) => {
             const filterDiv = document.createElement("div");
             filterDiv.className = "filter-item";
+
+            const isFirstItem = filterContainer.querySelectorAll('.filter-item').length === 0;
+
+            let logicOptions = '';
+            if (isFirstItem) {
+              logicOptions = `
+                <option value="" ${filter.logic === '' ? 'selected' : ''}>(先頭)</option>
+                <option value="NOT" ${filter.logic === 'NOT' ? 'selected' : ''}>NOT (この単語が含まれていないなら)</option>
+              `;
+            } else {
+              logicOptions = `
+                <option value="AND" ${filter.logic === 'AND' ? 'selected' : ''}>AND (「上のフィルター」と「このフィルター」の両方を満たす)</option>
+                <option value="OR" ${filter.logic === 'OR' ? 'selected' : ''}>OR (「上のフィルター」か「このフィルター」のどちらか一方でも満たす)</option>
+                <option value="NOT" ${filter.logic === 'NOT' ? 'selected' : ''}>NOT (かつ、この単語が含まれていないなら)</option>
+                <option value="NAND" ${filter.logic === 'NAND' ? 'selected' : ''}>NAND (「上のフィルター」と「このフィルター」の両方を満たすものを含まない)</option>
+                <option value="NOR" ${filter.logic === 'NOR' ? 'selected' : ''}>NOR (「上のフィルター」も「このフィルター」もどちらも満たさない)</option>
+                <option value="XOR" ${filter.logic === 'XOR' ? 'selected' : ''}>XOR (「上のフィルター」か「このフィルター」のどちらか一方だけを満たす)</option>
+                <option value="XNOR" ${filter.logic === 'XNOR' ? 'selected' : ''}>XNOR (「上のフィルター」と「このフィルター」の条件が同じである（両方満たす、または両方満たさない）)</option>
+              `;
+            }
+
             filterDiv.innerHTML = `
-              <input type="text" class="memo_filter_text trigger-input" placeholder="フィルター内容" required value="${filter.text || ''}">
+              <input type="text" class="memo_filter_text trigger-input" placeholder="フィルター内容" value="${filter.text || ''}">
               <select class="memo_filter_logic trigger-input">
-                <option value="AND" ${filter.logic === 'AND' ? 'selected' : ''}>AND</option><option value="OR" ${filter.logic === 'OR' ? 'selected' : ''}>OR</option><option value="NOT" ${filter.logic === 'NOT' ? 'selected' : ''}>NOT</option><option value="NAND" ${filter.logic === 'NAND' ? 'selected' : ''}>NAND</option><option value="NOR" ${filter.logic === 'NOR' ? 'selected' : ''}>NOR</option>
+                ${logicOptions}
               </select>
-              <input type="number" class="memo_filter_priority trigger-input" placeholder="優先順位" value="${filter.priority || ''}">
-              <button type="button" class="remove_filter_btn">削除</button>
+              <button type="button" class="remove_filter_btn remove">削除</button>
             `;
             filterDiv.querySelector(".remove_filter_btn").addEventListener("click", (e) => e.target.parentNode.remove());
-            filterContainer.appendChild(filterDiv);
+            filterContainer.insertBefore(filterDiv, addFilterBtn);
           };
           addFilterBtn.addEventListener("click", () => addFilter());
           initialValue.filters?.forEach(filter => addFilter(filter));
-          if (!initialValue.filters || initialValue.filters.length === 0) {
-            addFilter(); // 初期表示で空のフィルターを1つ追加
-          }
         }
         break;
       case "時間":
@@ -1092,12 +1145,10 @@ function parseConditions(root){
                 break;
               case "収支管理":
                 if (sub === "入力があったら") {
-                  value.actions = [...valueContainer.querySelectorAll(`[id$="finance_action_add"]:checked, [id$="finance_action_modify"]:checked, [id$="finance_action_get"]:checked, [id$="finance_action_delete"]:checked`)].map(cb => cb.value);
-                  value.filters = [...valueContainer.querySelectorAll(".filter-item")].map(item => ({
-                    text: item.querySelector(".finance_filter_text")?.value,
-                    logic: item.querySelector(".finance_filter_logic")?.value,
-                    priority: item.querySelector(".finance_filter_priority")?.value
-                  }));
+                  value.actions = [...valueContainer.querySelectorAll(`#${prefix}trigger_value_finance_actions button.selected`)].map(btn => btn.dataset.value);
+                  if (value.actions.includes('追加')) {
+                    value.genres = [...valueContainer.querySelectorAll(`#${prefix}trigger_value_finance_genres button.selected`)].map(btn => btn.dataset.value);
+                  }
                 } else if (sub === "特定金額になったら") {
                   value.item = valueContainer.querySelector(`[id$="trigger_value_finance_item"]`)?.value;
                   value.amount = valueContainer.querySelector(`[id$="trigger_value_finance_amount"]`)?.value;
@@ -1105,20 +1156,11 @@ function parseConditions(root){
                 }
                 break;
               case "メモ":
-                if (sub === "入力があったら") {
-                  value.actions = [...valueContainer.querySelectorAll(`[id$="memo_action_add"]:checked, [id$="memo_action_modify"]:checked, [id$="memo_action_get"]:checked, [id$="memo_action_delete"]:checked`)].map(cb => cb.value);
-                  value.filters = [...valueContainer.querySelectorAll(".filter-item")].map(item => ({
-                    text: item.querySelector(".memo_filter_text")?.value,
-                    logic: item.querySelector(".memo_filter_logic")?.value,
-                    priority: item.querySelector(".memo_filter_priority")?.value
-                  }));
-                } else if (sub === "特定のメモが追加されたら") {
-                  value.filters = [...valueContainer.querySelectorAll(".filter-item")].map(item => ({
-                    text: item.querySelector(".memo_filter_text")?.value,
-                    logic: item.querySelector(".memo_filter_logic")?.value,
-                    priority: item.querySelector(".memo_filter_priority")?.value
-                  }));
-                }
+                value.actions = [...valueContainer.querySelectorAll(`#${prefix}trigger_value_memo_actions button.selected`)].map(btn => btn.dataset.value);
+                value.filters = [...valueContainer.querySelectorAll(".filter-item")].map(item => ({
+                  text: item.querySelector(".memo_filter_text")?.value,
+                  logic: item.querySelector(".memo_filter_logic")?.value
+                }));
                 break;
               case "時間":
                 value.year = valueContainer.querySelector(`[id$="trigger_value_time_year"]`)?.value;
@@ -1459,6 +1501,21 @@ async function registerCommand(){
   } catch (error) {
     console.error("--- [ERROR] Fetch failed:", error);
     document.getElementById("message").innerText = "エラーが発生しました。コンソールを確認してください。";
+  }
+}
+
+async function fetchGenres() {
+  try {
+    const response = await fetch('/api/categories');
+    if (!response.ok) {
+      console.error('Failed to fetch genres:', response.statusText);
+      return [];
+    }
+    const genres = await response.json();
+    return genres;
+  } catch (error) {
+    console.error('Error fetching genres:', error);
+    return [];
   }
 }
 
