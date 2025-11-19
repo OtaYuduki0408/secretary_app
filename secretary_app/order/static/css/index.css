@@ -377,3 +377,9 @@ body.co-body {
   font-weight: 600;
   color: var(--co-accent-strong);
 }
+
+/* Leaflet Map Styles */
+.leaflet-container {
+    background-color: var(--co-card-bg); /* 地図の背景色をカード背景に合わせる */
+    border-radius: 8px; /* 角を丸くする */
+}

@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>カスタム命令 | Secretary Automation</title>
   <link rel="stylesheet" href="/custom_order/static/css/index.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 </head>
 <body class="co-body">
   <div class="co-shell">
@@ -278,100 +279,300 @@ function createTriggerUI(prefix = '', initialValue = {}) {
         triggerValueContainer.innerHTML = `
           <label for="${prefix}trigger_value_address">住所</label>
           <input type="text" id="${prefix}trigger_value_address" class="trigger-input" placeholder="住所を入力してください" required value="${initialValue.address || ''}">
-          <button type="button" id="${prefix}get_coords_btn" class="co-btn ghost" style="margin-top: 10px;">住所から緯度経度を取得</button>
+          <button type="button" id="${prefix}get_coords_btn" class="co-btn ghost" style="margin-top: 10px;">住所から緯度経度を取得</button><br>
           <label for="${prefix}trigger_value_latitude">緯度</label>
           <input type="text" id="${prefix}trigger_value_latitude" class="trigger-input" placeholder="緯度" readonly value="${initialValue.latitude || ''}">
           <label for="${prefix}trigger_value_longitude">経度</label>
           <input type="text" id="${prefix}trigger_value_longitude" class="trigger-input" placeholder="経度" readonly value="${initialValue.longitude || ''}">
           <label for="${prefix}trigger_value_range">許容範囲 (m)</label>
-          <input type="number" id="${prefix}trigger_value_range" class="trigger-input" placeholder="許容範囲 (m)" required value="${initialValue.range || ''}">
+          <input type="number" id="${prefix}trigger_value_range" class="trigger-input" placeholder="許容範囲 (m)" required value="${initialValue.range || '1000'}">
           <small>注意: 許容範囲はなるべく幅広くしてください。(例：1000m等)</small>
           <div id="${prefix}location_message" style="color: green; margin-top: 5px;"></div>
-          <div id="${prefix}location_error_message" style="color: red; display: none;">住所が特定できませんでした。都道府県、市区町村、番地までなど、より簡潔な形式でお試しください。</div>
+          <div id="${prefix}location_error_message" style="color: red; display: none;">住所が特定できませんでした。「東京都千代田区」までなどより広い範囲を指定してください。</div>
+          <div id="${prefix}map" style="height: 300px; margin-top: 10px;"></div>
         `;
+        // mapとmarkerのインスタンスを保持する変数
+        let map = null;
+        let marker = null;
+
+        // 既存の地図インスタンスがあれば破棄
+        const existingMapElement = document.getElementById(`${prefix}map`);
+        if (existingMapElement && existingMapElement._leaflet_id) {
+            existingMapElement._leaflet_id = null; // Leafletの内部IDをクリア
+            // Leafletのmapインスタンスを直接破棄
+            if (window[`${prefix}leafletMap`]) {
+                window[`${prefix}leafletMap`].remove();
+                window[`${prefix}leafletMap`] = null;
+            }
+        }
+
         document.getElementById(`${prefix}get_coords_btn`).addEventListener("click", async () => {
           const addressInput = document.getElementById(`${prefix}trigger_value_address`);
-          console.log("--- [DEBUG] addressInput element:", addressInput); // デバッグログ追加
           const address = addressInput ? addressInput.value : '';
-          console.log("--- [DEBUG] Address input value:", address); // デバッグログ追加
 
-          if (address && address.trim() !== '') { // 空白のみの場合も考慮
+          if (address && address.trim() !== '') {
             document.getElementById(`${prefix}location_message`).textContent = "緯度経度を取得中...";
             document.getElementById(`${prefix}location_error_message`).style.display = 'none';
-            const result = await geocodeAddress(address); // 国土地理院APIを呼び出す
+            const result = await geocodeAddress(address);
             if (result) {
-              document.getElementById(`${prefix}trigger_value_latitude`).value = result.lat;
-              document.getElementById(`${prefix}trigger_value_longitude`).value = result.lng;
+              const lat = result.lat;
+              const lng = result.lng;
+
+              document.getElementById(`${prefix}trigger_value_latitude`).value = lat;
+              document.getElementById(`${prefix}trigger_value_longitude`).value = lng;
               document.getElementById(`${prefix}location_message`).textContent = "緯度経度を正常に取得しました。";
               document.getElementById(`${prefix}location_error_message`).style.display = 'none';
+
+              // 地図の初期化または更新
+              if (map === null) {
+                map = L.map(`${prefix}map`).setView([lat, lng], 13);
+                window[`${prefix}leafletMap`] = map; // グローバルに保存して後で参照できるようにする
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                }).addTo(map);
+                marker = L.marker([lat, lng], {draggable: true}).addTo(map);
+
+                marker.on('dragend', function(event) {
+                  const newLatLng = marker.getLatLng();
+                  document.getElementById(`${prefix}trigger_value_latitude`).value = newLatLng.lat.toFixed(6);
+                  document.getElementById(`${prefix}trigger_value_longitude`).value = newLatLng.lng.toFixed(6);
+                });
+              } else {
+                map.setView([lat, lng], 13);
+                marker.setLatLng([lat, lng]);
+              }
             } else {
               document.getElementById(`${prefix}trigger_value_latitude`).value = '';
               document.getElementById(`${prefix}trigger_value_longitude`).value = '';
               document.getElementById(`${prefix}location_message`).textContent = "";
-              document.getElementById(`${prefix}location_error_message`).textContent = "住所が特定できませんでした。都道府県、市区町村、番地までなど、より簡潔な形式でお試しください。"; // エラーメッセージを更新
+              document.getElementById(`${prefix}location_error_message`).textContent = "住所が特定できませんでした。都道府県、市区町村、番地までなど、より簡潔な形式でお試しください。";
               document.getElementById(`${prefix}location_error_message`).style.display = 'block';
+
+              // 地図とマーカーをクリア
+              if (map !== null) {
+                map.remove();
+                map = null;
+                marker = null;
+                window[`${prefix}leafletMap`] = null;
+              }
             }
           } else {
             document.getElementById(`${prefix}location_error_message`).textContent = "住所を入力してください。";
             document.getElementById(`${prefix}location_error_message`).style.display = 'block';
             document.getElementById(`${prefix}location_message`).textContent = "";
+
+            // 地図とマーカーをクリア
+            if (map !== null) {
+                map.remove();
+                map = null;
+                marker = null;
+                window[`${prefix}leafletMap`] = null;
+            }
           }
         });
+        // 編集時の初期表示
+        if (initialValue.latitude && initialValue.longitude) {
+            const lat = parseFloat(initialValue.latitude);
+            const lng = parseFloat(initialValue.longitude);
+
+            if (!isNaN(lat) && !isNaN(lng)) {
+                // 地図がまだ初期化されていない場合のみ初期化
+                if (map === null) {
+                    map = L.map(`${prefix}map`).setView([lat, lng], 13);
+                    window[`${prefix}leafletMap`] = map;
+                    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                    }).addTo(map);
+                    marker = L.marker([lat, lng], {draggable: true}).addTo(map);
+
+                    marker.on('dragend', function(event) {
+                        const newLatLng = marker.getLatLng();
+                        document.getElementById(`${prefix}trigger_value_latitude`).value = newLatLng.lat.toFixed(6);
+                        document.getElementById(`${prefix}trigger_value_longitude`).value = newLatLng.lng.toFixed(6);
+                    });
+                } else {
+                    // 既に地図が初期化されている場合はビューとマーカーの位置を更新
+                    map.setView([lat, lng], 13);
+                    marker.setLatLng([lat, lng]);
+                }
+            }
+        }
         break;
       case "カレンダー":
         if (sub === "入力があったら") {
           triggerValueContainer.innerHTML = `
             <label>アクション (複数選択可)</label>
-            <div id="${prefix}trigger_value_calendar_actions">
-              <input type="checkbox" id="${prefix}cal_action_add" value="追加" ${initialValue.actions?.includes('追加') ? 'checked' : ''}><label for="${prefix}cal_action_add">追加</label>
-              <input type="checkbox" id="${prefix}cal_action_modify" value="変更" ${initialValue.actions?.includes('変更') ? 'checked' : ''}><label for="${prefix}cal_action_modify">変更</label>
-              <input type="checkbox" id="${prefix}cal_action_get" value="取得" ${initialValue.actions?.includes('取得') ? 'checked' : ''}><label for="${prefix}cal_action_get">取得</label>
-              <input type="checkbox" id="${prefix}cal_action_delete" value="削除" ${initialValue.actions?.includes('削除') ? 'checked' : ''}><label for="${prefix}cal_action_delete">削除</label>
+            <div id="${prefix}trigger_value_calendar_actions" class="co-day-of-week-selector">
+              <button type="button" data-value="追加">追加</button>
+              <button type="button" data-value="変更">変更</button>
+              <button type="button" data-value="取得">取得</button>
+              <button type="button" data-value="削除">削除</button>
             </div>
-            <label>フィルター (任意)</label>
+            <label>フィルター (任意)</label><br>
+            <small>単語を指定して、検知するアクションにフィルターを掛けれます。</small>
             <div id="${prefix}trigger_value_calendar_filters">
-              <button type="button" class="add_filter_btn">フィルターを追加</button>
+              <button type="button" class="add_filter_btn co-btn ghost">フィルターを追加</button>
             </div>
-            <small>注意: フィルターとは、各アクションのタイトルにフィルターの単語が含まれている場合のみこのアクションを起動します。</small>
+            
           `;
+          const actionButtonsContainer = triggerValueContainer.querySelector(`#${prefix}trigger_value_calendar_actions`);
+          if (actionButtonsContainer) {
+            actionButtonsContainer.addEventListener('click', (event) => {
+              if (event.target.tagName === 'BUTTON') {
+                event.target.classList.toggle('selected');
+              }
+            });
+            // 復元
+            if (initialValue.actions && Array.isArray(initialValue.actions)) {
+              initialValue.actions.forEach(action => {
+                const button = actionButtonsContainer.querySelector(`button[data-value="${action}"]`);
+                if (button) {
+                  button.classList.add('selected');
+                }
+              });
+            }
+          }
           const addFilterBtn = triggerValueContainer.querySelector(".add_filter_btn");
           const filterContainer = triggerValueContainer.querySelector(`#${prefix}trigger_value_calendar_filters`);
           if (addFilterBtn) {
             const addFilter = (filter = {}) => {
               const filterDiv = document.createElement("div");
               filterDiv.className = "filter-item";
+
+              const isFirstItem = filterContainer.querySelectorAll('.filter-item').length === 0;
+
+              let logicOptions = '';
+              if (isFirstItem) {
+                logicOptions = `
+                  <option value="" ${filter.logic === '' ? 'selected' : ''}>(先頭)</option>
+                  <option value="NOT" ${filter.logic === 'NOT' ? 'selected' : ''}>NOT (この単語が含まれていないなら)</option>
+                `;
+              } else {
+                logicOptions = `
+                  <option value="AND" ${filter.logic === 'AND' ? 'selected' : ''}>AND (「上のフィルター」と「このフィルター」の両方を満たす)</option>
+                  <option value="OR" ${filter.logic === 'OR' ? 'selected' : ''}>OR (「上のフィルター」か「このフィルター」のどちらか一方でも満たす)</option>
+                  <option value="NAND" ${filter.logic === 'NAND' ? 'selected' : ''}>NAND (「上のフィルター」と「このフィルター」の両方を満たすものを含まない)</option>
+                  <option value="NOR" ${filter.logic === 'NOR' ? 'selected' : ''}>NOR (「上のフィルター」も「このフィルター」もどちらも満たさない)</option>
+                  <option value="XOR" ${filter.logic === 'XOR' ? 'selected' : ''}>XOR (「上のフィルター」か「このフィルター」のどちらか一方だけを満たす)</option>
+                  <option value="XNOR" ${filter.logic === 'XNOR' ? 'selected' : ''}>XNOR (「上のフィルター」と「このフィルター」の条件が同じである（両方満たす、または両方満たさない）)</option>
+                `;
+              }
+
               filterDiv.innerHTML = `
                 <input type="text" class="calendar_filter_text trigger-input" placeholder="フィルター内容" value="${filter.text || ''}">
                 <select class="calendar_filter_logic trigger-input">
-                  <option value="AND" ${filter.logic === 'AND' ? 'selected' : ''}>AND</option><option value="OR" ${filter.logic === 'OR' ? 'selected' : ''}>OR</option><option value="NOT" ${filter.logic === 'NOT' ? 'selected' : ''}>NOT</option><option value="NAND" ${filter.logic === 'NAND' ? 'selected' : ''}>NAND</option><option value="NOR" ${filter.logic === 'NOR' ? 'selected' : ''}>NOR</option>
+                  ${logicOptions}
                 </select>
-                <input type="number" class="calendar_filter_priority trigger-input" placeholder="優先順位" value="${filter.priority || ''}">
-                <button type="button" class="remove_filter_btn">削除</button>
+                <button type="button" class="remove_filter_btn remove">削除</button>
               `;
               filterDiv.querySelector(".remove_filter_btn").addEventListener("click", (e) => e.target.parentNode.remove());
-              filterContainer.appendChild(filterDiv);
+              filterContainer.insertBefore(filterDiv, addFilterBtn);
             };
             addFilterBtn.addEventListener("click", () => addFilter());
             initialValue.filters?.forEach(filter => addFilter(filter));
           }
         } else if (sub === "予定の時間になったら") {
+          const updateSummary = (group) => {
+            const details = triggerValueContainer.querySelector(`[data-group='${group}']`);
+            if (!details) return;
+
+            const year = details.querySelector(`[id$='_cal_${group}_year']`)?.value || '';
+            const month = details.querySelector(`[id$='_cal_${group}_month']`)?.value || '';
+            const day = details.querySelector(`[id$='_cal_${group}_day']`)?.value || '';
+            const time = details.querySelector(`[id$='_cal_${group}_time']`)?.value || '';
+            
+            let summaryText = '';
+            if (year) summaryText += `${year}年`;
+            if (month) summaryText += `${month}月`;
+            if (day) summaryText += `${day}日`;
+            if (summaryText && time) summaryText += ' ';
+            if (time) summaryText += time;
+
+            const summaryValueEl = details.querySelector('.co-summary-value');
+            if (summaryValueEl) {
+                summaryValueEl.textContent = summaryText || '未設定';
+            }
+          };
+
           let html = `
+            <small><b>以下の条件を満たす予定の時間になったらトリガーが発動されます</b></small>
             <input type="text" id="${prefix}trigger_value_cal_title" class="trigger-input" placeholder="タイトル (任意)" value="${initialValue.title || ''}">
-            <label>日付[開始] (任意)</label><input type="date" id="${prefix}trigger_value_cal_date_start" class="trigger-input" value="${initialValue.date_start || ''}">
-            <label>曜日 (任意)</label>
-            <select id="${prefix}trigger_value_cal_day_of_week" class="trigger-input" multiple>
-              <option value="月" ${initialValue.day_of_week?.includes('月') ? 'selected' : ''}>月</option><option value="火" ${initialValue.day_of_week?.includes('火') ? 'selected' : ''}>火</option><option value="水" ${initialValue.day_of_week?.includes('水') ? 'selected' : ''}>水</option>
-              <option value="木" ${initialValue.day_of_week?.includes('木') ? 'selected' : ''}>木</option><option value="金" ${initialValue.day_of_week?.includes('金') ? 'selected' : ''}>金</option><option value="土" ${initialValue.day_of_week?.includes('土') ? 'selected' : ''}>土</option><option value="日" ${initialValue.day_of_week?.includes('日') ? 'selected' : ''}>日</option>
-            </select>
-            <label>時間[開始] (任意)</label><input type="time" id="${prefix}trigger_value_cal_time_time_start" class="trigger-input" value="${initialValue.time_start || ''}">
+            
+            <label style="margin-top: 10px; display: block;">曜日 (任意)(複数選択可)</label>
+            <div id="${prefix}trigger_value_cal_day_of_week_buttons" class="co-day-of-week-selector">
+                <button type="button" data-value="月">月</button> <button type="button" data-value="火">火</button> <button type="button" data-value="水">水</button> <button type="button" data-value="木">木</button>
+                <button type="button" data-value="金">金</button> <button type="button" data-value="土">土</button> <button type="button" data-value="日">日</button>
+            </div>
+
+            <details class="co-details-group" data-group="start" style="margin-top: 10px; border: 1px solid var(--co-border); border-radius: 12px; padding: 10px;">
+              <summary style="font-weight: 600; cursor: pointer; display: flex; justify-content: space-between;">
+                <span>開始日時</span>
+                <span class="co-summary-value" style="color: var(--co-accent); padding-right: 10px;">未設定</span>
+              </summary>
+              <div class="co-details-content" style="margin-top: 15px;">
+                  <label>年 (任意)</label>
+                  <input type="text" id="${prefix}trigger_value_cal_start_year" class="trigger-input" list="${prefix}cal_start_year_options" value="${initialValue.start_year || ''}" placeholder="例: 2025" onfocus="this.setAttribute('data-prev-value', this.value); this.value='';" onblur="if(this.value==='') this.value=this.getAttribute('data-prev-value');">
+                  <datalist id="${prefix}cal_start_year_options">${(() => { let o = ''; const y = new Date().getFullYear(); for (let i = y; i <= y + 20; i++) { o += `<option value="${i}">`; } return o; })()}</datalist>
+                  <label>月 (任意)</label>
+                  <input type="text" id="${prefix}trigger_value_cal_start_month" class="trigger-input" list="${prefix}cal_start_month_options" value="${initialValue.start_month || ''}" placeholder="例: 1" onfocus="this.setAttribute('data-prev-value', this.value); this.value='';" onblur="if(this.value==='') this.value=this.getAttribute('data-prev-value');">
+                  <datalist id="${prefix}cal_start_month_options">${(() => { let o = ''; for (let i = 1; i <= 12; i++) { o += `<option value="${i}">`; } return o; })()}</datalist>
+                  <label>日 (任意)</label>
+                  <input type="text" id="${prefix}trigger_value_cal_start_day" class="trigger-input" list="${prefix}cal_start_day_options" value="${initialValue.start_day || ''}" placeholder="例: 15" onfocus="this.setAttribute('data-prev-value', this.value); this.value='';" onblur="if(this.value==='') this.value=this.getAttribute('data-prev-value');">
+                  <datalist id="${prefix}cal_start_day_options">${(() => { let o = ''; for (let i = 1; i <= 31; i++) { o += `<option value="${i}">`; } return o; })()}</datalist>
+                  <label>時刻 (任意)</label>
+                  <input type="text" id="${prefix}trigger_value_cal_start_time" class="trigger-input" list="${prefix}cal_start_time_options" value="${initialValue.start_time || initialValue.time_start || ''}" placeholder="例: 07:30" onfocus="this.setAttribute('data-prev-value', this.value); this.value='';" onblur="if(this.value==='') this.value=this.getAttribute('data-prev-value');">
+                  <datalist id="${prefix}cal_start_time_options">${(() => { let o = ''; for (let h = 0; h < 24; h++) for (let m = 0; m < 60; m += 15) o += `<option value="${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}">`; return o; })()}</datalist>
+              </div>
+            </details>
+
+            <details class="co-details-group" data-group="end" style="margin-top: 10px; border: 1px solid var(--co-border); border-radius: 12px; padding: 10px;">
+              <summary style="font-weight: 600; cursor: pointer; display: flex; justify-content: space-between;">
+                <span>終了日時</span>
+                <span class="co-summary-value" style="color: var(--co-accent); padding-right: 10px;">未設定</span>
+              </summary>
+              <div class="co-details-content" style="margin-top: 15px;">
+                  <label>年 (任意)</label>
+                  <input type="text" id="${prefix}trigger_value_cal_end_year" class="trigger-input" list="${prefix}cal_end_year_options" value="${initialValue.end_year || ''}" placeholder="例: 2025" onfocus="this.setAttribute('data-prev-value', this.value); this.value='';" onblur="if(this.value==='') this.value=this.getAttribute('data-prev-value');">
+                  <datalist id="${prefix}cal_end_year_options">${(() => { let o = ''; const y = new Date().getFullYear(); for (let i = y; i <= y + 20; i++) { o += `<option value="${i}">`; } return o; })()}</datalist>
+                  <label>月 (任意)</label>
+                  <input type="text" id="${prefix}trigger_value_cal_end_month" class="trigger-input" list="${prefix}cal_end_month_options" value="${initialValue.end_month || ''}" placeholder="例: 1" onfocus="this.setAttribute('data-prev-value', this.value); this.value='';" onblur="if(this.value==='') this.value=this.getAttribute('data-prev-value');">
+                  <datalist id="${prefix}cal_end_month_options">${(() => { let o = ''; for (let i = 1; i <= 12; i++) { o += `<option value="${i}">`; } return o; })()}</datalist>
+                  <label>日 (任意)</label>
+                  <input type="text" id="${prefix}trigger_value_cal_end_day" class="trigger-input" list="${prefix}cal_end_day_options" value="${initialValue.end_day || ''}" placeholder="例: 15" onfocus="this.setAttribute('data-prev-value', this.value); this.value='';" onblur="if(this.value==='') this.value=this.getAttribute('data-prev-value');">
+                  <datalist id="${prefix}cal_end_day_options">${(() => { let o = ''; for (let i = 1; i <= 31; i++) { o += `<option value="${i}">`; } return o; })()}</datalist>
+                  <label>時刻 (任意)</label>
+                  <input type="text" id="${prefix}trigger_value_cal_end_time" class="trigger-input" list="${prefix}cal_end_time_options" value="${initialValue.end_time || initialValue.time_end || ''}" placeholder="例: 18:00" onfocus="this.setAttribute('data-prev-value', this.value); this.value='';" onblur="if(this.value==='') this.value=this.getAttribute('data-prev-value');">
+                  <datalist id="${prefix}cal_end_time_options">${(() => { let o = ''; for (let h = 0; h < 24; h++) for (let m = 0; m < 60; m += 15) o += `<option value="${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}">`; return o; })()}</datalist>
+              </div>
+            </details>
           `;
-          if (prefix) { // 条件ブロック内でのみ終了日時を表示
-            html += `
-              <label>日付[終了] (任意)</label><input type="date" id="${prefix}trigger_value_cal_date_end" class="trigger-input" value="${initialValue.date_end || ''}">
-              <label>時間[終了] (任意)</label><input type="time" id="${prefix}trigger_value_cal_time_time_end" class="trigger-input" value="${initialValue.time_end || ''}">
-            `;
-          }
           triggerValueContainer.innerHTML = html;
+
+          // 曜日選択ボタンのロジックと復元
+          const dayOfWeekButtonsContainer = document.getElementById(`${prefix}trigger_value_cal_day_of_week_buttons`);
+          if (dayOfWeekButtonsContainer) {
+            dayOfWeekButtonsContainer.addEventListener('click', (event) => {
+              if (event.target.tagName === 'BUTTON') {
+                event.target.classList.toggle('selected');
+              }
+            });
+            const daysToRestore = initialValue.day_of_week || initialValue.start_day_of_week;
+            if (daysToRestore && Array.isArray(daysToRestore)) {
+              daysToRestore.forEach(day => {
+                const button = dayOfWeekButtonsContainer.querySelector(`button[data-value="${day}"]`);
+                if (button) button.classList.add('selected');
+              });
+            }
+          }
+
+          // Summaryの更新ロジック
+          ['start', 'end'].forEach(group => {
+            const details = triggerValueContainer.querySelector(`[data-group='${group}']`);
+            if(details) {
+                details.addEventListener('input', () => updateSummary(group));
+                updateSummary(group); // 初期表示の更新
+            }
+          });
         }
         break;
       case "収支管理":
@@ -871,19 +1072,22 @@ function parseConditions(root){
                 break;
               case "カレンダー":
                 if (sub === "入力があったら") {
-                  value.actions = [...valueContainer.querySelectorAll(`[id$="cal_action_add"]:checked, [id$="cal_action_modify"]:checked, [id$="cal_action_get"]:checked, [id$="cal_action_delete"]:checked`)].map(cb => cb.value);
+                  value.actions = [...valueContainer.querySelectorAll(`#${prefix}trigger_value_calendar_actions button.selected`)].map(btn => btn.dataset.value);
                   value.filters = [...valueContainer.querySelectorAll(".filter-item")].map(item => ({
                     text: item.querySelector(".calendar_filter_text")?.value,
-                    logic: item.querySelector(".calendar_filter_logic")?.value,
-                    priority: item.querySelector(".calendar_filter_priority")?.value
+                    logic: item.querySelector(".calendar_filter_logic")?.value
                   }));
                 } else if (sub === "予定の時間になったら") {
                   value.title = valueContainer.querySelector(`[id$="trigger_value_cal_title"]`)?.value;
-                  value.date_start = valueContainer.querySelector(`[id$="trigger_value_cal_date_start"]`)?.value;
-                  value.date_end = valueContainer.querySelector(`[id$="trigger_value_cal_date_end"]`)?.value;
-                  value.day_of_week = [...valueContainer.querySelector(`[id$="trigger_value_cal_day_of_week"]`)?.selectedOptions].map(option => option.value);
-                  value.time_start = valueContainer.querySelector(`[id$="trigger_value_cal_time_time_start"]`)?.value;
-                  value.time_end = valueContainer.querySelector(`[id$="trigger_value_cal_time_time_end"]`)?.value;
+                  value.start_year = valueContainer.querySelector(`[id$="trigger_value_cal_start_year"]`)?.value;
+                  value.start_month = valueContainer.querySelector(`[id$="trigger_value_cal_start_month"]`)?.value;
+                  value.start_day = valueContainer.querySelector(`[id$="trigger_value_cal_start_day"]`)?.value;
+                  value.day_of_week = [...valueContainer.querySelectorAll(`[id$="trigger_value_cal_day_of_week_buttons"] button.selected`)].map(btn => btn.dataset.value);
+                  value.start_time = valueContainer.querySelector(`[id$="trigger_value_cal_start_time"]`)?.value;
+                  value.end_year = valueContainer.querySelector(`[id$="trigger_value_cal_end_year"]`)?.value;
+                  value.end_month = valueContainer.querySelector(`[id$="trigger_value_cal_end_month"]`)?.value;
+                  value.end_day = valueContainer.querySelector(`[id$="trigger_value_cal_end_day"]`)?.value;
+                  value.end_time = valueContainer.querySelector(`[id$="trigger_value_cal_end_time"]`)?.value;
                 }
                 break;
               case "収支管理":
@@ -1113,11 +1317,10 @@ async function registerCommand(){
       break;
     case "カレンダー":
       if (triggerSub === "入力があったら") {
-        triggerValue.actions = [...triggerContainer.querySelectorAll("input[id^='cal_action_']:checked")].map(cb => cb.value);
+        triggerValue.actions = [...triggerContainer.querySelectorAll("#trigger_value_calendar_actions button.selected")].map(btn => btn.dataset.value);
         triggerValue.filters = [...triggerContainer.querySelectorAll(".filter-item")].map(item => ({
           text: item.querySelector(".calendar_filter_text")?.value,
-          logic: item.querySelector(".calendar_filter_logic")?.value,
-          priority: item.querySelector(".calendar_filter_priority")?.value
+          logic: item.querySelector(".calendar_filter_logic")?.value
         }));
       } else if (triggerSub === "予定の時間になったら") {
         triggerValue.title = triggerContainer.querySelector("#trigger_value_cal_title")?.value;
@@ -1353,5 +1556,6 @@ document.addEventListener("DOMContentLoaded",()=>{
   updateSubOptions("action_category","action_sub",ACTION_CATEGORIES); // アクションの初期表示
 });
 </script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 </body>
 </html>
