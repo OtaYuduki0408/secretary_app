@@ -1206,7 +1206,7 @@ function addConditionBlock(parent=document.getElementById("condition_blocks"), d
   });
 
   // ロジック選択の制御
-  if (parent.children.length === 1) {
+  if (parent.querySelectorAll('.condition-block').length === 1) {
     logicSelect.querySelector('option[value="AND"]').remove();
     logicSelect.querySelector('option[value="OR"]').remove();
     logicSelect.querySelector('option[value="NAND"]').remove();

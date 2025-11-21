@@ -1,17 +1,23 @@
 :root {
-  --co-bg: #040812;
-  --co-gradient: linear-gradient(130deg, #040812 0%, #0e1d35 40%, #102f3f 100%);
-  --co-card-bg: rgba(7, 12, 24, 0.86);
-  --co-border: rgba(255, 255, 255, 0.08);
-  --co-border-strong: rgba(100, 210, 255, 0.25);
-  --co-text: #f6f8fb;
-  --co-muted: rgba(246, 248, 251, 0.75);
-  --co-accent: #6ef3ff;
-  --co-accent-strong: #76ffc3;
-  --co-danger: #ff6b81;
-  --co-shadow: 0 30px 70px rgba(0, 0, 0, 0.45);
+  --co-bg: #0A0F1A; /* より深いネイビーブルー */
+  --co-gradient: linear-gradient(140deg, #0A0F1A 0%, #111827 50%, #1A202C 100%); /* 彩度を抑えたグラデーション */
+  --co-card-bg: rgba(17, 24, 39, 0.7); /* カード背景。少し透明感を残す */
+  --co-border: rgba(255, 255, 255, 0.06);
+  --co-border-strong: rgba(110, 231, 255, 0.3); /* Cyan系 */
+  --co-text: #E5E7EB; /* 少し柔らかい白 */
+  --co-muted: rgba(229, 231, 235, 0.7);
+  --co-accent: #6EE7FF; /* Cyan */
+  --co-accent-strong: #818CF8; /* Indigo */
+  --co-danger: #F47174;
+  --co-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.4);
   --co-radius: 22px;
   --co-transition: 0.25s ease;
+
+  /* Block Colors */
+  --action-bg-base: hsla(230, 60%, 35%, 0.4); /* アクション: 青紫系 */
+  --action-border-base: hsla(230, 60%, 55%, 0.6);
+  --condition-bg-base: hsla(180, 60%, 35%, 0.4); /* 条件: 青緑系 */
+  --condition-border-base: hsla(180, 60%, 55%, 0.6);
 }
 
 *,
@@ -320,11 +326,108 @@ body.co-body {
   gap: 14px;
 }
 
+/* --- Action/Condition Block Styling --- */
+
+
+
+/* Base Styles & Colors */
+
 .condition-block {
-  border: 1px dashed var(--co-border-strong);
+
   border-radius: 16px;
+
   padding: 16px;
-  background: rgba(255, 255, 255, 0.03);
+
+  background: var(--condition-bg-base);
+
+  border: 1px solid var(--condition-border-base);
+
+  transition: all 0.2s ease-in-out;
+
+  box-shadow: 0 4px 6px rgba(0,0,0,0.2), inset 0 1px 1px rgba(255,255,255,0.05);
+
+}
+
+
+
+#condition_blocks > .item,
+
+.nested-actions > .item {
+
+  border-radius: 16px;
+
+  padding: 16px;
+
+  background: var(--action-bg-base);
+
+  border: 1px solid var(--action-border-base);
+
+  transition: all 0.2s ease-in-out;
+
+  box-shadow: 0 4px 6px rgba(0,0,0,0.2), inset 0 1px 1px rgba(255,255,255,0.05);
+
+}
+
+
+
+/* Nesting Level 1 */
+
+.condition-block .condition-block,
+
+.item .condition-block {
+
+  background: hsla(180, 60%, 30%, 0.5); /* Darker & slightly more opaque */
+
+  border-color: hsla(180, 60%, 50%, 0.7);
+
+}
+
+.condition-block .item,
+
+.item .item {
+
+  background: hsla(230, 60%, 30%, 0.5);
+
+  border-color: hsla(230, 60%, 50%, 0.7);
+
+}
+
+
+
+/* Nesting Level 2 */
+
+.condition-block .condition-block .condition-block,
+
+.item .condition-block .condition-block,
+
+.condition-block .item .condition-block,
+
+.item .item .condition-block {
+
+  background: hsla(180, 60%, 25%, 0.6);
+
+  border-color: hsla(180, 60%, 45%, 0.8);
+
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2), inset 0 1px 2px rgba(0,0,0,0.3); /* Deeper inset shadow */
+
+}
+
+
+
+.condition-block .condition-block .item,
+
+.item .condition-block .item,
+
+.condition-block .item .item,
+
+.item .item .item {
+
+  background: hsla(230, 60%, 25%, 0.6);
+
+  border-color: hsla(230, 60%, 45%, 0.8);
+
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2), inset 0 1px 2px rgba(0,0,0,0.3);
+
 }
 
 .condition-block select {
