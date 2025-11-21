@@ -55,38 +55,12 @@
 
         <div class="co-fieldset">
           <div class="co-fieldset-head">
-            <h3>条件設定</h3>
-            <p>必要に応じて複数条件を積み上げられます</p>
+            <h3>アクション・追加条件設定</h3>
+            <p>実行するアクションや、アクションの実行条件を設定します</p>
           </div>
           <div id="condition_blocks" class="co-stack"></div>
+          <button class="co-btn ghost add-button" id="add-action" type="button">＋ アクションを追加</button>
           <button class="co-btn ghost add-button" id="add-condition" type="button">＋ 条件を追加</button>
-        </div>
-
-        <div class="co-fieldset">
-          <div class="co-fieldset-head">
-            <h3>アクション設定</h3>
-            <p>実行タイミングと内容を調整</p>
-          </div>
-          <div class="co-grid-two">
-            <div class="co-field">
-              <label for="action_category">カテゴリ</label>
-              <select id="action_category" class="co-select"></select>
-            </div>
-            <div class="co-field">
-              <label for="action_sub">詳細</label>
-              <select id="action_sub" class="co-select"></select>
-            </div>
-          </div>
-          <div class="co-field co-action-timing">
-            <label>実行タイミング <span>（空欄の場合は即時実行）</span></label>
-            <div class="co-timing-grid">
-              <input type="date" id="action_timing_date_abs" class="co-input" title="実行日（絶対）">
-              <input type="number" id="action_timing_date_rel" class="co-input co-input--compact" placeholder="+n 日" title="実行日（相対）">
-              <input type="time" id="action_timing_time_abs" class="co-input" title="実行時刻（絶対）">
-              <input type="text" id="action_timing_time_rel" class="co-input co-input--compact" placeholder="+HH:MM:SS" title="実行時刻（相対）">
-            </div>
-          </div>
-          <div id="action_detail_container" class="co-dynamic-field"></div>
         </div>
 
         <div class="co-actions">
@@ -113,8 +87,7 @@ const TRIGGER_CATEGORIES = {
   "カレンダー": ["入力があったら", "予定の時間になったら"],
   "収支管理": ["入力があったら", "特定金額になったら"],
   "メモ": ["入力があったら"],
-  "時間": [],
-  "言葉": []
+  "時間": []
 };
 console.log("TRIGGER_CATEGORIES:", TRIGGER_CATEGORIES);
 
@@ -166,18 +139,11 @@ function updateSubOptions(categoryId, subId, data) {
   const prefix = categoryId.replace('trigger_category', '').replace('action_category', '');
   const cat = document.getElementById(categoryId).value;
   const sub = document.getElementById(subId);
-
-  if (categoryId === "trigger_sub" && cat === "") { // trigger_subで親カテゴリが未選択の場合
-    sub.innerHTML = "<option value=''>カテゴリを選択してください</option>";
-  } else {
-    sub.innerHTML = "<option value=''>選択してください</option>";
-  }
-  
+  sub.innerHTML = "<option value=''>選択してください</option>";
   if (data[cat]) data[cat].forEach(v=>{ const o=document.createElement("option"); o.value=v;o.textContent=v; sub.appendChild(o); });
 
   if (categoryId.includes('trigger')) {
-    // sub.style.display = 'none'; の条件から cat === "" を削除
-    if (cat === "場所" || cat === "メモ" || cat === "言葉") {
+    if (cat === "場所" || cat === "メモ") {
       sub.style.display = 'none';
     } else if (cat === "時間") {
       sub.style.display = 'none';
@@ -1181,12 +1147,6 @@ function createTriggerUI(prefix = '', initialValue = {}) {
           }
         }
         break;
-      case "言葉": // 言葉カテゴリの追加
-        triggerValueContainer.innerHTML = `
-          <label for="${prefix}trigger_value_keyword">キーワード</label>
-          <input type="text" id="${prefix}trigger_value_keyword" class="trigger-input" placeholder="キーワードを入力してください" required value="${initialValue.keyword || ''}">
-        `;
-        break;
       default:
         triggerValueContainer.innerHTML = `<input type="text" id="${prefix}trigger_value" placeholder="${defaultPlaceholder}" value="${initialValue.value || ''}">`;
         break;
@@ -1404,15 +1364,10 @@ function addAction(parent, data={}) {
     <div class="action-detail-container" id="${prefix}action_detail_container" style="margin-top: 10px;">
       <!-- ここに動的UIが挿入される -->
     </div>
-    <button class="add-sibling-condition add-button">＋ 条件追加</button>
-    <button class="add-nested-condition nest-button">＋ ネスト条件</button>
-    <button class="add-nested-action nest-button">＋ ネストアクション</button>
-    <button class="remove">削除</button>
-    <div class="nested-conditions"></div>
-    <div class="nested-actions"></div>
+    <button class="remove-action">削除</button>
   `;
   parent.appendChild(el);
-  el.querySelector(".remove").onclick=()=>el.remove();
+  el.querySelector(".remove-action").onclick=()=>el.remove();
   
   const categorySelect = el.querySelector(".action-category");
   const subSelect = el.querySelector(".action-sub");
@@ -1426,21 +1381,6 @@ function addAction(parent, data={}) {
     createActionUI(prefix);
   });
   
-  const siblingCondBtn = el.querySelector(".add-sibling-condition");
-  siblingCondBtn.onclick = () => {
-    addConditionBlock(el.querySelector(".nested-conditions"));
-  };
-
-  const nestedCondBtn = el.querySelector(".add-nested-condition");
-  const nestedActBtn = el.querySelector(".add-nested-action");
-
-  nestedCondBtn.onclick = () => {
-    addConditionBlock(el.querySelector(".nested-conditions"));
-  };
-  nestedActBtn.onclick = () => {
-    addAction(el.querySelector(".nested-actions"));
-  };
-
   // データ復元
   if (data.category) {
     categorySelect.value = data.category;
@@ -1461,10 +1401,11 @@ function addAction(parent, data={}) {
   }, 100);
 }
 
-function parseConditions(root) {
-  const parseActionArray = (actionRoot) => {
-    if (!actionRoot) return [];
-    return [...actionRoot.children].map(actionItem => {
+function parseActionArray(actionRoot) {
+  if (!actionRoot) return [];
+  return [...actionRoot.children]
+    .filter(child => child.classList.contains('item'))
+    .map(actionItem => {
       const prefix = actionItem.querySelector('.action-category').id.replace('action_category', '');
       const category = actionItem.querySelector(".action-category").value;
       const sub = actionItem.querySelector(".action-sub").value;
@@ -1535,9 +1476,12 @@ function parseConditions(root) {
 
       return actionData;
     });
-  };
+}
 
-  return [...root.children].map(block => {
+function parseConditions(root){
+  return [...root.children]
+    .filter(child => child.classList.contains('condition-block'))
+    .map(block => {
     const type = block.querySelector(".condition-type").value;
     let expr = null;
 
@@ -1615,9 +1559,6 @@ function parseConditions(root) {
                 value.end_month = valueContainer.querySelector(`[id$='_time_end_month']`)?.value;
                 value.end_day = valueContainer.querySelector(`[id$='_time_end_day']`)?.value;
                 value.end_time = valueContainer.querySelector(`[id$='_time_end_time']`)?.value;
-                break;
-              case "言葉": // 言葉カテゴリのデータ収集
-                value.keyword = valueContainer.querySelector(`[id$="trigger_value_keyword"]`)?.value;
                 break;
               default:
                 value.value = valueContainer.querySelector(`[id$="trigger_value"]`)?.value;
@@ -1723,31 +1664,11 @@ function loadCommandToForm(cmd){
   document.getElementById("register-btn").parentNode.appendChild(hid);
 }
 
-function addConditionBlockFromData(data, parent) {
+function addConditionBlockFromData(data,parent){
   addConditionBlock(parent, data);
-  const b = parent.lastElementChild;
-
-  if (data.nested?.length) {
-    data.nested.forEach(n => addConditionBlockFromData(n, b.querySelector(".nested-conditions")));
-  }
-
-  const addActionsAndNested = (actionsData, actionsParent) => {
-    if (!actionsData || !actionsData.length) return;
-    actionsData.forEach(actionData => {
-      addAction(actionsParent, actionData);
-      const newActionEl = actionsParent.lastElementChild;
-      // アクションの中のネストされた条件を再帰的にロード
-      if (actionData.nested?.length) {
-        actionData.nested.forEach(nestedCondData => addConditionBlockFromData(nestedCondData, newActionEl.querySelector(".nested-conditions")));
-      }
-      // アクションの中のネストされたアクションを再帰的にロード
-      if (actionData.actions?.length) {
-        addActionsAndNested(actionData.actions, newActionEl.querySelector(".nested-actions"));
-      }
-    });
-  };
-
-  addActionsAndNested(data.actions, b.querySelector(".nested-actions"));
+  const b=parent.lastElementChild;
+  if(data.nested?.length) data.nested.forEach(n=>addConditionBlockFromData(n,b.querySelector(".nested-conditions")));
+  if(data.actions?.length) data.actions.forEach(a=>addAction(b.querySelector(".nested-actions"),a));
 }
 
 async function registerCommand(){
@@ -1828,72 +1749,16 @@ async function registerCommand(){
                                     triggerValue.day_of_week = [...triggerContainer.querySelectorAll("#trigger_value_time_day_of_week_buttons button.selected")].map(btn => btn.dataset.value);
                                     triggerValue.time_start = triggerContainer.querySelector("#trigger_value_time_start")?.value;
                                     triggerValue.time_end = triggerContainer.querySelector("#trigger_value_time_time_end")?.value;
-                                    break;    default:
+                                    break;
+    case "言葉":
+        triggerValue.keyword = triggerContainer.querySelector("#trigger_value_keyword")?.value;
+        break;
+    default:
       triggerValue.value = triggerContainer.querySelector("#trigger_value")?.value;
       break;
   }
 
-  // Action
-  const actionCategory = document.getElementById("action_category").value;
-  const actionSub = document.getElementById("action_sub").value;
-  const actionTiming = {
-    date_abs: document.getElementById("action_timing_date_abs")?.value,
-    date_rel: document.getElementById("action_timing_date_rel")?.value,
-    time_abs: document.getElementById("action_timing_time_abs")?.value,
-    time_rel: document.getElementById("action_timing_time_rel")?.value,
-  };
-  let actionDetail = {};
-  const detailContainer = document.getElementById("action_detail_container");
-
-  // Actionのデータ収集ロジック
-  switch (actionCategory) {
-    case "カレンダー":
-      if (actionSub === "追加" || actionSub === "削除") {
-        actionDetail.text = detailContainer.querySelector(".action-detail-cal-text")?.value;
-      } else if (actionSub === "読み上げ") {
-        actionDetail.start_year = detailContainer.querySelector(".action-detail-cal-read-start-year")?.value;
-        actionDetail.start_month = detailContainer.querySelector(".action-detail-cal-read-start-month")?.value;
-        actionDetail.start_day = detailContainer.querySelector(".action-detail-cal-read-start-day")?.value;
-        actionDetail.start_time = detailContainer.querySelector(".action-detail-cal-read-start-time")?.value;
-        actionDetail.end_year = detailContainer.querySelector(".action-detail-cal-read-end-year")?.value;
-        actionDetail.end_month = detailContainer.querySelector(".action-detail-cal-read-end-month")?.value;
-        actionDetail.end_day = detailContainer.querySelector(".action-detail-cal-read-end-day")?.value;
-        actionDetail.end_time = detailContainer.querySelector(".action-detail-cal-read-end-time")?.value;
-      }
-      break;
-          case "収支管理":
-            if (actionSub === "読み上げ") {
-              actionDetail.item = detailContainer.querySelector(".action-detail-fin-read-item")?.value;
-              actionDetail.format = detailContainer.querySelector(".action-detail-fin-read-format")?.value;
-              actionDetail.start_year = detailContainer.querySelector(".action-detail-fin-read-start-year")?.value;
-              actionDetail.start_month = detailContainer.querySelector(".action-detail-fin-read-start-month")?.value;
-              actionDetail.start_day = detailContainer.querySelector(".action-detail-fin-read-start-day")?.value;
-              actionDetail.start_time = detailContainer.querySelector(".action-detail-fin-read-start-time")?.value;
-              actionDetail.end_year = detailContainer.querySelector(".action-detail-fin-read-end-year")?.value;
-              actionDetail.end_month = detailContainer.querySelector(".action-detail-fin-read-end-month")?.value;
-              actionDetail.end_day = detailContainer.querySelector(".action-detail-fin-read-end-day")?.value;
-              actionDetail.end_time = detailContainer.querySelector(".action-detail-fin-read-end-time")?.value;
-            }
-            break;    case "メモ":
-      if (actionSub === "読み上げ") {
-        actionDetail.start_year = detailContainer.querySelector(".action-detail-memo-read-start-year")?.value;
-        actionDetail.start_month = detailContainer.querySelector(".action-detail-memo-read-start-month")?.value;
-        actionDetail.start_day = detailContainer.querySelector(".action-detail-memo-read-start-day")?.value;
-        actionDetail.start_time = detailContainer.querySelector(".action-detail-memo-read-start-time")?.value;
-        actionDetail.end_year = detailContainer.querySelector(".action-detail-memo-read-end-year")?.value;
-        actionDetail.end_month = detailContainer.querySelector(".action-detail-memo-read-end-month")?.value;
-        actionDetail.end_day = detailContainer.querySelector(".action-detail-memo-read-end-day")?.value;
-        actionDetail.end_time = detailContainer.querySelector(".action-detail-memo-read-end-time")?.value;
-      }
-      break;
-    case "メール":
-      if (actionSub === "送信") {
-        actionDetail.subject = detailContainer.querySelector(".action-detail-mail-subject")?.value;
-        actionDetail.body = detailContainer.querySelector(".action-detail-mail-body")?.value;
-        // TODO: 付与情報 (attachment) の収集ロジック
-      }
-      break;
-  }
+  const topLevelBlocks = document.getElementById("condition_blocks");
 
   const payload={
     name:document.getElementById("name").value,
@@ -1902,13 +1767,8 @@ async function registerCommand(){
       sub: triggerSub,
       value: triggerValue
     }],
-    conditions:parseConditions(document.getElementById("condition_blocks")),
-    actions:[{
-      category: actionCategory,
-      sub: actionSub,
-      timing: actionTiming,
-      detail: actionDetail
-    }]
+    conditions: parseConditions(topLevelBlocks),
+    actions: parseActionArray(topLevelBlocks)
   };
   console.log("--- [DEBUG] Payload to be sent:", JSON.stringify(payload, null, 2));
 
@@ -2046,24 +1906,18 @@ async function geocodeAddress(address) {
 document.addEventListener("DOMContentLoaded",()=>{
   console.log("DOMContentLoaded event fired.");
   populateSelect("trigger_category",TRIGGER_CATEGORIES);
-  populateSelect("action_category",ACTION_CATEGORIES);
   
   document.getElementById("trigger_category").addEventListener("change",()=>{
     updateSubOptions("trigger_category","trigger_sub",TRIGGER_CATEGORIES);
   });
   document.getElementById("trigger_sub").addEventListener("change",()=>createTriggerUI(''));
   
-  document.getElementById("action_category").addEventListener("change",()=>{
-    updateSubOptions("action_category","action_sub",ACTION_CATEGORIES);
-  });
-  document.getElementById("action_sub").addEventListener("change",()=>createActionUI(''));
-
-  document.getElementById("add-condition").addEventListener("click",()=>addConditionBlock());
+  document.getElementById("add-condition").addEventListener("click",()=>addConditionBlock(document.getElementById("condition_blocks")));
+  document.getElementById("add-action").addEventListener("click",()=>addAction(document.getElementById("condition_blocks")));
   document.getElementById("register-btn").addEventListener("click",registerCommand);
   
   loadCommands();
   updateTriggerInputFields(); // 初期表示
-  updateSubOptions("action_category","action_sub",ACTION_CATEGORIES); // アクションの初期表示
 });
 </script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
