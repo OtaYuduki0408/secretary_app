@@ -314,14 +314,15 @@ function createTriggerUI(prefix = '', initialValue = {}) {
             document.getElementById(`${prefix}location_message`).textContent = "緯度経度を取得中...";
             document.getElementById(`${prefix}location_error_message`).style.display = 'none';
             const result = await geocodeAddress(address);
-            if (result) {
+            const locationErrorMessageElement = document.getElementById(`${prefix}location_error_message`);
+            if (result && result.type === "success") {
               const lat = result.lat;
               const lng = result.lng;
 
               document.getElementById(`${prefix}trigger_value_latitude`).value = lat;
               document.getElementById(`${prefix}trigger_value_longitude`).value = lng;
               document.getElementById(`${prefix}location_message`).textContent = "緯度経度を正常に取得しました。";
-              document.getElementById(`${prefix}location_error_message`).style.display = 'none';
+              locationErrorMessageElement.style.display = 'none';
 
               // 地図の初期化または更新
               if (map === null) {
@@ -344,9 +345,15 @@ function createTriggerUI(prefix = '', initialValue = {}) {
             } else {
               document.getElementById(`${prefix}trigger_value_latitude`).value = '';
               document.getElementById(`${prefix}trigger_value_longitude`).value = '';
-              document.getElementById(`${prefix}location_message`).textContent = "";
-              document.getElementById(`${prefix}location_error_message`).textContent = "住所が特定できませんでした。都道府県、市区町村、番地までなど、より簡潔な形式でお試しください。";
-              document.getElementById(`${prefix}location_error_message`).style.display = 'block';
+              document.getElementById(`${prefix}location_message`).textContent = ""; // 取得中メッセージをクリア
+              
+              // エラーの種類に応じてメッセージを分岐
+              if (result && (result.type === "api_error" || result.type === "network_error" || result.type === "malformed_response")) {
+                locationErrorMessageElement.textContent = "使用APIにエラーが発生しております。時間を置いて再度お試しください。詳細：https://vldb.gsi.go.jp/sokuchi/surveycalc/main.html(国土地理院：ジオイド高計算　お知らせページ)";
+              } else { // result.type === "no_coordinates" または result が null
+                locationErrorMessageElement.textContent = "住所が特定できませんでした。都道府県、市区町村、番地までなど、より簡潔な形式でお試しください。";
+              }
+              locationErrorMessageElement.style.display = 'block';
 
               // 地図とマーカーをクリア
               if (map !== null) {
@@ -1604,22 +1611,46 @@ async function loadCommands() {
 }
 
 async function geocodeAddress(address) {
-  console.log("Geocoding address using GSI API:", address);
+  console.log("[DEBUG] geocodeAddress started. Address:", address);
   const GeospatialUrl = "https://msearch.gsi.go.jp/address-search/AddressSearch?q=";
+  const requestUrl = GeospatialUrl + encodeURIComponent(address) + "&json=true";
+  console.log("[DEBUG] Fetching URL:", requestUrl);
+
   try {
-    const response = await fetch(GeospatialUrl + encodeURIComponent(address) + "&json=true"); // &json=true を追加
-    const data = await response.json();
-    console.log("--- [DEBUG] GSI API response:", data); // デバッグログ追加
+    const response = await fetch(requestUrl);
+    console.log("[DEBUG] Received response. Status:", response.status, "Ok:", response.ok);
+
+    if (!response.ok) { // APIからのHTTPエラーレスポンス（504など）
+      const errorText = await response.text(); // エラーレスポンスのテキストも取得
+      console.error(`[DEBUG] API returned non-OK status: ${response.status}. Response text:`, errorText);
+      return { type: "api_error", status: response.status, errorText: errorText };
+    }
+
+    const responseText = await response.text();
+    console.log("[DEBUG] Raw response text:", responseText);
+
+    // JSONパースを試みる
+    let data;
+    try {
+      data = JSON.parse(responseText);
+      console.log("[DEBUG] Parsed JSON data:", data);
+    } catch (jsonError) {
+      console.error("[DEBUG] JSON parsing failed, but API status was OK. Response text might not be JSON:", jsonError);
+      return { type: "malformed_response", error: jsonError, responseText: responseText };
+    }
+
     if (data && data.length > 0 && data[0].geometry && data[0].geometry.coordinates) {
-      // 国土地理院APIの座標は [経度, 緯度] の順
       const lng = data[0].geometry.coordinates[0];
       const lat = data[0].geometry.coordinates[1];
-      return { lat: lat, lng: lng, display_name: address }; // display_nameは元の住所を使用
+      console.log("[DEBUG] Geocoding successful. Lat:", lat, "Lng:", lng);
+      return { type: "success", lat: lat, lng: lng, display_name: address };
+    } else {
+      console.log("[DEBUG] Geocoding failed. No coordinates found in response.");
+      return { type: "no_coordinates" };
     }
-    return null;
-  } catch (error) {
-    console.error("Error geocoding address with GSI API:", error);
-    return null;
+  } catch (error) { // ネットワークエラーなど
+    console.error("[DEBUG] An error occurred during fetch or processing:", error);
+    return { type: "network_error", error: error };
   }
 }
 
