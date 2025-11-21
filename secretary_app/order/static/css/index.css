@@ -326,6 +326,50 @@ body.co-body {
   gap: 14px;
 }
 
+
+/* --- Details/Summary Accordion Styling --- */
+summary {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  cursor: pointer;
+  list-style: none;
+  font-weight: 600;
+}
+summary::-webkit-details-marker { display: none; }
+
+summary::before {
+  content: '▶';
+  font-size: 0.6em;
+  color: var(--co-muted);
+  transform: rotate(0deg);
+  transition: transform 0.2s;
+}
+details[open] > summary::before { transform: rotate(90deg); }
+
+.co-summary-label {
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #fff;
+}
+.co-summary-label.condition { background-color: hsla(180, 60%, 55%, 0.8); }
+.co-summary-label.action { background-color: hsla(230, 60%, 55%, 0.8); }
+
+.co-summary-text {
+  color: var(--co-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.co-block-content {
+  padding: 16px;
+  border-top: 1px solid var(--co-border);
+}
+
 /* --- Action/Condition Block Styling --- */
 
 
@@ -335,8 +379,6 @@ body.co-body {
 .condition-block {
 
   border-radius: 16px;
-
-  padding: 16px;
 
   background: var(--condition-bg-base);
 
@@ -355,8 +397,6 @@ body.co-body {
 .nested-actions > .item {
 
   border-radius: 16px;
-
-  padding: 16px;
 
   background: var(--action-bg-base);
 

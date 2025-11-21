@@ -1162,41 +1162,49 @@ function updateTriggerInputFields() {
 
 function addConditionBlock(parent=document.getElementById("condition_blocks"), data={}) {
   console.log(`[DEBUG] addConditionBlock called. Parent element:`, parent);
-  const block = document.createElement("div");
+  const block = document.createElement("details");
+  block.open = true;
   const blockId = `cond_${Date.now()}_${Math.floor(Math.random() * 1e9)}`;
   block.id = blockId;
   block.className = "condition-block";
   block.innerHTML = `
-    <select class="condition-logic">
-      <option value="">(先頭)</option>
-      <option value="NOT">NOT</option>
-      <option value="AND">AND (かつ)</option>
-      <option value="OR">OR (または)</option>
-      <option value="NAND">NAND (両方が違うなら)</option>
-      <option value="NOR">NOR (どちらかが違うなら)</option>
-      <option value="XOR">XOR (どちらかが違く、かつ両方が正しくも違くもないのなら)</option>
-      <option value="XNOR">XNOR (両方が正しい、または両方が違うなら)</option>
-    </select>
-    <select class="condition-type">
-      <option value="if">if (この条件を満たしたなら)</option>
-      <option value="else">else (上の条件を満たしてないのなら)</option>
-    </select>
-    <div class="condition-expr-container"></div>
-    <div class="nested-conditions"></div>
-    <div class="nested-actions"></div>
-    <div class="co-block-actions" style="margin-top: 16px; border-top: 1px solid var(--co-border); padding-top: 16px; display: flex; flex-wrap: wrap; gap: 8px;">
-      <button class="add-sibling-action add-button">＋ アクションを追加</button>
-      <button class="add-sibling-condition add-button">＋ 条件を追加</button>
-      <button class="add-nested-action nest-button">＋ ネストアクション</button>
-      <button class="add-nested-condition nest-button">＋ ネスト条件</button>
-      <button class="remove-condition remove">削除</button>
+    <summary>
+      <span class="co-summary-label condition">IF</span>
+      <span class="co-summary-text">条件を設定してください</span>
+    </summary>
+    <div class="co-block-content">
+      <select class="condition-logic">
+        <option value="">(先頭)</option>
+        <option value="NOT">NOT</option>
+        <option value="AND">AND (かつ)</option>
+        <option value="OR">OR (または)</option>
+        <option value="NAND">NAND (両方が違うなら)</option>
+        <option value="NOR">NOR (どちらかが違うなら)</option>
+        <option value="XOR">XOR (どちらかが違く、かつ両方が正しくも違くもないのなら)</option>
+        <option value="XNOR">XNOR (両方が正しい、または両方が違うなら)</option>
+      </select>
+      <select class="condition-type">
+        <option value="if">if (この条件を満たしたなら)</option>
+        <option value="else">else (上の条件を満たしてないのなら)</option>
+      </select>
+      <div class="condition-expr-container"></div>
+      <div class="nested-conditions"></div>
+      <div class="nested-actions"></div>
+      <div class="co-block-actions" style="margin-top: 16px; border-top: 1px solid var(--co-border); padding-top: 16px; display: flex; flex-wrap: wrap; gap: 8px;">
+        <button class="add-sibling-action add-button">＋ アクションを追加</button>
+        <button class="add-sibling-condition add-button">＋ 条件を追加</button>
+        <button class="add-nested-action nest-button">＋ ネストアクション</button>
+        <button class="add-nested-condition nest-button">＋ ネスト条件</button>
+        <button class="remove-condition remove">削除</button>
+      </div>
     </div>
   `;
   parent.appendChild(block);
 
-  const logicSelect = block.querySelector(".condition-logic");
-  const typeSelect = block.querySelector(".condition-type");
-  const exprContainer = block.querySelector(".condition-expr-container");
+  const content = block.querySelector('.co-block-content');
+  const logicSelect = content.querySelector(".condition-logic");
+  const typeSelect = content.querySelector(".condition-type");
+  const exprContainer = content.querySelector(".condition-expr-container");
 
   // ロジック選択の制御
   if (parent.querySelectorAll('.condition-block').length === 1 && parent.querySelectorAll('.item').length === 0) {
@@ -1323,12 +1331,12 @@ function addConditionBlock(parent=document.getElementById("condition_blocks"), d
   handleTypeChange();
 
   // --- Event Listeners ---
-  block.querySelector(".remove-condition").onclick = () => block.remove();
-  block.querySelector(".add-nested-condition").onclick = () => addConditionBlock(block.querySelector(".nested-conditions"));
-  block.querySelector(".add-nested-action").onclick = () => addAction(block.querySelector(".nested-actions"));
+  content.querySelector(".remove-condition").onclick = () => block.remove();
+  content.querySelector(".add-nested-condition").onclick = () => addConditionBlock(content.querySelector(".nested-conditions"));
+  content.querySelector(".add-nested-action").onclick = () => addAction(content.querySelector(".nested-actions"));
   
-  const siblingActionBtn = block.querySelector(".add-sibling-action");
-  const siblingCondBtn = block.querySelector(".add-sibling-condition");
+  const siblingActionBtn = content.querySelector(".add-sibling-action");
+  const siblingCondBtn = content.querySelector(".add-sibling-condition");
 
   siblingActionBtn.onclick = () => addAction(parent);
   siblingCondBtn.onclick = () => addConditionBlock(parent);
@@ -1336,40 +1344,49 @@ function addConditionBlock(parent=document.getElementById("condition_blocks"), d
 
 function addAction(parent, data={}) {
   console.log(`[DEBUG] addAction called. Parent element:`, parent);
-  const el = document.createElement("div");
+  const el = document.createElement("details");
+  el.open = true;
   el.className = "item";
   const prefix = `action_${Date.now()}_${Math.floor(Math.random() * 1e9)}_`;
   
   el.innerHTML = `
-    <select class="action-category" id="${prefix}action_category"></select>
-    <select class="action-sub" id="${prefix}action_sub"></select>
-    <div class="action-timing-container" style="margin-top: 10px;">
-      <label style="font-size:0.9em; opacity:0.8;">実行タイミング（無入力で即時実行）</label>
-      <input type="date" class="action-timing-date-abs" id="${prefix}action_timing_date_abs" title="実行日（絶対）">
-      <input type="number" class="action-timing-date-rel" id="${prefix}action_timing_date_rel" placeholder="+n 日" title="実行日（相対）" style="width: 80px;">
-      <input type="time" class="action-timing-time-abs" id="${prefix}action_timing_time_abs" title="実行時刻（絶対）">
-      <input type="text" class="action-timing-time-rel" id="${prefix}action_timing_time_rel" placeholder="+HH:MM:SS" title="実行時刻（相対）" style="width: 120px;">
-    </div>
-    <div class="action-detail-container" id="${prefix}action_detail_container" style="margin-top: 10px;">
-      <!-- ここに動的UIが挿入される -->
-    </div>
-    <div class="co-block-actions" style="margin-top: 16px; display: flex; flex-wrap: wrap; gap: 8px;">
-      <button class="add-sibling-action add-button">＋ アクションを追加</button>
-      <button class="add-sibling-condition add-button">＋ 条件を追加</button>
-      <button class="remove-action remove">削除</button>
+    <summary>
+      <span class="co-summary-label action">ACTION</span>
+      <span class="co-summary-text">アクションを設定してください</span>
+    </summary>
+    <div class="co-block-content">
+      <select class="action-category" id="${prefix}action_category"></select>
+      <select class="action-sub" id="${prefix}action_sub"></select>
+      <div class="action-timing-container" style="margin-top: 10px;">
+        <label style="font-size:0.9em; opacity:0.8;">実行タイミング（無入力で即時実行）</label>
+        <input type="date" class="action-timing-date-abs" id="${prefix}action_timing_date_abs" title="実行日（絶対）">
+        <input type="number" class="action-timing-date-rel" id="${prefix}action_timing_date_rel" placeholder="+n 日" title="実行日（相対）" style="width: 80px;">
+        <input type="time" class="action-timing-time-abs" id="${prefix}action_timing_time_abs" title="実行時刻（絶対）">
+        <input type="text" class="action-timing-time-rel" id="${prefix}action_timing_time_rel" placeholder="+HH:MM:SS" title="実行時刻（相対）" style="width: 120px;">
+      </div>
+      <div class="action-detail-container" id="${prefix}action_detail_container" style="margin-top: 10px;">
+        <!-- ここに動的UIが挿入される -->
+      </div>
+      <div class="co-block-actions" style="margin-top: 16px; display: flex; flex-wrap: wrap; gap: 8px;">
+        <button class="add-sibling-action add-button">＋ アクションを追加</button>
+        <button class="add-sibling-condition add-button">＋ 条件を追加</button>
+        <button class="remove-action remove">削除</button>
+      </div>
     </div>
   `;
   parent.appendChild(el);
-  el.querySelector(".remove-action").onclick=()=>el.remove();
+
+  const content = el.querySelector('.co-block-content');
+  content.querySelector(".remove-action").onclick=()=>el.remove();
   
-  const siblingActionBtn = el.querySelector(".add-sibling-action");
-  const siblingCondBtn = el.querySelector(".add-sibling-condition");
+  const siblingActionBtn = content.querySelector(".add-sibling-action");
+  const siblingCondBtn = content.querySelector(".add-sibling-condition");
 
   siblingActionBtn.onclick = () => addAction(parent);
   siblingCondBtn.onclick = () => addConditionBlock(parent);
 
-  const categorySelect = el.querySelector(".action-category");
-  const subSelect = el.querySelector(".action-sub");
+  const categorySelect = content.querySelector(".action-category");
+  const subSelect = content.querySelector(".action-sub");
   
   populateSelect(categorySelect.id, ACTION_CATEGORIES);
 
