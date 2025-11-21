@@ -327,26 +327,37 @@ body.co-body {
 }
 
 
-/* --- Details/Summary Accordion Styling --- */
-summary {
+/* --- Block Common --- */
+.condition-block, .item {
+  border-radius: 16px;
+  transition: all 0.2s ease-in-out;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.2), inset 0 1px 1px rgba(255,255,255,0.05);
+  margin-bottom: 12px; /* ブロック間のマージン */
+}
+.co-block-header {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 16px;
+  padding: 12px 16px;
   cursor: pointer;
-  list-style: none;
   font-weight: 600;
+  border-radius: inherit; /* 親の角丸を継承 */
 }
-summary::-webkit-details-marker { display: none; }
-
-summary::before {
-  content: '▶';
-  font-size: 0.6em;
+/* ヘッダーがブロックの上部を占めるため、下部だけ角丸を解除 */
+.co-block-header:has(+ .co-block-content) {
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+}
+.co-toggle-icon {
+  font-size: 0.7em;
   color: var(--co-muted);
-  transform: rotate(0deg);
+  transform: rotate(90deg);
   transition: transform 0.2s;
+  padding: 4px;
 }
-details[open] > summary::before { transform: rotate(90deg); }
+.is-collapsed .co-toggle-icon {
+  transform: rotate(0deg);
+}
 
 .co-summary-label {
   padding: 4px 8px;
@@ -355,120 +366,80 @@ details[open] > summary::before { transform: rotate(90deg); }
   font-weight: 700;
   color: #fff;
 }
-.co-summary-label.condition { background-color: hsla(180, 60%, 55%, 0.8); }
-.co-summary-label.action { background-color: hsla(230, 60%, 55%, 0.8); }
-
 .co-summary-text {
   color: var(--co-text);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-
 .co-block-content {
   padding: 16px;
   border-top: 1px solid var(--co-border);
 }
+.is-collapsed .co-block-content {
+  display: none;
+}
 
-/* --- Action/Condition Block Styling --- */
 
-
-
-/* Base Styles & Colors */
-
+/* --- Nesting & Coloring --- */
+/* Base Colors (block.dataset.nestLevelで上書きされる) */
 .condition-block {
+  --block-hue: 180; --block-saturation: 60%;
+  background-color: hsla(var(--block-hue), var(--block-saturation), 35%, 0.4);
+  border: 1px solid hsla(var(--block-hue), var(--block-saturation), 55%, 0.6);
+}
+.co-summary-label.condition { background-color: hsla(var(--block-hue), var(--block-saturation), 55%, 0.8); }
 
-  border-radius: 16px;
+.item { /* アクション */
+  --block-hue: 230; --block-saturation: 60%;
+  background-color: hsla(var(--block-hue), var(--block-saturation), 35%, 0.4);
+  border: 1px solid hsla(var(--block-hue), var(--block-saturation), 55%, 0.6);
+}
+.co-summary-label.action { background-color: hsla(var(--block-hue), var(--block-saturation), 55%, 0.8); }
 
-  background: var(--condition-bg-base);
 
-  border: 1px solid var(--condition-border-base);
+/* ネストレベルに応じた色 (JSでdata-nest-levelを付与) */
+[data-nest-level="0"].condition-block {
+  background-color: hsla(180, 60%, 35%, 0.4);
+  border-color: hsla(180, 60%, 55%, 0.6);
+}
+[data-nest-level="0"].item {
+  background-color: hsla(230, 60%, 35%, 0.4);
+  border-color: hsla(230, 60%, 55%, 0.6);
+}
 
-  transition: all 0.2s ease-in-out;
-
-  box-shadow: 0 4px 6px rgba(0,0,0,0.2), inset 0 1px 1px rgba(255,255,255,0.05);
-
+[data-nest-level="1"].condition-block, [data-nest-level="1"].item {
+  background-color: hsla(var(--block-hue), var(--block-saturation), 30%, 0.5);
+  border-color: hsla(var(--block-hue), var(--block-saturation), 50%, 0.7);
+}
+[data-nest-level="2"].condition-block, [data-nest-level="2"].item {
+  background-color: hsla(var(--block-hue), var(--block-saturation), 25%, 0.6);
+  border-color: hsla(var(--block-hue), var(--block-saturation), 45%, 0.8);
+}
+[data-nest-level="3"].condition-block, [data-nest-level="3"].item {
+  background-color: hsla(var(--block-hue), var(--block-saturation), 20%, 0.7);
+  border-color: hsla(var(--block-hue), var(--block-saturation), 40%, 0.9);
+}
+[data-nest-level="4"].condition-block, [data-nest-level="4"].item {
+  background-color: hsla(var(--block-hue), var(--block-saturation), 15%, 0.8);
+  border-color: hsla(var(--block-hue), var(--block-saturation), 35%, 1.0);
 }
 
 
-
-#condition_blocks > .item,
-
-.nested-actions > .item {
-
-  border-radius: 16px;
-
-  background: var(--action-bg-base);
-
-  border: 1px solid var(--action-border-base);
-
-  transition: all 0.2s ease-in-out;
-
-  box-shadow: 0 4px 6px rgba(0,0,0,0.2), inset 0 1px 1px rgba(255,255,255,0.05);
-
+/* --- Nested Blocks Container --- */
+.nested-blocks {
+  margin-top: 12px; /* 親ブロックのコンテンツと子ブロックの間のマージン */
+  margin-left: 24px; /* 親ブロックに対してインデント */
+  padding-left: 12px; /* 縦線のためにさらにパディング */
+  border-left: 2px solid var(--co-border-strong); /* インデントの縦線 */
+}
+/* 最も外側の .co-stack に含まれる .nested-blocks はインデントしない */
+#condition_blocks > .nested-blocks {
+    margin-left: 0;
+    padding-left: 0;
+    border-left: none;
 }
 
-
-
-/* Nesting Level 1 */
-
-.condition-block .condition-block,
-
-.item .condition-block {
-
-  background: hsla(180, 60%, 30%, 0.5); /* Darker & slightly more opaque */
-
-  border-color: hsla(180, 60%, 50%, 0.7);
-
-}
-
-.condition-block .item,
-
-.item .item {
-
-  background: hsla(230, 60%, 30%, 0.5);
-
-  border-color: hsla(230, 60%, 50%, 0.7);
-
-}
-
-
-
-/* Nesting Level 2 */
-
-.condition-block .condition-block .condition-block,
-
-.item .condition-block .condition-block,
-
-.condition-block .item .condition-block,
-
-.item .item .condition-block {
-
-  background: hsla(180, 60%, 25%, 0.6);
-
-  border-color: hsla(180, 60%, 45%, 0.8);
-
-  box-shadow: 0 2px 4px rgba(0,0,0,0.2), inset 0 1px 2px rgba(0,0,0,0.3); /* Deeper inset shadow */
-
-}
-
-
-
-.condition-block .condition-block .item,
-
-.item .condition-block .item,
-
-.condition-block .item .item,
-
-.item .item .item {
-
-  background: hsla(230, 60%, 25%, 0.6);
-
-  border-color: hsla(230, 60%, 45%, 0.8);
-
-  box-shadow: 0 2px 4px rgba(0,0,0,0.2), inset 0 1px 2px rgba(0,0,0,0.3);
-
-}
 
 .condition-block select {
   margin-right: 8px;
