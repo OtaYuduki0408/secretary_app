@@ -64,7 +64,7 @@ order_html_dir = os.path.join(os.path.dirname(__file__), 'order', 'static', 'htm
 
 @custom_order_pages_bp.route('/')
 def custom_order_index():
-    return send_from_directory(order_html_dir, 'index.html')
+    return render_template('index.html') # Blueprintのtemplate_folderからindex.htmlを探す
 
 @custom_order_pages_bp.route('/edit')
 @custom_order_pages_bp.route('/edit/<int:order_id>')
