@@ -1390,10 +1390,15 @@ function addAction(parent, data={}) {
     <div class="action-detail-container" id="${prefix}action_detail_container" style="margin-top: 10px;">
       <!-- ここに動的UIが挿入される -->
     </div>
-    <button class="remove-action">削除</button>
+    <button class="add-sibling-condition add-button">＋ 条件追加</button>
+    <button class="add-nested-condition nest-button">＋ ネスト条件</button>
+    <button class="add-nested-action nest-button">＋ ネストアクション</button>
+    <button class="remove">削除</button>
+    <div class="nested-conditions"></div>
+    <div class="nested-actions"></div>
   `;
   parent.appendChild(el);
-  el.querySelector(".remove-action").onclick=()=>el.remove();
+  el.querySelector(".remove").onclick=()=>el.remove();
   
   const categorySelect = el.querySelector(".action-category");
   const subSelect = el.querySelector(".action-sub");
@@ -1407,6 +1412,21 @@ function addAction(parent, data={}) {
     createActionUI(prefix);
   });
   
+  const siblingCondBtn = el.querySelector(".add-sibling-condition");
+  siblingCondBtn.onclick = () => {
+    addConditionBlock(el.querySelector(".nested-conditions"));
+  };
+
+  const nestedCondBtn = el.querySelector(".add-nested-condition");
+  const nestedActBtn = el.querySelector(".add-nested-action");
+
+  nestedCondBtn.onclick = () => {
+    addConditionBlock(el.querySelector(".nested-conditions"));
+  };
+  nestedActBtn.onclick = () => {
+    addAction(el.querySelector(".nested-actions"));
+  };
+
   // データ復元
   if (data.category) {
     categorySelect.value = data.category;
@@ -1427,7 +1447,82 @@ function addAction(parent, data={}) {
   }, 100);
 }
 
-function parseConditions(root){
+function parseConditions(root) {
+  const parseActionArray = (actionRoot) => {
+    if (!actionRoot) return [];
+    return [...actionRoot.children].map(actionItem => {
+      const prefix = actionItem.querySelector('.action-category').id.replace('action_category', '');
+      const category = actionItem.querySelector(".action-category").value;
+      const sub = actionItem.querySelector(".action-sub").value;
+      const timing = {
+        date_abs: actionItem.querySelector(".action-timing-date-abs").value,
+        date_rel: actionItem.querySelector(".action-timing-date-rel").value,
+        time_abs: actionItem.querySelector(".action-timing-time-abs").value,
+        time_rel: actionItem.querySelector(".action-timing-time-rel").value,
+      };
+      let detail = {};
+      const detailContainer = actionItem.querySelector(".action-detail-container");
+
+      switch (category) {
+        case "カレンダー":
+          if (sub === "追加" || sub === "削除") {
+            detail.text = detailContainer.querySelector(".action-detail-cal-text")?.value;
+          } else if (sub === "読み上げ") {
+            detail.start_year = detailContainer.querySelector(".action-detail-cal-read-start-year")?.value;
+            detail.start_month = detailContainer.querySelector(".action-detail-cal-read-start-month")?.value;
+            detail.start_day = detailContainer.querySelector(".action-detail-cal-read-start-day")?.value;
+            detail.start_time = detailContainer.querySelector(".action-detail-cal-read-start-time")?.value;
+            detail.end_year = detailContainer.querySelector(".action-detail-cal-read-end-year")?.value;
+            detail.end_month = detailContainer.querySelector(".action-detail-cal-read-end-month")?.value;
+            detail.end_day = detailContainer.querySelector(".action-detail-cal-read-end-day")?.value;
+            detail.end_time = detailContainer.querySelector(".action-detail-cal-read-end-time")?.value;
+          }
+          break;
+        case "収支管理":
+          if (sub === "読み上げ") {
+            detail.item = detailContainer.querySelector(".action-detail-fin-read-item")?.value;
+            detail.format = detailContainer.querySelector(".action-detail-fin-read-format")?.value;
+            detail.start_year = detailContainer.querySelector(".action-detail-fin-read-start-year")?.value;
+            detail.start_month = detailContainer.querySelector(".action-detail-fin-read-start-month")?.value;
+            detail.start_day = detailContainer.querySelector(".action-detail-fin-read-start-day")?.value;
+            detail.start_time = detailContainer.querySelector(".action-detail-fin-read-start-time")?.value;
+            detail.end_year = detailContainer.querySelector(".action-detail-fin-read-end-year")?.value;
+            detail.end_month = detailContainer.querySelector(".action-detail-fin-read-end-month")?.value;
+            detail.end_day = detailContainer.querySelector(".action-detail-fin-read-end-day")?.value;
+            detail.end_time = detailContainer.querySelector(".action-detail-fin-read-end-time")?.value;
+          }
+          break;
+        case "メモ":
+          if (sub === "読み上げ") {
+            detail.start_year = detailContainer.querySelector(".action-detail-memo-read-start-year")?.value;
+            detail.start_month = detailContainer.querySelector(".action-detail-memo-read-start-month")?.value;
+            detail.start_day = detailContainer.querySelector(".action-detail-memo-read-start-day")?.value;
+            detail.start_time = detailContainer.querySelector(".action-detail-memo-read-start-time")?.value;
+            detail.end_year = detailContainer.querySelector(".action-detail-memo-read-end-year")?.value;
+            detail.end_month = detailContainer.querySelector(".action-detail-memo-read-end-month")?.value;
+            detail.end_day = detailContainer.querySelector(".action-detail-memo-read-end-day")?.value;
+            detail.end_time = detailContainer.querySelector(".action-detail-memo-read-end-time")?.value;
+          }
+          break;
+        case "メール":
+          if (sub === "送信") {
+            detail.subject = detailContainer.querySelector(".action-detail-mail-subject")?.value;
+            detail.body = detailContainer.querySelector(".action-detail-mail-body")?.value;
+          }
+          break;
+      }
+
+      const actionData = { category, sub, timing, detail };
+      actionData.nested = parseConditions(actionItem.querySelector(".nested-conditions"));
+      actionData.actions = parseActionArray(actionItem.querySelector(".nested-actions"));
+      
+      if (actionData.nested.length === 0) delete actionData.nested;
+      if (actionData.actions.length === 0) delete actionData.actions;
+
+      return actionData;
+    });
+  };
+
   return [...root.children].map(block => {
     const type = block.querySelector(".condition-type").value;
     let expr = null;
@@ -1526,70 +1621,7 @@ function parseConditions(root){
       type: type,
       expr: expr,
       nested: parseConditions(block.querySelector(".nested-conditions")),
-      actions: [...block.querySelectorAll(".nested-actions > .item")].map(actionItem => {
-        const prefix = actionItem.querySelector('.action-category').id.replace('action_category', '');
-        const category = actionItem.querySelector(".action-category").value;
-        const sub = actionItem.querySelector(".action-sub").value;
-        const timing = {
-          date_abs: actionItem.querySelector(".action-timing-date-abs").value,
-          date_rel: actionItem.querySelector(".action-timing-date-rel").value,
-          time_abs: actionItem.querySelector(".action-timing-time-abs").value,
-          time_rel: actionItem.querySelector(".action-timing-time-rel").value,
-        };
-        let detail = {};
-        const detailContainer = actionItem.querySelector(".action-detail-container");
-        
-        switch (category) {
-          case "カレンダー":
-            if (sub === "追加" || sub === "削除") {
-              detail.text = detailContainer.querySelector(".action-detail-cal-text")?.value;
-            } else if (sub === "読み上げ") {
-              detail.start_year = detailContainer.querySelector(".action-detail-cal-read-start-year")?.value;
-              detail.start_month = detailContainer.querySelector(".action-detail-cal-read-start-month")?.value;
-              detail.start_day = detailContainer.querySelector(".action-detail-cal-read-start-day")?.value;
-              detail.start_time = detailContainer.querySelector(".action-detail-cal-read-start-time")?.value;
-              detail.end_year = detailContainer.querySelector(".action-detail-cal-read-end-year")?.value;
-              detail.end_month = detailContainer.querySelector(".action-detail-cal-read-end-month")?.value;
-              detail.end_day = detailContainer.querySelector(".action-detail-cal-read-end-day")?.value;
-              detail.end_time = detailContainer.querySelector(".action-detail-cal-read-end-time")?.value;
-            }
-            break;
-          case "収支管理":
-            if (sub === "読み上げ") {
-              detail.item = detailContainer.querySelector(".action-detail-fin-read-item")?.value;
-              detail.format = detailContainer.querySelector(".action-detail-fin-read-format")?.value;
-              detail.start_year = detailContainer.querySelector(".action-detail-fin-read-start-year")?.value;
-              detail.start_month = detailContainer.querySelector(".action-detail-fin-read-start-month")?.value;
-              detail.start_day = detailContainer.querySelector(".action-detail-fin-read-start-day")?.value;
-              detail.start_time = detailContainer.querySelector(".action-detail-fin-read-start-time")?.value;
-              detail.end_year = detailContainer.querySelector(".action-detail-fin-read-end-year")?.value;
-              detail.end_month = detailContainer.querySelector(".action-detail-fin-read-end-month")?.value;
-              detail.end_day = detailContainer.querySelector(".action-detail-fin-read-end-day")?.value;
-              detail.end_time = detailContainer.querySelector(".action-detail-fin-read-end-time")?.value;
-            }
-            break;
-          case "メモ":
-            if (sub === "読み上げ") {
-              detail.start_year = detailContainer.querySelector(".action-detail-memo-read-start-year")?.value;
-              detail.start_month = detailContainer.querySelector(".action-detail-memo-read-start-month")?.value;
-              detail.start_day = detailContainer.querySelector(".action-detail-memo-read-start-day")?.value;
-              detail.start_time = detailContainer.querySelector(".action-detail-memo-read-start-time")?.value;
-              detail.end_year = detailContainer.querySelector(".action-detail-memo-read-end-year")?.value;
-              detail.end_month = detailContainer.querySelector(".action-detail-memo-read-end-month")?.value;
-              detail.end_day = detailContainer.querySelector(".action-detail-memo-read-end-day")?.value;
-              detail.end_time = detailContainer.querySelector(".action-detail-memo-read-end-time")?.value;
-            }
-            break;
-          case "メール":
-            if (sub === "送信") {
-              detail.subject = detailContainer.querySelector(".action-detail-mail-subject")?.value;
-              detail.body = detailContainer.querySelector(".action-detail-mail-body")?.value;
-            }
-            break;
-        }
-
-        return { category, sub, timing, detail };
-      })
+      actions: parseActionArray(block.querySelector(".nested-actions"))
     };
   });
 }
@@ -1674,11 +1706,31 @@ function loadCommandToForm(cmd){
   document.getElementById("register-btn").parentNode.appendChild(hid);
 }
 
-function addConditionBlockFromData(data,parent){
+function addConditionBlockFromData(data, parent) {
   addConditionBlock(parent, data);
-  const b=parent.lastElementChild;
-  if(data.nested?.length) data.nested.forEach(n=>addConditionBlockFromData(n,b.querySelector(".nested-conditions")));
-  if(data.actions?.length) data.actions.forEach(a=>addAction(b.querySelector(".nested-actions"),a));
+  const b = parent.lastElementChild;
+
+  if (data.nested?.length) {
+    data.nested.forEach(n => addConditionBlockFromData(n, b.querySelector(".nested-conditions")));
+  }
+
+  const addActionsAndNested = (actionsData, actionsParent) => {
+    if (!actionsData || !actionsData.length) return;
+    actionsData.forEach(actionData => {
+      addAction(actionsParent, actionData);
+      const newActionEl = actionsParent.lastElementChild;
+      // アクションの中のネストされた条件を再帰的にロード
+      if (actionData.nested?.length) {
+        actionData.nested.forEach(nestedCondData => addConditionBlockFromData(nestedCondData, newActionEl.querySelector(".nested-conditions")));
+      }
+      // アクションの中のネストされたアクションを再帰的にロード
+      if (actionData.actions?.length) {
+        addActionsAndNested(actionData.actions, newActionEl.querySelector(".nested-actions"));
+      }
+    });
+  };
+
+  addActionsAndNested(data.actions, b.querySelector(".nested-actions"));
 }
 
 async function registerCommand(){
