@@ -902,6 +902,7 @@ function updateTriggerInputFields() {
 }
 
 function addConditionBlock(parent=document.getElementById("condition_blocks"), data={}) {
+  console.log(`[DEBUG] addConditionBlock called. Parent element:`, parent);
   const block = document.createElement("div");
   const blockId = `cond_${Date.now()}_${Math.floor(Math.random() * 1e9)}`;
   block.id = blockId;
@@ -990,7 +991,7 @@ function addConditionBlock(parent=document.getElementById("condition_blocks"), d
         if (exprData) {
           subSelect.value = exprData.sub || '';
         }
-        createTriggerUI(prefix, exprData.value);
+        createTriggerUI(prefix, exprData ? exprData.value : {});
 
         if (exprData && exprData.value) {
           setTimeout(() => {
@@ -1070,11 +1071,23 @@ function addConditionBlock(parent=document.getElementById("condition_blocks"), d
   handleTypeChange();
 
   block.querySelector(".remove-condition").onclick = ()=>block.remove();
-  block.querySelector(".add-nested-condition").onclick = ()=>addConditionBlock(block.querySelector(".nested-conditions"));
-  block.querySelector(".add-nested-action").onclick = ()=>addAction(block.querySelector(".nested-actions"));
+
+  const nestedCondBtn = block.querySelector(".add-nested-condition");
+  const nestedActBtn = block.querySelector(".add-nested-action");
+  console.log("[DEBUG] Nested buttons found:", { nestedCondBtn, nestedActBtn });
+
+  nestedCondBtn.onclick = () => {
+    console.log("[DEBUG] Add Nested Condition button clicked.");
+    addConditionBlock(block.querySelector(".nested-conditions"));
+  };
+  nestedActBtn.onclick = () => {
+    console.log("[DEBUG] Add Nested Action button clicked.");
+    addAction(block.querySelector(".nested-actions"));
+  };
 }
 
 function addAction(parent, data={}) {
+  console.log(`[DEBUG] addAction called. Parent element:`, parent);
   const el = document.createElement("div");
   el.className = "item";
   const prefix = `action_${Date.now()}_${Math.floor(Math.random() * 1e9)}_`;
@@ -1094,6 +1107,7 @@ function addAction(parent, data={}) {
     </div>
     <button class="remove-action">削除</button>
   `;
+  parent.appendChild(el);
   el.querySelector(".remove-action").onclick=()=>el.remove();
   
   const categorySelect = el.querySelector(".action-category");
@@ -1126,8 +1140,6 @@ function addAction(parent, data={}) {
       el.querySelector(".action-timing-time-rel").value = data.timing.time_rel || "";
     }
   }, 100);
-  
-  parent.appendChild(el);
 }
 
 function parseConditions(root){
