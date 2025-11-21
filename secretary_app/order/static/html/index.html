@@ -204,11 +204,18 @@ function createActionUI(prefix = '', initialValue = {}) {
           const time = details.querySelector(`[class*='${group}-time']`)?.value || '';
           
           let summaryText = '';
-          if (year) summaryText += `${year}年`;
-          if (month) summaryText += `${month}月`;
-          if (day) summaryText += `${day}日`;
-          if (summaryText && time) summaryText += ' ';
-          if (time) summaryText += time;
+          if (year) summaryText += (year.startsWith('実行された') ? 'n' : year) + '年';
+          if (month) summaryText += (month.startsWith('実行された') ? 'n' : month) + '月';
+          if (day) summaryText += (day.startsWith('実行された') ? 'n' : day) + '日';
+          
+          if (time) {
+              summaryText += (summaryText ? ' ' : '');
+              if (time.startsWith('実行された')) {
+                  summaryText += 'n時n分';
+              } else {
+                  summaryText += time;
+              }
+          }
 
           const summaryValueEl = details.querySelector('.co-summary-value');
           if (summaryValueEl) {
@@ -220,10 +227,22 @@ function createActionUI(prefix = '', initialValue = {}) {
           let options = '';
           const currentYear = new Date().getFullYear();
           switch(type) {
-            case 'year': for (let i = currentYear; i <= currentYear + 20; i++) options += `<option value="${i}">`; break;
-            case 'month': for (let i = 1; i <= 12; i++) options += `<option value="${i}">`; break;
-            case 'day': for (let i = 1; i <= 31; i++) options += `<option value="${i}">`; break;
-            case 'time': for (let h = 0; h < 24; h++) for (let m = 0; m < 60; m += 15) options += `<option value="${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}">`; break;
+            case 'year':
+              options += `<option value="実行された年">`;
+              for (let i = currentYear; i <= currentYear + 20; i++) options += `<option value="${i}">`;
+              break;
+            case 'month':
+              options += `<option value="実行された月">`;
+              for (let i = 1; i <= 12; i++) options += `<option value="${i}">`;
+              break;
+            case 'day':
+              options += `<option value="実行された日">`;
+              for (let i = 1; i <= 31; i++) options += `<option value="${i}">`;
+              break;
+            case 'time':
+              options += `<option value="実行された時刻">`;
+              for (let h = 0; h < 24; h++) for (let m = 0; m < 60; m += 15) options += `<option value="${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}">`;
+              break;
           }
           return options;
         };
@@ -292,11 +311,18 @@ function createActionUI(prefix = '', initialValue = {}) {
           const time = details.querySelector(`[class*='${group}-time']`)?.value || '';
           
           let summaryText = '';
-          if (year) summaryText += `${year}年`;
-          if (month) summaryText += `${month}月`;
-          if (day) summaryText += `${day}日`;
-          if (summaryText && time) summaryText += ' ';
-          if (time) summaryText += time;
+          if (year) summaryText += (year.startsWith('実行された') ? 'n' : year) + '年';
+          if (month) summaryText += (month.startsWith('実行された') ? 'n' : month) + '月';
+          if (day) summaryText += (day.startsWith('実行された') ? 'n' : day) + '日';
+          
+          if (time) {
+              summaryText += (summaryText ? ' ' : '');
+              if (time.startsWith('実行された')) {
+                  summaryText += 'n時n分';
+              } else {
+                  summaryText += time;
+              }
+          }
 
           const summaryValueEl = details.querySelector('.co-summary-value');
           if (summaryValueEl) {
@@ -308,10 +334,22 @@ function createActionUI(prefix = '', initialValue = {}) {
           let options = '';
           const currentYear = new Date().getFullYear();
           switch(type) {
-            case 'year': for (let i = currentYear; i <= currentYear + 20; i++) options += `<option value="${i}">`; break;
-            case 'month': for (let i = 1; i <= 12; i++) options += `<option value="${i}">`; break;
-            case 'day': for (let i = 1; i <= 31; i++) options += `<option value="${i}">`; break;
-            case 'time': for (let h = 0; h < 24; h++) for (let m = 0; m < 60; m += 15) options += `<option value="${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}">`; break;
+            case 'year':
+              options += `<option value="実行された年">`;
+              for (let i = currentYear; i <= currentYear + 20; i++) options += `<option value="${i}">`;
+              break;
+            case 'month':
+              options += `<option value="実行された月">`;
+              for (let i = 1; i <= 12; i++) options += `<option value="${i}">`;
+              break;
+            case 'day':
+              options += `<option value="実行された日">`;
+              for (let i = 1; i <= 31; i++) options += `<option value="${i}">`;
+              break;
+            case 'time':
+              options += `<option value="実行された時刻">`;
+              for (let h = 0; h < 24; h++) for (let m = 0; m < 60; m += 15) options += `<option value="${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}">`;
+              break;
           }
           return options;
         };
@@ -397,11 +435,18 @@ function createActionUI(prefix = '', initialValue = {}) {
           const time = details.querySelector(`[class*='${group}-time']`)?.value || '';
           
           let summaryText = '';
-          if (year) summaryText += `${year}年`;
-          if (month) summaryText += `${month}月`;
-          if (day) summaryText += `${day}日`;
-          if (summaryText && time) summaryText += ' ';
-          if (time) summaryText += time;
+          if (year) summaryText += (year.startsWith('実行された') ? 'n' : year) + '年';
+          if (month) summaryText += (month.startsWith('実行された') ? 'n' : month) + '月';
+          if (day) summaryText += (day.startsWith('実行された') ? 'n' : day) + '日';
+          
+          if (time) {
+              summaryText += (summaryText ? ' ' : '');
+              if (time.startsWith('実行された')) {
+                  summaryText += 'n時n分';
+              } else {
+                  summaryText += time;
+              }
+          }
 
           const summaryValueEl = details.querySelector('.co-summary-value');
           if (summaryValueEl) {
@@ -413,10 +458,22 @@ function createActionUI(prefix = '', initialValue = {}) {
           let options = '';
           const currentYear = new Date().getFullYear();
           switch(type) {
-            case 'year': for (let i = currentYear; i <= currentYear + 20; i++) options += `<option value="${i}">`; break;
-            case 'month': for (let i = 1; i <= 12; i++) options += `<option value="${i}">`; break;
-            case 'day': for (let i = 1; i <= 31; i++) options += `<option value="${i}">`; break;
-            case 'time': for (let h = 0; h < 24; h++) for (let m = 0; m < 60; m += 15) options += `<option value="${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}">`; break;
+            case 'year':
+              options += `<option value="実行された年">`;
+              for (let i = currentYear; i <= currentYear + 20; i++) options += `<option value="${i}">`;
+              break;
+            case 'month':
+              options += `<option value="実行された月">`;
+              for (let i = 1; i <= 12; i++) options += `<option value="${i}">`;
+              break;
+            case 'day':
+              options += `<option value="実行された日">`;
+              for (let i = 1; i <= 31; i++) options += `<option value="${i}">`;
+              break;
+            case 'time':
+              options += `<option value="実行された時刻">`;
+              for (let h = 0; h < 24; h++) for (let m = 0; m < 60; m += 15) options += `<option value="${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}">`;
+              break;
           }
           return options;
         };
