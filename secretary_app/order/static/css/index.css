@@ -481,12 +481,12 @@ details[open] > summary::before { transform: rotate(90deg); }
 
 .nested-conditions,
 .nested-actions {
-  margin-top: 12px;
-  padding-left: 12px;
-  border-left: 2px solid var(--co-border);
+  margin-top: 16px;
+  padding-left: 24px; /* インデントを深くする */
+  border-left: 2px solid var(--co-border-strong); /* 境界線を目立たせる */
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
 }
 
 .co-command-list {

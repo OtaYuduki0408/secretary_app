@@ -82,6 +82,64 @@
     </main>
   </div>
 <script>
+function updateActionSummary(block) {
+    const summaryTextEl = block.querySelector('.co-summary-text');
+    if (!summaryTextEl) return;
+
+    const categoryEl = block.querySelector('.action-category');
+    const subEl = block.querySelector('.action-sub');
+
+    const category = categoryEl ? categoryEl.value : '';
+    const sub = subEl ? subEl.value : '';
+
+    if (category && sub) {
+        summaryTextEl.textContent = `${category}: ${sub}`;
+    } else {
+        summaryTextEl.textContent = 'アクションを設定してください';
+    }
+}
+
+function updateConditionSummary(block) {
+    const summaryTextEl = block.querySelector('.co-summary-text');
+    if (!summaryTextEl) return;
+
+    const typeEl = block.querySelector('.condition-type');
+    if (typeEl && typeEl.value === 'else') {
+        summaryTextEl.textContent = '上記以外のすべての条件';
+        return;
+    }
+
+    const categoryEl = block.querySelector('[id*="_trigger_category"]');
+    const subEl = block.querySelector('[id*="_trigger_sub"]');
+    
+    const category = categoryEl ? categoryEl.value : '';
+    const sub = subEl ? subEl.value : '';
+    
+    let summary = '';
+    if (category) {
+        summary += `${category}`;
+        if (sub) {
+            summary += ` - ${sub}`;
+        }
+    } else {
+        summaryTextEl.textContent = '条件を設定してください';
+        return;
+    }
+    
+    const valueContainer = block.querySelector('[id*="_trigger_value_container"]');
+    if (valueContainer) {
+        const inputs = valueContainer.querySelectorAll('input[type="text"], input[type="number"], input[type="date"], input[type="time"]');
+        for (const input of inputs) {
+            if (input.value && !input.readOnly && input.offsetParent !== null) { // 値があり、読み取り専用でなく、表示されている
+                summary += ` (${input.value})`;
+                break; 
+            }
+        }
+    }
+
+    summaryTextEl.textContent = summary;
+}
+
 const TRIGGER_CATEGORIES = {
   "場所": [],
   "カレンダー": ["入力があったら", "予定の時間になったら"],
@@ -1173,6 +1231,10 @@ function addConditionBlock(parent=document.getElementById("condition_blocks"), d
       <span class="co-summary-text">条件を設定してください</span>
     </summary>
     <div class="co-block-content">
+      <select class="condition-type">
+        <option value="if">if (この条件を満たしたなら)</option>
+        <option value="else">else (上の条件を満たしてないのなら)</option>
+      </select>
       <select class="condition-logic">
         <option value="">(先頭)</option>
         <option value="NOT">NOT</option>
@@ -1182,10 +1244,6 @@ function addConditionBlock(parent=document.getElementById("condition_blocks"), d
         <option value="NOR">NOR (どちらかが違うなら)</option>
         <option value="XOR">XOR (どちらかが違く、かつ両方が正しくも違くもないのなら)</option>
         <option value="XNOR">XNOR (両方が正しい、または両方が違うなら)</option>
-      </select>
-      <select class="condition-type">
-        <option value="if">if (この条件を満たしたなら)</option>
-        <option value="else">else (上の条件を満たしてないのなら)</option>
       </select>
       <div class="condition-expr-container"></div>
       <div class="nested-conditions"></div>
@@ -1206,8 +1264,13 @@ function addConditionBlock(parent=document.getElementById("condition_blocks"), d
   const typeSelect = content.querySelector(".condition-type");
   const exprContainer = content.querySelector(".condition-expr-container");
 
-  // ロジック選択の制御
-  if (parent.querySelectorAll('.condition-block').length === 1 && parent.querySelectorAll('.item').length === 0) {
+  // Summary updater
+  block.addEventListener('change', () => updateConditionSummary(block));
+  block.addEventListener('input', () => updateConditionSummary(block));
+  setTimeout(() => updateConditionSummary(block), 200); // 復元時のUI描画後に実行
+
+  // ロジック選択の制御 (handleTypeChangeが実行される前に初期設定)
+  if (parent.querySelectorAll('.condition-block').length === 1) {
     logicSelect.querySelector('option[value="AND"]').remove();
     logicSelect.querySelector('option[value="OR"]').remove();
     logicSelect.querySelector('option[value="NAND"]').remove();
@@ -1224,9 +1287,15 @@ function addConditionBlock(parent=document.getElementById("condition_blocks"), d
   // タイプ選択の制御
   const handleTypeChange = () => {
     const selectedType = typeSelect.value;
-    exprContainer.innerHTML = ''; // コンテナをクリア
+    const summaryTextEl = block.querySelector('.co-summary-text'); // Summary Text Elementも取得
 
-    if (selectedType === 'if') {
+    if (selectedType === 'else') {
+      logicSelect.style.display = 'none'; // elseの場合は非表示
+      exprContainer.innerHTML = ''; // 条件式コンテナもクリア
+      if (summaryTextEl) summaryTextEl.textContent = '上記以外のすべての条件'; // Summaryも更新
+    } else { // if が選択された場合
+      logicSelect.style.display = 'block'; // ifの場合は表示
+      // exprContainer のHTMLを生成する既存ロジック
       const prefix = `${blockId}_`;
       exprContainer.innerHTML = `
         <label style="font-size:0.9em; opacity:0.8;">条件</label>
@@ -1320,15 +1389,10 @@ function addConditionBlock(parent=document.getElementById("condition_blocks"), d
     }
   };
 
-  if (parent.querySelectorAll('.condition-block').length === 1 && parent.querySelectorAll('.item').length === 0) {
-    typeSelect.querySelector('option[value="else"]').remove();
-    typeSelect.value = "if";
-  } else {
-    typeSelect.value = data.type || "if";
-  }
-  
+  // 最初にelseが選ばれてた場合の処理
+  typeSelect.value = data.type || "if"; // データ復元
   typeSelect.addEventListener("change", handleTypeChange);
-  handleTypeChange();
+  handleTypeChange(); // 初期表示
 
   // --- Event Listeners ---
   content.querySelector(".remove-condition").onclick = () => block.remove();
@@ -1375,6 +1439,11 @@ function addAction(parent, data={}) {
     </div>
   `;
   parent.appendChild(el);
+
+  // Summary updater
+  el.addEventListener('change', () => updateActionSummary(el));
+  el.addEventListener('input', () => updateActionSummary(el));
+  setTimeout(() => updateActionSummary(el), 200);
 
   const content = el.querySelector('.co-block-content');
   content.querySelector(".remove-action").onclick=()=>el.remove();
