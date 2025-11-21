@@ -577,7 +577,7 @@ function createTriggerUI(prefix = '', initialValue = {}) {
               
               // エラーの種類に応じてメッセージを分岐
               if (result && (result.type === "api_error" || result.type === "network_error" || result.type === "malformed_response")) {
-                locationErrorMessageElement.textContent = "使用APIにエラーが発生しております。時間を置いて再度お試しください。詳細：https://vldb.gsi.go.jp/sokuchi/surveycalc/main.html(国土地理院：ジオイド高計算　お知らせページ)";
+                locationErrorMessageElement.textContent = "使用APIにエラーが発生しております。時間を置いて再度お試しください。<br>詳細：https://vldb.gsi.go.jp/sokuchi/surveycalc/main.html<br>(国土地理院：ジオイド高計算　お知らせページ)";
               } else { // result.type === "no_coordinates" または result が null
                 locationErrorMessageElement.textContent = "住所が特定できませんでした。都道府県、市区町村、番地までなど、より簡潔な形式でお試しください。";
               }
