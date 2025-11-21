@@ -1182,31 +1182,24 @@ function addConditionBlock(parent=document.getElementById("condition_blocks"), d
       <option value="else">else (上の条件を満たしてないのなら)</option>
     </select>
     <div class="condition-expr-container"></div>
-    <button class="add-sibling-condition add-button">＋ 条件追加</button>
-    <button class="add-nested-condition nest-button">＋ ネスト条件</button>
-    <button class="add-nested-action nest-button">＋ ネストアクション</button>
-    <button class="remove-condition remove">削除</button>
     <div class="nested-conditions"></div>
     <div class="nested-actions"></div>
+    <div class="co-block-actions" style="margin-top: 16px; border-top: 1px solid var(--co-border); padding-top: 16px; display: flex; flex-wrap: wrap; gap: 8px;">
+      <button class="add-sibling-action add-button">＋ アクションを追加</button>
+      <button class="add-sibling-condition add-button">＋ 条件を追加</button>
+      <button class="add-nested-action nest-button">＋ ネストアクション</button>
+      <button class="add-nested-condition nest-button">＋ ネスト条件</button>
+      <button class="remove-condition remove">削除</button>
+    </div>
   `;
   parent.appendChild(block);
 
   const logicSelect = block.querySelector(".condition-logic");
   const typeSelect = block.querySelector(".condition-type");
   const exprContainer = block.querySelector(".condition-expr-container");
-  const isToplevel = parent.id === "condition_blocks";
-
-  // 同階層追加ボタンの制御
-  const siblingButton = block.querySelector(".add-sibling-condition");
-  if (isToplevel) {
-    siblingButton.style.display = "none";
-  }
-  siblingButton.addEventListener("click", () => {
-    addConditionBlock(parent);
-  });
 
   // ロジック選択の制御
-  if (parent.querySelectorAll('.condition-block').length === 1) {
+  if (parent.querySelectorAll('.condition-block').length === 1 && parent.querySelectorAll('.item').length === 0) {
     logicSelect.querySelector('option[value="AND"]').remove();
     logicSelect.querySelector('option[value="OR"]').remove();
     logicSelect.querySelector('option[value="NAND"]').remove();
@@ -1319,7 +1312,7 @@ function addConditionBlock(parent=document.getElementById("condition_blocks"), d
     }
   };
 
-  if (parent.children.length === 1) {
+  if (parent.querySelectorAll('.condition-block').length === 1 && parent.querySelectorAll('.item').length === 0) {
     typeSelect.querySelector('option[value="else"]').remove();
     typeSelect.value = "if";
   } else {
@@ -1329,20 +1322,16 @@ function addConditionBlock(parent=document.getElementById("condition_blocks"), d
   typeSelect.addEventListener("change", handleTypeChange);
   handleTypeChange();
 
-  block.querySelector(".remove-condition").onclick = ()=>block.remove();
+  // --- Event Listeners ---
+  block.querySelector(".remove-condition").onclick = () => block.remove();
+  block.querySelector(".add-nested-condition").onclick = () => addConditionBlock(block.querySelector(".nested-conditions"));
+  block.querySelector(".add-nested-action").onclick = () => addAction(block.querySelector(".nested-actions"));
+  
+  const siblingActionBtn = block.querySelector(".add-sibling-action");
+  const siblingCondBtn = block.querySelector(".add-sibling-condition");
 
-  const nestedCondBtn = block.querySelector(".add-nested-condition");
-  const nestedActBtn = block.querySelector(".add-nested-action");
-  console.log("[DEBUG] Nested buttons found:", { nestedCondBtn, nestedActBtn });
-
-  nestedCondBtn.onclick = () => {
-    console.log("[DEBUG] Add Nested Condition button clicked.");
-    addConditionBlock(block.querySelector(".nested-conditions"));
-  };
-  nestedActBtn.onclick = () => {
-    console.log("[DEBUG] Add Nested Action button clicked.");
-    addAction(block.querySelector(".nested-actions"));
-  };
+  siblingActionBtn.onclick = () => addAction(parent);
+  siblingCondBtn.onclick = () => addConditionBlock(parent);
 }
 
 function addAction(parent, data={}) {
@@ -1364,11 +1353,21 @@ function addAction(parent, data={}) {
     <div class="action-detail-container" id="${prefix}action_detail_container" style="margin-top: 10px;">
       <!-- ここに動的UIが挿入される -->
     </div>
-    <button class="remove-action">削除</button>
+    <div class="co-block-actions" style="margin-top: 16px; display: flex; flex-wrap: wrap; gap: 8px;">
+      <button class="add-sibling-action add-button">＋ アクションを追加</button>
+      <button class="add-sibling-condition add-button">＋ 条件を追加</button>
+      <button class="remove-action remove">削除</button>
+    </div>
   `;
   parent.appendChild(el);
   el.querySelector(".remove-action").onclick=()=>el.remove();
   
+  const siblingActionBtn = el.querySelector(".add-sibling-action");
+  const siblingCondBtn = el.querySelector(".add-sibling-condition");
+
+  siblingActionBtn.onclick = () => addAction(parent);
+  siblingCondBtn.onclick = () => addConditionBlock(parent);
+
   const categorySelect = el.querySelector(".action-category");
   const subSelect = el.querySelector(".action-sub");
   
