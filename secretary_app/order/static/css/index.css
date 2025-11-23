@@ -497,3 +497,76 @@ body.co-body {
     background-color: var(--co-card-bg); /* 地図の背景色をカード背景に合わせる */
     border-radius: 8px; /* 角を丸くする */
 }
+
+/* --- Responsive Design --- */
+@media (max-width: 768px) {
+  html {
+    font-size: 14px; /* rem単位の基準を小さくする */
+  }
+
+  .co-shell {
+    padding: 32px 16px 60px;
+  }
+
+  .co-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 16px;
+  }
+
+  h1 {
+    font-size: 2rem;
+  }
+
+  .co-section-head {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .co-card {
+    padding: 20px;
+  }
+
+  .co-grid-two {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+  
+  .co-block-header .co-summary-text {
+    white-space: normal; /* サマリーが折り返すように */
+  }
+
+  .nested-blocks {
+    margin-left: 12px;
+    padding-left: 8px;
+  }
+  
+  .co-actions {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+
+  .co-btn, .add-button, .save-button, .nest-button, .remove {
+    width: 100%;
+    text-align: center;
+    padding: 12px 18px;
+  }
+
+  .co-inline-message {
+    text-align: center;
+    min-height: auto;
+    padding: 8px 0;
+  }
+
+  .co-command-list .item {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .co-command-list .item button {
+    margin-right: 0;
+  }
+}
