@@ -1,5 +1,5 @@
 import { addConditionBlock, addAction } from './block_operations.js';
-import { populateSelect } from './ui_helpers.js';
+import { populateSelect, updateSubOptions } from './ui_helpers.js';
 import { createTriggerUI } from './trigger_ui.js';
 import { createActionUI } from './action_ui.js'; // createActionUI も必要
 import { TRIGGER_CATEGORIES, ACTION_CATEGORIES } from './constants.js';
@@ -81,17 +81,13 @@ export function parseActionArray(actionRoot) {
       }
 
       const actionData = { category, sub, timing, detail };
-      actionData.nested = parseConditions(actionItem.querySelector(".nested-conditions"));
-      actionData.actions = parseActionArray(actionItem.querySelector(".nested-actions"));
-      
-      if (actionData.nested.length === 0) delete actionData.nested;
-      if (actionData.actions.length === 0) delete actionData.actions;
 
       return actionData;
     });
 }
 
 export function parseConditions(root){
+  if (!root) return [];
   return [...root.children]
     .filter(child => child.classList.contains('condition-block'))
     .map(block => {
@@ -209,16 +205,13 @@ export function parseConditions(root){
 }
 
 export function loadCommandToForm(cmd){
-  console.log("--- [DEBUG] loadCommandToForm called with cmd:", cmd); // デバッグログ追加
+  console.log("--- [DEBUG] loadCommandToForm called with cmd:", cmd);
   // フォームをリセット
   document.getElementById("name").value = "";
   document.getElementById("trigger_category").value = "";
   document.getElementById("trigger_sub").innerHTML = "<option value=''>選択してください</option>";
   document.getElementById("trigger_value_container").innerHTML = '<input type="text" id="trigger_value" placeholder="値">';
   document.getElementById("condition_blocks").innerHTML = "";
-  document.getElementById("action_category").value = "";
-  document.getElementById("action_sub").innerHTML = "<option value=''>選択してください</option>";
-  document.getElementById("action_detail_container").innerHTML = "";
   document.getElementById("command-id")?.remove();
 
 
@@ -228,60 +221,26 @@ export function loadCommandToForm(cmd){
   // Triggerの復元
   if (cmd.triggers && cmd.triggers.length > 0) {
     const trigger = cmd.triggers[0];
-    console.log("--- [DEBUG] Restoring trigger:", trigger); // デバッグログ追加
     const triggerCategorySelect = document.getElementById("trigger_category");
     const triggerSubSelect = document.getElementById("trigger_sub");
 
     triggerCategorySelect.value = trigger.category || "";
-    // updateSubOptions(triggerCategorySelect.id, triggerSubSelect.id, TRIGGER_CATEGORIES); // createTriggerUI内で呼ばれるためコメントアウト
+    
+    updateSubOptions(triggerCategorySelect.id, triggerSubSelect.id, TRIGGER_CATEGORIES);
+    
     triggerSubSelect.value = trigger.sub || "";
-    // createTriggerUI(''); // ここでUIを再生成すると、setTimeoutの前にinnerHTMLがクリアされる可能性がある
-
-    // 動的に生成されたトリガー詳細UIに値を設定
-    // createTriggerUIにtrigger.valueを渡してUI生成と値の設定を一度に行う
-    createTriggerUI('', trigger.value);
-  }
-
-  document.getElementById("condition_blocks").innerHTML="";
-  (cmd.conditions||[]).forEach(c=>addConditionBlockFromData(c, document.getElementById("condition_blocks")));
-
-  if(cmd.actions?.length > 0){
-    const a = cmd.actions[0];
-    const categorySelect = document.getElementById("action_category");
-    const subSelect = document.getElementById("action_sub");
-
-    categorySelect.value = a.category || "";
-    // updateSubOptions(categorySelect.id, subSelect.id, ACTION_CATEGORIES); // createActionUI内で呼ばれるためコメントアウト
-    subSelect.value = a.sub || "";
-    createActionUI('');
 
     setTimeout(() => {
-      if (a.timing) {
-        document.getElementById("action_timing_date_abs").value = a.timing.date_abs || "";
-        document.getElementById("action_timing_date_rel").value = a.timing.date_rel || "";
-        document.getElementById("action_timing_time_abs").value = a.timing.time_abs || "";
-        document.getElementById("action_timing_time_rel").value = a.timing.time_rel || "";
-      }
-      if (a.detail) {
-        const detailContainer = document.getElementById("action_detail_container");
-        for(const key in a.detail) {
-          const input = detailContainer.querySelector(`[class*="${key}"]`);
-          if(input) {
-            if (input.type === 'checkbox') {
-              input.checked = a.detail[key];
-            } else if (input.tagName === 'SELECT' && input.multiple) {
-              const selectedValues = Array.isArray(a.detail[key]) ? a.detail[key] : [a.detail[key]];
-              Array.from(input.options).forEach(option => {
-                option.selected = selectedValues.includes(option.value);
-              });
-            } else {
-              input.value = a.detail[key];
-            }
-          }
-        }
-      }
-    }, 100);
+        createTriggerUI('', trigger.value);
+    }, 0);
   }
+
+  // 条件ブロックとトップレベルアクションの復元
+  const conditionBlocksContainer = document.getElementById("condition_blocks");
+  conditionBlocksContainer.innerHTML = "";
+  (cmd.conditions || []).forEach(c => addConditionBlockFromData(c, conditionBlocksContainer));
+  (cmd.actions || []).forEach(a => addAction(conditionBlocksContainer, a));
+
 
   document.getElementById("command-id")?.remove();
   const hid=document.createElement("input"); hid.type="hidden"; hid.id="command-id"; hid.value=cmd.id;
