@@ -166,17 +166,17 @@ export function createActionUI(prefix = '', initialValue = {}) {
               <span class="co-summary-value" style="color: var(--co-accent); padding-right: 10px;">未設定</span>
             </summary>
             <div class="co-details-content" style="margin-top: 15px;">
-                <label>年 (任意)</label>
-                <input type="text" class="action-detail-fin-read-start-year" list="action_fin_read_start_year_options" value="${initialValue.start_year || ''}" placeholder="例: 2025" onfocus="this.setAttribute('data-prev-value', this.value); this.value='';" onblur="if(this.value==='') this.value=this.getAttribute('data-prev-value');">
+                <label>年 (必須)</label>
+                <input type="text" class="action-detail-fin-read-start-year" list="action_fin_read_start_year_options" value="${initialValue.start_year || '実行された年'}" placeholder="例: 2025" onfocus="this.setAttribute('data-prev-value', this.value); this.value='';" onblur="if(this.value==='') this.value=this.getAttribute('data-prev-value');">
                 <datalist id="action_fin_read_start_year_options">${generateDatalist('year')}</datalist>
-                <label>月 (任意)</label>
-                <input type="text" class="action-detail-fin-read-start-month" list="action_fin_read_start_month_options" value="${initialValue.start_month || ''}" placeholder="例: 1" onfocus="this.setAttribute('data-prev-value', this.value); this.value='';" onblur="if(this.value==='') this.value=this.getAttribute('data-prev-value');">
+                <label>月 (必須)</label>
+                <input type="text" class="action-detail-fin-read-start-month" list="action_fin_read_start_month_options" value="${initialValue.start_month || '実行された月'}" placeholder="例: 1" onfocus="this.setAttribute('data-prev-value', this.value); this.value='';" onblur="if(this.value==='') this.value=this.getAttribute('data-prev-value');">
                 <datalist id="action_fin_read_start_month_options">${generateDatalist('month')}</datalist>
-                <label>日 (任意)</label>
-                <input type="text" class="action-detail-fin-read-start-day" list="action_fin_read_start_day_options" value="${initialValue.start_day || ''}" placeholder="例: 15" onfocus="this.setAttribute('data-prev-value', this.value); this.value='';" onblur="if(this.value==='') this.value=this.getAttribute('data-prev-value');">
+                <label>日 (必須)</label>
+                <input type="text" class="action-detail-fin-read-start-day" list="action_fin_read_start_day_options" value="${initialValue.start_day || '1'}" placeholder="例: 15" onfocus="this.setAttribute('data-prev-value', this.value); this.value='';" onblur="if(this.value==='') this.value=this.getAttribute('data-prev-value');">
                 <datalist id="action_fin_read_start_day_options">${generateDatalist('day')}</datalist>
-                <label>時刻 (任意)</label>
-                <input type="text" class="action-detail-fin-read-start-time" list="action_fin_read_start_time_options" value="${initialValue.start_time || ''}" placeholder="例: 07:30" onfocus="this.setAttribute('data-prev-value', this.value); this.value='';" onblur="if(this.value==='') this.value=this.getAttribute('data-prev-value');">
+                <label>時刻 (必須)</label>
+                <input type="text" class="action-detail-fin-read-start-time" list="action_fin_read_start_time_options" value="${initialValue.start_time || '00:00'}" placeholder="例: 07:30" onfocus="this.setAttribute('data-prev-value', this.value); this.value='';" onblur="if(this.value==='') this.value=this.getAttribute('data-prev-value');">
                 <datalist id="action_fin_read_start_time_options">${generateDatalist('time')}</datalist>
             </div>
           </details>
@@ -186,27 +186,54 @@ export function createActionUI(prefix = '', initialValue = {}) {
               <span class="co-summary-value" style="color: var(--co-accent); padding-right: 10px;">未設定</span>
             </summary>
             <div class="co-details-content" style="margin-top: 15px;">
-                <label>年 (任意)</label>
-                <input type="text" class="action-detail-fin-read-end-year" list="action_fin_read_end_year_options" value="${initialValue.end_year || ''}" placeholder="例: 2025" onfocus="this.setAttribute('data-prev-value', this.value); this.value='';" onblur="if(this.value==='') this.value=this.getAttribute('data-prev-value');">
+                <label>年 (必須)</label>
+                <input type="text" class="action-detail-fin-read-end-year" list="action_fin_read_end_year_options" value="${initialValue.end_year || '実行された年'}" placeholder="例: 2025" onfocus="this.setAttribute('data-prev-value', this.value); this.value='';" onblur="if(this.value==='') this.value=this.getAttribute('data-prev-value');">
                 <datalist id="action_fin_read_end_year_options">${generateDatalist('year')}</datalist>
-                <label>月 (任意)</label>
-                <input type="text" class="action-detail-fin-read-end-month" list="action_fin_read_end_month_options" value="${initialValue.end_month || ''}" placeholder="例: 1" onfocus="this.setAttribute('data-prev-value', this.value); this.value='';" onblur="if(this.value==='') this.value=this.getAttribute('data-prev-value');">
+                <label>月 (必須)</label>
+                <input type="text" class="action-detail-fin-read-end-month" list="action_fin_read_end_month_options" value="${initialValue.end_month || '実行された月'}" placeholder="例: 1" onfocus="this.setAttribute('data-prev-value', this.value); this.value='';" onblur="if(this.value==='') this.value=this.getAttribute('data-prev-value');">
                 <datalist id="action_fin_read_end_month_options">${generateDatalist('month')}</datalist>
-                <label>日 (任意)</label>
-                <input type="text" class="action-detail-fin-read-end-day" list="action_fin_read_end_day_options" value="${initialValue.end_day || ''}" placeholder="例: 15" onfocus="this.setAttribute('data-prev-value', this.value); this.value='';" onblur="if(this.value==='') this.value=this.getAttribute('data-prev-value');">
+                <label>日 (必須)</label>
+                <input type="text" class="action-detail-fin-read-end-day" list="action_fin_read_end_day_options" value="${initialValue.end_day || '実行された日'}" placeholder="例: 15" onfocus="this.setAttribute('data-prev-value', this.value); this.value='';" onblur="if(this.value==='') this.value=this.getAttribute('data-prev-value');">
                 <datalist id="action_fin_read_end_day_options">${generateDatalist('day')}</datalist>
-                <label>時刻 (任意)</label>
-                <input type="text" class="action-detail-fin-read-end-time" list="action_fin_read_end_time_options" value="${initialValue.end_time || ''}" placeholder="例: 18:00" onfocus="this.setAttribute('data-prev-value', this.value); this.value='';" onblur="if(this.value==='') this.value=this.getAttribute('data-prev-value');">
+                <label>時刻 (必須)</label>
+                <input type="text" class="action-detail-fin-read-end-time" list="action_fin_read_end_time_options" value="${initialValue.end_time || '23:55'}" placeholder="例: 18:00" onfocus="this.setAttribute('data-prev-value', this.value); this.value='';" onblur="if(this.value==='') this.value=this.getAttribute('data-prev-value');">
                 <datalist id="action_fin_read_end_time_options">${generateDatalist('time')}</datalist>
             </div>
           </details>
         `;
 
+        const updateSummary = (group) => {
+            const details = detailContainer.querySelector(`[data-group='${group}']`);
+            if (!details) return;
+
+            const yearInput = details.querySelector(`[class*='-${group}-year']`);
+            const monthInput = details.querySelector(`[class*='-${group}-month']`);
+            const dayInput = details.querySelector(`[class*='-${group}-day']`);
+            const timeInput = details.querySelector(`[class*='-${group}-time']`);
+
+            const year = yearInput?.value || '';
+            const month = monthInput?.value || '';
+            const day = dayInput?.value || '';
+            const time = timeInput?.value || '';
+            
+            let summaryText = '';
+            if (year) summaryText += year.includes('実行された') ? 'n年' : `${year}年`;
+            if (month) summaryText += month.includes('実行された') ? 'n月' : `${month}月`;
+            if (day) summaryText += day.includes('実行された') ? 'n日' : `${day}日`;
+            if (summaryText && time) summaryText += ' ';
+            if (time) summaryText += time.includes('実行された') ? 'n:n' : time;
+
+            const summaryValueEl = details.querySelector('.co-summary-value');
+            if (summaryValueEl) {
+                summaryValueEl.textContent = summaryText || '未設定';
+            }
+        };
+
         ['start', 'end'].forEach(group => {
           const details = detailContainer.querySelector(`[data-group='${group}']`);
           if(details) {
-            details.addEventListener('input', () => updateActionSummary(group));
-            updateActionSummary(group); // 初期表示の更新
+            details.addEventListener('input', () => updateSummary(group));
+            updateSummary(group); // 初期表示の更新
           }
         });
       }
@@ -330,6 +357,26 @@ export function createActionUI(prefix = '', initialValue = {}) {
           </div>
         `;
         // TODO: 付与情報追加ボタンのロジック
+      }
+      break;
+    case "発声":
+      if (sub === "実行") {
+        detailContainer.innerHTML = `
+          <label>発声する文章</label>
+          <textarea class="action-detail-speak-text" placeholder="発声させたい文章を入力">${initialValue.text || ''}</textarea>
+        `;
+      }
+      break;
+    case "アラート":
+      if (sub === "実行") {
+        detailContainer.innerHTML = `
+          <label>アラート音</label>
+          <select class="action-detail-alert-sound">
+            <option value="sound1" ${initialValue.sound === 'sound1' ? 'selected' : ''}>音1</option>
+            <option value="sound2" ${initialValue.sound === 'sound2' ? 'selected' : ''}>音2</option>
+            <option value="sound3" ${initialValue.sound === 'sound3' ? 'selected' : ''}>音3</option>
+          </select>
+        `;
       }
       break;
   }

@@ -68,6 +68,16 @@ export function parseActionArray(actionRoot) {
             detail.body = detailContainer.querySelector(".action-detail-mail-body")?.value;
           }
           break;
+        case "発声":
+          if (sub === "実行") {
+            detail.text = detailContainer.querySelector(".action-detail-speak-text")?.value;
+          }
+          break;
+        case "アラート":
+          if (sub === "実行") {
+            detail.sound = detailContainer.querySelector(".action-detail-alert-sound")?.value;
+          }
+          break;
       }
 
       const actionData = { category, sub, timing, detail };
@@ -130,6 +140,17 @@ export function parseConditions(root){
                   value.end_month = valueContainer.querySelector(`[id$="trigger_value_cal_end_month"]`)?.value;
                   value.end_day = valueContainer.querySelector(`[id$="trigger_value_cal_end_day"]`)?.value;
                   value.end_time = valueContainer.querySelector(`[id$="trigger_value_cal_end_time"]`)?.value;
+                } else if (sub === "この予定があるなら") {
+                  value.search_type = valueContainer.querySelector(`[id$="trigger_value_cal_search_type"]`)?.value;
+                  value.title = valueContainer.querySelector(`[id$="trigger_value_cal_event_title"]`)?.value;
+                  value.start_year = valueContainer.querySelector(`[id$="trigger_value_cal_event_start_year"]`)?.value;
+                  value.start_month = valueContainer.querySelector(`[id$="trigger_value_cal_event_start_month"]`)?.value;
+                  value.start_day = valueContainer.querySelector(`[id$="trigger_value_cal_event_start_day"]`)?.value;
+                  value.start_time = valueContainer.querySelector(`[id$="trigger_value_cal_event_start_time"]`)?.value;
+                  value.end_year = valueContainer.querySelector(`[id$="trigger_value_cal_event_end_year"]`)?.value;
+                  value.end_month = valueContainer.querySelector(`[id$="trigger_value_cal_event_end_month"]`)?.value;
+                  value.end_day = valueContainer.querySelector(`[id$="trigger_value_cal_event_end_day"]`)?.value;
+                  value.end_time = valueContainer.querySelector(`[id$="trigger_value_cal_event_end_time"]`)?.value;
                 }
                 break;
               case "収支管理":
