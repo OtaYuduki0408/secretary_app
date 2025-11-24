@@ -19,6 +19,7 @@ document.addEventListener("DOMContentLoaded",()=>{
   document.getElementById("register-btn").addEventListener("click",registerCommand);
   
   loadCommands();
+  console.log("--- DEBUG: Setting up pollPendingActions interval (5000ms). ---"); // 追加
   setInterval(pollPendingActions, 5000); // 5秒ごとにポーリングを追加
   updateTriggerInputFields(); // 初期表示
 });

@@ -48,6 +48,7 @@ from order.evaluator import evaluate_triggers # 関数名を修正
 
 # ============== 基本設定 ==============
 app = Flask(__name__, template_folder='templates', static_folder='static')
+app.config['VERSION_TIMESTAMP'] = int(datetime.now().timestamp()) # キャッシュバスター用
 
 # DBファイルのパス設定
 instance_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'instance')
@@ -599,6 +600,11 @@ PLAYER_BAR_SNIPPET = """
 
 @app.after_request
 def ensure_spotify_playerbar(response):
+    # すべてのレスポンスにキャッシュ無効化ヘッダーを追加
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    
     content_type = (response.headers.get('Content-Type') or '').lower()
     if (200 <= response.status_code < 300 and not response.direct_passthrough and 'text/html' in content_type):
         body = response.get_data(as_text=True)

@@ -441,15 +441,23 @@ export async function loadCommands() {
 const TEMP_USER_ID_FOR_POLLING = "user123"; // あなたのSupabaseユーザーのIDに置き換えてください
 
 export async function pollPendingActions() {
+  console.log("--- DEBUG: pollPendingActions called ---");
   const userId = TEMP_USER_ID_FOR_POLLING; 
 
   if (!userId || userId === "user123") {
     console.warn("User ID not available for polling pending actions. Skipping poll. (Current ID is 'user123' or empty)");
-    return;
+    // return; // デバッグ目的でコメントアウト
   }
 
   try {
     const response = await fetch("/order/api/pending_actions/" + userId);
+    console.log("--- DEBUG: pollPendingActions fetch response status:", response.status); // 追加
+    if (!response.ok) {
+      console.error("Failed to poll pending actions: " + response.status + " " + response.statusText);
+      return;
+    }
+    const actions = await response.json();
+    console.log("--- DEBUG: pollPendingActions received actions:", actions); // 追加
     if (!response.ok) {
       console.error("Failed to poll pending actions: " + response.status + " " + response.statusText);
       return;
@@ -458,6 +466,7 @@ export async function pollPendingActions() {
     if (actions && actions.length > 0) {
       console.log("RECEIVED PENDING ACTIONS:", actions);
       actions.forEach(action => {
+        console.log("--- DEBUG: Processing action:", action); // 追加
         const actionData = action.action_data;
         const executionResult = action.execution_result; // ActionExecutorからの実行結果
         let message = "アクション受信: " + actionData.category + ":" + actionData.sub;
@@ -481,6 +490,8 @@ export async function pollPendingActions() {
         }
         alert(message); // シンプルにalertで表示
       });
+    } else {
+      console.log("--- DEBUG: pollPendingActions received no actions."); // 追加
     }
   } catch (error) {
     console.error("Error polling pending actions:", error);
