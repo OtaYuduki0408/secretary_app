@@ -1,6 +1,8 @@
 from supabase_client import supabase
 from datetime import datetime
 
+import json # 追加
+
 TABLE_NAME = "pending_user_actions"
 
 def get_pending_actions(user_id: str):
@@ -28,6 +30,7 @@ def get_pending_actions(user_id: str):
             .in_("id", action_ids)
             .execute()
         )
+        # action_data はDBから直接JSONBとして取得されるため、変換は不要
 
         return actions
     except Exception as e:

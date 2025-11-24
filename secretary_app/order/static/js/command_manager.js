@@ -435,3 +435,54 @@ export async function loadCommands() {
     document.getElementById("command-list").innerHTML = `<p style="color:red;">一覧の読み込み中にエラーが発生しました。</p>`;
   }
 }
+
+// ★仮のユーザーID。実際にはサーバーから取得するか、セッションから取得する
+// TODO: ユーザー認証後に、サーバーから安全にユーザーIDをフロントエンドに渡す仕組みが必要
+const TEMP_USER_ID_FOR_POLLING = "user123"; // あなたのSupabaseユーザーのIDに置き換えてください
+
+export async function pollPendingActions() {
+  const userId = TEMP_USER_ID_FOR_POLLING; 
+
+  if (!userId || userId === "user123") {
+    console.warn("User ID not available for polling pending actions. Skipping poll. (Current ID is 'user123' or empty)");
+    return;
+  }
+
+  try {
+    const response = await fetch("/order/api/pending_actions/" + userId);
+    if (!response.ok) {
+      console.error("Failed to poll pending actions: " + response.status + " " + response.statusText);
+      return;
+    }
+    const actions = await response.json();
+    if (actions && actions.length > 0) {
+      console.log("RECEIVED PENDING ACTIONS:", actions);
+      actions.forEach(action => {
+        const actionData = action.action_data;
+        const executionResult = action.execution_result; // ActionExecutorからの実行結果
+        let message = "アクション受信: " + actionData.category + ":" + actionData.sub;
+        if (actionData.category === '発声' && actionData.sub === '実行') {
+          // 発声アクションの場合、ブラウザの音声合成機能を使う
+          const textToSpeak = actionData.detail.text;
+          if (textToSpeak) {
+            console.log("音声合成: " + textToSpeak);
+            const utterance = new SpeechSynthesisUtterance(textToSpeak);
+            speechSynthesis.speak(utterance);
+            message += " -> " + textToSpeak;
+          }
+        } else if (actionData.category === 'アラート' && actionData.sub === '実行') {
+          // アラートアクションの場合、アラート音を鳴らす
+          const alertSound = actionData.detail.sound;
+          console.log("アラート音鳴動: " + alertSound);
+          // TODO: 実際のアラート音再生ロジック（HTML Audio要素など）
+          message += " -> " + alertSound;
+        } else if (executionResult) {
+          message += " -> 実行結果: " + executionResult;
+        }
+        alert(message); // シンプルにalertで表示
+      });
+    }
+  } catch (error) {
+    console.error("Error polling pending actions:", error);
+  }
+}

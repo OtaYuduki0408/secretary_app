@@ -118,6 +118,7 @@ if not GEMINI_API_KEY:
     print('Warning: GEMINI_API_KEY not set. ChatSpaceModel may not work.')
 chat_space_model = ChatSpaceModel(gemini_api_key=GEMINI_API_KEY)
 calendar_manager = ScheduleManager()
+app.calendar_manager = calendar_manager # ScheduleManagerインスタンスをアプリにアタッチ
 
 QUICK_COMMANDS_FILE = os.path.join(os.path.dirname(__file__), 'quick_commands.json')
 
