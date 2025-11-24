@@ -1,5 +1,4 @@
-from flask import Blueprint, jsonify, request, render_template, current_app
-from services import custom_order_service
+from services import custom_order_service, category_service, pending_action_service
 import os
 
 # Blueprintを定義
@@ -20,6 +19,16 @@ def get_orders():
     if isinstance(orders, dict) and 'error' in orders:
         return jsonify(orders), 500
     return jsonify(orders)
+
+@order_bp.route('/api/categories', methods=['GET'])
+def get_categories():
+    """すべてのカテゴリを取得する"""
+    categories = category_service.get_all_categories()
+    if isinstance(categories, dict) and 'error' in categories:
+        return jsonify(categories), 500
+    # フロントエンドが期待する形式に変換（例: [{"name": "カテゴリ名"}] のリスト）
+    formatted_categories = [{"name": cat["name"]} for cat in categories]
+    return jsonify(formatted_categories)
 
 @order_bp.route('/api/custom_orders', methods=['POST'])
 def add_order():
@@ -54,6 +63,14 @@ def remove_order(order_id):
     if isinstance(result, dict) and 'error' in result:
         return jsonify(result), 404
     return jsonify(result)
+
+@order_bp.route('/api/pending_actions/<string:user_id>', methods=['GET'])
+def get_pending_actions_route(user_id):
+    """ユーザーの保留中のアクションを取得し、ステータスを更新する"""
+    actions = pending_action_service.get_pending_actions(user_id)
+    if isinstance(actions, dict) and 'error' in actions:
+        return jsonify(actions), 500 # エラーハンドリング
+    return jsonify(actions)
 
 # --- HTML Serving Endpoint ---
 

@@ -11,6 +11,9 @@ from flask import (
 from spotipy.oauth2 import SpotifyOAuth
 import spotipy
 from services.google_oauth import build_web_flow, get_google_redirect_uri
+from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
+import atexit
 
 # order配下のモジュール/ルートを使うためにパス追加
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'order'))
@@ -39,6 +42,8 @@ from services.ScheduleManager import ScheduleManager
 from order.models import db
 from order.custom_order_routes import custom_order_bp
 from order.command_routes import command_bp
+from order.evaluator import evaluate_triggers # 関数名を修正
+
 
 
 # ============== 基本設定 ==============
@@ -49,7 +54,20 @@ instance_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'instan
 os.makedirs(instance_path, exist_ok=True)
 app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{os.path.join(instance_path, "orders.db")}'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-db.init_app(app)
+db.init_app(app) # db.init_appはschedulerの前に実行
+
+# APSchedulerの初期化
+jobstores = {
+    'default': SQLAlchemyJobStore(url=app.config['SQLALCHEMY_DATABASE_URI'])
+}
+executors = {
+    'default': {'type': 'threadpool', 'max_workers': 20}
+}
+job_defaults = {
+    'coalesce': True,
+    'max_instances': 3
+}
+scheduler = BackgroundScheduler(jobstores=jobstores, executors=executors, job_defaults=job_defaults)
 
 # Blueprint登録
 app.register_blueprint(custom_order_bp, url_prefix='/api')
@@ -825,5 +843,24 @@ app.register_blueprint(memo_bp, url_prefix='/api/memos')
 with app.app_context():
     db.create_all()
 
+# APSchedulerのジョブをラップする関数
+def _run_job_with_app_context(func): # app_instance を引数から削除
+    # グローバルスコープにある app インスタンスに直接アクセス
+    with app.app_context(): # app がこのスコープで利用可能であることを前提
+        func()
+
+# アプリケーション終了時にスケジューラをシャットダウン
+atexit.register(lambda: scheduler.shutdown())
+
 if __name__ == '__main__':
+    # APSchedulerジョブの登録
+    scheduler.add_job(
+        id='time_trigger_evaluator',
+        func=_run_job_with_app_context, # ラッパー関数を呼び出す
+        trigger='interval',
+        minutes=1, # 1分ごとに実行
+        replace_existing=True,
+        args=[evaluate_triggers] # 実行する関数名を修正
+    )
+    scheduler.start()
     app.run(host='0.0.0.0', port=5000, debug=True, ssl_context='adhoc')
