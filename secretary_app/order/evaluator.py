@@ -1,5 +1,5 @@
 from supabase_client import supabase
-from datetime import datetime # 追加
+from datetime import datetime, timedelta # timedeltaを追加
 import json
 import pytz
 from services import pending_action_service
@@ -7,6 +7,9 @@ from services.finance_service import get_current_balance, get_monthly_expense, g
 from services.memo_service import get_all_memos
 from flask import current_app
 from math import radians, sin, cos, sqrt, atan2
+
+# タイムゾーン設定
+JST = pytz.timezone('Asia/Tokyo')
 
 # Supabaseにpending_user_actionsテーブルが存在しない場合に作成を試みる
 # この処理はアプリケーション起動時に一度だけ実行されるべきだが、
@@ -16,6 +19,69 @@ def _ensure_pending_actions_table_exists():
     # insert/selectが失敗しないことを期待するか、事前に手動で作成する
     # ここでは便宜上、テーブル名を返すだけにする
     return 'pending_user_actions'
+
+def _calculate_action_execution_time(timing_data: dict, triggered_at: datetime) -> datetime:
+    """
+    アクションの実行タイミングを計算する。
+    絶対指定が相対指定に優先する。
+    Args:
+        timing_data (dict): アクションのタイミング情報を含む辞書 (date_abs, date_rel, time_abs, time_rel)。
+        triggered_at (datetime): トリガーが発動した日時 (タイムゾーン情報を持つdatetimeオブジェクト)。
+
+    Returns:
+        datetime: 実際にアクションが実行されるべき日時。
+    """
+    execution_time = triggered_at # 基準はトリガー発動日時
+
+    # 1. 日付の指定 (絶対指定が優先)
+    date_abs = timing_data.get('date_abs')
+    date_rel_str = timing_data.get('date_rel')
+
+    if date_abs:
+        # 絶対日付が指定されている場合 (YYYY-MM-DD形式を想定)
+        try:
+            # 実行時の時刻は維持し、日付部分のみ置き換える
+            abs_date = datetime.strptime(date_abs, '%Y-%m-%d').date()
+            execution_time = execution_time.replace(year=abs_date.year, month=abs_date.month, day=abs_date.day)
+        except ValueError:
+            pass # 無効な日付形式は無視
+    elif date_rel_str:
+        # 相対日付 (+n 日) が指定されている場合
+        try:
+            days_offset = int(date_rel_str)
+            execution_time += timedelta(days=days_offset)
+        except ValueError:
+            pass # 無効な数値は無視
+
+    # 2. 時刻の指定 (絶対指定が優先)
+    time_abs = timing_data.get('time_abs')
+    time_rel_str = timing_data.get('time_rel')
+
+    if time_abs:
+        # 絶対時刻が指定されている場合 (HH:MM形式を想定)
+        try:
+            abs_time = datetime.strptime(time_abs, '%H:%M').time()
+            execution_time = execution_time.replace(hour=abs_time.hour, minute=abs_time.minute, second=0, microsecond=0)
+        except ValueError:
+            pass # 無効な時刻形式は無視
+    elif time_rel_str:
+        # 相対時刻 (+HH:MM:SS) が指定されている場合
+        try:
+            # HH:MM:SS 形式のパースを強化
+            parts = time_rel_str.split(':')
+            hours = int(parts[0]) if len(parts) > 0 else 0
+            minutes = int(parts[1]) if len(parts) > 1 else 0
+            seconds = int(parts[2]) if len(parts) > 2 else 0
+            execution_time += timedelta(hours=hours, minutes=minutes, seconds=seconds)
+        except ValueError:
+            pass # 無効な時刻形式は無視
+    
+    # タイムゾーン情報を付与 (JSTとして扱う)
+    if execution_time.tzinfo is None:
+        execution_time = JST.localize(execution_time)
+
+    return execution_time
+
 
 def _evaluate_time_trigger(trigger, now_jst, current_time_str, current_day_of_week_jp):
     """時間トリガーを評価するヘルパー関数"""
@@ -108,9 +174,9 @@ def _evaluate_calendar_trigger(order, user_id, now_jst, current_time_str, curren
 
         try:
             time_min = datetime(int(start_year), int(start_month), int(start_day), 
-                                int(start_time_val.split(':')[0]), int(start_time_val.split(':')[1]), tzinfo=jst)
+                                int(start_time_val.split(':')[0]), int(start_time_val.split(':')[1]), tzinfo=JST) # pytz.timezone('Asia/Tokyo')をJSTに変更
             time_max = datetime(int(end_year), int(end_month), int(end_day),
-                                int(end_time_val.split(':')[0]), int(end_time_val.split(':')[1]), tzinfo=jst)
+                                int(end_time_val.split(':')[0]), int(end_time_val.split(':')[1]), tzinfo=JST) # pytz.timezone('Asia/Tokyo')をJSTに変更
         except (ValueError, TypeError) as e:
             print(f"カレンダートリガーの日時解析エラー: {e}, trigger_value: {trigger_value}")
             return False
@@ -301,12 +367,14 @@ def evaluate_conditions(conditions_list, order_data, user_id, now_jst, current_t
             # ネストされたアクションのキューイング (条件が満たされた場合)
             if current_condition_result and nested_actions:
                 for action in nested_actions:
-                     pending_action_service.add_pending_action(
+                    action['scheduled_at'] = _calculate_action_execution_time(action.get('timing', {}), now_jst).isoformat()
+                    action['triggered_at'] = now_jst.isoformat()
+                    pending_action_service.add_pending_action(
                         user_id=user_id,
                         command_id=order_data.get('id'),
                         action_data=action
                     )
-                     print(f"ネストアクションをpending_user_actionsに格納: {action.get('category')}:{action.get('sub')}")
+                    print(f"ネストアクションをpending_user_actionsに格納: {action.get('category')}:{action.get('sub')} (予定時刻: {action['scheduled_at']})")
 
 
         elif condition_type == 'else':
@@ -328,12 +396,14 @@ def evaluate_conditions(conditions_list, order_data, user_id, now_jst, current_t
             # ネストされたアクションのキューイング (条件が満たされた場合)
             if current_condition_result and nested_actions:
                 for action in nested_actions:
-                     pending_action_service.add_pending_action(
+                    action['scheduled_at'] = _calculate_action_execution_time(action.get('timing', {}), now_jst).isoformat()
+                    action['triggered_at'] = now_jst.isoformat()
+                    pending_action_service.add_pending_action(
                         user_id=user_id,
                         command_id=order_data.get('id'),
                         action_data=action
                     )
-                     print(f"ネストアクションをpending_user_actionsに格納 (else): {action.get('category')}:{action.get('sub')}")
+                    print(f"ネストアクションをpending_user_actionsに格納 (else): {action.get('category')}:{action.get('sub')} (予定時刻: {action['scheduled_at']})")
 
 
         # 論理演算子の適用
@@ -373,8 +443,8 @@ def evaluate_triggers(): # appインスタンスを受け取らないように�
         return
 
     # 日本時間 (JST) を取得
-    jst = pytz.timezone('Asia/Tokyo')
-    now_jst = datetime.now(jst)
+    # pytz.timezone('Asia/Tokyo')をJSTに変更
+    now_jst = datetime.now(JST)
     current_time_str = now_jst.strftime('%H:%M')
     current_day_of_week = now_jst.strftime('%a') # 'Mon', 'Tue', ...
 
@@ -439,13 +509,14 @@ def evaluate_triggers(): # appインスタンスを受け取らないように�
                 actions_to_execute = order_data.get('actions', [])
                 
                 for action in actions_to_execute:
-                    # pending_action_service.add_pending_action を呼び出す
+                    action['scheduled_at'] = _calculate_action_execution_time(action.get('timing', {}), now_jst).isoformat()
+                    action['triggered_at'] = now_jst.isoformat()
                     pending_action_service.add_pending_action(
                         user_id=user_id,
                         command_id=command_id,
                         action_data=action
                     )
-                    print(f"アクションをpending_user_actionsに格納: {action.get('category')}:{action.get('sub')}")
+                    print(f"アクションをpending_user_actionsに格納: {action.get('category')}:{action.get('sub')} (予定時刻: {action['scheduled_at']})")
 
 # Haversine距離計算関数 (2点間の距離をメートルで計算)
 def haversine_distance(lat1, lon1, lat2, lon2):
@@ -465,7 +536,7 @@ def haversine_distance(lat1, lon1, lat2, lon2):
 def _evaluate_condition_expr(expr, user_id, now_jst, current_time_str, current_day_of_week_jp):
     """条件の 'expr' 部分を評価するヘルパー関数 (トリガー評価ロジックを流用)"""
     if not expr or not expr.get('category'):
-        return False, {} # exprがないか、カテゴリがない場合は評価できない
+        return False, {{}} # exprがないか、カテゴリがない場合は評価できない
 
     expr_category = expr.get('category')
     
@@ -477,7 +548,7 @@ def _evaluate_condition_expr(expr, user_id, now_jst, current_time_str, current_d
     }
     
     is_expr_met = False
-    evaluated_data = {} # 評価結果から得られるデータ（例: 財務値、イベントリストなど）
+    evaluated_data = {{}} # 評価結果から得られるデータ（例: 財務値、イベントリストなど）
 
     if expr_category == '時間':
         is_expr_met = _evaluate_time_trigger(dummy_order, now_jst, current_time_str, current_day_of_week_jp)
@@ -541,12 +612,14 @@ def evaluate_location_triggers(app, user_id, current_latitude, current_longitude
                         if conditions_met:
                             actions_to_execute = order_data.get('actions', [])
                             for action in actions_to_execute:
+                                action['scheduled_at'] = _calculate_action_execution_time(action.get('timing', {}), now_jst).isoformat()
+                                action['triggered_at'] = now_jst.isoformat()
                                 pending_action_service.add_pending_action(
                                     user_id=user_id,
                                     command_id=command_id,
                                     action_data=action
                                 )
-                                print(f"アクションをpending_user_actionsに格納 (場所トリガー): {action.get('category')}:{action.get('sub')}")
+                                print(f"アクションをpending_user_actionsに格納 (場所トリガー): {action.get('category')}:{action.get('sub')} (予定時刻: {action['scheduled_at']})")
                     else:
                         print(f"場所トリガー未発動: Command ID={command_id}, User ID={user_id}, Distance={distance:.2f}m (Allowed: {allowed_range}m)")
 

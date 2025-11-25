@@ -458,11 +458,6 @@ export async function pollPendingActions() {
     }
     const actions = await response.json();
     console.log("--- DEBUG: pollPendingActions received actions:", actions); // 追加
-    if (!response.ok) {
-      console.error("Failed to poll pending actions: " + response.status + " " + response.statusText);
-      return;
-    }
-    const actions = await response.json();
     if (actions && actions.length > 0) {
       console.log("RECEIVED PENDING ACTIONS:", actions);
       actions.forEach(action => {

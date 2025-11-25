@@ -42,6 +42,7 @@ from services.ScheduleManager import ScheduleManager
 from order.models import db
 from order.custom_order_routes import custom_order_bp
 from order.command_routes import command_bp
+from routes.order_routes import order_bp
 from order.evaluator import evaluate_triggers # 関数名を修正
 
 
@@ -73,6 +74,7 @@ scheduler = BackgroundScheduler(jobstores=jobstores, executors=executors, job_de
 # Blueprint登録
 app.register_blueprint(custom_order_bp, url_prefix='/api')
 app.register_blueprint(command_bp, url_prefix='/api')
+app.register_blueprint(order_bp, url_prefix='/order')
 
 from flask import Blueprint
 custom_order_pages_bp = Blueprint(
@@ -845,6 +847,25 @@ def chat_api_web():
     return jsonify(response_data)# メモAPIのBlueprint
 app.register_blueprint(memo_bp, url_prefix='/api/memos')
 
+@app.route('/api/execute_action', methods=['POST'])
+@login_required # ユーザーはアクションを実行するためにログインしている必要がある
+def api_execute_action():
+    data = request.get_json()
+    action_entry = data.get('action_entry')
+    user_id = session.get('user', {}).get('id')
+
+    if not action_entry or not user_id:
+        return jsonify({"error": "Invalid request or user not logged in"}), 400
+
+    # action_entry['action_data']内の'triggered_at'はISOフォーマット文字列なのでdatetimeオブジェクトに変換
+    triggered_at_dt = datetime.fromisoformat(action_entry['action_data']['triggered_at'])
+
+    # action_executor_serviceからexecute_actionを呼び出す
+    from services.action_executor_service import execute_action
+    result = execute_action(user_id=user_id, action_data=action_entry['action_data'])
+
+    return jsonify(result)
+
 
 # ============== DB初期化と起動 ==============
 with app.app_context():
@@ -864,10 +885,13 @@ if __name__ == '__main__':
     scheduler.add_job(
         id='time_trigger_evaluator',
         func=_run_job_with_app_context, # ラッパー関数を呼び出す
-        trigger='interval',
-        minutes=1, # 1分ごとに実行
+        trigger='cron',
+        minute='*', # 毎分実行
+        second=0, # 毎分00秒に実行
         replace_existing=True,
         args=[evaluate_triggers] # 実行する関数名を修正
     )
     scheduler.start()
+    # 起動時に一度だけ即時実行
+    _run_job_with_app_context(evaluate_triggers)
     app.run(host='0.0.0.0', port=5000, debug=True, ssl_context='adhoc')

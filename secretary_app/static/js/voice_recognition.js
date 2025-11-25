@@ -401,4 +401,61 @@ document.addEventListener('DOMContentLoaded', () => {
     } catch(e) {
         console.error("初期認識開始に失敗", e);
     }
+    
+    // 5秒ごとに保留中のアクションをポーリング
+    setInterval(pollPendingActions, 5000);
 });
+
+// ============================================================================
+// 保留中アクションのポーリング
+// ============================================================================
+
+async function pollPendingActions() {
+  const userId = document.body.dataset.userId; 
+
+  if (!userId) {
+    // ユーザーIDが取得できない場合はポーリングしない
+    return;
+  }
+
+  try {
+    const response = await fetch(`/order/api/pending_actions/${userId}`);
+    if (!response.ok) {
+      // 404 Not Foundなどはエラーとして扱わない（アクションがないだけ）
+      if (response.status !== 404) {
+          console.error("Failed to poll pending actions: " + response.status + " " + response.statusText);
+      }
+      return;
+    }
+    const actions = await response.json();
+    if (actions && actions.length > 0) {
+      console.log("RECEIVED PENDING ACTIONS:", actions);
+      for (const action_entry of actions) { // actionsをaction_entryにリネームしてループ
+        console.log("--- DEBUG: Processing action_entry:", action_entry); 
+        
+        // 新しいバックエンドエンドポイントにアクションを送信して実行させる
+        const executeResponse = await fetch('/api/execute_action', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ action_entry: action_entry }),
+        });
+        const executeResult = await executeResponse.json();
+        console.log("--- DEBUG: execute_action result:", executeResult);
+
+        if (executeResult.status === 'success' && executeResult.message) {
+            console.log("アクション実行結果:", executeResult.message);
+            speakText(executeResult.message);
+        } else if (executeResult.status === 'error') {
+            console.error("アクション実行エラー:", executeResult.message);
+            // エラーメッセージがあれば読み上げることも検討
+            // speakText("エラーが発生しました: " + executeResult.message);
+        }
+      }
+    }
+  } catch (error) {
+    console.error("Error polling pending actions:", error);
+  }
+}
+
