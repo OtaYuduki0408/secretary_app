@@ -446,12 +446,50 @@ async function pollPendingActions() {
 
         if (executeResult.status === 'success' && executeResult.message) {
             console.log("アクション実行結果:", executeResult.message);
+
+            // --- オーバーレイ表示ロジック ---
+            const overlay = document.getElementById('read-aloud-overlay');
+            const overlayTime = document.getElementById('overlay-time');
+            const overlayMessage = document.getElementById('overlay-message');
+            const category = executeResult.category;
+
+            if (overlay && category) {
+                // 1. 背景色クラスを設定
+                overlay.className = 'read-aloud-overlay'; // リセット
+                if (category === 'カレンダー') {
+                    overlay.classList.add('overlay-calendar');
+                } else if (category === '収支管理') {
+                    overlay.classList.add('overlay-finance');
+                } else if (category === 'メモ') {
+                    overlay.classList.add('overlay-memo');
+                }
+
+                // 2. 時間とメッセージを設定
+                const now = new Date();
+                overlayTime.textContent = now.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+                overlayMessage.textContent = executeResult.message;
+
+                // 3. オーバーレイを表示
+                overlay.style.display = 'flex';
+                // フェードインのために少し待ってからクラスを追加
+                setTimeout(() => overlay.classList.add('visible'), 10);
+            }
+
+            // --- 音声再生 ---
             if (executeResult.action === 'play_alert_sound') {
-                // アラート音再生アクションの場合
-                playWakeWordSound(); // ここでは既存のウェイクワード音を再利用
-                // 必要であれば、executeResult.sound_typeに応じた音を鳴らすロジックを追加
+                playWakeWordSound();
             }
             await speakText(executeResult.message); // speakTextの完了を待つ
+
+            // --- オーバーレイ非表示ロジック ---
+            if (overlay && category) {
+                overlay.classList.remove('visible');
+                // トランジションが終わるのを待ってからdisplay:noneを設定
+                setTimeout(() => {
+                    overlay.style.display = 'none';
+                }, 300); // CSSのtransition時間と合わせる
+            }
+
         } else if (executeResult.status === 'error') {
             console.error("アクション実行エラー:", executeResult.message);
             // エラーメッセージがあれば読み上げることも検討

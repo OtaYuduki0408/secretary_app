@@ -102,7 +102,7 @@ def _execute_calendar_read_aloud(user_id: str, detail_data: dict, triggered_at: 
     events = sm.list_events(user_id, time_min=start_datetime.isoformat(), time_max=end_datetime.isoformat())
 
     if not events:
-        return {"status": "success", "message": "指定期間のイベントは見つかりませんでした。"}
+        return {"status": "success", "message": "指定期間のイベントは見つかりませんでした。", "category": "カレンダー"}
 
     speech_parts = ["カレンダー情報を読み上げます。"]
 
@@ -154,7 +154,7 @@ def _execute_calendar_read_aloud(user_id: str, detail_data: dict, triggered_at: 
             
     speech_parts.append(f"以上{len(events)}件見つかりました。")
             
-    return {"status": "success", "message": "".join(speech_parts)}
+    return {"status": "success", "message": "".join(speech_parts), "category": "カレンダー"}
 
 def _execute_finance_read_aloud(user_id: str, detail_data: dict, triggered_at: datetime) -> dict:
     """
@@ -285,7 +285,7 @@ def _execute_finance_read_aloud(user_id: str, detail_data: dict, triggered_at: d
     if len(message_parts) == 1: # 最初のメッセージ「収支管理情報を読み上げます。」しかない場合
         message_parts.append("指定された収支項目は見つかりませんでした。")
 
-    return {"status": "success", "message": "".join(message_parts)}
+    return {"status": "success", "message": "".join(message_parts), "category": "収支管理"}
 
 def _execute_memo_read_aloud(user_id: str, detail_data: dict, triggered_at: datetime) -> dict:
     """
@@ -343,13 +343,13 @@ def _execute_memo_read_aloud(user_id: str, detail_data: dict, triggered_at: date
     )
 
     if not memos:
-        return {"status": "success", "message": "指定期間のメモは見つかりませんでした。"}
+        return {"status": "success", "message": "指定期間のメモは見つかりませんでした。", "category": "メモ"}
 
     speech_parts = ["メモをお知らせします。"]
     for memo in memos:
         speech_parts.append(f"タイトル、{memo.get('title', '無題')}。内容、{memo.get('content', '内容なし')}。")
     
-    return {"status": "success", "message": "".join(speech_parts)}
+    return {"status": "success", "message": "".join(speech_parts), "category": "メモ"}
 
 def _execute_email_send(user_id: str, detail_data: dict) -> dict:
     """

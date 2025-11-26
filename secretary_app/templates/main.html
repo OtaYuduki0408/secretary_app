@@ -300,6 +300,13 @@
 
 <div id="toast-stack" aria-live="polite" aria-atomic="true"></div>
  
+<div id="read-aloud-overlay" class="read-aloud-overlay" style="display: none;">
+    <div class="overlay-content">
+        <div id="overlay-time" class="overlay-time"></div>
+        <div id="overlay-message" class="overlay-message"></div>
+    </div>
+</div>
+
 <script src="{{ url_for('static', filename='js/voice_recognition.js') }}"></script>
 <script src="{{ url_for('static', filename='js/Parallax_and_Theme_rotation.js') }}" type="module"></script>
 <script src="{{ url_for('static', filename='js/calendar_toast.js') }}" defer></script>
