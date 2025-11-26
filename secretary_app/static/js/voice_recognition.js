@@ -30,6 +30,164 @@ let userInteracted = false; // ユーザーがページとインタラクトし�
 // ============================================================================
 
 /**
+ * カレンダーUIを生成するヘルパー関数
+ * @param {object} data - バックエンドから受け取ったdisplay_data
+ * @returns {HTMLElement} 生成されたDOM要素
+ */
+function createCalendarUI(data) {
+    const container = document.createElement('div');
+    container.className = 'overlay-calendar-content';
+
+    const title = document.createElement('h2');
+    title.className = 'overlay-category-title';
+    title.textContent = 'カレンダーの予定';
+    container.appendChild(title);
+
+    const dateRange = document.createElement('p');
+    dateRange.className = 'overlay-date-range';
+    const startDt = new Date(data.start_datetime);
+    const endDt = new Date(data.end_datetime);
+    dateRange.textContent = `${startDt.toLocaleDateString('ja-JP', {year: 'numeric', month: 'long', day: 'numeric'})} - ${endDt.toLocaleDateString('ja-JP', {year: 'numeric', month: 'long', day: 'numeric'})}`;
+    container.appendChild(dateRange);
+
+    if (data.events && data.events.length > 0) {
+        const ul = document.createElement('ul');
+        ul.className = 'overlay-event-list';
+        data.events.forEach(event => {
+            const li = document.createElement('li');
+            li.className = 'overlay-event-item';
+            const timeSpan = document.createElement('span');
+            timeSpan.className = 'event-time';
+            timeSpan.textContent = `${event.formatted_start_time || ''} - ${event.formatted_end_time || ''}`;
+            const summarySpan = document.createElement('span');
+            summarySpan.className = 'event-summary';
+            summarySpan.textContent = event.summary;
+            li.appendChild(timeSpan);
+            li.appendChild(summarySpan);
+            ul.appendChild(li);
+        });
+        container.appendChild(ul);
+    } else {
+        const noEvents = document.createElement('p');
+        noEvents.className = 'overlay-no-data';
+        noEvents.textContent = '予定は見つかりませんでした。';
+        container.appendChild(noEvents);
+    }
+    return container;
+}
+
+/**
+ * 収支管理UIを生成するヘルパー関数
+ * @param {object} data - バックエンドから受け取ったdisplay_data
+ * @returns {HTMLElement} 生成されたDOM要素
+ */
+function createFinanceUI(data) {
+    const container = document.createElement('div');
+    container.className = 'overlay-finance-content';
+
+    const title = document.createElement('h2');
+    title.className = 'overlay-category-title';
+    title.textContent = '収支管理';
+    container.appendChild(title);
+
+    const dateRange = document.createElement('p');
+    dateRange.className = 'overlay-date-range';
+    dateRange.textContent = data.date_range || '期間指定なし';
+    container.appendChild(dateRange);
+
+    const details = data.details;
+    if (details.item === 'total_balance' || details.item === 'monthly_expense' || details.item === 'daily_expense' || details.item === 'monthly_income') {
+        const itemValue = document.createElement('p');
+        itemValue.className = 'finance-value';
+        itemValue.textContent = `${details.value.toLocaleString()} ${details.unit}`;
+        container.appendChild(itemValue);
+        const itemLabel = document.createElement('p');
+        itemLabel.className = 'finance-label';
+        itemLabel.textContent = details.item === 'total_balance' ? '現在の所持金' :
+                                details.item === 'monthly_expense' ? '今月の支出' :
+                                details.item === 'daily_expense' ? '今日の支出' :
+                                '今月の収入';
+        container.appendChild(itemLabel);
+    } else if (details.item === 'remaining_to_target') {
+        if (details.goal_amount) {
+            const goalP = document.createElement('p');
+            goalP.className = 'finance-label';
+            goalP.textContent = `今月の目標: ${details.goal_amount.toLocaleString()} ${details.unit}`;
+            container.appendChild(goalP);
+            const remainingP = document.createElement('p');
+            remainingP.className = 'finance-value';
+            remainingP.textContent = `残り: ${details.remaining.toLocaleString()} ${details.unit}`;
+            container.appendChild(remainingP);
+        } else {
+            const messageP = document.createElement('p');
+            messageP.className = 'overlay-no-data';
+            messageP.textContent = details.message || '目標額が設定されていません。';
+            container.appendChild(messageP);
+        }
+    } else if (details.item === 'period_summary') {
+        const summary = details.summary;
+        const incomeP = document.createElement('p');
+        incomeP.className = 'finance-summary-item income';
+        incomeP.textContent = `収入: ${summary.total_income.toLocaleString()} ${summary.unit}`;
+        container.appendChild(incomeP);
+        const expenseP = document.createElement('p');
+        expenseP.className = 'finance-summary-item expense';
+        expenseP.textContent = `支出: ${summary.total_expense.toLocaleString()} ${summary.unit}`;
+        container.appendChild(expenseP);
+        const balanceP = document.createElement('p');
+        balanceP.className = 'finance-summary-item balance';
+        balanceP.textContent = `収支: ${summary.net_balance.toLocaleString()} ${summary.unit}`;
+        container.appendChild(balanceP);
+    } else {
+        const messageP = document.createElement('p');
+        messageP.className = 'overlay-no-data';
+        messageP.textContent = details.message || 'データが見つかりませんでした。';
+        container.appendChild(messageP);
+    }
+    return container;
+}
+
+/**
+ * メモUIを生成するヘルパー関数
+ * @param {object} data - バックエンドから受け取ったdisplay_data
+ * @returns {HTMLElement} 生成されたDOM要素
+ */
+function createMemoUI(data) {
+    const container = document.createElement('div');
+    container.className = 'overlay-memo-content';
+
+    const title = document.createElement('h2');
+    title.className = 'overlay-category-title';
+    title.textContent = 'メモ';
+    container.appendChild(title);
+
+    if (data.memos && data.memos.length > 0) {
+        const ul = document.createElement('ul');
+        ul.className = 'overlay-memo-list';
+        data.memos.forEach(memo => {
+            const li = document.createElement('li');
+            li.className = 'overlay-memo-item';
+            const memoTitle = document.createElement('h3');
+            memoTitle.className = 'memo-title';
+            memoTitle.textContent = memo.title || '無題';
+            const memoContent = document.createElement('p');
+            memoContent.className = 'memo-content';
+            memoContent.textContent = memo.content;
+            li.appendChild(memoTitle);
+            li.appendChild(memoContent);
+            ul.appendChild(li);
+        });
+        container.appendChild(ul);
+    } else {
+        const noMemos = document.createElement('p');
+        noMemos.className = 'overlay-no-data';
+        noMemos.textContent = 'メモは見つかりませんでした。';
+        container.appendChild(noMemos);
+    }
+    return container;
+}
+
+/**
  * 音声ファイルを再生する
  * @param {string} filename - 再生する音声ファイルのパス
  */
@@ -414,14 +572,12 @@ async function pollPendingActions() {
   const userId = document.body.dataset.userId; 
 
   if (!userId) {
-    // ユーザーIDが取得できない場合はポーリングしない
     return;
   }
 
   try {
     const response = await fetch(`/order/api/pending_actions/${userId}`);
     if (!response.ok) {
-      // 404 Not Foundなどはエラーとして扱わない（アクションがないだけ）
       if (response.status !== 404) {
           console.error("Failed to poll pending actions: " + response.status + " " + response.statusText);
       }
@@ -430,10 +586,21 @@ async function pollPendingActions() {
     const actions = await response.json();
     if (actions && actions.length > 0) {
       console.log("RECEIVED PENDING ACTIONS:", actions);
-      for (const action_entry of actions) { // actionsをaction_entryにリネームしてループ
+      
+      const overlay = document.getElementById('read-aloud-overlay');
+      const overlayTime = document.getElementById('overlay-time');
+      const overlayContent = overlay.querySelector('.overlay-content');
+
+      // 最初のタスクの前にオーバーレイを表示
+      if (overlay) {
+          overlay.style.display = 'flex';
+          setTimeout(() => overlay.classList.add('visible'), 10);
+      }
+
+      for (let i = 0; i < actions.length; i++) {
+        const action_entry = actions[i];
         console.log("--- DEBUG: Processing action_entry:", action_entry); 
         
-        // 新しいバックエンドエンドポイントにアクションを送信して実行させる
         const executeResponse = await fetch('/api/execute_action', {
             method: 'POST',
             headers: {
@@ -446,16 +613,14 @@ async function pollPendingActions() {
 
         if (executeResult.status === 'success' && executeResult.message) {
             console.log("アクション実行結果:", executeResult.message);
-
-            // --- オーバーレイ表示ロジック ---
-            const overlay = document.getElementById('read-aloud-overlay');
-            const overlayTime = document.getElementById('overlay-time');
-            const overlayMessage = document.getElementById('overlay-message');
+            
             const category = executeResult.category;
+            const displayData = executeResult.display_data;
 
-            if (overlay && category) {
+            // --- UI表示/更新ロジック ---
+            if (overlay && category && displayData) {
                 // 1. 背景色クラスを設定
-                overlay.className = 'read-aloud-overlay'; // リセット
+                overlay.className = 'read-aloud-overlay visible'; // visibleは維持
                 if (category === 'カレンダー') {
                     overlay.classList.add('overlay-calendar');
                 } else if (category === '収支管理') {
@@ -464,37 +629,44 @@ async function pollPendingActions() {
                     overlay.classList.add('overlay-memo');
                 }
 
-                // 2. 時間とメッセージを設定
-                const now = new Date();
-                overlayTime.textContent = now.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
-                overlayMessage.textContent = executeResult.message;
-
-                // 3. オーバーレイを表示
-                overlay.style.display = 'flex';
-                // フェードインのために少し待ってからクラスを追加
-                setTimeout(() => overlay.classList.add('visible'), 10);
+                // 2. 時間とメッセージコンテンツを生成
+                overlayContent.innerHTML = ''; 
+                overlayTime.textContent = new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+                overlayContent.appendChild(overlayTime);
+                
+                let detailedContent;
+                if (category === 'カレンダー') {
+                    detailedContent = createCalendarUI(displayData);
+                } else if (category === '収支管理') {
+                    detailedContent = createFinanceUI(displayData);
+                } else if (category === 'メモ') {
+                    detailedContent = createMemoUI(displayData);
+                } else {
+                    const messageElement = document.createElement('div');
+                    messageElement.className = 'overlay-message';
+                    messageElement.textContent = executeResult.message;
+                    detailedContent = messageElement;
+                }
+                overlayContent.appendChild(detailedContent);
             }
 
             // --- 音声再生 ---
             if (executeResult.action === 'play_alert_sound') {
                 playWakeWordSound();
             }
-            await speakText(executeResult.message); // speakTextの完了を待つ
-
-            // --- オーバーレイ非表示ロジック ---
-            if (overlay && category) {
-                overlay.classList.remove('visible');
-                // トランジションが終わるのを待ってからdisplay:noneを設定
-                setTimeout(() => {
-                    overlay.style.display = 'none';
-                }, 300); // CSSのtransition時間と合わせる
-            }
-
+            await speakText(executeResult.message);
         } else if (executeResult.status === 'error') {
             console.error("アクション実行エラー:", executeResult.message);
-            // エラーメッセージがあれば読み上げることも検討
-            // await speakText("エラーが発生しました: " + executeResult.message);
         }
+      }
+
+      // すべてのアクションが完了した後にオーバーレイを非表示にする
+      if (overlay) {
+          overlay.classList.remove('visible');
+          setTimeout(() => {
+              overlay.style.display = 'none';
+              overlayContent.innerHTML = '';
+          }, 300); // CSSのtransition時間
       }
     }
   } catch (error) {

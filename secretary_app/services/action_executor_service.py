@@ -102,7 +102,16 @@ def _execute_calendar_read_aloud(user_id: str, detail_data: dict, triggered_at: 
     events = sm.list_events(user_id, time_min=start_datetime.isoformat(), time_max=end_datetime.isoformat())
 
     if not events:
-        return {"status": "success", "message": "指定期間のイベントは見つかりませんでした。", "category": "カレンダー"}
+        return {
+            "status": "success",
+            "message": "指定期間のイベントは見つかりませんでした。",
+            "category": "カレンダー",
+            "display_data": {
+                "start_datetime": start_datetime.isoformat(), # 検索範囲の開始日時
+                "end_datetime": end_datetime.isoformat(),   # 検索範囲の終了日時
+                "events": []
+            }
+        }
 
     speech_parts = ["カレンダー情報を読み上げます。"]
 
@@ -154,7 +163,31 @@ def _execute_calendar_read_aloud(user_id: str, detail_data: dict, triggered_at: 
             
     speech_parts.append(f"以上{len(events)}件見つかりました。")
             
-    return {"status": "success", "message": "".join(speech_parts), "category": "カレンダー"}
+    # フロントエンドで表示しやすいように整形したイベント情報も渡す
+    display_events = []
+    for event in events:
+        summary = event.get('summary', 'タイトルなし')
+        event_start_iso = event.get('start', {}).get('dateTime', event.get('start', {}).get('date'))
+        event_end_iso = event.get('end', {}).get('dateTime', event.get('end', {}).get('date'))
+        
+        display_events.append({
+            "summary": summary,
+            "start_time_iso": event_start_iso,
+            "end_time_iso": event_end_iso,
+            "formatted_start_time": _format_event_time(event_start_iso),
+            "formatted_end_time": _format_event_time(event_end_iso),
+        })
+
+    return {
+        "status": "success",
+        "message": "".join(speech_parts),
+        "category": "カレンダー",
+        "display_data": {
+            "start_datetime": start_datetime.isoformat(),
+            "end_datetime": end_datetime.isoformat(),
+            "events": display_events
+        }
+    }
 
 def _execute_finance_read_aloud(user_id: str, detail_data: dict, triggered_at: datetime) -> dict:
     """
@@ -207,6 +240,7 @@ def _execute_finance_read_aloud(user_id: str, detail_data: dict, triggered_at: d
 
 
     message_parts = ["収支管理情報を読み上げます。"]
+    finance_display_data = {"type": "summary", "date_range": "", "details": {}}
     
     # 日付範囲の文字列を作成
     date_range_str = ""
@@ -218,18 +252,23 @@ def _execute_finance_read_aloud(user_id: str, detail_data: dict, triggered_at: d
     else:
         # 期間指定がない場合、今日の日付を使用
         date_range_str = current_dt_jst.strftime('%Y年%m月%d日')
+    
+    finance_display_data["date_range"] = date_range_str
 
     # 期間指定がない場合のシンプルな読み上げ
     if not (start_datetime and end_datetime):
         if item == 'total_balance':
             balance = get_current_balance(user_id)
             message_parts.append(f"現在の所持金は{balance}円です。")
+            finance_display_data["details"] = {"item": "total_balance", "value": balance, "unit": "円"}
         elif item == 'monthly_expense':
             expense = get_monthly_expense(user_id)
             message_parts.append(f"今月の合計支出は{expense}円です。")
+            finance_display_data["details"] = {"item": "monthly_expense", "value": expense, "unit": "円"}
         elif item == 'daily_expense':
             expense = get_daily_expense(user_id)
             message_parts.append(f"今日の合計支出は{expense}円です。")
+            finance_display_data["details"] = {"item": "daily_expense", "value": expense, "unit": "円"}
         elif item == 'monthly_income':
             all_records = get_all_finance_records(user_id)
             current_month_str = current_dt_jst.strftime('%Y-%m')
@@ -238,6 +277,7 @@ def _execute_finance_read_aloud(user_id: str, detail_data: dict, triggered_at: d
                 if r.get('type') == 'income' and datetime.fromisoformat(r['date']).strftime('%Y-%m') == current_month_str
             )
             message_parts.append(f"今月の合計収入は{monthly_income}円です。")
+            finance_display_data["details"] = {"item": "monthly_income", "value": monthly_income, "unit": "円"}
         elif item == 'remaining_to_target':
             goal = get_monthly_goal(user_id)
             if goal and goal.get('goal_amount'):
@@ -245,8 +285,10 @@ def _execute_finance_read_aloud(user_id: str, detail_data: dict, triggered_at: d
                 current_expense = get_monthly_expense(user_id)
                 remaining = goal_amount - current_expense
                 message_parts.append(f"今月の目標額{goal_amount}円に対し、残り{remaining}円使えます。")
+                finance_display_data["details"] = {"item": "remaining_to_target", "goal_amount": goal_amount, "current_expense": current_expense, "remaining": remaining, "unit": "円"}
             else:
                 message_parts.append("今月の目標額が設定されていません。")
+                finance_display_data["details"] = {"item": "remaining_to_target", "message": "目標額未設定"}
         # TODO: monthly_expense_no_necessities, daily_expense_no_necessities もここに追加
     else:
         # 期間指定がある場合
@@ -267,9 +309,20 @@ def _execute_finance_read_aloud(user_id: str, detail_data: dict, triggered_at: d
 
         if not filtered_records:
             message_parts.append(f"{date_range_str}の収支は見つかりませんでした。")
+            finance_display_data["details"] = {"message": "該当記録なし"}
         else:
             total_income = sum(r.get('amount', 0) for r in filtered_records if r.get('type') == 'income')
             total_expense = sum(r.get('amount', 0) for r in filtered_records if r.get('type') == 'expense')
+            net_balance = total_income - total_expense
+
+            finance_summary = {
+                "total_income": total_income,
+                "total_expense": total_expense,
+                "net_balance": net_balance,
+                "unit": "円",
+                "records": filtered_records # 詳細な記録もUIで表示するために含める
+            }
+            finance_display_data["details"] = {"item": "period_summary", "summary": finance_summary}
             
             if fmt == 'individual':
                 message_parts.append(f"{date_range_str}の合計収入は{total_income}円、合計支出は{total_expense}円です。差し引き{total_income - total_expense}円です。")
@@ -284,8 +337,9 @@ def _execute_finance_read_aloud(user_id: str, detail_data: dict, triggered_at: d
 
     if len(message_parts) == 1: # 最初のメッセージ「収支管理情報を読み上げます。」しかない場合
         message_parts.append("指定された収支項目は見つかりませんでした。")
+        finance_display_data["details"] = {"message": "指定項目なし"}
 
-    return {"status": "success", "message": "".join(message_parts), "category": "収支管理"}
+    return {"status": "success", "message": "".join(message_parts), "category": "収支管理", "display_data": finance_display_data}
 
 def _execute_memo_read_aloud(user_id: str, detail_data: dict, triggered_at: datetime) -> dict:
     """
@@ -343,13 +397,31 @@ def _execute_memo_read_aloud(user_id: str, detail_data: dict, triggered_at: date
     )
 
     if not memos:
-        return {"status": "success", "message": "指定期間のメモは見つかりませんでした。", "category": "メモ"}
+        return {
+            "status": "success",
+            "message": "指定期間のメモは見つかりませんでした。",
+            "category": "メモ",
+            "display_data": {
+                "start_date_iso": start_date_iso, # 検索範囲の開始日時
+                "end_date_iso": end_date_iso,     # 検索範囲の終了日時
+                "memos": []
+            }
+        }
 
     speech_parts = ["メモをお知らせします。"]
     for memo in memos:
         speech_parts.append(f"タイトル、{memo.get('title', '無題')}。内容、{memo.get('content', '内容なし')}。")
     
-    return {"status": "success", "message": "".join(speech_parts), "category": "メモ"}
+    return {
+        "status": "success",
+        "message": "".join(speech_parts),
+        "category": "メモ",
+        "display_data": {
+            "start_date_iso": start_date_iso,
+            "end_date_iso": end_date_iso,
+            "memos": memos # 取得したメモリストをそのまま渡す
+        }
+    }
 
 def _execute_email_send(user_id: str, detail_data: dict) -> dict:
     """

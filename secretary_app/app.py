@@ -881,15 +881,18 @@ def _run_job_with_app_context(func): # app_instance を引数から削除
 atexit.register(lambda: scheduler.shutdown())
 
 if __name__ == '__main__':
-    # APSchedulerジョブの登録
-    scheduler.add_job(
-        id='time_trigger_evaluator',
-        func=_run_job_with_app_context, # ラッパー関数を呼び出す
-        trigger='cron',
-        minute='*', # 毎分実行
-        second=0, # 毎分00秒に実行
-        replace_existing=True,
-        args=[evaluate_triggers] # 実行する関数名を修正
-    )
-    scheduler.start()
+    # Werkzeugのリローダーによる重複起動を防ぐため、メインプロセスでのみスケジューラを起動
+    if os.environ.get('WERKZEUG_RUN_MAIN') != 'true':
+        # APSchedulerジョブの登録
+        scheduler.add_job(
+            id='time_trigger_evaluator',
+            func=_run_job_with_app_context, # ラッパー関数を呼び出す
+            trigger='cron',
+            minute='*', # 毎分実行
+            second=0, # 毎分00秒に実行
+            replace_existing=True,
+            args=[evaluate_triggers] # 実行する関数名を修正
+        )
+        scheduler.start()
+        
     app.run(host='0.0.0.0', port=5000, debug=True, ssl_context='adhoc')
