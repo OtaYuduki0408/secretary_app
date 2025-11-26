@@ -68,10 +68,21 @@ def remove_order(order_id):
 @order_bp.route('/api/pending_actions/<string:user_id>', methods=['GET'])
 def get_pending_actions_route(user_id):
     """ユーザーの保留中のアクションを取得し、ステータスを更新する"""
-    actions = pending_action_service.get_pending_actions(user_id)
-    if isinstance(actions, dict) and 'error' in actions:
-        return jsonify(actions), 500 # エラーハンドリング
-    return jsonify(actions)
+    try:
+        actions = pending_action_service.get_pending_actions(user_id)
+        if isinstance(actions, dict) and 'error' in actions:
+            return jsonify(actions), 500 # エラーハンドリング
+        if not actions:
+            # アクションがない場合は、空のリストと204 No Contentを返す
+            return jsonify([]), 204
+        return jsonify(actions)
+    except Exception as e:
+        # 予期せぬ例外をキャッチし、ログに出力
+        import traceback
+        print(f"Error in get_pending_actions_route for user_id {user_id}: {e}")
+        print(traceback.format_exc())
+        # フロントエンドにはJSONでエラーを返す
+        return jsonify({"error": "An unexpected error occurred on the server."}), 500
 
 # --- HTML Serving Endpoint ---
 

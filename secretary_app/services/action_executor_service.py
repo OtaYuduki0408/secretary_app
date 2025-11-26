@@ -112,7 +112,7 @@ def _execute_calendar_read_aloud(user_id: str, detail_data: dict, triggered_at: 
         date_str = start_datetime.strftime('%Y年%m月%d日')
         speech_parts.append(f"{date_str}に")
     # 期間が1ヶ月全体の場合 (1日から月末まで)
-    elif start_datetime.day == 1 and end_datetime.day == (start_datetime + timedelta(days=32)).replace(day=1) - timedelta(days=1)).day:
+    elif start_datetime.day == 1 and end_datetime.day == ((start_datetime + timedelta(days=32)).replace(day=1) - timedelta(days=1)).day:
         date_str = start_datetime.strftime('%Y年%m月')
         speech_parts.append(f"{date_str}の")
     else:
