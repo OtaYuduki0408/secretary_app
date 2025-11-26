@@ -43,23 +43,36 @@ function playSound(filename) {
 }
 
 /**
- * TTSでテキストを読み上げる
+ * TTSでテキストを読み上げる (Promiseを返すように変更)
  * @param {string} text - 読み上げるテキスト
+ * @returns {Promise<void>} 発話が完了したら解決するPromise
  */
 function speakText(text) {
-    if (!userInteracted) {
-        console.warn("ユーザーインタラクションがないため、TTSをスキップしました。");
-        return;
-    }
-    if (speechSynth && speechUtterance) {
-        // ★追加: シングルクォーテーションを削除
-        const cleanedText = text.replace(/'/g, ''); 
-        speechSynth.cancel(); // 以前の発話を中断
-        speechUtterance.text = cleanedText; // 修正後のテキストを設定
-        speechSynth.speak(speechUtterance);
-    } else {
-        console.warn("TTS機能が利用できません。");
-    }
+    return new Promise((resolve, reject) => {
+        if (!userInteracted) {
+            console.warn("ユーザーインタラクションがないため、TTSをスキップしました。");
+            resolve();
+            return;
+        }
+        if (speechSynth && speechUtterance) {
+            const cleanedText = text.replace(/'/g, ''); 
+            speechSynth.cancel(); // 以前の発話を中断
+            speechUtterance.text = cleanedText; // 修正後のテキストを設定
+            
+            speechUtterance.onend = () => {
+                resolve();
+            };
+            speechUtterance.onerror = (event) => {
+                console.error('TTSエラー:', event.error);
+                reject(event.error);
+            };
+
+            speechSynth.speak(speechUtterance);
+        } else {
+            console.warn("TTS機能が利用できません。");
+            resolve();
+        }
+    });
 }
 
 /**
@@ -446,11 +459,16 @@ async function pollPendingActions() {
 
         if (executeResult.status === 'success' && executeResult.message) {
             console.log("アクション実行結果:", executeResult.message);
-            speakText(executeResult.message);
+            if (executeResult.action === 'play_alert_sound') {
+                // アラート音再生アクションの場合
+                playWakeWordSound(); // ここでは既存のウェイクワード音を再利用
+                // 必要であれば、executeResult.sound_typeに応じた音を鳴らすロジックを追加
+            }
+            await speakText(executeResult.message); // speakTextの完了を待つ
         } else if (executeResult.status === 'error') {
             console.error("アクション実行エラー:", executeResult.message);
             // エラーメッセージがあれば読み上げることも検討
-            // speakText("エラーが発生しました: " + executeResult.message);
+            // await speakText("エラーが発生しました: " + executeResult.message);
         }
       }
     }
