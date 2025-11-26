@@ -505,18 +505,21 @@ def evaluate_triggers(): # appインスタンスを受け取らないように�
             conditions_met = evaluate_conditions(conditions_list, order_data, user_id, now_jst, current_time_str, current_day_of_week_jp, current_trigger_data)
 
             if conditions_met:
-                # アクションをpending_user_actionsに格納
-                actions_to_execute = order_data.get('actions', [])
-                
-                for action in actions_to_execute:
-                    action['scheduled_at'] = _calculate_action_execution_time(action.get('timing', {}), now_jst).isoformat()
-                    action['triggered_at'] = now_jst.isoformat()
-                    pending_action_service.add_pending_action(
-                        user_id=user_id,
-                        command_id=command_id,
-                        action_data=action
-                    )
-                    print(f"アクションをpending_user_actionsに格納: {action.get('category')}:{action.get('sub')} (予定時刻: {action['scheduled_at']})")
+                # 条件リストが存在しない場合のみ、トップレベルのアクションを処理する
+                # 条件リストが存在する場合、アクションの処理は evaluate_conditions 内で行われる
+                if not conditions_list:
+                    # アクションをpending_user_actionsに格納
+                    actions_to_execute = order_data.get('actions', [])
+                    
+                    for action in actions_to_execute:
+                        action['scheduled_at'] = _calculate_action_execution_time(action.get('timing', {}), now_jst).isoformat()
+                        action['triggered_at'] = now_jst.isoformat()
+                        pending_action_service.add_pending_action(
+                            user_id=user_id,
+                            command_id=command_id,
+                            action_data=action
+                        )
+                        print(f"アクションをpending_user_actionsに格納: {action.get('category')}:{action.get('sub')} (予定時刻: {action['scheduled_at']})")
 
 # Haversine距離計算関数 (2点間の距離をメートルで計算)
 def haversine_distance(lat1, lon1, lat2, lon2):

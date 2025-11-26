@@ -34,10 +34,6 @@ let userInteracted = false; // ユーザーがページとインタラクトし�
  * @param {string} filename - 再生する音声ファイルのパス
  */
 function playSound(filename) {
-    if (!userInteracted) {
-        console.warn("ユーザーインタラクションがないため、音声再生をスキップしました。");
-        return;
-    }
     const audio = new Audio(filename);
     audio.play().catch(e => console.error("音声再生エラー:", e));
 }
@@ -49,11 +45,6 @@ function playSound(filename) {
  */
 function speakText(text) {
     return new Promise((resolve, reject) => {
-        if (!userInteracted) {
-            console.warn("ユーザーインタラクションがないため、TTSをスキップしました。");
-            resolve();
-            return;
-        }
         if (speechSynth && speechUtterance) {
             const cleanedText = text.replace(/'/g, ''); 
             speechSynth.cancel(); // 以前の発話を中断
@@ -79,10 +70,6 @@ function speakText(text) {
  * アラート音を鳴らす (ウェイクワード検出時)
  */
 function playWakeWordSound() {
-    if (!userInteracted) {
-        console.warn("ユーザーインタラクションがないため、アラート音再生をスキップしました。");
-        return;
-    }
     try {
         const audioContext = new (window.AudioContext || window.webkitAudioContext)();
         // AudioContextがsuspended状態であればresumeする

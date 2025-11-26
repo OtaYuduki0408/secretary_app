@@ -892,6 +892,4 @@ if __name__ == '__main__':
         args=[evaluate_triggers] # 実行する関数名を修正
     )
     scheduler.start()
-    # 起動時に一度だけ即時実行
-    _run_job_with_app_context(evaluate_triggers)
     app.run(host='0.0.0.0', port=5000, debug=True, ssl_context='adhoc')
