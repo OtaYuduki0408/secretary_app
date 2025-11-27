@@ -1,6 +1,6 @@
 import { addConditionBlock, addAction } from './block_operations.js';
 import { populateSelect, updateSubOptions } from './ui_helpers.js';
-import { createTriggerUI } from './trigger_ui.js';
+import { createTriggerUI, saveAddressToDB } from './trigger_ui.js';
 import { createActionUI } from './action_ui.js'; // createActionUI も必要
 import { TRIGGER_CATEGORIES, ACTION_CATEGORIES } from './constants.js';
 
@@ -278,6 +278,11 @@ export async function registerCommand(){
       triggerValue.latitude = triggerContainer.querySelector("#trigger_value_latitude")?.value;
       triggerValue.longitude = triggerContainer.querySelector("#trigger_value_longitude")?.value;
       triggerValue.range = triggerContainer.querySelector("#trigger_value_range")?.value;
+
+      // 住所が入力されている場合、DBに保存
+      if (triggerValue.address) {
+        await saveAddressToDB(triggerValue.address);
+      }
       break;
     case "カレンダー":
       if (triggerSub === "入力があったら") {

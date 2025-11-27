@@ -18,6 +18,7 @@ export function createTriggerUI(prefix = '', initialValue = {}) {
         triggerValueContainer.innerHTML = `
           <label for="${prefix}trigger_value_address">住所</label>
           <input type="text" id="${prefix}trigger_value_address" class="trigger-input" placeholder="住所を入力してください" required value="${initialValue.address || ''}">
+          <ul id="${prefix}past_addresses_list" class="past-addresses-list" style="display: none;"></ul>
           <div style="display: flex; gap: 10px; margin-top: 10px;">
             <button type="button" id="${prefix}get_coords_btn" class="co-btn ghost" style="flex: 1;">住所から緯度経度を取得</button>
             <button type="button" id="${prefix}get_current_location_btn" class="co-btn ghost" style="flex: 1;">現在地を取得</button>
@@ -36,6 +37,60 @@ export function createTriggerUI(prefix = '', initialValue = {}) {
         // Googleマップとマーカーのインスタンスを保持する変数
         let map = null;
         let marker = null;
+
+        const addressInput = document.getElementById(`${prefix}trigger_value_address`);
+        const pastAddressesList = document.getElementById(`${prefix}past_addresses_list`);
+
+        const fetchPastAddresses = async () => {
+          try {
+            const response = await fetch('/order/api/past_addresses');
+            if (!response.ok) {
+              throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            const addresses = await response.json();
+            pastAddressesList.innerHTML = ''; // リストをクリア
+            if (addresses.length > 0) {
+              addresses.forEach(addr => {
+                const li = document.createElement('li');
+                li.textContent = addr;
+                li.addEventListener('click', () => {
+                  addressInput.value = addr;
+                  pastAddressesList.style.display = 'none'; // 選択したらリストを隠す
+                });
+                pastAddressesList.appendChild(li);
+              });
+              pastAddressesList.style.display = 'block'; // リストを表示
+            } else {
+              pastAddressesList.style.display = 'none'; // 住所がない場合は表示しない
+            }
+          } catch (error) {
+            console.error("過去の住所の取得に失敗しました:", error);
+            pastAddressesList.style.display = 'none';
+          }
+        };
+
+        addressInput.addEventListener('focus', fetchPastAddresses);
+        addressInput.addEventListener('input', () => {
+          if (addressInput.value === '') {
+            pastAddressesList.style.display = 'block'; // 入力がない場合は全履歴を表示
+          } else {
+            // 入力に基づいてリストをフィルタリングするロジック（オプション）
+            const filterText = addressInput.value.toLowerCase();
+            Array.from(pastAddressesList.children).forEach(li => {
+              if (li.textContent.toLowerCase().includes(filterText)) {
+                li.style.display = 'list-item';
+              } else {
+                li.style.display = 'none';
+              }
+            });
+            pastAddressesList.style.display = 'block';
+          }
+        });
+        document.addEventListener('click', (event) => {
+          if (!addressInput.contains(event.target) && !pastAddressesList.contains(event.target)) {
+            pastAddressesList.style.display = 'none';
+          }
+        });
 
         const updateMap = async (lat, lng) => {
           const mapElement = document.getElementById(`${prefix}map`);
@@ -91,6 +146,8 @@ export function createTriggerUI(prefix = '', initialValue = {}) {
               locationMessage.textContent = "緯度経度を正常に取得しました。";
               locationErrorMessage.style.display = 'none';
               updateMap(lat, lng);
+              // 住所が正常にジオコーディングされた場合、過去の住所として保存
+              await saveAddressToDB(address);
             } else {
               document.getElementById(`${prefix}trigger_value_latitude`).value = '';
               document.getElementById(`${prefix}trigger_value_longitude`).value = '';
@@ -130,6 +187,8 @@ export function createTriggerUI(prefix = '', initialValue = {}) {
                     const addressResult = await reverseGeocodeCoordinates(lat, lng);
                     if (addressResult.type === 'success') {
                         document.getElementById(`${prefix}trigger_value_address`).value = addressResult.address;
+                        // 現在地から住所が特定できた場合、過去の住所として保存
+                        await saveAddressToDB(addressResult.address); // 追加
                     } else {
                         locationMessage.textContent = "現在地は取得しましたが、住所の特定に失敗しました。";
                     }
@@ -753,6 +812,34 @@ export function createTriggerUI(prefix = '', initialValue = {}) {
     }
   } else {
     triggerValueContainer.innerHTML = `<input type="text" id="${prefix}trigger_value" placeholder="${defaultPlaceholder}" value="${initialValue.value || ''}">`;
+  }
+}
+
+export async function saveAddressToDB(address) {
+  if (!address || address.trim() === '') {
+    console.warn("保存する住所が空です。");
+    return false;
+  }
+  try {
+    const response = await fetch('/order/api/past_addresses', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ address: address }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      console.error("住所の保存に失敗しました:", errorData.error);
+      return false;
+    }
+
+    console.log("住所が正常に保存されました。");
+    return true;
+  } catch (error) {
+    console.error("住所の保存中にエラーが発生しました:", error);
+    return false;
   }
 }
 

@@ -1,5 +1,5 @@
-from flask import Blueprint, request, jsonify, render_template
-from services import custom_order_service, category_service, pending_action_service
+from flask import Blueprint, request, jsonify, render_template, session
+from services import custom_order_service, category_service, pending_action_service, address_service
 import os
 
 # Blueprintを定義
@@ -83,6 +83,35 @@ def get_pending_actions_route(user_id):
         print(traceback.format_exc())
         # フロントエンドにはJSONでエラーを返す
         return jsonify({"error": "An unexpected error occurred on the server."}), 500
+
+@order_bp.route('/api/past_addresses', methods=['GET'])
+def get_past_addresses_api():
+    """ユーザーの過去の住所を新しい順に取得する"""
+    user_id = session.get('user', {}).get('id')
+    if not user_id:
+        return jsonify({"error": "User not authenticated"}), 401
+    
+    addresses = address_service.get_past_addresses(user_id)
+    return jsonify(addresses)
+
+@order_bp.route('/api/past_addresses', methods=['POST'])
+def save_past_address_api():
+    """過去の住所を保存する"""
+    user_id = session.get('user', {}).get('id')
+    if not user_id:
+        return jsonify({"error": "User not authenticated"}), 401
+    
+    data = request.get_json()
+    address = data.get('address')
+    
+    if not address or not address.strip():
+        return jsonify({"error": "Address is required"}), 400
+        
+    success = address_service.add_past_address(user_id, address)
+    if success:
+        return jsonify({"message": "Address saved successfully"}), 201
+    else:
+        return jsonify({"error": "Failed to save address"}), 500
 
 # --- HTML Serving Endpoint ---
 
