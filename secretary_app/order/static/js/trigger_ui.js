@@ -33,45 +33,42 @@ export function createTriggerUI(prefix = '', initialValue = {}) {
           <div id="${prefix}location_error_message" style="color: red; display: none;"></div>
           <div id="${prefix}map" style="height: 300px; margin-top: 10px;"></div>
         `;
-        // mapとmarkerのインスタンスを保持する変数
+        // Googleマップとマーカーのインスタンスを保持する変数
         let map = null;
         let marker = null;
 
-        // 既存の地図インスタンスがあれば破棄
-        const existingMapElement = document.getElementById(`${prefix}map`);
-        if (existingMapElement && existingMapElement._leaflet_id) {
-            existingMapElement._leaflet_id = null; // Leafletの内部IDをクリア
-            // Leafletのmapインスタンスを直接破棄
-            if (window[`${prefix}leafletMap`]) {
-                window[`${prefix}leafletMap`].remove();
-                window[`${prefix}leafletMap`] = null;
-            }
-        }
-
-        const updateMap = (lat, lng) => {
-          if (map === null) {
-            map = L.map(`${prefix}map`).setView([lat, lng], 13);
-            window[`${prefix}leafletMap`] = map; // グローバルに保存して後で参照できるようにする
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-              attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-            }).addTo(map);
-            marker = L.marker([lat, lng], {draggable: true}).addTo(map);
-
-            marker.on('dragend', function(event) {
-              const newLatLng = marker.getLatLng();
-              document.getElementById(`${prefix}trigger_value_latitude`).value = newLatLng.lat.toFixed(6);
-              document.getElementById(`${prefix}trigger_value_longitude`).value = newLatLng.lng.toFixed(6);
-              // ドラッグ後に住所も更新
-              reverseGeocodeAndUpdateAddress(newLatLng.lat, newLatLng.lng);
+        const updateMap = async (lat, lng) => {
+          const mapElement = document.getElementById(`${prefix}map`);
+          if (mapElement && !mapElement.__gm_id) { // Google Mapがまだ初期化されていない場合
+            const { Map, Marker } = await google.maps.importLibrary("maps"); 
+            const initialLatLng = { lat: lat, lng: lng };
+            map = new Map(mapElement, {
+              center: initialLatLng,
+              zoom: 13,
             });
-          } else {
-            map.setView([lat, lng], 13);
-            marker.setLatLng([lat, lng]);
+            mapElement.__gm_id = true; // Google Mapが初期化されたことを示すフラグ
+
+            marker = new google.maps.Marker({
+              position: initialLatLng,
+              map: map,
+              draggable: true,
+            });
+
+            google.maps.event.addListener(marker, 'dragend', function() {
+              const newLatLng = marker.getPosition();
+              document.getElementById(`${prefix}trigger_value_latitude`).value = newLatLng.lat().toFixed(6);
+              document.getElementById(`${prefix}trigger_value_longitude`).value = newLatLng.lng().toFixed(6);
+              // ドラッグ後に住所も更新
+              reverseGeocodeAndUpdateAddress(newLatLng.lat(), newLatLng.lng());
+            });
+          } else if (map) {
+            map.setCenter({ lat: lat, lng: lng });
+            marker.setPosition({ lat: lat, lng: lng });
           }
         };
 
         const reverseGeocodeAndUpdateAddress = async (lat, lng) => {
-            const result = await reverseGeocodeCoordinates(lat, lng);
+            const result = await reverseGeocodeCoordinates(lat, lng, window.gcp_api_key);
             if (result.type === 'success') {
                 document.getElementById(`${prefix}trigger_value_address`).value = result.address;
             }
@@ -86,7 +83,7 @@ export function createTriggerUI(prefix = '', initialValue = {}) {
           if (address && address.trim() !== '') {
             locationMessage.textContent = "緯度経度を取得中...";
             locationErrorMessage.style.display = 'none';
-            const result = await geocodeAddress(address);
+            const result = await geocodeAddress(address, window.gcp_api_key);
             if (result && result.type === "success") {
               const { lat, lng } = result;
               document.getElementById(`${prefix}trigger_value_latitude`).value = lat;
@@ -762,3 +759,5 @@ export function createTriggerUI(prefix = '', initialValue = {}) {
 export function updateTriggerInputFields() {
   createTriggerUI('');
 }
+
+

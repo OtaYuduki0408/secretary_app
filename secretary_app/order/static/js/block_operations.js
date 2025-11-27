@@ -1,6 +1,7 @@
 import { populateSelect, updateSubOptions, updateActionSummary, updateConditionSummary } from './ui_helpers.js';
 import { createActionUI } from './action_ui.js';
 import { createTriggerUI } from './trigger_ui.js';
+
 import { TRIGGER_CATEGORIES, ACTION_CATEGORIES } from './constants.js';
 
 export function addConditionBlock(anchorElement, data={}) {

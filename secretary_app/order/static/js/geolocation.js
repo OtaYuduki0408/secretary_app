@@ -1,114 +1,65 @@
-export async function geocodeAddress(address) {
+export async function geocodeAddress(address, apiKey) {
   console.log("[DEBUG] geocodeAddress started. Address:", address);
-  const GeospatialUrl = "https://msearch.gsi.go.jp/address-search/AddressSearch?q=";
-  const requestUrl = GeospatialUrl + encodeURIComponent(address) + "&json=true";
+  const requestUrl = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=${apiKey}`;
   console.log("[DEBUG] Fetching URL:", requestUrl);
 
   try {
     const response = await fetch(requestUrl);
     console.log("[DEBUG] Received response. Status:", response.status, "Ok:", response.ok);
 
-    if (!response.ok) { // APIからのHTTPエラーレスポンス（504など）
-      const errorText = await response.text(); // エラーレスポンスのテキストも取得
+    if (!response.ok) {
+      const errorText = await response.text();
       console.error(`[DEBUG] API returned non-OK status: ${response.status}. Response text:`, errorText);
       return { type: "api_error", status: response.status, errorText: errorText };
     }
 
-    const responseText = await response.text();
-    console.log("[DEBUG] Raw response text:", responseText);
+    const data = await response.json();
+    console.log("[DEBUG] Parsed JSON data:", data);
 
-    // JSONパースを試みる
-    let data;
-    try {
-      data = JSON.parse(responseText);
-      console.log("[DEBUG] Parsed JSON data:", data);
-    } catch (jsonError) {
-      console.error("[DEBUG] JSON parsing failed, but API status was OK. Response text might not be JSON:", jsonError);
-      return { type: "malformed_response", error: jsonError, responseText: responseText };
-    }
-
-    if (data && data.length > 0 && data[0].geometry && data[0].geometry.coordinates) {
-      const lng = data[0].geometry.coordinates[0];
-      const lat = data[0].geometry.coordinates[1];
+    if (data.status === 'OK' && data.results.length > 0) {
+      const location = data.results[0].geometry.location;
+      const lat = location.lat;
+      const lng = location.lng;
       console.log("[DEBUG] Geocoding successful. Lat:", lat, "Lng:", lng);
-      return { type: "success", lat: lat, lng: lng, display_name: address };
+      return { type: "success", lat: lat, lng: lng, display_name: data.results[0].formatted_address };
     } else {
-      console.log("[DEBUG] Geocoding failed. No coordinates found in response.");
-      return { type: "no_coordinates" };
+      console.log("[DEBUG] Geocoding failed. Status:", data.status, "Error message:", data.error_message);
+      return { type: "no_coordinates", status: data.status, error_message: data.error_message };
     }
-  } catch (error) { // ネットワークエラーなど
+  } catch (error) {
     console.error("[DEBUG] An error occurred during fetch or processing:", error);
     return { type: "network_error", error: error };
   }
 }
 
-export async function reverseGeocodeCoordinates(latitude, longitude) {
+export async function reverseGeocodeCoordinates(latitude, longitude, apiKey) {
   console.log("[DEBUG] reverseGeocodeCoordinates started. Lat:", latitude, "Lng:", longitude);
-  // OpenStreetMap Nominatim APIを使用
-  const NominatimUrl = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=18&addressdetails=1`;
-  console.log("[DEBUG] Fetching URL:", NominatimUrl);
+  const requestUrl = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${latitude},${longitude}&key=${apiKey}`;
+  console.log("[DEBUG] Fetching URL:", requestUrl);
 
   try {
-    const response = await fetch(NominatimUrl);
+    const response = await fetch(requestUrl);
     console.log("[DEBUG] Received response. Status:", response.status, "Ok:", response.ok);
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error(`[DEBUG] Nominatim API returned non-OK status: ${response.status}. Response text:`, errorText);
+      console.error(`[DEBUG] API returned non-OK status: ${response.status}. Response text:`, errorText);
       return { type: "api_error", status: response.status, errorText: errorText };
     }
 
     const data = await response.json();
-    console.log("[DEBUG] Parsed Nominatim JSON data:", data);
+    console.log("[DEBUG] Parsed JSON data:", data);
 
-    if (data && data.display_name) {
-      // Nominatimのdisplay_nameは詳細すぎる場合があるので、より短い住所を構築を試みる
-      let address = data.address.country || '';
-      if (data.address.state) address = `${data.address.state}${address}`;
-      if (data.address.city) address = `${data.address.city}${address}`;
-      if (data.address.town) address = `${data.address.town}${address}`;
-      if (data.address.village) address = `${data.address.village}${address}`;
-      if (data.address.suburb) address = `${data.address.suburb}${address}`;
-      if (data.address.road) address = `${data.address.road}${address}`;
-      if (data.address.house_number) address = `${data.address.house_number}-${address}`;
-      
-      // より一般的な形式に調整 (例: 日本の住所の場合)
-      let formattedAddress = '';
-      if (data.address.country) formattedAddress = data.address.country;
-      if (data.address.state) formattedAddress = `${data.address.state}${formattedAddress}`;
-      if (data.address.city) formattedAddress = `${data.address.city}${formattedAddress}`;
-      else if (data.address.town) formattedAddress = `${data.address.town}${formattedAddress}`;
-      else if (data.address.village) formattedAddress = `${data.address.village}${formattedAddress}`;
-      if (data.address.suburb) formattedAddress = `${data.address.suburb}${formattedAddress}`; // 区など
-      if (data.address.road) formattedAddress = `${formattedAddress}${data.address.road}`;
-      if (data.address.house_number) formattedAddress = `${formattedAddress}${data.address.house_number}`;
-      
-      if (data.address.country_code === "jp") {
-          let jpAddressParts = [];
-          if (data.address.state) jpAddressParts.push(data.address.state); // 都道府県
-          if (data.address.city) jpAddressParts.push(data.address.city); // 市
-          if (data.address.town) jpAddressParts.push(data.address.town); // 町
-          if (data.address.suburb) jpAddressParts.push(data.address.suburb); // 区
-          if (data.address.road) jpAddressParts.push(data.address.road); // 通り名
-          if (data.address.house_number) jpAddressParts.push(data.address.house_number); // 番地
-          
-          if (jpAddressParts.length > 0) {
-              formattedAddress = jpAddressParts.join('');
-          } else {
-              formattedAddress = data.display_name; // 詳細すぎる場合はNominatimの表示名をそのまま使用
-          }
-      } else {
-          formattedAddress = data.display_name; // 日本以外の住所はNominatimの表示名をそのまま使用
-      }
-
+    if (data.status === 'OK' && data.results.length > 0) {
+      const formattedAddress = data.results[0].formatted_address;
       console.log("[DEBUG] Reverse geocoding successful. Address:", formattedAddress);
       return { type: "success", address: formattedAddress, lat: latitude, lng: longitude };
     } else {
-      console.log("[DEBUG] Reverse geocoding failed. No display_name found in response.");
-      return { type: "no_address" };
+      console.log("[DEBUG] Reverse geocoding failed. Status:", data.status, "Error message:", data.error_message);
+      return { type: "no_address", status: data.status, error_message: data.error_message };
     }
   } catch (error) {
-    console.error("[DEBUG] An error occurred during Nominatim fetch or processing:", error);
+    console.error("[DEBUG] An error occurred during fetch or processing:", error);
     return { type: "network_error", error: error };
   }
 }

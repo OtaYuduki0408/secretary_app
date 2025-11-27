@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>カスタム命令 | Secretary Automation</title>
   <link rel="stylesheet" href="/custom_order/static/css/index.css">
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <script async defer src="https://maps.googleapis.com/maps/api/js?key={{ gcp_api_key }}"></script>
 </head>
 <body class="co-body">
   <div class="co-shell">
@@ -81,7 +81,10 @@
       </section>
     </main>
   </div>
+<script>
+  window.gcp_api_key = "{{ gcp_api_key }}";
+</script>
+<script type="module" src="{{ url_for('custom_order_pages.static', filename='js/trigger_ui.js', _t=config['VERSION_TIMESTAMP']) }}"></script>
 <script type="module" src="{{ url_for('custom_order_pages.static', filename='js/index.js', _t=config['VERSION_TIMESTAMP']) }}"></script>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 </body>
 </html>

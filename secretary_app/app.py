@@ -85,7 +85,9 @@ order_html_dir = os.path.join(os.path.dirname(__file__), 'order', 'static', 'htm
 
 @custom_order_pages_bp.route('/')
 def custom_order_index():
-    return render_template('index.html') # Blueprintのtemplate_folderからindex.htmlを探す
+    gcp_api_key = os.getenv('GCP_API_KEY')
+    print(f"DEBUG: GCP_API_KEY from environment: {{gcp_api_key}}") # 追加
+    return render_template('index.html', gcp_api_key=gcp_api_key)
 
 @custom_order_pages_bp.route('/edit')
 @custom_order_pages_bp.route('/edit/<int:order_id>')
