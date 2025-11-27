@@ -5,7 +5,12 @@ import { createTriggerUI } from './trigger_ui.js';
 import { TRIGGER_CATEGORIES, ACTION_CATEGORIES } from './constants.js';
 
 export function addConditionBlock(anchorElement, data={}) {
-  console.log(`[DEBUG] addConditionBlock called. Anchor element:`, anchorElement);
+  console.log(`[START] addConditionBlock called. anchorElement:`, anchorElement);
+  if (!anchorElement) {
+    console.error(`[ERROR] addConditionBlock: anchorElement is null or undefined. Aborting.`);
+    return;
+  }
+  console.log(`[INFO] anchorElement details (id: ${anchorElement?.id}, class: ${anchorElement?.className}, tag: ${anchorElement?.tagName})`);
   const block = document.createElement("div");
   block.open = true;
   const blockId = `cond_${Date.now()}_${Math.floor(Math.random() * 1e9)}`;
@@ -17,26 +22,43 @@ export function addConditionBlock(anchorElement, data={}) {
 
   if (anchorElement instanceof Element) {
     if (anchorElement.id === "add-condition" || anchorElement.id === "add-action" || anchorElement.id === "condition_blocks") {
-      // index.jsからの初期呼び出し、またはcondition_blocksが直接渡された場合
+      console.log(`[BRANCH] addConditionBlock: Matched initial call or condition_blocks ID/class.`);
       targetParent = document.getElementById("condition_blocks");
     } else if (anchorElement.classList.contains("add-sibling-condition") || anchorElement.classList.contains("add-sibling-action")) {
-      // 既存ブロック内の「＋ アクションを追加」「＋ 条件を追加」ボタン
+      console.log(`[BRANCH] addConditionBlock: Matched sibling button.`);
       referenceElement = anchorElement.closest(".condition-block, .item");
       if (referenceElement) {
         targetParent = referenceElement.parentNode; // 挿入対象の親は、参照要素の親
+        console.log(`[INFO] addConditionBlock: Sibling button found referenceElement.parentNode as targetParent (id: ${targetParent?.id}, class: ${targetParent?.className}).`);
+      } else {
+        console.warn(`[WARN] addConditionBlock: Sibling button did NOT find a referenceElement.`);
       }
     } else if (anchorElement.classList.contains("nested-conditions")) {
-      // ネストされた条件ブロックへの追加
+      console.log(`[BRANCH] addConditionBlock: Matched nested-conditions container.`);
       targetParent = anchorElement;
+    } else {
+      console.log(`[BRANCH] addConditionBlock: anchorElement is an Element, but did not match specific conditions. Defaulting to condition_blocks.`);
     }
+  } else {
+    console.log(`[BRANCH] addConditionBlock: anchorElement is NOT an Element. Defaulting to condition_blocks.`);
   }
-  
-  // ネストレベルの計算
+
+  // ネストレベルの計算に必要な変数を定義
   const parentOfNewBlock = referenceElement || targetParent; // 挿入先の親または参照要素
-  const actualParentBlock = parentOfNewBlock.closest('.condition-block, .item');
-  const parentLevel = actualParentBlock ? parseInt(actualParentBlock.dataset.nestLevel) : -1;
-  const nestLevel = parentLevel + 1;
+  const actualParentBlock = parentOfNewBlock.closest('.condition-block, .item'); // ここで定義する
+
+  let nestLevel;
+  if (referenceElement) { // 兄弟要素として追加する場合
+    // referenceElementと同じネストレベルにする
+    nestLevel = parseInt(referenceElement.dataset.nestLevel || 0); // トップレベルの兄弟は0
+    if (isNaN(nestLevel)) nestLevel = 0; // 万が一NaNの場合のフォールバック
+  } else { // ネスト要素として追加する場合、またはトップレベルに追加する場合
+    const parentLevel = actualParentBlock ? parseInt(actualParentBlock.dataset.nestLevel || 0) : -1;
+    nestLevel = parentLevel + 1;
+  }
   block.dataset.nestLevel = nestLevel;
+  console.log(`[INFO] addConditionBlock: Calculated nestLevel: ${nestLevel}, actualParentBlock:`, actualParentBlock);
+  console.log(`[INFO] addConditionBlock: Final targetParent:`, targetParent, `Final referenceElement:`, referenceElement);
 
   block.innerHTML = `
     <div class="co-block-header">
@@ -235,19 +257,42 @@ export function addConditionBlock(anchorElement, data={}) {
   handleTypeChange(); // 初期表示
 
   // --- Event Listeners ---
-  content.querySelector(".remove-condition").onclick = () => block.remove();
-  content.querySelector(".add-nested-action").onclick = (event) => addAction(event.currentTarget.closest(".nested-actions"), {});
-  content.querySelector(".add-nested-condition").onclick = (event) => addConditionBlock(event.currentTarget.closest(".nested-conditions"), data);
+  content.querySelector(".remove-condition").onclick = () => {
+    console.log(`[CLICK] Remove Condition button clicked for block: ${blockId}`);
+    block.remove();
+  };
+  content.querySelector(".add-nested-action").onclick = (event) => {
+    console.log(`[CLICK] "＋ ネストアクション" button clicked for block: ${blockId}`);
+    const targetNestedActionsContainer = event.currentTarget.closest(".condition-block").querySelector(".nested-actions"); // block要素の子として.nested-actionsを探す
+    console.log(`[DEBUG] addAction called with anchorElement (nestedActionsContainer):`, targetNestedActionsContainer);
+    addAction(targetNestedActionsContainer, {});
+  };
+  content.querySelector(".add-nested-condition").onclick = (event) => {
+    console.log(`[CLICK] "＋ ネスト条件" button clicked for block: ${blockId}`);
+    const targetNestedConditionsContainer = event.currentTarget.closest(".condition-block").querySelector(".nested-conditions"); // block要素の子として.nested-conditionsを探す
+    console.log(`[DEBUG] addConditionBlock called with anchorElement (nestedConditionsContainer):`, targetNestedConditionsContainer);
+    addConditionBlock(targetNestedConditionsContainer, data);
+  };
   
   const siblingActionBtn = content.querySelector(".add-sibling-action");
   const siblingCondBtn = content.querySelector(".add-sibling-condition");
 
-  siblingActionBtn.onclick = (event) => addAction(event.currentTarget, {}); // クリックされたボタン自身を渡す
-  siblingCondBtn.onclick = (event) => addConditionBlock(event.currentTarget, data); // クリックされたボタン自身を渡す
-}
+  siblingActionBtn.onclick = (event) => {
+    console.log(`[CLICK] "＋ アクションを追加" (sibling) button clicked for block: ${blockId}`);
+    addAction(event.currentTarget, {}); // クリックされたボタン自身を渡す
+  };
+  siblingCondBtn.onclick = (event) => {
+    console.log(`[CLICK] "＋ 条件を追加" (sibling) button clicked for block: ${blockId}`);
+    addConditionBlock(event.currentTarget, data); // クリックされたボタン自身を渡す
+  };}
 
 export function addAction(anchorElement, data={}) {
-  console.log(`[DEBUG] addAction called. Anchor element:`, anchorElement);
+  console.log(`[START] addAction called. anchorElement:`, anchorElement);
+  if (!anchorElement) {
+    console.error(`[ERROR] addAction: anchorElement is null or undefined. Aborting.`);
+    return;
+  }
+  console.log(`[INFO] anchorElement details (id: ${anchorElement?.id}, class: ${anchorElement?.className}, tag: ${anchorElement?.tagName})`);
   const el = document.createElement("div");
   el.open = true;
   el.className = "item";
@@ -257,26 +302,43 @@ export function addAction(anchorElement, data={}) {
 
   if (anchorElement instanceof Element) {
     if (anchorElement.id === "add-action" || anchorElement.id === "add-condition" || anchorElement.id === "condition_blocks") {
-      // index.jsからの初期呼び出し、またはcondition_blocksが直接渡された場合
+      console.log(`[DEBUG] addAction: Matching initial call or condition_blocks ID/class.`);
       targetParent = document.getElementById("condition_blocks");
     } else if (anchorElement.classList.contains("add-sibling-action") || anchorElement.classList.contains("add-sibling-condition")) {
-      // 既存ブロック内の「＋ アクションを追加」「＋ 条件を追加」ボタン
+      console.log(`[DEBUG] addAction: Matching sibling button.`);
       referenceElement = anchorElement.closest(".condition-block, .item");
       if (referenceElement) {
         targetParent = referenceElement.parentNode; // 挿入対象の親は、参照要素の親
+        console.log(`[DEBUG] addAction: Sibling button found referenceElement.parentNode as targetParent:`, targetParent);
+      } else {
+        console.warn(`[DEBUG] addAction: Sibling button did NOT find a referenceElement.`);
       }
     } else if (anchorElement.classList.contains("nested-actions")) {
-      // ネストされたアクションブロックへの追加
+      console.log(`[DEBUG] addAction: Matching nested-actions container.`);
       targetParent = anchorElement;
+    } else {
+      console.log(`[DEBUG] addAction: anchorElement is an Element, but did not match specific conditions. Defaulting to condition_blocks.`);
     }
+  } else {
+    console.log(`[DEBUG] addAction: anchorElement is NOT an Element. Defaulting to condition_blocks.`);
   }
   
-  // ネストレベルの計算
+  // ネストレベルの計算に必要な変数を定義
   const parentOfNewBlock = referenceElement || targetParent; // 挿入先の親または参照要素
-  const actualParentBlock = parentOfNewBlock.closest('.condition-block, .item');
-  const parentLevel = actualParentBlock ? parseInt(actualParentBlock.dataset.nestLevel) : -1;
-  const nestLevel = parentLevel + 1;
+  const actualParentBlock = parentOfNewBlock.closest('.condition-block, .item'); // ここで定義する
+
+  let nestLevel;
+  if (referenceElement) { // 兄弟要素として追加する場合
+    // referenceElementと同じネストレベルにする
+    nestLevel = parseInt(referenceElement.dataset.nestLevel || 0); // トップレベルの兄弟は0
+    if (isNaN(nestLevel)) nestLevel = 0; // 万が一NaNの場合のフォールバック
+  } else { // ネスト要素として追加する場合、またはトップレベルに追加する場合
+    const parentLevel = actualParentBlock ? parseInt(actualParentBlock.dataset.nestLevel || 0) : -1;
+    nestLevel = parentLevel + 1;
+  }
   el.dataset.nestLevel = nestLevel;
+  console.log(`[DEBUG] addAction: Calculated nestLevel: ${nestLevel}, actualParentBlock:`, actualParentBlock);
+  console.log(`[DEBUG] addAction: Final targetParent:`, targetParent, `Final referenceElement:`, referenceElement);
   const prefix = `action_${Date.now()}_${Math.floor(Math.random() * 1e9)}_`;
   
   el.innerHTML = `
@@ -292,7 +354,7 @@ export function addAction(anchorElement, data={}) {
         <input type="date" class="action-timing-date-abs" id="${prefix}action_timing_date_abs" title="実行日（絶対）">
         <input type="number" class="action-timing-date-rel" id="${prefix}action_timing_date_rel" placeholder="+n 日" title="実行日（相対）" style="width: 80px;">
         <input type="time" class="action-timing-time-abs" id="${prefix}action_timing_time_abs" title="実行時刻（絶対）">
-        <input type="text" class="action-timing-time-rel" id="${prefix}action_timing_time_rel" placeholder="+HH:MM:SS" title="実行時刻（相対）" style="width: 120px;">
+        <input type="text" class="action-timing-time-rel" id="${prefix}action_timing-time-rel" placeholder="+HH:MM:SS" title="実行時刻（相対）" style="width: 120px;">
       </div>
       <div class="action-detail-container" id="${prefix}action_detail_container" style="margin-top: 10px;">
         <!-- ここに動的UIが挿入される -->
@@ -319,14 +381,22 @@ export function addAction(anchorElement, data={}) {
   setTimeout(() => updateActionSummary(el), 200);
 
   const content = el.querySelector('.co-block-content');
-  content.querySelector(".remove-action").onclick=()=>el.remove();
+  content.querySelector(".remove-action").onclick=() => {
+    console.log(`[CLICK] Remove Action button clicked for action: ${prefix}`);
+    el.remove();
+  };
   
   const siblingActionBtn = content.querySelector(".add-sibling-action");
   const siblingCondBtn = content.querySelector(".add-sibling-condition");
 
-  siblingActionBtn.onclick = (event) => addAction(event.currentTarget, {}); // クリックされたボタン自身を渡す
-  siblingCondBtn.onclick = (event) => addConditionBlock(event.currentTarget, data); // クリックされたボタン自身を渡す
-
+  siblingActionBtn.onclick = (event) => {
+    console.log(`[CLICK] "＋ アクションを追加" (sibling) button clicked for action: ${prefix}`);
+    addAction(event.currentTarget, {}); // クリックされたボタン自身を渡す
+  };
+  siblingCondBtn.onclick = (event) => {
+    console.log(`[CLICK] "＋ 条件を追加" (sibling) button clicked for action: ${prefix}`);
+    addConditionBlock(event.currentTarget, data); // クリックされたボタン自身を渡す
+  };
   const categorySelect = content.querySelector(".action-category");
   const subSelect = content.querySelector(".action-sub");
   
