@@ -3,19 +3,40 @@ import { createActionUI } from './action_ui.js';
 import { createTriggerUI } from './trigger_ui.js';
 import { TRIGGER_CATEGORIES, ACTION_CATEGORIES } from './constants.js';
 
-export function addConditionBlock(parent=document.getElementById("condition_blocks"), data={}) {
-  console.log(`[DEBUG] addConditionBlock called. Parent element:`, parent);
+export function addConditionBlock(anchorElement, data={}) {
+  console.log(`[DEBUG] addConditionBlock called. Anchor element:`, anchorElement);
   const block = document.createElement("div");
   block.open = true;
   const blockId = `cond_${Date.now()}_${Math.floor(Math.random() * 1e9)}`;
   block.id = blockId;
   block.className = "condition-block";
 
+  let targetParent = document.getElementById("condition_blocks"); // デフォルトの親
+  let referenceElement = null; // afterendで使う要素
+
+  if (anchorElement instanceof Element) {
+    if (anchorElement.id === "add-condition" || anchorElement.id === "add-action" || anchorElement.id === "condition_blocks") {
+      // index.jsからの初期呼び出し、またはcondition_blocksが直接渡された場合
+      targetParent = document.getElementById("condition_blocks");
+    } else if (anchorElement.classList.contains("add-sibling-condition") || anchorElement.classList.contains("add-sibling-action")) {
+      // 既存ブロック内の「＋ アクションを追加」「＋ 条件を追加」ボタン
+      referenceElement = anchorElement.closest(".condition-block, .item");
+      if (referenceElement) {
+        targetParent = referenceElement.parentNode; // 挿入対象の親は、参照要素の親
+      }
+    } else if (anchorElement.classList.contains("nested-conditions")) {
+      // ネストされた条件ブロックへの追加
+      targetParent = anchorElement;
+    }
+  }
+  
   // ネストレベルの計算
-  const parentElement = parent.closest('.condition-block, .item');
-  const parentLevel = parentElement ? parseInt(parentElement.dataset.nestLevel) : -1;
+  const parentOfNewBlock = referenceElement || targetParent; // 挿入先の親または参照要素
+  const actualParentBlock = parentOfNewBlock.closest('.condition-block, .item');
+  const parentLevel = actualParentBlock ? parseInt(actualParentBlock.dataset.nestLevel) : -1;
   const nestLevel = parentLevel + 1;
   block.dataset.nestLevel = nestLevel;
+
   block.innerHTML = `
     <div class="co-block-header">
       <span class="co-toggle-icon">▼</span>
@@ -51,9 +72,16 @@ export function addConditionBlock(parent=document.getElementById("condition_bloc
       <div class="nested-actions"></div>
     </div>
   `;
-  parent.appendChild(block);
+  
+  if (referenceElement) {
+    // 兄弟要素として挿入
+    referenceElement.insertAdjacentElement('afterend', block);
+  } else {
+    // 最後に追加
+    targetParent.appendChild(block);
+  }
 
-  const header = block.querySelector('.co-block-header'); // 新しく追加
+  const header = block.querySelector('.co-block-header');
   const content = block.querySelector('.co-block-content');
   const logicSelect = content.querySelector(".condition-logic");
   const typeSelect = content.querySelector(".condition-type");
@@ -63,8 +91,8 @@ export function addConditionBlock(parent=document.getElementById("condition_bloc
   header.addEventListener('click', () => {
     block.classList.toggle('is-collapsed');
   });
-  const nestedConditionsContainer = block.querySelector(".nested-blocks > .nested-conditions"); // 新しく追加
-  const nestedActionsContainer = block.querySelector(".nested-blocks > .nested-actions"); // 新しく追加
+  const nestedConditionsContainer = block.querySelector(".nested-blocks > .nested-conditions");
+  const nestedActionsContainer = block.querySelector(".nested-blocks > .nested-actions");
 
   // Summary updater
   block.addEventListener('change', () => updateConditionSummary(block));
@@ -72,7 +100,9 @@ export function addConditionBlock(parent=document.getElementById("condition_bloc
   setTimeout(() => updateConditionSummary(block), 200); // 復元時のUI描画後に実行
 
   // ロジック選択の制御 (handleTypeChangeが実行される前に初期設定)
-  if (parent.querySelectorAll(':scope > .condition-block').length === 1) {
+  // `targetParent` ではなく、実際にブロックが追加されたコンテナの直接の子の数で判断する
+  const siblings = Array.from(targetParent.children).filter(child => child.classList.contains('condition-block'));
+  if (siblings.length === 1 && !referenceElement) { // referenceElementがある場合は常に最初の要素ではない
     logicSelect.querySelector('option[value="AND"]').remove();
     logicSelect.querySelector('option[value="OR"]').remove();
     logicSelect.querySelector('option[value="NAND"]').remove();
@@ -80,24 +110,27 @@ export function addConditionBlock(parent=document.getElementById("condition_bloc
     logicSelect.querySelector('option[value="XOR"]').remove();
     logicSelect.querySelector('option[value="XNOR"]').remove();
     logicSelect.value = data.logic || "";
-  } else {
-    logicSelect.querySelector('option[value=""]').remove();
-    logicSelect.querySelector('option[value="NOT"]').remove();
+  } else if (!referenceElement || (siblings.indexOf(block) > 0 || block.previousElementSibling?.classList.contains('condition-block'))) {
+    // referenceElementがない（最後に追加）、またはreferenceElementがあったとしても2つ目以降の要素である場合
+    const initialEmptyOption = logicSelect.querySelector('option[value=""]');
+    if (initialEmptyOption) initialEmptyOption.remove();
+    const initialNotOption = logicSelect.querySelector('option[value="NOT"]');
+    if (initialNotOption) initialNotOption.remove();
     logicSelect.value = data.logic || "AND";
   }
+
 
   // タイプ選択の制御
   const handleTypeChange = () => {
     const selectedType = typeSelect.value;
-    const summaryTextEl = block.querySelector('.co-summary-text'); // Summary Text Elementも取得
+    const summaryTextEl = block.querySelector('.co-summary-text');
 
     if (selectedType === 'else') {
-      logicSelect.style.display = 'none'; // elseの場合は非表示
-      exprContainer.innerHTML = ''; // 条件式コンテナもクリア
-      if (summaryTextEl) summaryTextEl.textContent = '上記以外のすべての条件'; // Summaryも更新
-    } else { // if が選択された場合
-      logicSelect.style.display = 'block'; // ifの場合は表示
-      // exprContainer のHTMLを生成する既存ロジック
+      logicSelect.style.display = 'none';
+      exprContainer.innerHTML = '';
+      if (summaryTextEl) summaryTextEl.textContent = '上記以外のすべての条件';
+    } else {
+      logicSelect.style.display = 'block';
       const prefix = `${blockId}_`;
       exprContainer.innerHTML = `
         <label style="font-size:0.9em; opacity:0.8;">条件</label>
@@ -148,7 +181,7 @@ export function addConditionBlock(parent=document.getElementById("condition_bloc
               }
             }
             // フィルターの復元
-            const filterContainer = valueContainer.querySelector(`div[id$="filters"]`); // 新しく追加
+            const filterContainer = valueContainer.querySelector(`div[id$="filters"]`);
             if (value.filters && Array.isArray(value.filters) && filterContainer) {
               const addFilterBtn = filterContainer.querySelector('.add_filter_btn');
               if (addFilterBtn) {
@@ -175,7 +208,7 @@ export function addConditionBlock(parent=document.getElementById("condition_bloc
             // アクションチェックボックスの復元 (カレンダー、収支管理、メモ)
             if (value.actions && Array.isArray(value.actions)) {
               value.actions.forEach(actionVal => {
-                const actionButtonsContainer = valueContainer.querySelector(`div[id$="actions"]`); // 新しく追加
+                const actionButtonsContainer = valueContainer.querySelector(`div[id$="actions"]`);
                 if (actionButtonsContainer) {
                   const button = actionButtonsContainer.querySelector(`button[data-value="${actionVal}"]`);
                   if (button) {
@@ -202,25 +235,45 @@ export function addConditionBlock(parent=document.getElementById("condition_bloc
 
   // --- Event Listeners ---
   content.querySelector(".remove-condition").onclick = () => block.remove();
-  content.querySelector(".add-nested-condition").onclick = () => addConditionBlock(nestedConditionsContainer); // .nested-blocks > .nested-conditionsに子を追加
-  content.querySelector(".add-nested-action").onclick = () => addAction(nestedActionsContainer); // .nested-blocks > .nested-actionsに子を追加
+  content.querySelector(".add-nested-condition").onclick = (event) => addConditionBlock(event.currentTarget.closest(".nested-conditions"), data);
+  content.querySelector(".add-nested-action").onclick = (event) => addAction(event.currentTarget.closest(".nested-actions"), {});
   
   const siblingActionBtn = content.querySelector(".add-sibling-action");
   const siblingCondBtn = content.querySelector(".add-sibling-condition");
 
-  siblingActionBtn.onclick = () => addAction(parent);
-  siblingCondBtn.onclick = () => addConditionBlock(parent);
+  siblingActionBtn.onclick = (event) => addAction(event.currentTarget, {}); // クリックされたボタン自身を渡す
+  siblingCondBtn.onclick = (event) => addConditionBlock(event.currentTarget, data); // クリックされたボタン自身を渡す
 }
 
-export function addAction(parent, data={}) {
-  console.log(`[DEBUG] addAction called. Parent element:`, parent);
+export function addAction(anchorElement, data={}) {
+  console.log(`[DEBUG] addAction called. Anchor element:`, anchorElement);
   const el = document.createElement("div");
   el.open = true;
   el.className = "item";
 
+  let targetParent = document.getElementById("condition_blocks"); // デフォルトの親
+  let referenceElement = null; // afterendで使う要素
+
+  if (anchorElement instanceof Element) {
+    if (anchorElement.id === "add-action" || anchorElement.id === "add-condition" || anchorElement.id === "condition_blocks") {
+      // index.jsからの初期呼び出し、またはcondition_blocksが直接渡された場合
+      targetParent = document.getElementById("condition_blocks");
+    } else if (anchorElement.classList.contains("add-sibling-action") || anchorElement.classList.contains("add-sibling-condition")) {
+      // 既存ブロック内の「＋ アクションを追加」「＋ 条件を追加」ボタン
+      referenceElement = anchorElement.closest(".condition-block, .item");
+      if (referenceElement) {
+        targetParent = referenceElement.parentNode; // 挿入対象の親は、参照要素の親
+      }
+    } else if (anchorElement.classList.contains("nested-actions")) {
+      // ネストされたアクションブロックへの追加
+      targetParent = anchorElement;
+    }
+  }
+  
   // ネストレベルの計算
-  const parentElement = parent.closest('.condition-block, .item');
-  const parentLevel = parentElement ? parseInt(parentElement.dataset.nestLevel) : -1;
+  const parentOfNewBlock = referenceElement || targetParent; // 挿入先の親または参照要素
+  const actualParentBlock = parentOfNewBlock.closest('.condition-block, .item');
+  const parentLevel = actualParentBlock ? parseInt(actualParentBlock.dataset.nestLevel) : -1;
   const nestLevel = parentLevel + 1;
   el.dataset.nestLevel = nestLevel;
   const prefix = `action_${Date.now()}_${Math.floor(Math.random() * 1e9)}_`;
@@ -250,7 +303,14 @@ export function addAction(parent, data={}) {
       </div>
     </div>
   `;
-  parent.appendChild(el);
+  
+  if (referenceElement) {
+    // 兄弟要素として挿入
+    referenceElement.insertAdjacentElement('afterend', el);
+  } else {
+    // 最後に追加
+    targetParent.appendChild(el);
+  }
 
   // Summary updater
   el.addEventListener('change', () => updateActionSummary(el));
@@ -263,8 +323,8 @@ export function addAction(parent, data={}) {
   const siblingActionBtn = content.querySelector(".add-sibling-action");
   const siblingCondBtn = content.querySelector(".add-sibling-condition");
 
-  siblingActionBtn.onclick = () => addAction(parent);
-  siblingCondBtn.onclick = () => addConditionBlock(parent);
+  siblingActionBtn.onclick = (event) => addAction(event.currentTarget, {}); // クリックされたボタン自身を渡す
+  siblingCondBtn.onclick = (event) => addConditionBlock(event.currentTarget, data); // クリックされたボタン自身を渡す
 
   const categorySelect = content.querySelector(".action-category");
   const subSelect = content.querySelector(".action-sub");
@@ -273,7 +333,7 @@ export function addAction(parent, data={}) {
 
   categorySelect.addEventListener('change', () => {
     updateSubOptions(categorySelect.id, subSelect.id, ACTION_CATEGORIES);
-    createActionUI(prefix); // updateSubOptionsから移動
+    createActionUI(prefix);
   });
   subSelect.addEventListener('change', () => {
     createActionUI(prefix);

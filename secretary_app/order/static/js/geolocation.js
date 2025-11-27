@@ -41,3 +41,74 @@ export async function geocodeAddress(address) {
     return { type: "network_error", error: error };
   }
 }
+
+export async function reverseGeocodeCoordinates(latitude, longitude) {
+  console.log("[DEBUG] reverseGeocodeCoordinates started. Lat:", latitude, "Lng:", longitude);
+  // OpenStreetMap Nominatim APIを使用
+  const NominatimUrl = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=18&addressdetails=1`;
+  console.log("[DEBUG] Fetching URL:", NominatimUrl);
+
+  try {
+    const response = await fetch(NominatimUrl);
+    console.log("[DEBUG] Received response. Status:", response.status, "Ok:", response.ok);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`[DEBUG] Nominatim API returned non-OK status: ${response.status}. Response text:`, errorText);
+      return { type: "api_error", status: response.status, errorText: errorText };
+    }
+
+    const data = await response.json();
+    console.log("[DEBUG] Parsed Nominatim JSON data:", data);
+
+    if (data && data.display_name) {
+      // Nominatimのdisplay_nameは詳細すぎる場合があるので、より短い住所を構築を試みる
+      let address = data.address.country || '';
+      if (data.address.state) address = `${data.address.state}${address}`;
+      if (data.address.city) address = `${data.address.city}${address}`;
+      if (data.address.town) address = `${data.address.town}${address}`;
+      if (data.address.village) address = `${data.address.village}${address}`;
+      if (data.address.suburb) address = `${data.address.suburb}${address}`;
+      if (data.address.road) address = `${data.address.road}${address}`;
+      if (data.address.house_number) address = `${data.address.house_number}-${address}`;
+      
+      // より一般的な形式に調整 (例: 日本の住所の場合)
+      let formattedAddress = '';
+      if (data.address.country) formattedAddress = data.address.country;
+      if (data.address.state) formattedAddress = `${data.address.state}${formattedAddress}`;
+      if (data.address.city) formattedAddress = `${data.address.city}${formattedAddress}`;
+      else if (data.address.town) formattedAddress = `${data.address.town}${formattedAddress}`;
+      else if (data.address.village) formattedAddress = `${data.address.village}${formattedAddress}`;
+      if (data.address.suburb) formattedAddress = `${data.address.suburb}${formattedAddress}`; // 区など
+      if (data.address.road) formattedAddress = `${formattedAddress}${data.address.road}`;
+      if (data.address.house_number) formattedAddress = `${formattedAddress}${data.address.house_number}`;
+      
+      if (data.address.country_code === "jp") {
+          let jpAddressParts = [];
+          if (data.address.state) jpAddressParts.push(data.address.state); // 都道府県
+          if (data.address.city) jpAddressParts.push(data.address.city); // 市
+          if (data.address.town) jpAddressParts.push(data.address.town); // 町
+          if (data.address.suburb) jpAddressParts.push(data.address.suburb); // 区
+          if (data.address.road) jpAddressParts.push(data.address.road); // 通り名
+          if (data.address.house_number) jpAddressParts.push(data.address.house_number); // 番地
+          
+          if (jpAddressParts.length > 0) {
+              formattedAddress = jpAddressParts.join('');
+          } else {
+              formattedAddress = data.display_name; // 詳細すぎる場合はNominatimの表示名をそのまま使用
+          }
+      } else {
+          formattedAddress = data.display_name; // 日本以外の住所はNominatimの表示名をそのまま使用
+      }
+
+      console.log("[DEBUG] Reverse geocoding successful. Address:", formattedAddress);
+      return { type: "success", address: formattedAddress, lat: latitude, lng: longitude };
+    } else {
+      console.log("[DEBUG] Reverse geocoding failed. No display_name found in response.");
+      return { type: "no_address" };
+    }
+  } catch (error) {
+    console.error("[DEBUG] An error occurred during Nominatim fetch or processing:", error);
+    return { type: "network_error", error: error };
+  }
+}
