@@ -1,5 +1,5 @@
 import { populateSelect, updateSubOptions } from './ui_helpers.js';
-import { geocodeAddress } from './geolocation.js';
+import { geocodeAddress, getCurrentLocation, reverseGeocodeCoordinates } from './geolocation.js';
 import { TRIGGER_CATEGORIES, TRIGGER_VALUE_PLACEHOLDERS } from './constants.js';
 import { fetchGenres } from './command_manager.js';
 
@@ -18,7 +18,10 @@ export function createTriggerUI(prefix = '', initialValue = {}) {
         triggerValueContainer.innerHTML = `
           <label for="${prefix}trigger_value_address">住所</label>
           <input type="text" id="${prefix}trigger_value_address" class="trigger-input" placeholder="住所を入力してください" required value="${initialValue.address || ''}">
-          <button type="button" id="${prefix}get_coords_btn" class="co-btn ghost" style="margin-top: 10px;">住所から緯度経度を取得</button><br>
+          <div style="display: flex; gap: 10px; margin-top: 10px;">
+            <button type="button" id="${prefix}get_coords_btn" class="co-btn ghost" style="flex: 1;">住所から緯度経度を取得</button>
+            <button type="button" id="${prefix}get_current_location_btn" class="co-btn ghost" style="flex: 1;">現在地を取得</button>
+          </div>
           <label for="${prefix}trigger_value_latitude">緯度</label>
           <input type="text" id="${prefix}trigger_value_latitude" class="trigger-input" placeholder="緯度" readonly value="${initialValue.latitude || ''}">
           <label for="${prefix}trigger_value_longitude">経度</label>
@@ -27,7 +30,7 @@ export function createTriggerUI(prefix = '', initialValue = {}) {
           <input type="number" id="${prefix}trigger_value_range" class="trigger-input" placeholder="許容範囲 (m)" required value="${initialValue.range || '1000'}">
           <small>注意: 許容範囲はなるべく幅広くしてください。(例：1000m等)</small>
           <div id="${prefix}location_message" style="color: green; margin-top: 5px;"></div>
-          <div id="${prefix}location_error_message" style="color: red; display: none;">住所が特定できませんでした。「東京都千代田区」までなどより広い範囲を指定してください。</div>
+          <div id="${prefix}location_error_message" style="color: red; display: none;"></div>
           <div id="${prefix}map" style="height: 300px; margin-top: 10px;"></div>
         `;
         // mapとmarkerのインスタンスを保持する変数
@@ -45,102 +48,111 @@ export function createTriggerUI(prefix = '', initialValue = {}) {
             }
         }
 
+        const updateMap = (lat, lng) => {
+          if (map === null) {
+            map = L.map(`${prefix}map`).setView([lat, lng], 13);
+            window[`${prefix}leafletMap`] = map; // グローバルに保存して後で参照できるようにする
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+              attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+            }).addTo(map);
+            marker = L.marker([lat, lng], {draggable: true}).addTo(map);
+
+            marker.on('dragend', function(event) {
+              const newLatLng = marker.getLatLng();
+              document.getElementById(`${prefix}trigger_value_latitude`).value = newLatLng.lat.toFixed(6);
+              document.getElementById(`${prefix}trigger_value_longitude`).value = newLatLng.lng.toFixed(6);
+              // ドラッグ後に住所も更新
+              reverseGeocodeAndUpdateAddress(newLatLng.lat, newLatLng.lng);
+            });
+          } else {
+            map.setView([lat, lng], 13);
+            marker.setLatLng([lat, lng]);
+          }
+        };
+
+        const reverseGeocodeAndUpdateAddress = async (lat, lng) => {
+            const result = await reverseGeocodeCoordinates(lat, lng);
+            if (result.type === 'success') {
+                document.getElementById(`${prefix}trigger_value_address`).value = result.address;
+            }
+        };
+
         document.getElementById(`${prefix}get_coords_btn`).addEventListener("click", async () => {
           const addressInput = document.getElementById(`${prefix}trigger_value_address`);
           const address = addressInput ? addressInput.value : '';
+          const locationMessage = document.getElementById(`${prefix}location_message`);
+          const locationErrorMessage = document.getElementById(`${prefix}location_error_message`);
 
           if (address && address.trim() !== '') {
-            document.getElementById(`${prefix}location_message`).textContent = "緯度経度を取得中...";
-            document.getElementById(`${prefix}location_error_message`).style.display = 'none';
+            locationMessage.textContent = "緯度経度を取得中...";
+            locationErrorMessage.style.display = 'none';
             const result = await geocodeAddress(address);
-            const locationErrorMessageElement = document.getElementById(`${prefix}location_error_message`);
             if (result && result.type === "success") {
-              const lat = result.lat;
-              const lng = result.lng;
-
+              const { lat, lng } = result;
               document.getElementById(`${prefix}trigger_value_latitude`).value = lat;
               document.getElementById(`${prefix}trigger_value_longitude`).value = lng;
-              document.getElementById(`${prefix}location_message`).textContent = "緯度経度を正常に取得しました。";
-              locationErrorMessageElement.style.display = 'none';
-
-              // 地図の初期化または更新
-              if (map === null) {
-                map = L.map(`${prefix}map`).setView([lat, lng], 13);
-                window[`${prefix}leafletMap`] = map; // グローバルに保存して後で参照できるようにする
-                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                }).addTo(map);
-                marker = L.marker([lat, lng], {draggable: true}).addTo(map);
-
-                marker.on('dragend', function(event) {
-                  const newLatLng = marker.getLatLng();
-                  document.getElementById(`${prefix}trigger_value_latitude`).value = newLatLng.lat.toFixed(6);
-                  document.getElementById(`${prefix}trigger_value_longitude`).value = newLatLng.lng.toFixed(6);
-                });
-              } else {
-                map.setView([lat, lng], 13);
-                marker.setLatLng([lat, lng]);
-              }
+              locationMessage.textContent = "緯度経度を正常に取得しました。";
+              locationErrorMessage.style.display = 'none';
+              updateMap(lat, lng);
             } else {
               document.getElementById(`${prefix}trigger_value_latitude`).value = '';
               document.getElementById(`${prefix}trigger_value_longitude`).value = '';
-              document.getElementById(`${prefix}location_message`).textContent = ""; // 取得中メッセージをクリア
-              
-              // エラーの種類に応じてメッセージを分岐
+              locationMessage.textContent = "";
               if (result && (result.type === "api_error" || result.type === "network_error" || result.type === "malformed_response")) {
-                locationErrorMessageElement.textContent = "使用APIにエラーが発生しております。時間を置いて再度お試しください。<br>詳細：https://vldb.gsi.go.jp/sokuchi/surveycalc/main.html<br>(国土地理院：ジオイド高計算　お知らせページ)";
-              } else { // result.type === "no_coordinates" または result が null
-                locationErrorMessageElement.textContent = "住所が特定できませんでした。都道府県、市区町村、番地までなど、より簡潔な形式でお試しください。";
+                locationErrorMessage.textContent = "使用APIにエラーが発生しております。時間を置いて再度お試しください。";
+              } else {
+                locationErrorMessage.textContent = "住所が特定できませんでした。都道府県、市区町村、番地までなど、より簡潔な形式でお試しください。";
               }
-              locationErrorMessageElement.style.display = 'block';
-
-              // 地図とマーカーをクリア
-              if (map !== null) {
-                map.remove();
-                map = null;
-                marker = null;
-                window[`${prefix}leafletMap`] = null;
-              }
+              locationErrorMessage.style.display = 'block';
+              if (map !== null) { map.remove(); map = null; marker = null; window[`${prefix}leafletMap`] = null; }
             }
           } else {
-            document.getElementById(`${prefix}location_error_message`).textContent = "住所を入力してください。";
-            document.getElementById(`${prefix}location_error_message`).style.display = 'block';
-            document.getElementById(`${prefix}location_message`).textContent = "";
-
-            // 地図とマーカーをクリア
-            if (map !== null) {
-                map.remove();
-                map = null;
-                marker = null;
-                window[`${prefix}leafletMap`] = null;
-            }
+            locationErrorMessage.textContent = "住所を入力してください。";
+            locationErrorMessage.style.display = 'block';
+            locationMessage.textContent = "";
+            if (map !== null) { map.remove(); map = null; marker = null; window[`${prefix}leafletMap`] = null; }
           }
         });
+
+        document.getElementById(`${prefix}get_current_location_btn`).addEventListener("click", async () => {
+            const locationMessage = document.getElementById(`${prefix}location_message`);
+            const locationErrorMessage = document.getElementById(`${prefix}location_error_message`);
+            locationMessage.textContent = "現在地を取得中...";
+            locationErrorMessage.style.display = 'none';
+
+            try {
+                const result = await getCurrentLocation();
+                if (result.type === 'success') {
+                    const { lat, lng } = result;
+                    document.getElementById(`${prefix}trigger_value_latitude`).value = lat;
+                    document.getElementById(`${prefix}trigger_value_longitude`).value = lng;
+                    locationMessage.textContent = "現在地を正常に取得しました。";
+                    updateMap(lat, lng);
+                    
+                    // 逆ジオコーディングで住所を取得
+                    const addressResult = await reverseGeocodeCoordinates(lat, lng);
+                    if (addressResult.type === 'success') {
+                        document.getElementById(`${prefix}trigger_value_address`).value = addressResult.address;
+                    } else {
+                        locationMessage.textContent = "現在地は取得しましたが、住所の特定に失敗しました。";
+                    }
+                }
+            } catch (error) {
+                document.getElementById(`${prefix}trigger_value_latitude`).value = '';
+                document.getElementById(`${prefix}trigger_value_longitude`).value = '';
+                locationMessage.textContent = "";
+                locationErrorMessage.textContent = error.message || "現在地の取得に失敗しました。";
+                locationErrorMessage.style.display = 'block';
+                if (map !== null) { map.remove(); map = null; marker = null; window[`${prefix}leafletMap`] = null; }
+            }
+        });
+
         // 編集時の初期表示
         if (initialValue.latitude && initialValue.longitude) {
             const lat = parseFloat(initialValue.latitude);
             const lng = parseFloat(initialValue.longitude);
-
             if (!isNaN(lat) && !isNaN(lng)) {
-                // 地図がまだ初期化されていない場合のみ初期化
-                if (map === null) {
-                    map = L.map(`${prefix}map`).setView([lat, lng], 13);
-                    window[`${prefix}leafletMap`] = map;
-                    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                    }).addTo(map);
-                    marker = L.marker([lat, lng], {draggable: true}).addTo(map);
-
-                    marker.on('dragend', function(event) {
-                        const newLatLng = marker.getLatLng();
-                        document.getElementById(`${prefix}trigger_value_latitude`).value = newLatLng.lat.toFixed(6);
-                        document.getElementById(`${prefix}trigger_value_longitude`).value = newLatLng.lng.toFixed(6);
-                    });
-                } else {
-                    // 既に地図が初期化されている場合はビューとマーカーの位置を更新
-                    map.setView([lat, lng], 13);
-                    marker.setLatLng([lat, lng]);
-                }
+                updateMap(lat, lng);
             }
         }
         break;

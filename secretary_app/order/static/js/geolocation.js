@@ -112,3 +112,39 @@ export async function reverseGeocodeCoordinates(latitude, longitude) {
     return { type: "network_error", error: error };
   }
 }
+
+export function getCurrentLocation() {
+  return new Promise((resolve, reject) => {
+    if (!navigator.geolocation) {
+      reject({ type: "unsupported", message: "お使いのブラウザは位置情報取得に対応していません。" });
+    } else {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          resolve({
+            type: "success",
+            lat: position.coords.latitude,
+            lng: position.coords.longitude,
+          });
+        },
+        (error) => {
+          let message = "";
+          switch (error.code) {
+            case error.PERMISSION_DENIED:
+              message = "位置情報の利用が許可されていません。";
+              break;
+            case error.POSITION_UNAVAILABLE:
+              message = "位置情報が取得できませんでした。";
+              break;
+            case error.TIMEOUT:
+              message = "位置情報取得がタイムアウトしました。";
+              break;
+            default:
+              message = "原因不明のエラーが発生しました。";
+              break;
+          }
+          reject({ type: "error", code: error.code, message: message });
+        }
+      );
+    }
+  });
+}
