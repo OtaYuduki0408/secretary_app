@@ -561,116 +561,160 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     
     // 5秒ごとに保留中のアクションをポーリング
-    setInterval(pollPendingActions, 5000);
+    // setInterval(pollPendingActions, 5000);
+    // ↓
+    // 再帰的なsetTimeoutでポーリングを開始
+    setTimeout(pollPendingActions, 5000);
 });
 
 // ============================================================================
 // 保留中アクションのポーリング
 // ============================================================================
+let isPolling = false; // ポーリング処理中フラグ
+const POLLING_INTERVAL = 5000; // ポーリング間隔
 
 async function pollPendingActions() {
-  const userId = document.body.dataset.userId; 
-
-  if (!userId) {
-    return;
-  }
-
-  try {
-    const response = await fetch(`/order/api/pending_actions/${userId}`);
-    if (!response.ok) {
-      if (response.status !== 404) {
-          console.error("Failed to poll pending actions: " + response.status + " " + response.statusText);
-      }
-      return;
+    if (isPolling) {
+        console.log("INFO: Polling is already in progress. Skipping.");
+        return;
     }
-    const actions = await response.json();
-    if (actions && actions.length > 0) {
-      console.log("RECEIVED PENDING ACTIONS:", actions);
-      
-      const overlay = document.getElementById('read-aloud-overlay');
-      const overlayTime = document.getElementById('overlay-time');
-      const overlayContent = overlay.querySelector('.overlay-content');
+    isPolling = true;
 
-      // 最初のタスクの前にオーバーレイを表示
-      if (overlay) {
-          overlay.style.display = 'flex';
-          setTimeout(() => overlay.classList.add('visible'), 10);
-      }
+    const userId = document.body.dataset.userId;
+    if (!userId) {
+        isPolling = false;
+        setTimeout(pollPendingActions, POLLING_INTERVAL);
+        return;
+    }
 
-      for (let i = 0; i < actions.length; i++) {
-        const action_entry = actions[i];
-        console.log("--- DEBUG: Processing action_entry:", action_entry); 
-        
-        const executeResponse = await fetch('/api/execute_action', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ action_entry: action_entry }),
-        });
-        const executeResult = await executeResponse.json();
-        console.log("--- DEBUG: execute_action result:", executeResult);
-
-        if (executeResult.status === 'success' && executeResult.message) {
-            console.log("アクション実行結果:", executeResult.message);
-            
-            const category = executeResult.category;
-            const displayData = executeResult.display_data;
-
-            // --- UI表示/更新ロジック ---
-            if (overlay && category && displayData) {
-                // 1. 背景色クラスを設定
-                overlay.className = 'read-aloud-overlay visible'; // visibleは維持
-                if (category === 'カレンダー') {
-                    overlay.classList.add('overlay-calendar');
-                } else if (category === '収支管理') {
-                    overlay.classList.add('overlay-finance');
-                } else if (category === 'メモ') {
-                    overlay.classList.add('overlay-memo');
-                }
-
-                // 2. 時間とメッセージコンテンツを生成
-                overlayContent.innerHTML = ''; 
-                overlayTime.textContent = new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
-                overlayContent.appendChild(overlayTime);
-                
-                let detailedContent;
-                if (category === 'カレンダー') {
-                    detailedContent = createCalendarUI(displayData);
-                } else if (category === '収支管理') {
-                    detailedContent = createFinanceUI(displayData);
-                } else if (category === 'メモ') {
-                    detailedContent = createMemoUI(displayData);
-                } else {
-                    const messageElement = document.createElement('div');
-                    messageElement.className = 'overlay-message';
-                    messageElement.textContent = executeResult.message;
-                    detailedContent = messageElement;
-                }
-                overlayContent.appendChild(detailedContent);
-            }
-
-            // --- 音声再生 ---
-            if (executeResult.action === 'play_alert_sound') {
-                playWakeWordSound();
-            }
-            await speakText(executeResult.message);
-        } else if (executeResult.status === 'error') {
-            console.error("アクション実行エラー:", executeResult.message);
+    try {
+        const response = await fetch(`/order/api/pending_actions/${userId}`);
+        if (response.status === 204) {
+            return; // アクションなし
         }
-      }
+        if (!response.ok) {
+            console.error("Failed to poll pending actions: " + response.status + " " + response.statusText);
+            return;
+        }
 
-      // すべてのアクションが完了した後にオーバーレイを非表示にする
-      if (overlay) {
-          overlay.classList.remove('visible');
-          setTimeout(() => {
-              overlay.style.display = 'none';
-              overlayContent.innerHTML = '';
-          }, 300); // CSSのtransition時間
-      }
+        const actions = await response.json();
+        if (actions && actions.length > 0) {
+            console.log("RECEIVED PENDING ACTIONS:", actions);
+
+            const overlay = document.getElementById('read-aloud-overlay');
+            const overlayTime = document.getElementById('overlay-time');
+            const overlayMessage = document.getElementById('overlay-message');
+            const bgClasses = ['overlay-calendar', 'overlay-finance', 'overlay-memo'];
+
+            if (!overlay || !overlayTime || !overlayMessage) {
+                console.error("Overlay elements not found in the DOM.");
+                return;
+            }
+
+            // オーバーレイを表示
+            overlay.style.display = 'flex';
+            setTimeout(() => overlay.classList.add('visible'), 10);
+
+            // 現在処理中のアクションIDをグローバルに管理するSetを初期化
+            if (!window.processingActionIds) {
+                window.processingActionIds = new Set();
+            }
+
+            for (const action_entry of actions) {
+                // このアクションがすでに処理中の場合はスキップ
+                if (window.processingActionIds.has(action_entry.id)) {
+                    console.log(`--- DEBUG: Skipping action ${action_entry.id} as it is already being processed.`);
+                    continue;
+                }
+                
+                console.log("--- DEBUG: Processing action_entry:", action_entry);
+
+                // 処理開始を記録
+                window.processingActionIds.add(action_entry.id);
+
+                try {
+                    const executeResponse = await fetch('/api/execute_action', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ action_entry: action_entry }),
+                    });
+
+                    // execute_actionがHTMLエラーページを返した場合の対策
+                    if (!executeResponse.ok) {
+                        const errorText = await executeResponse.text();
+                        console.error(`アクション実行APIエラー: ${executeResponse.status}`, errorText);
+                        // このアクションはスキップして次へ
+                        continue; 
+                    }
+
+                    const executeResult = await executeResponse.json();
+                    console.log("--- DEBUG: execute_action result:", executeResult);
+
+                    if (executeResult.status === 'success' && executeResult.message) {
+                        const category = executeResult.category;
+                        const displayData = executeResult.display_data;
+
+                        // --- UI表示/更新ロジック ---
+                        // 1. 背景色クラスをリセットしてから設定
+                        overlay.classList.remove(...bgClasses);
+                        if (category === 'カレンダー') overlay.classList.add('overlay-calendar');
+                        else if (category === '収支管理') overlay.classList.add('overlay-finance');
+                        else if (category === 'メモ') overlay.classList.add('overlay-memo');
+
+                        // 2. 時間とメッセージコンテンツを安全に更新
+                        overlayTime.textContent = new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+                        
+                        // メッセージエリアをクリアしてから新しいコンテンツを生成
+                        overlayMessage.innerHTML = '';
+                        
+                        let detailedContent;
+                        if (category && displayData) {
+                            if (category === 'カレンダー') detailedContent = createCalendarUI(displayData);
+                            else if (category === '収支管理') detailedContent = createFinanceUI(displayData);
+                            else if (category === 'メモ') detailedContent = createMemoUI(displayData);
+                        }
+                        
+                        if (detailedContent) {
+                            overlayMessage.appendChild(detailedContent);
+                        } else {
+                            overlayMessage.textContent = executeResult.message;
+                        }
+
+                        // --- 音声再生 ---
+                        if (executeResult.action === 'play_alert_sound') playWakeWordSound();
+                        await speakText(executeResult.message);
+
+                    } else if (executeResult.status === 'error') {
+                        console.error("アクション実行エラー:", executeResult.message);
+                        // UIにエラーメッセージを表示することも可能
+                        overlayMessage.textContent = `エラー: ${executeResult.message}`;
+                        await speakText(`エラーが発生しました。${executeResult.message}`);
+                    }
+                } catch (execError) {
+                    console.error("Error during action execution or JSON parsing:", execError);
+                    overlayMessage.textContent = `クライアント側で予期せぬエラーが発生しました。`;
+                    await speakText(`予期せぬエラーが発生しました。`);
+                } finally {
+                    // 処理が完了したらIDをSetから削除する。
+                    // これにより、次回のポーリングで同じアクションが誤って再実行されるのを防ぐ。
+                    window.processingActionIds.delete(action_entry.id);
+                }
+            }
+
+            // すべてのアクションが完了した後にオーバーレイを非表示にする
+            overlay.classList.remove('visible');
+            setTimeout(() => {
+                overlay.style.display = 'none';
+                overlayMessage.innerHTML = ''; // コンテンツをクリア
+                overlay.classList.remove(...bgClasses); // 背景色をリセット
+            }, 500); // フェードアウトの時間
+
+        }
+    } catch (error) {
+        console.error("Error polling pending actions:", error);
+    } finally {
+        isPolling = false;
+        setTimeout(pollPendingActions, POLLING_INTERVAL);
     }
-  } catch (error) {
-    console.error("Error polling pending actions:", error);
-  }
 }
 

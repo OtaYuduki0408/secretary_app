@@ -75,27 +75,48 @@ def _execute_calendar_read_aloud(user_id: str, detail_data: dict, triggered_at: 
     end_time_str = _parse_time_param(detail_data.get('end_time'), current_dt_jst)
 
     try:
+        # 時刻文字列を安全に解析
+        start_hour, start_minute = (0, 0)
+        if isinstance(start_time_str, str) and ':' in start_time_str:
+            parts = start_time_str.split(':')
+            try:
+                start_hour = int(parts[0])
+                start_minute = int(parts[1]) if len(parts) > 1 else 0
+            except ValueError:
+                pass # 数値に変換できなければデフォルト値のまま
+
+        end_hour, end_minute = (23, 59)
+        if isinstance(end_time_str, str) and ':' in end_time_str:
+            parts = end_time_str.split(':')
+            try:
+                end_hour = int(parts[0])
+                end_minute = int(parts[1]) if len(parts) > 1 else 59
+            except ValueError:
+                pass # 数値に変換できなければデフォルト値のまま
+
         # 日付と時刻を結合してdatetimeオブジェクトを作成
         start_datetime = datetime(
             int(start_year) if start_year else current_dt_jst.year,
             int(start_month) if start_month else current_dt_jst.month,
             int(start_day) if start_day else current_dt_jst.day,
-            int(start_time_str.split(':')[0]) if start_time_str else 0,
-            int(start_time_str.split(':')[1]) if start_time_str else 0
+            start_hour,
+            start_minute
         )
         end_datetime = datetime(
             int(end_year) if end_year else current_dt_jst.year,
             int(end_month) if end_month else current_dt_jst.month,
             int(end_day) if end_day else current_dt_jst.day,
-            int(end_time_str.split(':')[0]) if end_time_str else 23, # デフォルトで一日の終わり
-            int(end_time_str.split(':')[1]) if end_time_str else 59  # デフォルトで一日の終わり
+            end_hour,
+            end_minute
         )
         # JSTをローカライズ
         start_datetime = JST.localize(start_datetime)
         end_datetime = JST.localize(end_datetime)
 
     except Exception as e:
+        import traceback
         print(f"カレンダー読み上げ: 日時解析エラー: {e}")
+        print(traceback.format_exc())
         return {"status": "error", "message": f"カレンダー読み上げに失敗しました: 日時解析エラー {e}"}
 
     # ScheduleManagerを使ってイベントを取得
