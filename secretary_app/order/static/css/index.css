@@ -570,3 +570,17 @@ body.co-body {
     margin-right: 0;
   }
 }
+
+/* ネストレベルに応じたインデント */
+.condition-block[data-nest-level="1"], .item[data-nest-level="1"] {
+  margin-left: 20px;
+}
+.condition-block[data-nest-level="2"], .item[data-nest-level="2"] {
+  margin-left: 40px;
+}
+.condition-block[data-nest-level="3"], .item[data-nest-level="3"] {
+  margin-left: 60px;
+}
+.condition-block[data-nest-level="4"], .item[data-nest-level="4"] {
+  margin-left: 80px;
+}

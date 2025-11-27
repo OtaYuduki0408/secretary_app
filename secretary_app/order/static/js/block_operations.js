@@ -236,8 +236,8 @@ export function addConditionBlock(anchorElement, data={}) {
 
   // --- Event Listeners ---
   content.querySelector(".remove-condition").onclick = () => block.remove();
-  content.querySelector(".add-nested-condition").onclick = (event) => addConditionBlock(event.currentTarget.closest(".nested-conditions"), data);
   content.querySelector(".add-nested-action").onclick = (event) => addAction(event.currentTarget.closest(".nested-actions"), {});
+  content.querySelector(".add-nested-condition").onclick = (event) => addConditionBlock(event.currentTarget.closest(".nested-conditions"), data);
   
   const siblingActionBtn = content.querySelector(".add-sibling-action");
   const siblingCondBtn = content.querySelector(".add-sibling-condition");
