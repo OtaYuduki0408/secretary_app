@@ -116,43 +116,70 @@ async function getActionsToExecute(conditions) {
 function executeAction(action) {
     console.log("アクションを実行します:", action);
     let textToSpeak = "";
+    let overlayTitle = "";
+    let overlayCategoryClass = "overlay-speech"; // デフォルトは汎用読み上げ
+
+    // UI表示要素の取得
+    const overlay = document.getElementById('read-aloud-overlay');
+    const timeElement = document.getElementById('overlay-time');
+    const messageElement = document.getElementById('overlay-message');
+
+    // 既存のカテゴリクラスをすべて削除
+    overlay.classList.remove('overlay-calendar', 'overlay-finance', 'overlay-memo', 'overlay-speech');
+
+    // 現在時刻の表示
+    const now = new Date();
+    const formattedTime = now.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    if (timeElement) {
+        timeElement.textContent = formattedTime;
+    }
+    
+    let messageHtml = ""; // overlay-messageに挿入するHTML
 
     if (action.category === '発声') {
         textToSpeak = action.detail.text;
+        overlayTitle = "読み上げ";
+        overlayCategoryClass = "overlay-speech";
+        messageHtml = `<p>${textToSpeak}</p>`;
     } else if (action.category === 'カレンダー' && action.sub === '読み上げ') {
         const itemName = action.detail.item_name || 'カレンダーイベント';
         const startTime = action.detail.start_time;
         const endTime = action.detail.end_time;
-        const startDate = action.detail.start_day; // detail に start_day があることを前提
-        const endDate = action.detail.end_day;     // detail に end_day があることを前提
+        const startDate = action.detail.start_day;
+        const endDate = action.detail.end_day;
+        const eventLink = action.detail.event_link; // イベントリンクを追加
 
-        if (startTime && endTime) {
-            // 例: 「今日の午後3時から午後4時までのミーティング」
-            // 日付情報もあれば追加
-            let datePart = "";
-            if (startDate && endDate && startDate !== "実行された日") {
-                if (startDate === endDate) {
-                    datePart = `${startDate}日の`;
-                } else {
-                    datePart = `${startDate}日から${endDate}日までの`;
-                }
-            } else if (startDate === "実行された日") {
-                 datePart = "今日の"; // 仮に"実行された日"が今日を意味すると解釈
-            }
-
-
-            textToSpeak = `${datePart}${itemName}が、${startTime}から${endTime}までです。`;
-        } else {
-            // 時間情報がない場合
-            textToSpeak = `${itemName}の予定です。`;
-        }
+        overlayTitle = "カレンダー";
+        overlayCategoryClass = "overlay-calendar";
         
+        let datePart = "";
+        if (startDate && endDate && startDate !== "実行された日") {
+            if (startDate === endDate) {
+                datePart = `${startDate}日の`;
+            } else {
+                datePart = `${startDate}日から${endDate}日までの`;
+            }
+        } else if (startDate === "実行された日") {
+             datePart = "今日の";
+        }
+
+        textToSpeak = `${datePart}${itemName}が、${startTime}から${endTime}までです。`;
+        messageHtml = `
+            <h3>${overlayTitle}</h3>
+            <div class="event-details">
+                <p><strong>イベント:</strong> ${itemName}</p>
+                <p><strong>期間:</strong> ${datePart}${startTime} - ${endTime}</p>
+                ${eventLink ? `<p><a href="${eventLink}" target="_blank" style="color: #60a5fa;">イベントを見る</a></p>` : ''}
+            </div>
+        `;
     } else if (action.category === '収支' && action.sub === '読み上げ') {
-        // 収支読み上げのロジックを追加
         const recordType = action.detail.record_type || '記録';
         const amount = action.detail.amount;
         const description = action.detail.description;
         const category = action.detail.category;
+
+        overlayTitle = "収支管理";
+        overlayCategoryClass = "overlay-finance";
 
         let recordText = `${recordType}の記録です。`;
         if (amount) {
@@ -165,24 +192,43 @@ function executeAction(action) {
             recordText += `内容は${description}。`;
         }
         textToSpeak = recordText;
+        messageHtml = `
+            <h3>${overlayTitle}</h3>
+            <div class="finance-details">
+                <p><strong>種類:</strong> ${recordType}</p>
+                <p><strong>金額:</strong> ${amount ? `${amount}円` : '不明'}</p>
+                <p><strong>カテゴリ:</strong> ${category || '不明'}</p>
+                ${description ? `<p><strong>内容:</strong> ${description}</p>` : ''}
+            </div>
+        `;
+    } else if (action.category === 'メモ' && action.sub === '読み上げ') {
+        const memoContent = action.detail.content || 'メモの内容がありません。'; // メモの詳細情報を取得
+
+        overlayTitle = "メモ";
+        overlayCategoryClass = "overlay-memo";
+        textToSpeak = `メモの読み上げです。内容は「${memoContent}」です。`;
+        messageHtml = `
+            <h3>${overlayTitle}</h3>
+            <div class="memo-details">
+                <p>${memoContent}</p>
+            </div>
+        `;
     }
     // TODO: 他のカテゴリの読み上げもここに追加
 
-    if (textToSpeak) {
-        // UI表示の処理
-        const overlay = document.getElementById('read-aloud-overlay');
-        const messageElement = document.getElementById('overlay-message');
+    if (textToSpeak && overlay && messageElement) {
+        // オーバーレイにカテゴリクラスを追加
+        overlay.classList.add(overlayCategoryClass);
+        messageElement.innerHTML = messageHtml; // HTMLを挿入
 
-        if (overlay && messageElement) {
-            messageElement.textContent = textToSpeak;
-            overlay.style.display = 'flex'; // オーバーレイを表示
+        // オーバーレイを表示
+        overlay.classList.add('visible');
 
-            // テキストの長さに応じて表示時間を調整（最小5秒、1文字あたり0.1秒）
-            const displayDuration = Math.max(5000, textToSpeak.length * 100);
-            setTimeout(() => {
-                overlay.style.display = 'none';
-            }, displayDuration);
-        }
+        // テキストの長さに応じて表示時間を調整（最小5秒、1文字あたり0.1秒）
+        const displayDuration = Math.max(5000, textToSpeak.length * 100);
+        setTimeout(() => {
+            overlay.classList.remove('visible'); // オーバーレイを非表示
+        }, displayDuration);
 
         // 音声読み上げの処理
         if (typeof SpeechSynthesisUtterance !== 'undefined' && typeof speechSynthesis !== 'undefined') {
@@ -228,8 +274,6 @@ function setupWebSocket() {
     // サーバーからコマンド実行の指示を受け取るリスナー
     socket.on('dispatch_command', async (order_data) => {
         console.log('サーバーからコマンドディスパッチを受け取りました:', order_data);
-        console.log('DEBUG: Received order_data:', JSON.stringify(order_data, null, 2));
-
         const conditions = order_data.conditions || [];
         const top_level_actions = order_data.actions || [];
 
@@ -241,8 +285,6 @@ function setupWebSocket() {
             // 条件がなければトップレベルのアクションを実行
             actionsToExecute = top_level_actions;
         }
-
-        console.log('DEBUG: Actions to execute:', JSON.stringify(actionsToExecute, null, 2));
 
         if (actionsToExecute && actionsToExecute.length > 0) {
             console.log("条件を満たしました。アクションを実行します。");

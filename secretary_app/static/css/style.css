@@ -1379,6 +1379,9 @@ html.theme-light .spotify-btn svg{
 .read-aloud-overlay.overlay-memo {
     background-color: #f39c12; /* オレンジ */
 }
+.read-aloud-overlay.overlay-speech {
+    background-color: #8e44ad; /* 紫（読み上げ専用） */
+}
 
 .overlay-content {
     max-width: 80%;
