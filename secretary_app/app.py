@@ -8,6 +8,7 @@ from flask import (
     Flask, render_template, jsonify, request, redirect, url_for, session, abort, g,
     send_from_directory,
 )
+from flask_socketio import SocketIO
 from spotipy.oauth2 import SpotifyOAuth
 import spotipy
 from services.google_oauth import build_web_flow, get_google_redirect_uri
@@ -49,7 +50,11 @@ from order.evaluator import evaluate_triggers # 関数名を修正
 
 # ============== 基本設定 ==============
 app = Flask(__name__, template_folder='templates', static_folder='static')
+socketio = SocketIO(app, async_mode='threading', cors_allowed_origins="*")
 app.config['VERSION_TIMESTAMP'] = int(datetime.now().timestamp()) # キャッシュバスター用
+
+# 接続中のユーザーを管理するための辞書 {user_id: sid}
+connected_users = {}
 
 # DBファイルのパス設定
 instance_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'instance')
@@ -86,8 +91,9 @@ order_html_dir = os.path.join(os.path.dirname(__file__), 'order', 'static', 'htm
 @custom_order_pages_bp.route('/')
 def custom_order_index():
     gcp_api_key = os.getenv('GCP_API_KEY')
-    print(f"DEBUG: GCP_API_KEY from environment: {{gcp_api_key}}") # 追加
-    return render_template('index.html', gcp_api_key=gcp_api_key)
+    user_id = session.get('user', {}).get('id') if session.get('user') else None
+    print(f"DEBUG: GCP_API_KEY from environment: {{gcp_api_key}}")
+    return render_template('index.html', gcp_api_key=gcp_api_key, user_id=user_id)
 
 @custom_order_pages_bp.route('/edit')
 @custom_order_pages_bp.route('/edit/<int:order_id>')
@@ -96,6 +102,35 @@ def edit_command_page(order_id=None):
 
 app.register_blueprint(custom_order_pages_bp, url_prefix='/custom_order')
 
+
+# ============== WebSocket 接続管理 ==============
+@socketio.on('connect')
+def handle_connect():
+    print(f"Client attempting to connect: sid={request.sid}")
+
+@socketio.on('authenticate')
+def handle_authenticate(data):
+    user_id = data.get('user_id')
+    if user_id:
+        connected_users[user_id] = request.sid
+        print(f"Client authenticated and connected: user_id={user_id}, sid={request.sid}")
+    else:
+        print(f"Authentication failed for sid={request.sid}")
+
+@socketio.on('disconnect')
+def handle_disconnect():
+    # 切断したクライアントをconnected_usersから削除
+    disconnected_sid = request.sid
+    user_id_to_remove = None
+    for user_id, sid in connected_users.items():
+        if sid == disconnected_sid:
+            user_id_to_remove = user_id
+            break
+    if user_id_to_remove:
+        del connected_users[user_id_to_remove]
+        print(f"Client disconnected: user_id={user_id_to_remove}, sid={disconnected_sid}")
+    else:
+        print(f"Unauthenticated client disconnected: sid={disconnected_sid}")
 
 # ============== APIキー認証（api/* のみ）==============
 ALLOWED_API_KEYS = set(os.environ.get('ALLOWED_API_KEYS', '').split(','))
@@ -874,10 +909,20 @@ with app.app_context():
     db.create_all()
 
 # APSchedulerのジョブをラップする関数
-def _run_job_with_app_context(func): # app_instance を引数から削除
-    # グローバルスコープにある app インスタンスに直接アクセス
-    with app.app_context(): # app がこのスコープで利用可能であることを前提
-        func()
+def _run_job_with_app_context(func):
+    with app.app_context():
+        # evaluate_triggersからディスパッチリストを取得
+        dispatch_list = func()
+        if dispatch_list:
+            print(f"Dispatching {len(dispatch_list)} commands to clients...")
+            for user_id, order_data in dispatch_list:
+                # ユーザーが接続中か確認
+                sid = connected_users.get(user_id)
+                if sid:
+                    print(f"Dispatching command for user {user_id} to sid {sid}")
+                    socketio.emit('dispatch_command', order_data, room=sid)
+                else:
+                    print(f"User {user_id} is not connected. Command not dispatched.")
 
 # アプリケーション終了時にスケジューラをシャットダウン
 atexit.register(lambda: scheduler.shutdown())
@@ -888,13 +933,13 @@ if __name__ == '__main__':
         # APSchedulerジョブの登録
         scheduler.add_job(
             id='time_trigger_evaluator',
-            func=_run_job_with_app_context, # ラッパー関数を呼び出す
+            func=_run_job_with_app_context,
             trigger='cron',
             minute='*', # 毎分実行
             second=0, # 毎分00秒に実行
             replace_existing=True,
-            args=[evaluate_triggers] # 実行する関数名を修正
+            args=[evaluate_triggers] # 引数はevaluate_triggers関数オブジェクトのみ
         )
         scheduler.start()
         
-    app.run(host='0.0.0.0', port=5000, debug=True, ssl_context='adhoc')
+    socketio.run(app, host='0.0.0.0', port=5000, debug=True, ssl_context='adhoc', use_reloader=False)
