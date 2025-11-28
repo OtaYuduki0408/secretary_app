@@ -1,0 +1,720 @@
+// ============================================================================
+// グローバル変数と定数
+// ============================================================================
+const WAKE_WORDS = ['ボイスメイト', 'ぼいすめいと', 'voicemate', '高速実行', 'クイックコマンド'];
+const VOICE_WATE_SOUND_PATH = '/static/voice/voice_wate.mp3';
+const RELODE_SOUND_PATH = '/static/voice/relode.mp3';
+const ERROR_SOUND_PATH = '/static/voice/error.mp3';
+const INPUT_COOLTIME_MS = 1000; // 1秒の入力クールタイム
+
+let recognition; // SpeechRecognitionインスタンス
+let currentMode = 'waiting'; // 'waiting' or 'listening'
+let recognitionTimeoutId; // 音声入力タイムアウトのID
+
+let commandQueue = null; // 完全確定前のコマンドを一時的に保持
+let inputCooltimeTimerId = null; // 入力クールタイムのタイマーID
+let isBackendProcessing = false; // バックエンド処理中フラグ
+
+// TTS (Text-to-Speech) 設定
+const speechSynth = window.speechSynthesis;
+const speechUtterance = new SpeechSynthesisUtterance();
+speechUtterance.lang = 'ja-JP';
+speechUtterance.volume = 1;
+speechUtterance.rate = 1;
+speechUtterance.pitch = 1;
+
+let userInteracted = false; // ユーザーがページとインタラクトしたかどうかのフラグ
+
+// ============================================================================
+// ヘルパー関数
+// ============================================================================
+
+/**
+ * カレンダーUIを生成するヘルパー関数
+ * @param {object} data - バックエンドから受け取ったdisplay_data
+ * @returns {HTMLElement} 生成されたDOM要素
+ */
+function createCalendarUI(data) {
+    const container = document.createElement('div');
+    container.className = 'overlay-calendar-content';
+
+    const title = document.createElement('h2');
+    title.className = 'overlay-category-title';
+    title.textContent = 'カレンダーの予定';
+    container.appendChild(title);
+
+    const dateRange = document.createElement('p');
+    dateRange.className = 'overlay-date-range';
+    const startDt = new Date(data.start_datetime);
+    const endDt = new Date(data.end_datetime);
+    dateRange.textContent = `${startDt.toLocaleDateString('ja-JP', {year: 'numeric', month: 'long', day: 'numeric'})} - ${endDt.toLocaleDateString('ja-JP', {year: 'numeric', month: 'long', day: 'numeric'})}`;
+    container.appendChild(dateRange);
+
+    if (data.events && data.events.length > 0) {
+        const ul = document.createElement('ul');
+        ul.className = 'overlay-event-list';
+        data.events.forEach(event => {
+            const li = document.createElement('li');
+            li.className = 'overlay-event-item';
+            const timeSpan = document.createElement('span');
+            timeSpan.className = 'event-time';
+            timeSpan.textContent = `${event.formatted_start_time || ''} - ${event.formatted_end_time || ''}`;
+            const summarySpan = document.createElement('span');
+            summarySpan.className = 'event-summary';
+            summarySpan.textContent = event.summary;
+            li.appendChild(timeSpan);
+            li.appendChild(summarySpan);
+            ul.appendChild(li);
+        });
+        container.appendChild(ul);
+    } else {
+        const noEvents = document.createElement('p');
+        noEvents.className = 'overlay-no-data';
+        noEvents.textContent = '予定は見つかりませんでした。';
+        container.appendChild(noEvents);
+    }
+    return container;
+}
+
+/**
+ * 収支管理UIを生成するヘルパー関数
+ * @param {object} data - バックエンドから受け取ったdisplay_data
+ * @returns {HTMLElement} 生成されたDOM要素
+ */
+function createFinanceUI(data) {
+    const container = document.createElement('div');
+    container.className = 'overlay-finance-content';
+
+    const title = document.createElement('h2');
+    title.className = 'overlay-category-title';
+    title.textContent = '収支管理';
+    container.appendChild(title);
+
+    const dateRange = document.createElement('p');
+    dateRange.className = 'overlay-date-range';
+    dateRange.textContent = data.date_range || '期間指定なし';
+    container.appendChild(dateRange);
+
+    const details = data.details;
+    if (details.item === 'total_balance' || details.item === 'monthly_expense' || details.item === 'daily_expense' || details.item === 'monthly_income') {
+        const itemValue = document.createElement('p');
+        itemValue.className = 'finance-value';
+        itemValue.textContent = `${details.value.toLocaleString()} ${details.unit}`;
+        container.appendChild(itemValue);
+        const itemLabel = document.createElement('p');
+        itemLabel.className = 'finance-label';
+        itemLabel.textContent = details.item === 'total_balance' ? '現在の所持金' :
+                                details.item === 'monthly_expense' ? '今月の支出' :
+                                details.item === 'daily_expense' ? '今日の支出' :
+                                '今月の収入';
+        container.appendChild(itemLabel);
+    } else if (details.item === 'remaining_to_target') {
+        if (details.goal_amount) {
+            const goalP = document.createElement('p');
+            goalP.className = 'finance-label';
+            goalP.textContent = `今月の目標: ${details.goal_amount.toLocaleString()} ${details.unit}`;
+            container.appendChild(goalP);
+            const remainingP = document.createElement('p');
+            remainingP.className = 'finance-value';
+            remainingP.textContent = `残り: ${details.remaining.toLocaleString()} ${details.unit}`;
+            container.appendChild(remainingP);
+        } else {
+            const messageP = document.createElement('p');
+            messageP.className = 'overlay-no-data';
+            messageP.textContent = details.message || '目標額が設定されていません。';
+            container.appendChild(messageP);
+        }
+    } else if (details.item === 'period_summary') {
+        const summary = details.summary;
+        const incomeP = document.createElement('p');
+        incomeP.className = 'finance-summary-item income';
+        incomeP.textContent = `収入: ${summary.total_income.toLocaleString()} ${summary.unit}`;
+        container.appendChild(incomeP);
+        const expenseP = document.createElement('p');
+        expenseP.className = 'finance-summary-item expense';
+        expenseP.textContent = `支出: ${summary.total_expense.toLocaleString()} ${summary.unit}`;
+        container.appendChild(expenseP);
+        const balanceP = document.createElement('p');
+        balanceP.className = 'finance-summary-item balance';
+        balanceP.textContent = `収支: ${summary.net_balance.toLocaleString()} ${summary.unit}`;
+        container.appendChild(balanceP);
+    } else {
+        const messageP = document.createElement('p');
+        messageP.className = 'overlay-no-data';
+        messageP.textContent = details.message || 'データが見つかりませんでした。';
+        container.appendChild(messageP);
+    }
+    return container;
+}
+
+/**
+ * メモUIを生成するヘルパー関数
+ * @param {object} data - バックエンドから受け取ったdisplay_data
+ * @returns {HTMLElement} 生成されたDOM要素
+ */
+function createMemoUI(data) {
+    const container = document.createElement('div');
+    container.className = 'overlay-memo-content';
+
+    const title = document.createElement('h2');
+    title.className = 'overlay-category-title';
+    title.textContent = 'メモ';
+    container.appendChild(title);
+
+    if (data.memos && data.memos.length > 0) {
+        const ul = document.createElement('ul');
+        ul.className = 'overlay-memo-list';
+        data.memos.forEach(memo => {
+            const li = document.createElement('li');
+            li.className = 'overlay-memo-item';
+            const memoTitle = document.createElement('h3');
+            memoTitle.className = 'memo-title';
+            memoTitle.textContent = memo.title || '無題';
+            const memoContent = document.createElement('p');
+            memoContent.className = 'memo-content';
+            memoContent.textContent = memo.content;
+            li.appendChild(memoTitle);
+            li.appendChild(memoContent);
+            ul.appendChild(li);
+        });
+        container.appendChild(ul);
+    } else {
+        const noMemos = document.createElement('p');
+        noMemos.className = 'overlay-no-data';
+        noMemos.textContent = 'メモは見つかりませんでした。';
+        container.appendChild(noMemos);
+    }
+    return container;
+}
+
+/**
+ * 音声ファイルを再生する
+ * @param {string} filename - 再生する音声ファイルのパス
+ */
+function playSound(filename) {
+    const audio = new Audio(filename);
+    audio.play().catch(e => console.error("音声再生エラー:", e));
+}
+
+/**
+ * TTSでテキストを読み上げる (Promiseを返すように変更)
+ * @param {string} text - 読み上げるテキスト
+ * @returns {Promise<void>} 発話が完了したら解決するPromise
+ */
+function speakText(text) {
+    return new Promise((resolve, reject) => {
+        if (speechSynth && speechUtterance) {
+            const cleanedText = text.replace(/'/g, ''); 
+            speechSynth.cancel(); // 以前の発話を中断
+            speechUtterance.text = cleanedText; // 修正後のテキストを設定
+            
+            speechUtterance.onend = () => {
+                resolve();
+            };
+            speechUtterance.onerror = (event) => {
+                console.error('TTSエラー:', event.error);
+                reject(event.error);
+            };
+
+            speechSynth.speak(speechUtterance);
+        } else {
+            console.warn("TTS機能が利用できません。");
+            resolve();
+        }
+    });
+}
+
+/**
+ * アラート音を鳴らす (ウェイクワード検出時)
+ */
+function playWakeWordSound() {
+    try {
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        // AudioContextがsuspended状態であればresumeする
+        if (audioContext.state === 'suspended') {
+            audioContext.resume().then(() => {
+                console.log('AudioContext resumed successfully');
+            }).catch(e => console.error('Failed to resume AudioContext:', e));
+        }
+
+        const oscillator = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
+
+        oscillator.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+
+        oscillator.type = 'sine'; // サイン波
+        oscillator.frequency.value = 440; // 440Hz (A4)
+        gainNode.gain.value = 0.1; // 音量
+
+        oscillator.start();
+        oscillator.stop(audioContext.currentTime + 0.1); // 0.1秒後に停止
+    } catch (e) {
+        console.warn("アラート音の再生に失敗しました:", e);
+    }
+}
+
+/**
+ * モードを切り替える ('waiting' または 'listening')
+ * @param {string} newMode - 新しいモード
+ */
+function setMode(newMode) {
+    if (currentMode === newMode) return; // 同じモードなら何もしない
+
+    console.log(`DEBUG: モード変更: ${currentMode} -> ${newMode}`);
+    currentMode = newMode;
+    clearTimeout(recognitionTimeoutId); // 既存のタイムアウトをクリア
+
+    const micButton = document.querySelector('.mic-btn');
+    const searchBox = document.getElementById('searchbox');
+
+    if (currentMode === 'listening') {
+        micButton.classList.add('active');
+        searchBox.placeholder = "お話しください...";
+        searchBox.value = ''; // 入力欄をクリア
+        playSound(VOICE_WATE_SOUND_PATH); // 音声入力開始時のサウンド
+        
+        // 10秒後に自動でwaitingモードに戻るタイムアウトを設定
+        recognitionTimeoutId = setTimeout(() => {
+            if (currentMode === 'listening') {
+                console.log("コマンド入力タイムアウト。待機モードに戻ります。");
+                setMode('waiting');
+            }
+        }, 10000);
+    } else { // 'waiting'
+        micButton.classList.remove('active');
+        searchBox.placeholder = "「ボイスメイト」または「クイックコマンド」と呼びかけてください";
+        searchBox.value = '';
+    }
+}
+
+/**
+ * コマンドをバックエンドに送信し、応答を処理する
+ * @param {string} command - 送信するコマンド
+ */
+async function sendCommandToBackend(command) {
+    if (isBackendProcessing) {
+        console.log("DEBUG: バックエンド処理中のため、新しいコマンドを却下します。");
+        playSound(ERROR_SOUND_PATH); // エラー音を再生
+        return;
+    }
+
+    isBackendProcessing = true; // バックエンド処理中フラグを立てる
+    const searchBox = document.getElementById('searchbox');
+    searchBox.value = command + ';'; // searchBoxに最終的なコマンドを表示
+
+    try {
+        const response = await fetch('/web_api/chat', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ inputValue: command }),
+        });
+        const data = await response.json();
+        console.log('DEBUG: バックエンドからの応答:', data);
+
+        // 7. 処理終了後のユーザーフィードバック
+        if (data.message) {
+            speakText(data.message);
+        }
+        // ここで必要に応じてUIを更新する処理を追加
+    } catch (error) {
+        console.error('DEBUG: コマンド送信エラー:', error);
+        playSound(ERROR_SOUND_PATH); // ★追加: コマンド送信エラー時にもエラー音を再生
+        // エラー処理
+    } finally {
+        isBackendProcessing = false; // バックエンド処理終了
+        setMode('waiting'); // 待機モードに戻る
+    }
+}
+
+// ============================================================================
+// イベントハンドラ
+// ============================================================================
+
+document.addEventListener('DOMContentLoaded', () => {
+    console.log("DEBUG: DOMContentLoaded fired.");
+
+    const micButton = document.querySelector('.mic-btn');
+    const searchBox = document.getElementById('searchbox');
+    const searchForm = document.getElementById('search-form'); // main.htmlでidをsearch-formに変更
+
+    // Web Speech APIのサポートチェック
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+        console.error("Web Speech API はこのブラウザでサポートされていません。");
+        micButton.disabled = true;
+        searchBox.placeholder = "音声認識非対応";
+        return;
+    }
+
+    // SpeechRecognitionの初期化
+    recognition = new SpeechRecognition();
+    recognition.lang = 'ja-JP';
+    recognition.continuous = true; // 継続的な認識
+    recognition.interimResults = true; // 暫定結果を返す
+
+    // ------------------------------------------------------------------------
+    // 音声認識イベント
+    // ------------------------------------------------------------------------
+    recognition.onresult = (event) => {
+        let finalTranscript = '';
+        let interimTranscript = '';
+
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+            const transcript = event.results[i][0].transcript;
+            if (event.results[i].isFinal) {
+                finalTranscript += transcript;
+            } else {
+                interimTranscript += transcript;
+            }
+        }
+        // searchBoxに暫定結果を表示
+        searchBox.value = finalTranscript + interimTranscript;
+
+        // 1. ユーザーによる入力 (音声) - ウェイクワード検出
+        if (currentMode === 'waiting') {
+            const lowerTranscript = (finalTranscript + interimTranscript).toLowerCase();
+            if (WAKE_WORDS.some(word => lowerTranscript.includes(word))) {
+                console.log("DEBUG: ウェイクワードを検出");
+                if (!userInteracted) {
+                    userInteracted = true; // ウェイクワード検出時にもフラグを立てる
+                    new Audio().play().catch(e => console.log("ダミー音声再生エラー (無視可能):", e));
+                }
+                playWakeWordSound(); // アラート音を鳴らす
+                setMode('listening'); // listeningモードに切り替え
+                // ウェイクワード検出時は、searchBoxはクリアされるので、ここでfinalTranscriptを処理しない
+                return; 
+            }
+        } 
+        
+        // 1. ユーザーによる入力 (音声) - 入力確定
+        if (currentMode === 'listening' && finalTranscript.trim()) {
+            console.log(`DEBUG: 音声入力確定: "${finalTranscript.trim()}"`);
+            processInput(finalTranscript.trim(), 'voice');
+        }
+    };
+
+    recognition.onend = () => {
+        console.log("DEBUG: recognition.onend fired.");
+        console.log("認識セッション終了。1秒後に再開します。");
+        setTimeout(() => {
+            if (!recognition.recognizing) {
+                try {
+                    recognition.start();
+                } catch(e) {
+                    console.error("認識の再開に失敗:", e);
+                }
+            }
+        }, 1000);
+    };
+    
+    recognition.onerror = (event) => {
+        console.error('DEBUG: 音声認識エラー:', event.error);
+        // 'no-speech'エラーは無視することが多いが、必要に応じて処理
+        if (event.error === 'no-speech') {
+            // 音声が検出されなかった場合、listeningモードからwaitingモードに戻す
+            if (currentMode === 'listening') {
+                setMode('waiting');
+            }
+            return;
+        }
+    };
+
+    // ------------------------------------------------------------------------
+    // UIイベント
+    // ------------------------------------------------------------------------
+
+    // 音声入力ボタンクリック
+    micButton.addEventListener('click', () => {
+        console.log("DEBUG: micButton clicked.");
+        if (!userInteracted) {
+            userInteracted = true; // 最初のクリックでフラグを立てる
+            // ここでダミーの音声再生を試みることで、AudioContextをアクティブにする
+            new Audio().play().catch(e => console.log("ダミー音声再生エラー (無視可能):", e));
+        }
+
+        if (currentMode === 'listening') {
+            setMode('waiting');
+        } else {
+            setMode('listening');
+        }
+    });
+
+    // テキストフォーム送信 (Enterキー)
+    searchForm.addEventListener('submit', (event) => {
+        event.preventDefault(); // フォームのデフォルト送信を防止
+        if (!userInteracted) {
+            userInteracted = true; // テキスト入力時にもフラグを立てる
+            new Audio().play().catch(e => console.log("ダミー音声再生エラー (無視可能):", e));
+        }
+        const inputText = searchBox.value.trim();
+        if (inputText) {
+            console.log(`DEBUG: テキスト入力確定: "${inputText}"`);
+            processInput(inputText, 'text');
+        }
+        searchBox.value = ''; // 送信後、入力欄をクリア
+    });
+
+    // ------------------------------------------------------------------------
+    // 入力処理のメインロジック
+    // ------------------------------------------------------------------------
+
+    /**
+     * ユーザーからの入力を処理する
+     * @param {string} input - ユーザーの入力テキスト
+     * @param {'voice'|'text'} inputType - 入力の種類 ('voice' または 'text')
+     */
+    function processInput(input, inputType) {
+        // 2. 入力却下 - ウェイクワードのみの場合
+        const lowerInput = input.toLowerCase();
+        if (WAKE_WORDS.includes(lowerInput)) {
+            console.log("DEBUG: ウェイクワードのみの入力のため却下。");
+            if (inputType === 'voice') {
+                // 音声入力の場合、即座に待機モードに戻る
+                // voice_wate.mp3の再生が完了するまで待ってからwaitingモードに戻る
+                setTimeout(() => {
+                    setMode('waiting');
+                }, 500); // voice_wate.mp3の再生時間に合わせて調整
+            } else {
+                // テキスト入力の場合、単に待機モードに戻る
+                setMode('waiting');
+            }
+            return;
+        }
+
+        // 6. バックエンド中の新規入力
+        if (isBackendProcessing) {
+            console.log("DEBUG: バックエンド処理中のため、新しい入力を却下します。");
+            playSound(ERROR_SOUND_PATH); // エラー音を再生
+            setMode('waiting'); // 待機モードに戻る
+            return;
+        }
+
+        // 3. 入力クールタイム (音声入力のみに適用)
+        if (inputType === 'voice') {
+            // クールタイム中の新しい音声入力があった場合、前のクールタイムをクリア
+            if (inputCooltimeTimerId) {
+                clearTimeout(inputCooltimeTimerId);
+                console.log("DEBUG: 既存の入力クールタイムをクリアしました。");
+            }
+
+            commandQueue = input; // コマンドをキューに格納
+            console.log(`DEBUG: コマンドをキューに格納 (クールタイム開始): "${commandQueue}"`);
+
+            inputCooltimeTimerId = setTimeout(() => {
+                // クールタイム終了後、完全確定したコマンドを処理
+                if (commandQueue) {
+                    console.log(`DEBUG: クールタイム終了。コマンドを完全確定: "${commandQueue}"`);
+                    handleFinalCommand(commandQueue);
+                    commandQueue = null; // 処理後キューをクリア
+                } else {
+                    console.log("DEBUG: クールタイム終了時、コマンドキューが空でした。");
+                    setMode('waiting');
+                }
+            }, INPUT_COOLTIME_MS);
+        } else { // テキスト入力はクールタイムなしで即時処理
+            handleFinalCommand(input);
+        }
+    }
+
+    /**
+     * 完全確定したコマンドを処理する
+     * @param {string} finalCommand - 完全確定したコマンド
+     */
+    function handleFinalCommand(finalCommand) {
+        playSound(RELODE_SOUND_PATH); // 音声確定時のアナウンス
+
+        // 4. ユーザーフィードバック
+        let feedbackMessage;
+        const lowerFinalCommand = finalCommand.toLowerCase();
+        // WAKE_WORDSに"クイックコマンド"が含まれているか、かつ入力が"クイックコマンド"で始まるか
+        if (WAKE_WORDS.includes('クイックコマンド') && lowerFinalCommand.startsWith('クイックコマンド')) {
+            feedbackMessage = `${finalCommand}を実行完了しました`;
+        } else {
+            feedbackMessage = `${finalCommand}でございますね。かしこまりました`;
+        }
+        
+        // ★追加: フィードバックテキストからウェイクワードを削除
+        let cleanedFeedbackMessage = feedbackMessage;
+        WAKE_WORDS.forEach(word => {
+            // 大文字小文字を区別しない置換
+            const regex = new RegExp(word, 'gi');
+            cleanedFeedbackMessage = cleanedFeedbackMessage.replace(regex, '');
+        });
+
+        speakText(cleanedFeedbackMessage); // 修正後のメッセージを発話
+
+        // 5. バックエンド送信
+        sendCommandToBackend(finalCommand);
+    }
+
+    // ------------------------------------------------------------------------
+    // 初期起動
+    // ------------------------------------------------------------------------
+    setMode('waiting'); // 初期モード設定
+    try {
+        recognition.start(); // 音声認識開始
+    } catch(e) {
+        console.error("初期認識開始に失敗", e);
+    }
+    
+    // 5秒ごとに保留中のアクションをポーリング
+    // setInterval(pollPendingActions, 5000);
+    // ↓
+    // 再帰的なsetTimeoutでポーリングを開始
+    setTimeout(pollPendingActions, 5000);
+});
+
+// ============================================================================
+// 保留中アクションのポーリング
+// ============================================================================
+let isPolling = false; // ポーリング処理中フラグ
+const POLLING_INTERVAL = 5000; // ポーリング間隔
+
+async function pollPendingActions() {
+    if (isPolling) {
+        console.log("INFO: Polling is already in progress. Skipping.");
+        return;
+    }
+    isPolling = true;
+
+    const userId = document.body.dataset.userId;
+    if (!userId) {
+        isPolling = false;
+        setTimeout(pollPendingActions, POLLING_INTERVAL);
+        return;
+    }
+
+    try {
+        const response = await fetch(`/order/api/pending_actions/${userId}`);
+        if (response.status === 204) {
+            return; // アクションなし
+        }
+        if (!response.ok) {
+            console.error("Failed to poll pending actions: " + response.status + " " + response.statusText);
+            return;
+        }
+
+        const actions = await response.json();
+        if (actions && actions.length > 0) {
+            console.log("RECEIVED PENDING ACTIONS:", actions);
+
+            const overlay = document.getElementById('read-aloud-overlay');
+            const overlayTime = document.getElementById('overlay-time');
+            const overlayMessage = document.getElementById('overlay-message');
+            const bgClasses = ['overlay-calendar', 'overlay-finance', 'overlay-memo'];
+
+            if (!overlay || !overlayTime || !overlayMessage) {
+                console.error("Overlay elements not found in the DOM.");
+                return;
+            }
+
+            // オーバーレイを表示
+            overlay.style.display = 'flex';
+            setTimeout(() => overlay.classList.add('visible'), 10);
+
+            // 現在処理中のアクションIDをグローバルに管理するSetを初期化
+            if (!window.processingActionIds) {
+                window.processingActionIds = new Set();
+            }
+
+            for (const action_entry of actions) {
+                // このアクションがすでに処理中の場合はスキップ
+                if (window.processingActionIds.has(action_entry.id)) {
+                    console.log(`--- DEBUG: Skipping action ${action_entry.id} as it is already being processed.`);
+                    continue;
+                }
+                
+                console.log("--- DEBUG: Processing action_entry:", action_entry);
+
+                // 処理開始を記録
+                window.processingActionIds.add(action_entry.id);
+
+                try {
+                    const executeResponse = await fetch('/api/execute_action', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ action_entry: action_entry }),
+                    });
+
+                    // execute_actionがHTMLエラーページを返した場合の対策
+                    if (!executeResponse.ok) {
+                        const errorText = await executeResponse.text();
+                        console.error(`アクション実行APIエラー: ${executeResponse.status}`, errorText);
+                        // このアクションはスキップして次へ
+                        continue; 
+                    }
+
+                    const executeResult = await executeResponse.json();
+                    console.log("--- DEBUG: execute_action result:", executeResult);
+
+                    if (executeResult.status === 'success' && executeResult.message) {
+                        const category = executeResult.category;
+                        const displayData = executeResult.display_data;
+
+                        // --- UI表示/更新ロジック ---
+                        // 1. 背景色クラスをリセットしてから設定
+                        overlay.classList.remove(...bgClasses);
+                        if (category === 'カレンダー') overlay.classList.add('overlay-calendar');
+                        else if (category === '収支管理') overlay.classList.add('overlay-finance');
+                        else if (category === 'メモ') overlay.classList.add('overlay-memo');
+
+                        // 2. 時間とメッセージコンテンツを安全に更新
+                        overlayTime.textContent = new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+                        
+                        // メッセージエリアをクリアしてから新しいコンテンツを生成
+                        overlayMessage.innerHTML = '';
+                        
+                        let detailedContent;
+                        if (category && displayData) {
+                            if (category === 'カレンダー') detailedContent = createCalendarUI(displayData);
+                            else if (category === '収支管理') detailedContent = createFinanceUI(displayData);
+                            else if (category === 'メモ') detailedContent = createMemoUI(displayData);
+                        }
+                        
+                        if (detailedContent) {
+                            overlayMessage.appendChild(detailedContent);
+                        } else {
+                            overlayMessage.textContent = executeResult.message;
+                        }
+
+                        // --- 音声再生 ---
+                        if (executeResult.action === 'play_alert_sound') playWakeWordSound();
+                        await speakText(executeResult.message);
+
+                    } else if (executeResult.status === 'error') {
+                        console.error("アクション実行エラー:", executeResult.message);
+                        // UIにエラーメッセージを表示することも可能
+                        overlayMessage.textContent = `エラー: ${executeResult.message}`;
+                        await speakText(`エラーが発生しました。${executeResult.message}`);
+                    }
+                } catch (execError) {
+                    console.error("Error during action execution or JSON parsing:", execError);
+                    overlayMessage.textContent = `クライアント側で予期せぬエラーが発生しました。`;
+                    await speakText(`予期せぬエラーが発生しました。`);
+                } finally {
+                    // 処理が完了したらIDをSetから削除する。
+                    // これにより、次回のポーリングで同じアクションが誤って再実行されるのを防ぐ。
+                    window.processingActionIds.delete(action_entry.id);
+                }
+            }
+
+            // すべてのアクションが完了した後にオーバーレイを非表示にする
+            overlay.classList.remove('visible');
+            setTimeout(() => {
+                overlay.style.display = 'none';
+                overlayMessage.innerHTML = ''; // コンテンツをクリア
+                overlay.classList.remove(...bgClasses); // 背景色をリセット
+            }, 500); // フェードアウトの時間
+
+        }
+    } catch (error) {
+        console.error("Error polling pending actions:", error);
+    } finally {
+        isPolling = false;
+        setTimeout(pollPendingActions, POLLING_INTERVAL);
+    }
+}
+

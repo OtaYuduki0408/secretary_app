@@ -1,0 +1,572 @@
+:root {
+  --co-bg: #0A0F1A; /* より深いネイビーブルー */
+  --co-gradient: linear-gradient(140deg, #0A0F1A 0%, #111827 50%, #1A202C 100%); /* 彩度を抑えたグラデーション */
+  --co-card-bg: rgba(17, 24, 39, 0.7); /* カード背景。少し透明感を残す */
+  --co-border: rgba(255, 255, 255, 0.06);
+  --co-border-strong: rgba(110, 231, 255, 0.3); /* Cyan系 */
+  --co-text: #E5E7EB; /* 少し柔らかい白 */
+  --co-muted: rgba(229, 231, 235, 0.7);
+  --co-accent: #6EE7FF; /* Cyan */
+  --co-accent-strong: #818CF8; /* Indigo */
+  --co-danger: #F47174;
+  --co-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.4);
+  --co-radius: 22px;
+  --co-transition: 0.25s ease;
+
+  /* Block Colors */
+  --action-bg-base: hsla(230, 60%, 35%, 0.4); /* アクション: 青紫系 */
+  --action-border-base: hsla(230, 60%, 55%, 0.6);
+  --condition-bg-base: hsla(180, 60%, 35%, 0.4); /* 条件: 青緑系 */
+  --condition-border-base: hsla(180, 60%, 55%, 0.6);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body.co-body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: "Noto Sans JP", "Inter", system-ui, sans-serif;
+  background: var(--co-gradient);
+  color: var(--co-text);
+}
+
+.co-shell {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 56px 20px 90px;
+}
+
+.co-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 24px;
+  margin-bottom: 32px;
+}
+
+.co-link-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 18px;
+  border-radius: 999px;
+  border: 1px solid var(--co-border);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--co-text);
+  text-decoration: none;
+  font-weight: 600;
+  transition: var(--co-transition);
+}
+
+.co-link-btn:hover {
+  color: var(--co-accent);
+  border-color: var(--co-border-strong);
+}
+
+.co-eyebrow {
+  font-size: 0.85rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  margin: 0 0 4px;
+  color: var(--co-muted);
+}
+
+.co-subtitle {
+  margin: 4px 0 0;
+  color: var(--co-muted);
+  line-height: 1.5;
+}
+
+.co-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(260px, 1fr);
+  gap: 28px;
+}
+
+@media (max-width: 980px) {
+  .co-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.co-card {
+  background: var(--co-card-bg);
+  border-radius: var(--co-radius);
+  border: 1px solid var(--co-border);
+  box-shadow: var(--co-shadow);
+  padding: 32px;
+  backdrop-filter: blur(14px);
+}
+
+.co-section-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-end;
+  margin-bottom: 28px;
+}
+
+.co-section-title {
+  margin: 0;
+  font-size: 1.5rem;
+}
+
+.co-section-desc {
+  margin: 0;
+  color: var(--co-muted);
+  font-size: 0.95rem;
+}
+
+.co-fieldset {
+  border: 1px solid var(--co-border);
+  border-radius: 16px;
+  padding: 18px;
+  margin-bottom: 20px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.co-fieldset-head {
+  margin-bottom: 16px;
+}
+
+.co-fieldset-head h3 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.co-fieldset-head p {
+  margin: 4px 0 0;
+  font-size: 0.9rem;
+  color: var(--co-muted);
+}
+
+.co-grid-two {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+}
+
+.co-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.co-card label {
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+.co-card input[type="text"],
+.co-card input[type="number"],
+.co-card input[type="date"],
+.co-card input[type="time"],
+.co-card select,
+.co-card textarea {
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--co-border);
+  background: var(--co-card-bg); /* 背景色をカード背景に合わせる */
+  color: var(--co-text); /* 文字色をテーマの基本テキスト色に */
+  font-size: 0.95rem;
+  transition: var(--co-transition);
+}
+
+.co-card input:focus,
+.co-card select:focus,
+.co-card textarea:focus {
+  outline: none;
+  border-color: var(--co-border-strong);
+  box-shadow: 0 0 0 2px rgba(101, 214, 255, 0.25);
+}
+
+.co-card select[multiple] {
+  height: auto;
+  background: rgba(255, 255, 255, 0.02);
+  padding: 8px;
+}
+.co-card select[multiple] option {
+  padding: 8px 12px;
+  border-radius: 8px;
+  margin-top: 4px;
+}
+.co-card select[multiple] option:checked {
+  background: linear-gradient(135deg, var(--co-accent), var(--co-accent-strong));
+  color: var(--co-bg);
+  font-weight: 600;
+}
+
+.co-day-of-week-selector {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+.co-day-of-week-selector button {
+  flex: 1;
+  min-width: 40px;
+  padding: 8px 0;
+  border-radius: 8px;
+  border: 1px solid var(--co-border);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--co-text);
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--co-transition);
+}
+
+.co-day-of-week-selector button:hover {
+  border-color: var(--co-border-strong);
+  color: var(--co-accent);
+}
+
+.co-day-of-week-selector button.selected {
+  background: linear-gradient(135deg, #34c6ff, #7b61ff);
+  color: #fff;
+  border-color: transparent;
+}
+
+.co-input--compact {
+  max-width: 140px;
+}
+
+.co-dynamic-field {
+  margin-top: 14px;
+}
+
+.co-action-timing label span {
+  font-size: 0.85rem;
+  color: var(--co-muted);
+}
+
+.co-timing-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+  margin-top: 10px;
+}
+
+.co-actions {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+
+.co-inline-message {
+  margin: 0;
+  min-height: 1.2em;
+  font-weight: 600;
+  color: var(--co-accent-strong);
+}
+
+.co-btn,
+.add-button,
+.save-button,
+.nest-button,
+.remove {
+  border: none;
+  border-radius: 999px;
+  padding: 10px 18px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--co-transition);
+  letter-spacing: 0.03em;
+}
+
+.co-btn.primary,
+.save-button {
+  background: linear-gradient(135deg, #34c6ff, #7b61ff);
+  color: #fff;
+  box-shadow: 0 10px 25px rgba(53, 173, 255, 0.35);
+}
+
+.co-btn.primary:hover,
+.save-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 18px 35px rgba(53, 173, 255, 0.4);
+}
+
+.co-btn.ghost,
+.add-button,
+.nest-button {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--co-text);
+  border: 1px solid var(--co-border);
+}
+
+.co-btn.ghost:hover,
+.add-button:hover,
+.nest-button:hover {
+  border-color: var(--co-border-strong);
+  color: var(--co-accent);
+}
+
+.remove {
+  background: rgba(255, 107, 129, 0.15);
+  color: var(--co-danger);
+  border: 1px solid rgba(255, 107, 129, 0.3);
+}
+
+.remove:hover {
+  background: rgba(255, 107, 129, 0.25);
+}
+
+.co-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+
+/* --- Block Common --- */
+.condition-block, .item {
+  border-radius: 16px;
+  transition: all 0.2s ease-in-out;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.2), inset 0 1px 1px rgba(255,255,255,0.05);
+  margin-bottom: 12px; /* ブロック間のマージン */
+}
+.co-block-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  cursor: pointer;
+  font-weight: 600;
+  border-radius: inherit; /* 親の角丸を継承 */
+}
+/* ヘッダーがブロックの上部を占めるため、下部だけ角丸を解除 */
+.co-block-header:has(+ .co-block-content) {
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+}
+.co-toggle-icon {
+  font-size: 0.7em;
+  color: var(--co-muted);
+  transform: rotate(90deg);
+  transition: transform 0.2s;
+  padding: 4px;
+}
+.is-collapsed .co-toggle-icon {
+  transform: rotate(0deg);
+}
+
+.co-summary-label {
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #fff;
+}
+.co-summary-text {
+  color: var(--co-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.co-block-content {
+  padding: 16px;
+  border-top: 1px solid var(--co-border);
+}
+.is-collapsed .co-block-content {
+  display: none;
+}
+
+
+/* --- Nesting & Coloring --- */
+/* Base Colors (block.dataset.nestLevelで上書きされる) */
+.condition-block {
+  --block-hue: 180; --block-saturation: 60%;
+  background-color: hsla(var(--block-hue), var(--block-saturation), 35%, 0.4);
+  border: 1px solid hsla(var(--block-hue), var(--block-saturation), 55%, 0.6);
+}
+.co-summary-label.condition { background-color: hsla(var(--block-hue), var(--block-saturation), 55%, 0.8); }
+
+.item { /* アクション */
+  --block-hue: 230; --block-saturation: 60%;
+  background-color: hsla(var(--block-hue), var(--block-saturation), 35%, 0.4);
+  border: 1px solid hsla(var(--block-hue), var(--block-saturation), 55%, 0.6);
+}
+.co-summary-label.action { background-color: hsla(var(--block-hue), var(--block-saturation), 55%, 0.8); }
+
+
+/* ネストレベルに応じた色 (JSでdata-nest-levelを付与) */
+[data-nest-level="0"].condition-block {
+  background-color: hsla(180, 60%, 35%, 0.4);
+  border-color: hsla(180, 60%, 55%, 0.6);
+}
+[data-nest-level="0"].item {
+  background-color: hsla(230, 60%, 35%, 0.4);
+  border-color: hsla(230, 60%, 55%, 0.6);
+}
+
+[data-nest-level="1"].condition-block, [data-nest-level="1"].item {
+  background-color: hsla(var(--block-hue), var(--block-saturation), 30%, 0.5);
+  border-color: hsla(var(--block-hue), var(--block-saturation), 50%, 0.7);
+}
+[data-nest-level="2"].condition-block, [data-nest-level="2"].item {
+  background-color: hsla(var(--block-hue), var(--block-saturation), 25%, 0.6);
+  border-color: hsla(var(--block-hue), var(--block-saturation), 45%, 0.8);
+}
+[data-nest-level="3"].condition-block, [data-nest-level="3"].item {
+  background-color: hsla(var(--block-hue), var(--block-saturation), 20%, 0.7);
+  border-color: hsla(var(--block-hue), var(--block-saturation), 40%, 0.9);
+}
+[data-nest-level="4"].condition-block, [data-nest-level="4"].item {
+  background-color: hsla(var(--block-hue), var(--block-saturation), 15%, 0.8);
+  border-color: hsla(var(--block-hue), var(--block-saturation), 35%, 1.0);
+}
+
+
+/* --- Nested Blocks Container --- */
+.nested-blocks {
+  margin-top: 12px; /* 親ブロックのコンテンツと子ブロックの間のマージン */
+  margin-left: 24px; /* 親ブロックに対してインデント */
+  padding-left: 12px; /* 縦線のためにさらにパディング */
+  border-left: 2px solid var(--co-border-strong); /* インデントの縦線 */
+}
+/* 最も外側の .co-stack に含まれる .nested-blocks はインデントしない */
+#condition_blocks > .nested-blocks {
+    margin-left: 0;
+    padding-left: 0;
+    border-left: none;
+}
+
+
+.condition-block select {
+  margin-right: 8px;
+  min-width: 120px;
+}
+
+.condition-expr-container {
+  margin: 12px 0;
+}
+
+.nested-conditions,
+.nested-actions {
+  margin-top: 16px;
+  padding-left: 24px; /* インデントを深くする */
+  border-left: 2px solid var(--co-border-strong); /* 境界線を目立たせる */
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.co-command-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.co-command-list .item {
+  border: 1px solid var(--co-border);
+  border-radius: 16px;
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.02);
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.co-command-list .item b {
+  font-size: 1rem;
+}
+
+.co-command-list .item button {
+  margin-right: 8px;
+}
+
+.msg {
+  margin: 0;
+  font-weight: 600;
+  color: var(--co-accent-strong);
+}
+
+/* Leaflet Map Styles */
+.leaflet-container {
+    background-color: var(--co-card-bg); /* 地図の背景色をカード背景に合わせる */
+    border-radius: 8px; /* 角を丸くする */
+}
+
+/* --- Responsive Design --- */
+@media (max-width: 768px) {
+  html {
+    font-size: 14px; /* rem単位の基準を小さくする */
+  }
+
+  .co-shell {
+    padding: 32px 16px 60px;
+  }
+
+  .co-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 16px;
+  }
+
+  h1 {
+    font-size: 2rem;
+  }
+
+  .co-section-head {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .co-card {
+    padding: 20px;
+  }
+
+  .co-grid-two {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+  
+  .co-block-header .co-summary-text {
+    white-space: normal; /* サマリーが折り返すように */
+  }
+
+  .nested-blocks {
+    margin-left: 12px;
+    padding-left: 8px;
+  }
+  
+  .co-actions {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+
+  .co-btn, .add-button, .save-button, .nest-button, .remove {
+    width: 100%;
+    text-align: center;
+    padding: 12px 18px;
+  }
+
+  .co-inline-message {
+    text-align: center;
+    min-height: auto;
+    padding: 8px 0;
+  }
+
+  .co-command-list .item {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .co-command-list .item button {
+    margin-right: 0;
+  }
+}

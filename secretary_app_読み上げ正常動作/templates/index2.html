@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>Googleカレンダー管理</title>
+    <script src="https://apis.google.com/js/api.js"></script>
+    <script src="static/js/ScheduleManager.js"></script>
+    <style>
+       body {
+        font-family: "Segoe UI", sans-serif;
+        margin: 30px;
+        }
+        input, button {
+        margin: 5px;
+        padding: 6px;
+        }
+        #log {
+        margin-top: 20px;
+        border: 1px solid #aaa;
+        padding: 10px;
+        height: 200px;
+        overflow-y: auto;
+        background: #f8f8f8;
+        }
+    </style>
+</head>
+<body>
+    <h1>Googleカレンダー管理</h1>
+    <button id="authorize-button">Googleログイン</button>
+
+    <h3>イベント追加</h3>
+    <input id="event-title" placeholder="タイトル">
+    <input id="event-desc" placeholder="説明">
+    <input id="event-start" type="datetime-local">
+    <input id="event-end" type="datetime-local">
+    <button id="add-event-button" disabled>追加</button>
+
+    <h3>イベント削除</h3>
+    <input id="event-id" placeholder="イベントID">
+    <button id="delete-event-button" disabled>削除</button>
+
+    <h3>イベント確認</h3>
+    <input id="check-start" type="date">
+    <input id="check-end" type="date">
+    <button id="check-event-button" disabled>確認</button>
+
+    <h3>ログ</h3>
+    <div id="log"></div>
+
+    <script>
+        // ScheduleManager2.js で定義されたクラスのインスタンスを生成
+        const manager = new ScheduleManager();
+
+        // ログメッセージを画面の #log 要素に追加し、スクロール位置を最下部に移動させる関数
+        const log = (msg) => {
+            const el = document.getElementById("log");
+            const time = new Date().toLocaleTimeString();
+            el.innerHTML += `[${time}] ${msg}<br>`;
+            el.scrollTop = el.scrollHeight;
+        };
+
+        // 「Googleログイン」ボタンにクリックイベントリスナーを設定
+        document.getElementById("authorize-button").addEventListener("click", () => {
+            // ScheduleManager クラスの認証処理メソッドを呼び出し
+            manager.handleAuthClick();
+        });
+
+        // 「追加」ボタンにクリックイベントリスナーを設定
+        document.getElementById("add-event-button").addEventListener("click", async () => {
+            // 入力フィールドからイベント情報を取得。タイトルと説明にはデフォルト値を設定
+            const title = document.getElementById("event-title").value || "無題のイベント";
+            const desc = document.getElementById("event-desc").value || "";
+            const start = document.getElementById("event-start").value;
+            const end = document.getElementById("event-end").value;
+            // ScheduleManager クラスのイベント追加メソッドを呼び出し
+            await manager.addEvent(title, desc, start, end, log);
+        });
+
+        // 「削除」ボタンにクリックイベントリスナーを設定
+        document.getElementById("delete-event-button").addEventListener("click", async () => {
+            // イベントIDを取得
+            const id = document.getElementById("event-id").value;
+            // IDが存在する場合にのみ、ScheduleManager クラスのイベント削除メソッドを呼び出し
+            if (id) await manager.deleteEvent(id, log);
+        });
+
+        // 「確認」ボタンにクリックイベントリスナーを設定
+        document.getElementById("check-event-button").addEventListener("click", async () => {
+            // 期間の開始日と終了日を取得
+            const start = document.getElementById("check-start").value;
+            const end = document.getElementById("check-end").value;
+            // ScheduleManager クラスのイベント一覧取得メソッドを呼び出し
+            await manager.listEvents(start, end, log);
+        });
+
+        // ポップアップ（またはリダイレクト先）からの認証完了時に、アクセストークンを受け取るためのグローバル関数
+        // callback.html などから呼び出されることを想定
+        window.receiveAccessToken = (token) => {
+            log("Google認証成功！");
+            // ScheduleManager にアクセストークンをセット
+            manager.setAccessToken(token);
+            // 認証成功後、イベント操作ボタンを有効化
+            document.getElementById("add-event-button").disabled = false;
+            document.getElementById("delete-event-button").disabled = false;
+            document.getElementById("check-event-button").disabled = false;
+        };
+    </script>
+</body>
+</html>

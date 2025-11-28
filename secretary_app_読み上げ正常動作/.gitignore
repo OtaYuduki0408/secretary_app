@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg-info/
+
+# Local env / cache
+.cache/
+.env
+instance/
+
+# DB / artifacts
+*.db
+secretary_app/order/commands.db
+
+# Node
+node_modules/
+secretary_app/secretary_app/node_modules/
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+secretary_app/services/client_secret.json
+secretary_app/credentials.json
+token.json
