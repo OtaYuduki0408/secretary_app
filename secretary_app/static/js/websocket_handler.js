@@ -1,263 +1,165 @@
-// C:\Users\y_oota\Documents\secretary_app\secretary_app\static\js\websocket_handler.js
-
-console.log("websocket_handler.js loaded.");
-
-// =====================================================================
-// WebSocket通信とクライアントサイド評価ロジック
-// =====================================================================
-
-/**
- * 2点間の緯度経度から距離を計算する (Haversine公式)
- * @param {number} lat1 - 地点1の緯度
- * @param {number} lon1 - 地点1の経度
- * @param {number} lat2 - 地点2の緯度
- * @param {number} lon2 - 地点2の経度
- * @returns {number} 2点間の距離 (メートル)
- */
-function haversine_distance(lat1, lon1, lat2, lon2) {
-    const R = 6371000; // 地球の半径 (メートル)
-    const rad = (deg) => deg * (Math.PI / 180);
-
-    const rlat1 = rad(lat1);
-    const rlat2 = rad(lat2);
-    const dlat = rad(lat2 - lat1);
-    const dlon = rad(lon2 - lon1);
-
-    const a = Math.sin(dlat / 2) ** 2 + Math.cos(rlat1) * Math.cos(rlat2) * Math.sin(dlon / 2) ** 2;
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-
-    return R * c;
-}
-
-/**
- * 条件式(expr)を評価する非同期関数
- * @param {object} expr - 評価する条件の式
- * @returns {Promise<boolean>} 評価結果
- */
-async function evaluateConditionExpr(expr) {
-    if (!expr || !expr.category) {
-        return false;
-    }
-
-    if (expr.category === '場所') {
-        return new Promise((resolve) => {
-            if (!navigator.geolocation) {
-                console.error("このブラウザはGeolocationをサポートしていません。");
-                return resolve(false);
-            }
-            // 位置情報を取得
-            navigator.geolocation.getCurrentPosition(
-                (position) => {
-                    const { latitude: current_lat, longitude: current_lon } = position.coords;
-                    console.log(`現在の位置情報: 緯度=${current_lat}, 経度=${current_lon}`);
-                    
-                    try {
-                        const target_lat = parseFloat(expr.value.latitude);
-                        const target_lon = parseFloat(expr.value.longitude);
-                        const allowed_range = parseFloat(expr.value.range || 1000);
-
-                        const distance = haversine_distance(current_lat, current_lon, target_lat, target_lon);
-
-                        console.log(`場所条件評価: 距離=${distance.toFixed(2)}m, 範囲=${allowed_range}m`);
-                        
-                        // 距離が範囲内ならtrue
-                        resolve(distance <= allowed_range);
-                    } catch (e) {
-                        console.error("場所条件の評価中にエラー:", e);
-                        resolve(false);
-                    }
-                },
-                (error) => {
-                    console.error("位置情報の取得に失敗:", error.message);
-                    resolve(false); // 位置情報を取得できない場合はfalse
-                },
-                { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
-            );
-        });
-    }
-    // TODO: 他のカテゴリ（時間、カレンダーなど）のクライアントサイド評価が必要な場合はここに追加
-    console.warn(`未実装の条件カテゴリです: ${expr.category}`);
-    return false;
-}
-
-/**
- * 条件(if/else)のリストを評価し、実行すべきアクションのリストを返す
- * @param {Array} conditions - 条件のリスト
- * @returns {Promise<Array|null>} 実行すべきアクションの配列、またはnull
- */
-async function getActionsToExecute(conditions) {
-    if (!conditions || conditions.length === 0) {
-        return []; // 条件がなければ、トップレベルのアクションを実行する
-    }
-
-    for (const condition of conditions) {
-        if (condition.type === 'if') {
-            const isMet = await evaluateConditionExpr(condition.expr);
-            if (isMet) {
-                return condition.actions || []; // if条件がtrueなら、そのアクションを返す
-            }
-        }
-    }
-    
-    // どのif条件も満たされなかった場合、elseブロックのアクションを探す
-    const elseBlock = conditions.find(c => c.type === 'else');
-    if (elseBlock) {
-        return elseBlock.actions || [];
-    }
-
-    return null; // どの条件にも合致しなかった
-}
-
-
 /**
  * 指定されたアクションを実行する
  * @param {object} action - 実行するアクション
+ * @returns {Promise<void>} アクションの完了を示すPromise
  */
 function executeAction(action) {
-    console.log("アクションを実行します:", action);
-    let textToSpeak = "";
-    let overlayTitle = "";
-    let overlayCategoryClass = "overlay-speech"; // デフォルトは汎用読み上げ
+    return new Promise(resolve => {
+        console.log("アクションを実行します:", action);
+        let textToSpeak = "";
+        let overlayTitle = "";
+        let overlayCategoryClass = "overlay-speech"; // デフォルトは汎用読み上げ
 
-    // UI表示要素の取得
-    const overlay = document.getElementById('read-aloud-overlay');
-    const timeElement = document.getElementById('overlay-time');
-    const messageElement = document.getElementById('overlay-message');
+        // UI表示要素の取得
+        const overlay = document.getElementById('read-aloud-overlay');
+        const timeElement = document.getElementById('overlay-time');
+        const messageElement = document.getElementById('overlay-message');
 
-    // 既存のカテゴリクラスをすべて削除
-    overlay.classList.remove('overlay-calendar', 'overlay-finance', 'overlay-memo', 'overlay-speech');
+        // 既存のカテゴリクラスをすべて削除
+        overlay.classList.remove('overlay-calendar', 'overlay-finance', 'overlay-memo', 'overlay-speech');
 
-    // 現在時刻の表示
-    const now = new Date();
-    const formattedTime = now.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-    if (timeElement) {
-        timeElement.textContent = formattedTime;
-    }
-    
-    let messageHtml = ""; // overlay-messageに挿入するHTML
-
-    if (action.category === '発声') {
-        textToSpeak = action.detail.text;
-        overlayTitle = "読み上げ";
-        overlayCategoryClass = "overlay-speech";
-        messageHtml = `
-            <h3>${overlayTitle}</h3>
-            <p>${textToSpeak}</p>
-        `;
-    } else if (action.category === 'カレンダー' && action.sub === '読み上げ') {
-        const itemName = action.detail.summary || action.detail.item_name || '名称未設定イベント'; // item_nameがない場合を考慮
-        const startTime = action.detail.start_time;
-        const endTime = action.detail.end_time;
-        const startDate = action.detail.start_day;
-        const endDate = action.detail.end_day;
-        const eventLink = action.detail.event_link;
-
-        overlayTitle = "カレンダー";
-        overlayCategoryClass = "overlay-calendar";
+        // 現在時刻の表示
+        const now = new Date();
+        const formattedTime = now.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        if (timeElement) {
+            timeElement.textContent = formattedTime;
+        }
         
-        let datePart = "";
-        if (startDate && endDate && startDate !== "実行された日" && startDate !== "不明") { // "不明"のケースも考慮
-            if (startDate === endDate) {
-                datePart = `${startDate}日の`;
-            } else {
-                datePart = `${startDate}日から${endDate}日までの`;
-            }
-        } else if (startDate === "実行された日") {
-             datePart = "今日の";
-        } else if (startDate && startDate !== "不明") {
-            datePart = `${startDate}日の`;
-        }
+        let messageHtml = ""; // overlay-messageに挿入するHTML
 
+        if (action.category === '発声') {
+            textToSpeak = action.detail.text;
+            overlayTitle = "読み上げ";
+            overlayCategoryClass = "overlay-speech";
+            messageHtml = `
+                <h3>${overlayTitle}</h3>
+                <p>${textToSpeak}</p>
+            `;
+        } else if (action.category === 'カレンダー' && action.sub === '読み上げ') {
+            const itemName = action.detail.summary || '今日の予定はありません';
+            const startTime = action.detail.start_time;
+            const endTime = action.detail.end_time;
+            const startDate = action.detail.start_day;
+            const endDate = action.detail.end_day;
+            const eventLink = action.detail.event_link;
 
-        textToSpeak = `${datePart}${itemName}が、${startTime}から${endTime}までです。`;
-        messageHtml = `
-            <h3>${overlayTitle}</h3>
-            <div class="details-section">
-                <p><strong>イベント:</strong> ${itemName}</p>
-                <p><strong>期間:</strong> ${datePart}${startTime || '不明'} - ${endTime || '不明'}</p>
-                ${eventLink ? `<p><a href="${eventLink}" target="_blank">詳細を見る</a></p>` : ''}
-            </div>
-        `;
-    } else if (action.category === '収支' && action.sub === '読み上げ') {
-        const recordType = action.detail.record_type || '記録';
-        const amount = action.detail.amount;
-        const description = action.detail.description;
-        const category = action.detail.category;
-
-        overlayTitle = "収支管理";
-        overlayCategoryClass = "overlay-finance";
-
-        let recordText = `${recordType}の記録です。`;
-        if (amount) {
-            recordText += `金額は${amount}円。`;
-        }
-        if (category) {
-            recordText += `カテゴリは${category}。`;
-        }
-        if (description) {
-            recordText += `内容は${description}。`;
-        }
-        textToSpeak = recordText;
-        messageHtml = `
-            <h3>${overlayTitle}</h3>
-            <div class="details-section">
-                <p><strong>種類:</strong> ${recordType}</p>
-                <p><strong>金額:</strong> ${amount ? `${amount}円` : '不明'}</p>
-                <p><strong>カテゴリ:</strong> ${category || '不明'}</p>
-                ${description ? `<p><strong>内容:</strong> ${description}</p>` : ''}
-            </div>
-        `;
-    } else if (action.category === 'メモ' && action.sub === '読み上げ') {
-        const memoContent = action.detail.content || 'メモの内容がありません。';
-
-        overlayTitle = "メモ";
-        overlayCategoryClass = "overlay-memo";
-        textToSpeak = `メモの読み上げです。内容は「${memoContent}」です。`;
-        messageHtml = `
-            <h3>${overlayTitle}</h3>
-            <div class="details-section">
-                <p>${memoContent}</p>
-            </div>
-        `;
-    }
-    // TODO: 他のカテゴリの読み上げもここに追加
-
-    if (textToSpeak && overlay && messageElement) {
-        // オーバーレイにカテゴリクラスを追加
-        overlay.classList.add(overlayCategoryClass);
-        messageElement.innerHTML = messageHtml; // HTMLを挿入
-
-        // オーバーレイを表示
-        overlay.classList.add('visible');
-
-        let speechPromise;
-        if (typeof SpeechSynthesisUtterance !== 'undefined' && typeof speechSynthesis !== 'undefined') {
-            const utterance = new SpeechSynthesisUtterance(textToSpeak);
+            overlayTitle = "カレンダー";
+            overlayCategoryClass = "overlay-calendar";
             
-            speechPromise = new Promise(resolve => {
-                utterance.onend = () => {
-                    console.log(`発声終了: "${textToSpeak}"`);
-                    resolve();
-                };
-                utterance.onerror = (event) => {
-                    console.error(`音声合成エラー: ${event.error}`);
-                    resolve(); // エラーでもオーバーレイは閉じる
-                };
-                speechSynthesis.speak(utterance);
-            });
-            console.log(`発声開始: "${textToSpeak}"`);
-        } else {
-            console.error("音声合成がこのブラウザでサポートされていません。");
-            speechPromise = Promise.resolve(); // 音声合成がない場合は即座に解決
+            if (itemName === '今日の予定はありません') {
+                textToSpeak = '今日の予定はありません。';
+                messageHtml = `
+                    <h3>${overlayTitle}</h3>
+                    <p>${textToSpeak}</p>
+                `;
+            } else {
+                let datePart = "";
+                if (startDate && endDate && startDate !== "実行された日" && startDate !== "不明") {
+                    if (startDate === endDate) {
+                        datePart = `${startDate}日の`;
+                    } else {
+                        datePart = `${startDate}日から${endDate}日までの`;
+                    }
+                } else if (startDate === "実行された日") {
+                    datePart = "今日の";
+                } else if (startDate && startDate !== "不明") {
+                    datePart = `${startDate}日の`;
+                }
+
+                textToSpeak = `${datePart}${itemName}が、${startTime}から${endTime}までです。`;
+                messageHtml = `
+                    <h3>${overlayTitle}</h3>
+                    <div class="details-section">
+                        <p><strong>イベント:</strong> ${itemName}</p>
+                        <p><strong>期間:</strong> ${datePart}${startTime || '不明'} - ${endTime || '不明'}</p>
+                        ${eventLink ? `<p><a href="${eventLink}" target="_blank">詳細を見る</a></p>` : ''}
+                    </div>
+                `;
+            }
+        } else if (action.category === '収支管理' && action.sub === '読み上げ') {
+            const recordType = action.detail.record_type || '記録';
+            const amount = action.detail.amount;
+            const description = action.detail.description;
+            const category = action.detail.category;
+
+            overlayTitle = "収支管理";
+            overlayCategoryClass = "overlay-finance";
+
+            let recordText = `${recordType}の記録です。`;
+            if (amount) {
+                recordText += `金額は${amount}円。`;
+            }
+            if (category) {
+                recordText += `カテゴリは${category}。`;
+            }
+            if (description) {
+                recordText += `内容は${description}。`;
+            }
+            textToSpeak = recordText;
+            messageHtml = `
+                <h3>${overlayTitle}</h3>
+                <div class="details-section">
+                    <p><strong>種類:</strong> ${recordType}</p>
+                    <p><strong>金額:</strong> ${amount ? `${amount}円` : '不明'}</p>
+                    <p><strong>カテゴリ:</strong> ${category || '不明'}</p>
+                    ${description ? `<p><strong>内容:</strong> ${description}</p>` : ''}
+                </div>
+            `;
+        } else if (action.category === 'メモ' && action.sub === '読み上げ') {
+            const memoContent = action.detail.content || 'メモの内容がありません。';
+
+            overlayTitle = "メモ";
+            overlayCategoryClass = "overlay-memo";
+            textToSpeak = `メモの読み上げです。内容は「${memoContent}」です。`;
+            messageHtml = `
+                <h3>${overlayTitle}</h3>
+                <div class="details-section">
+                    <p>${memoContent}</p>
+                </div>
+            `;
         }
+        // TODO: 他のカテゴリの読み上げもここに追加
 
-        // 最小表示時間を保証するためのPromise (例: 2秒)
-        const minDisplayPromise = new Promise(resolve => setTimeout(resolve, 2000)); 
+        if (textToSpeak && overlay && messageElement) {
+            // オーバーレイにカテゴリクラスを追加
+            overlay.classList.add(overlayCategoryClass);
+            messageElement.innerHTML = messageHtml; // HTMLを挿入
 
-        Promise.all([speechPromise, minDisplayPromise]).then(() => {
-            overlay.classList.remove('visible'); // オーバーレイを非表示
-        });
-    }
+            // オーバーレイを表示
+            overlay.classList.add('visible');
+
+            let speechPromise;
+            if (typeof SpeechSynthesisUtterance !== 'undefined' && typeof speechSynthesis !== 'undefined') {
+                const utterance = new SpeechSynthesisUtterance(textToSpeak);
+                
+                speechPromise = new Promise(resolveSpeech => {
+                    utterance.onend = () => {
+                        console.log(`発声終了: "${textToSpeak}"`);
+                        resolveSpeech();
+                    };
+                    utterance.onerror = (event) => {
+                        console.error(`音声合成エラー: ${event.error}`);
+                        resolveSpeech(); // エラーでも次のアクションに進む
+                    };
+                    speechSynthesis.speak(utterance);
+                });
+                console.log(`発声開始: "${textToSpeak}"`);
+            } else {
+                console.error("音声合成がこのブラウザでサポートされていません。");
+                speechPromise = Promise.resolve(); // 音声合成がない場合は即座に解決
+            }
+
+            // 最小表示時間を保証するためのPromise (例: 2秒)
+            const minDisplayPromise = new Promise(resolveDisplay => setTimeout(resolveDisplay, 2000)); 
+
+            Promise.all([speechPromise, minDisplayPromise]).then(() => {
+                overlay.classList.remove('visible'); // オーバーレイを非表示
+                resolve(); // executeActionのPromiseを解決
+            });
+        } else {
+            resolve(); // 実行するテキストがなければ即座に解決
+        }
+    });
 }
 
 // WebSocketサーバーに接続し、イベントを待機
@@ -302,7 +204,9 @@ function setupWebSocket() {
 
         if (actionsToExecute && actionsToExecute.length > 0) {
             console.log("条件を満たしました。アクションを実行します。");
-            actionsToExecute.forEach(executeAction);
+            for (const action of actionsToExecute) {
+                await executeAction(action);
+            }
         } else {
             console.log("実行すべきアクションはありませんでした。");
         }
