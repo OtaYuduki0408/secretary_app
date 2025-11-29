@@ -912,17 +912,17 @@ with app.app_context():
 def _run_job_with_app_context(func):
     with app.app_context():
         # evaluate_triggersからディスパッチリストを取得
-        dispatch_list = func()
+        dispatch_list = func(app.logger) # app.loggerを引数として渡す
         if dispatch_list:
-            print(f"Dispatching {len(dispatch_list)} commands to clients...")
+            app.logger.debug(f"Dispatching {len(dispatch_list)} commands to clients...")
             for user_id, order_data in dispatch_list:
                 # ユーザーが接続中か確認
                 sid = connected_users.get(user_id)
                 if sid:
-                    print(f"Dispatching command for user {user_id} to sid {sid}")
+                    app.logger.debug(f"Dispatching command for user {user_id} to sid {sid}")
                     socketio.emit('dispatch_command', order_data, room=sid)
                 else:
-                    print(f"User {user_id} is not connected. Command not dispatched.")
+                    app.logger.debug(f"User {user_id} is not connected. Command not dispatched.")
 
 # アプリケーション終了時にスケジューラをシャットダウン
 atexit.register(lambda: scheduler.shutdown())

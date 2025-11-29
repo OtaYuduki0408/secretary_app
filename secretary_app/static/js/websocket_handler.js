@@ -140,20 +140,23 @@ function executeAction(action) {
         textToSpeak = action.detail.text;
         overlayTitle = "読み上げ";
         overlayCategoryClass = "overlay-speech";
-        messageHtml = `<p>${textToSpeak}</p>`;
+        messageHtml = `
+            <h3>${overlayTitle}</h3>
+            <p>${textToSpeak}</p>
+        `;
     } else if (action.category === 'カレンダー' && action.sub === '読み上げ') {
-        const itemName = action.detail.item_name || 'カレンダーイベント';
+        const itemName = action.detail.summary || action.detail.item_name || '名称未設定イベント'; // item_nameがない場合を考慮
         const startTime = action.detail.start_time;
         const endTime = action.detail.end_time;
         const startDate = action.detail.start_day;
         const endDate = action.detail.end_day;
-        const eventLink = action.detail.event_link; // イベントリンクを追加
+        const eventLink = action.detail.event_link;
 
         overlayTitle = "カレンダー";
         overlayCategoryClass = "overlay-calendar";
         
         let datePart = "";
-        if (startDate && endDate && startDate !== "実行された日") {
+        if (startDate && endDate && startDate !== "実行された日" && startDate !== "不明") { // "不明"のケースも考慮
             if (startDate === endDate) {
                 datePart = `${startDate}日の`;
             } else {
@@ -161,15 +164,18 @@ function executeAction(action) {
             }
         } else if (startDate === "実行された日") {
              datePart = "今日の";
+        } else if (startDate && startDate !== "不明") {
+            datePart = `${startDate}日の`;
         }
+
 
         textToSpeak = `${datePart}${itemName}が、${startTime}から${endTime}までです。`;
         messageHtml = `
             <h3>${overlayTitle}</h3>
-            <div class="event-details">
+            <div class="details-section">
                 <p><strong>イベント:</strong> ${itemName}</p>
-                <p><strong>期間:</strong> ${datePart}${startTime} - ${endTime}</p>
-                ${eventLink ? `<p><a href="${eventLink}" target="_blank" style="color: #60a5fa;">イベントを見る</a></p>` : ''}
+                <p><strong>期間:</strong> ${datePart}${startTime || '不明'} - ${endTime || '不明'}</p>
+                ${eventLink ? `<p><a href="${eventLink}" target="_blank">詳細を見る</a></p>` : ''}
             </div>
         `;
     } else if (action.category === '収支' && action.sub === '読み上げ') {
@@ -194,7 +200,7 @@ function executeAction(action) {
         textToSpeak = recordText;
         messageHtml = `
             <h3>${overlayTitle}</h3>
-            <div class="finance-details">
+            <div class="details-section">
                 <p><strong>種類:</strong> ${recordType}</p>
                 <p><strong>金額:</strong> ${amount ? `${amount}円` : '不明'}</p>
                 <p><strong>カテゴリ:</strong> ${category || '不明'}</p>
@@ -202,14 +208,14 @@ function executeAction(action) {
             </div>
         `;
     } else if (action.category === 'メモ' && action.sub === '読み上げ') {
-        const memoContent = action.detail.content || 'メモの内容がありません。'; // メモの詳細情報を取得
+        const memoContent = action.detail.content || 'メモの内容がありません。';
 
         overlayTitle = "メモ";
         overlayCategoryClass = "overlay-memo";
         textToSpeak = `メモの読み上げです。内容は「${memoContent}」です。`;
         messageHtml = `
             <h3>${overlayTitle}</h3>
-            <div class="memo-details">
+            <div class="details-section">
                 <p>${memoContent}</p>
             </div>
         `;
@@ -224,25 +230,33 @@ function executeAction(action) {
         // オーバーレイを表示
         overlay.classList.add('visible');
 
-        // テキストの長さに応じて表示時間を調整（最小5秒、1文字あたり0.1秒）
-        const displayDuration = Math.max(5000, textToSpeak.length * 100);
-        setTimeout(() => {
-            overlay.classList.remove('visible'); // オーバーレイを非表示
-        }, displayDuration);
-
-        // 音声読み上げの処理
+        let speechPromise;
         if (typeof SpeechSynthesisUtterance !== 'undefined' && typeof speechSynthesis !== 'undefined') {
             const utterance = new SpeechSynthesisUtterance(textToSpeak);
-            // TextToSpeechReader.js があればそれを使うことを検討
-            if (window.TextToSpeechReader && typeof window.TextToSpeechReader.read === 'function') {
-                window.TextToSpeechReader.read(textToSpeak);
-            } else {
+            
+            speechPromise = new Promise(resolve => {
+                utterance.onend = () => {
+                    console.log(`発声終了: "${textToSpeak}"`);
+                    resolve();
+                };
+                utterance.onerror = (event) => {
+                    console.error(`音声合成エラー: ${event.error}`);
+                    resolve(); // エラーでもオーバーレイは閉じる
+                };
                 speechSynthesis.speak(utterance);
-            }
-            console.log(`発声しました: "${textToSpeak}"`);
+            });
+            console.log(`発声開始: "${textToSpeak}"`);
         } else {
             console.error("音声合成がこのブラウザでサポートされていません。");
+            speechPromise = Promise.resolve(); // 音声合成がない場合は即座に解決
         }
+
+        // 最小表示時間を保証するためのPromise (例: 2秒)
+        const minDisplayPromise = new Promise(resolve => setTimeout(resolve, 2000)); 
+
+        Promise.all([speechPromise, minDisplayPromise]).then(() => {
+            overlay.classList.remove('visible'); // オーバーレイを非表示
+        });
     }
 }
 

@@ -6,17 +6,17 @@ import { TRIGGER_CATEGORIES, ACTION_CATEGORIES } from './constants.js';
 
 export function parseActionArray(actionRoot) {
   if (!actionRoot) return [];
-  return [...actionRoot.children]
-    .filter(child => child.classList.contains('item'))
+  const allActionItems = actionRoot.querySelectorAll('.item'); // root内のすべての.item要素を収集
+  
+  return [...allActionItems]
     .map(actionItem => {
-      const prefix = actionItem.querySelector('.action-category').id.replace('action_category', '');
       const category = actionItem.querySelector(".action-category").value;
       const sub = actionItem.querySelector(".action-sub").value;
       const timing = {
-        date_abs: actionItem.querySelector(".action-timing-date-abs").value,
-        date_rel: actionItem.querySelector(".action-timing-date-rel").value,
-        time_abs: actionItem.querySelector(".action-timing-time-abs").value,
-        time_rel: actionItem.querySelector(".action-timing-time-rel").value,
+        date_abs: actionItem.querySelector(".action-timing-date-abs")?.value || '',
+        date_rel: actionItem.querySelector(".action-timing-date-rel")?.value || '',
+        time_abs: actionItem.querySelector(".action-timing-time-abs")?.value || '',
+        time_rel: actionItem.querySelector(".action-timing-time-rel")?.value || '',
       };
       let detail = {};
       const detailContainer = actionItem.querySelector(".action-detail-container");
