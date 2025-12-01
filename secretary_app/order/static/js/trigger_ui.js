@@ -787,11 +787,30 @@ export function createTriggerUI(prefix = '', initialValue = {}) {
               <button type="button" data-value="月">月</button> <button type="button" data-value="火">火</button> <button type="button" data-value="水">水</button> <button type="button" data-value="木">木</button>
               <button type="button" data-value="金">金</button> <button type="button" data-value="土">土</button> <button type="button" data-value="日">日</button>
             </div>
-            <label>時刻 (必須)</label>
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <label style="margin: 0;">時刻 (必須)</label>
+                <button type="button" id="${prefix}set_time_after_1_min_btn" class="co-btn ghost" style="padding: 5px 10px;">1分後</button>
+            </div>
             <input type="text" id="${prefix}trigger_value_time_time_start" class="trigger-input" list="${prefix}time_options_start" value="${initialValue.time_start || ''}" placeholder="例: 07:30" required onfocus="this.setAttribute('data-prev-value', this.value); this.value='';" onblur="if(this.value==='') this.value=this.getAttribute('data-prev-value');">
             <datalist id="${prefix}time_options_start">${(() => { let o = ''; for (let h = 0; h < 24; h++) for (let m = 0; m < 60; m += 15) o += `<option value="${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}">`; return o; })()}</datalist>
           `;
           triggerValueContainer.innerHTML = html;
+          
+          // 「1分後」ボタンのイベントリスナー
+          const setTimeAfter1MinBtn = document.getElementById(`${prefix}set_time_after_1_min_btn`);
+          if (setTimeAfter1MinBtn) {
+            setTimeAfter1MinBtn.addEventListener('click', () => {
+              const now = new Date();
+              now.setMinutes(now.getMinutes() + 1);
+              const hours = String(now.getHours()).padStart(2, '0');
+              const minutes = String(now.getMinutes()).padStart(2, '0');
+              const timeInput = document.getElementById(`${prefix}trigger_value_time_time_start`);
+              if (timeInput) {
+                timeInput.value = `${hours}:${minutes}`;
+              }
+            });
+          }
+
           const dayOfWeekButtonsContainer = document.getElementById(`${prefix}trigger_value_time_day_of_week_buttons`);
           if (dayOfWeekButtonsContainer) {
             dayOfWeekButtonsContainer.addEventListener('click', (event) => {

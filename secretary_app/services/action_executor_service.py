@@ -221,8 +221,8 @@ def _execute_finance_read_aloud(user_id: str, detail_data: dict, triggered_at: d
     Returns:
         dict: 実行結果。
     """
-    item = detail_data.get('item')
-    fmt = detail_data.get('format')
+    item = detail_data.get('item') # 個別項目 (例: total_balance, monthly_expense)
+    fmt = detail_data.get('format') # 読み上げ形式 (individual, expense, income, balance)
 
     current_dt_jst = triggered_at.astimezone(JST)
 
@@ -237,128 +237,126 @@ def _execute_finance_read_aloud(user_id: str, detail_data: dict, triggered_at: d
     end_day = _parse_time_param(detail_data.get('end_day'), current_dt_jst)
     end_time_str = _parse_time_param(detail_data.get('end_time'), current_dt_jst)
 
-    start_datetime, end_datetime = None, None
-    try:
-        start_datetime = datetime(
-            int(start_year) if start_year else current_dt_jst.year,
-            int(start_month) if start_month else 1, # デフォルトで月の初日
-            int(start_day) if start_day else 1,
-            int(start_time_str.split(':')[0]) if start_time_str else 0,
-            int(start_time_str.split(':')[1]) if start_time_str else 0
-        )
-        end_datetime = datetime(
-            int(end_year) if end_year else current_dt_jst.year,
-            int(end_month) if end_month else 12, # デフォルトで年の最終月
-            int(end_day) if end_day else 31, # デフォルトで月の最終日
-            int(end_time_str.split(':')[0]) if end_time_str else 23,
-            int(end_time_str.split(':')[1]) if end_time_str else 59
-        )
-        start_datetime = JST.localize(start_datetime)
-        end_datetime = JST.localize(end_datetime)
-    except Exception as e:
-        print(f"収支読み上げ: 日時解析エラー: {e}")
-        # 日時解析に失敗しても続行できるように、ここではエラーを返さない（全体をフィルタリングしない）
+    has_period_filter = any(val for val in [start_year, start_month, start_day, start_time_str, end_year, end_month, end_day, end_time_str] if val and not str(val).startswith('実行された'))
 
 
     message_parts = ["収支管理情報を読み上げます。"]
     finance_display_data = {"type": "summary", "date_range": "", "details": {}}
     
-    # 日付範囲の文字列を作成
-    date_range_str = ""
-    if start_datetime and end_datetime:
-        if start_datetime.date() == end_datetime.date():
-            date_range_str = start_datetime.strftime('%Y年%m月%d日')
-        else:
-            date_range_str = f"{start_datetime.strftime('%Y年%m月%d日')}から{end_datetime.strftime('%Y年%m月%d日')}"
-    else:
-        # 期間指定がない場合、今日の日付を使用
-        date_range_str = current_dt_jst.strftime('%Y年%m月%d日')
+    total_income = 0
+    total_expense = 0
+    net_balance = 0
     
-    finance_display_data["date_range"] = date_range_str
+    start_datetime, end_datetime = None, None
+    date_range_str = ""
 
-    # 期間指定がない場合のシンプルな読み上げ
-    if not (start_datetime and end_datetime):
-        if item == 'total_balance':
-            balance = get_current_balance(user_id)
-            message_parts.append(f"現在の所持金は{balance}円です。")
-            finance_display_data["details"] = {"item": "total_balance", "value": balance, "unit": "円"}
-        elif item == 'monthly_expense':
-            expense = get_monthly_expense(user_id)
-            message_parts.append(f"今月の合計支出は{expense}円です。")
-            finance_display_data["details"] = {"item": "monthly_expense", "value": expense, "unit": "円"}
-        elif item == 'daily_expense':
-            expense = get_daily_expense(user_id)
-            message_parts.append(f"今日の合計支出は{expense}円です。")
-            finance_display_data["details"] = {"item": "daily_expense", "value": expense, "unit": "円"}
-        elif item == 'monthly_income':
-            all_records = get_all_finance_records(user_id)
-            current_month_str = current_dt_jst.strftime('%Y-%m')
-            monthly_income = sum(
-                r.get('amount', 0) for r in all_records
-                if r.get('type') == 'income' and datetime.fromisoformat(r['date']).strftime('%Y-%m') == current_month_str
-            )
-            message_parts.append(f"今月の合計収入は{monthly_income}円です。")
-            finance_display_data["details"] = {"item": "monthly_income", "value": monthly_income, "unit": "円"}
-        elif item == 'remaining_to_target':
-            goal = get_monthly_goal(user_id)
-            if goal and goal.get('goal_amount'):
-                goal_amount = goal['goal_amount']
-                current_expense = get_monthly_expense(user_id)
-                remaining = goal_amount - current_expense
-                message_parts.append(f"今月の目標額{goal_amount}円に対し、残り{remaining}円使えます。")
-                finance_display_data["details"] = {"item": "remaining_to_target", "goal_amount": goal_amount, "current_expense": current_expense, "remaining": remaining, "unit": "円"}
+    if has_period_filter:
+        try:
+            # 期間指定がある場合、指定された日時でdatetimeオブジェクトを作成
+            s_year = int(start_year) if start_year else current_dt_jst.year
+            s_month = int(start_month) if start_month else 1
+            s_day = int(start_day) if start_day else 1
+            s_hour = int(start_time_str.split(':')[0]) if start_time_str and ':' in start_time_str else 0
+            s_minute = int(start_time_str.split(':')[1]) if start_time_str and ':' in start_time_str else 0
+
+            e_year = int(end_year) if end_year else current_dt_jst.year
+            e_month = int(end_month) if end_month else 12
+            # 月末日を正しく計算
+            if end_month and not end_day:
+                next_month = datetime(e_year, e_month, 1) + timedelta(days=32)
+                e_day = (next_month.replace(day=1) - timedelta(days=1)).day
             else:
-                message_parts.append("今月の目標額が設定されていません。")
-                finance_display_data["details"] = {"item": "remaining_to_target", "message": "目標額未設定"}
-        # TODO: monthly_expense_no_necessities, daily_expense_no_necessities もここに追加
-    else:
-        # 期間指定がある場合
-        all_records = get_all_finance_records(user_id)
-        
-        filtered_records = []
-        for record in all_records:
-            record_date_str = record.get('date')
-            if not record_date_str: continue
+                e_day = int(end_day) if end_day else 31
             
-            try:
-                record_dt = JST.localize(datetime.fromisoformat(record_date_str))
-            except ValueError:
-                record_dt = datetime.fromisoformat(record_date_str.replace('Z', '+00:00')).astimezone(JST)
+            e_hour = int(end_time_str.split(':')[0]) if end_time_str and ':' in end_time_str else 23
+            e_minute = int(end_time_str.split(':')[1]) if end_time_str and ':' in end_time_str else 59
+            
+            start_datetime = JST.localize(datetime(s_year, s_month, s_day, s_hour, s_minute))
+            end_datetime = JST.localize(datetime(e_year, e_month, e_day, e_hour, e_minute))
 
-            if start_datetime <= record_dt <= end_datetime:
-                filtered_records.append(record)
+        except Exception as e:
+            print(f"収支読み上げ: 日時解析エラー: {e}")
+            return {"status": "error", "message": f"日時形式の解析に失敗しました: {e}"}
 
+        date_range_str = f"{start_datetime.strftime('%Y年%m月%d日')}から{end_datetime.strftime('%Y年%m月%d日')}"
+        finance_display_data["date_range"] = date_range_str
+
+        all_records = get_all_finance_records(user_id)
+        filtered_records = [
+            r for r in all_records 
+            if r.get('date') and start_datetime <= datetime.fromisoformat(r['date'].replace('Z', '+00:00')).astimezone(JST) <= end_datetime
+        ]
+        
         if not filtered_records:
-            message_parts.append(f"{date_range_str}の収支は見つかりませんでした。")
-            finance_display_data["details"] = {"message": "該当記録なし"}
+            total_income = 0
+            total_expense = 0
         else:
             total_income = sum(r.get('amount', 0) for r in filtered_records if r.get('type') == 'income')
             total_expense = sum(r.get('amount', 0) for r in filtered_records if r.get('type') == 'expense')
-            net_balance = total_income - total_expense
 
-            finance_summary = {
-                "total_income": total_income,
-                "total_expense": total_expense,
-                "net_balance": net_balance,
-                "unit": "円",
-                "records": filtered_records # 詳細な記録もUIで表示するために含める
-            }
-            finance_display_data["details"] = {"item": "period_summary", "summary": finance_summary}
-            
-            if fmt == 'individual':
-                message_parts.append(f"{date_range_str}の合計収入は{total_income}円、合計支出は{total_expense}円です。差し引き{total_income - total_expense}円です。")
-            elif fmt == 'income':
-                message_parts.append(f"{date_range_str}の合計収入は{total_income}円です。")
-            elif fmt == 'expense':
-                message_parts.append(f"{date_range_str}の合計支出は{total_expense}円です。")
-            elif fmt == 'balance':
-                message_parts.append(f"{date_range_str}の収支は{total_income - total_expense}円です。")
-            else: # デフォルトは収支
-                message_parts.append(f"{date_range_str}の収支は{total_income - total_expense}円です。")
+    else:
+        # 期間指定がない場合 (当月の集計)
+        date_range_str = current_dt_jst.strftime('%Y年%m月')
+        finance_display_data["date_range"] = date_range_str
 
-    if len(message_parts) == 1: # 最初のメッセージ「収支管理情報を読み上げます。」しかない場合
-        message_parts.append("指定された収支項目は見つかりませんでした。")
-        finance_display_data["details"] = {"message": "指定項目なし"}
+        all_records = get_all_finance_records(user_id)
+        current_month_str = current_dt_jst.strftime('%Y-%m')
+        
+        monthly_records = [
+            r for r in all_records
+            if r.get('date') and datetime.fromisoformat(r['date'].replace('Z', '+00:00')).strftime('%Y-%m') == current_month_str
+        ]
+
+        total_income = sum(r.get('amount', 0) for r in monthly_records if r.get('type') == 'income')
+        total_expense = get_monthly_expense(user_id) # 既存の関数を利用
+
+    net_balance = total_income - total_expense
+
+    # 読み上げ形式(fmt)に応じてメッセージを構築
+    if fmt == 'individual':
+        if not has_period_filter:
+            if item == 'total_balance':
+                balance = get_current_balance(user_id)
+                message_parts.append(f"現在の所持金は{balance}円です。")
+                finance_display_data["details"] = {"item": "total_balance", "value": balance, "unit": "円"}
+            elif item == 'monthly_expense':
+                message_parts.append(f"今月の合計支出は{total_expense}円です。")
+                finance_display_data["details"] = {"item": "monthly_expense", "value": total_expense, "unit": "円"}
+            elif item == 'daily_expense':
+                expense = get_daily_expense(user_id)
+                message_parts.append(f"今日の合計支出は{expense}円です。")
+                finance_display_data["details"] = {"item": "daily_expense", "value": expense, "unit": "円"}
+            elif item == 'monthly_income':
+                message_parts.append(f"今月の合計収入は{total_income}円です。")
+                finance_display_data["details"] = {"item": "monthly_income", "value": total_income, "unit": "円"}
+            elif item == 'remaining_to_target':
+                goal = get_monthly_goal(user_id)
+                if goal and goal.get('goal_amount'):
+                    goal_amount = goal['goal_amount']
+                    remaining = goal_amount - total_expense
+                    message_parts.append(f"今月の目標額{goal_amount}円に対し、残り{remaining}円使えます。")
+                    finance_display_data["details"] = {"item": "remaining_to_target", "goal_amount": goal_amount, "current_expense": total_expense, "remaining": remaining, "unit": "円"}
+                else:
+                    message_parts.append("今月の目標額が設定されていません。")
+                    finance_display_data["details"] = {"item": "remaining_to_target", "message": "目標額未設定"}
+            else:
+                message_parts.append("指定された収支個別項目は見つかりませんでした。")
+                finance_display_data["details"] = {"message": "指定個別項目なし"}
+        else:
+            message_parts.append(f"{date_range_str}の収支情報で個別項目は指定できません。")
+            finance_display_data["details"] = {"message": "個別項目での期間指定はサポートされていません"}
+    elif fmt == 'income':
+        message_parts.append(f"{date_range_str}の合計収入は{total_income}円です。")
+        finance_display_data["details"] = {"item": "total_income", "value": total_income, "unit": "円"}
+    elif fmt == 'expense':
+        message_parts.append(f"{date_range_str}の合計支出は{total_expense}円です。")
+        finance_display_data["details"] = {"item": "total_expense", "value": total_expense, "unit": "円"}
+    elif fmt == 'balance' or fmt is None:
+        message_parts.append(f"{date_range_str}の合計収入は{total_income}円、合計支出は{total_expense}円です。収支は{net_balance}円です。")
+        finance_display_data["details"] = { "item": "period_summary", "summary": { "total_income": total_income, "total_expense": total_expense, "net_balance": net_balance, "unit": "円" } }
+    else:
+        message_parts.append("収支の読み上げ形式が不明です。")
+        finance_display_data["details"] = {"message": "不明な読み上げ形式"}
 
     return {"status": "success", "message": "".join(message_parts), "category": "収支管理", "display_data": finance_display_data}
 
