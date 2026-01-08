@@ -1,5 +1,6 @@
 from supabase_client import supabase
 from datetime import datetime
+from supabase_auth.errors import AuthApiError
 
 # プロフィールテーブル（public.users）
 TABLE_PROFILES = "users"
@@ -13,15 +14,12 @@ def register_user(name: str, email: str, password: str):
     """
     try:
         # 既存ユーザー確認（Admin API）
-        try:
-            exist = supabase.auth.admin.get_user_by_email(email)
-            if exist and getattr(exist, "user", None):
-                # ユーザーが見つかった場合
-                return {"error": "このメールアドレスは既に登録されています。"}
-        except Exception as e:
-            # get_user_by_email がエラーを投げた場合 (例: 存在しないメールアドレス)
-            # ここではユーザーが存在しないと判断し、処理を続行
-            pass
+        # RPCを使って、メールアドレスからユーザーIDが存在するかを確認
+        rpc_response = supabase.rpc('get_user_id_by_email', {'p_email': email}).execute()
+
+        # rpc_response.data が空でなければ、ユーザーは存在すると判断
+        if rpc_response.data:
+            return {"error": "このメールアドレスは既に登録されています。"}
 
         # 管理者としてユーザー作成（メール確認済みにする）
         created = supabase.auth.admin.create_user({
