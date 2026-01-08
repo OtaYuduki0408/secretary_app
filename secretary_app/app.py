@@ -27,7 +27,7 @@ from services.category_service import (
     get_all_categories, add_category, delete_category, clear_all_categories
 )
 from services.auth_service import register_user, login_user
-from services.expense_service import add_finance_record, delete_finance_record
+from services.expense_service import add_finance_record, delete_finance_record, delete_finance_records
 from services.finance_service import (
     get_finance_summary,
     get_all_finance_records,
@@ -452,6 +452,16 @@ def add_finance_record_route():
     user_id = session.get('user', {}).get('id')
     data['user_id'] = user_id
     return jsonify(add_finance_record(data, user_id))
+
+@app.route('/api/finance/bulk-delete', methods=['DELETE'])
+@login_required
+def bulk_delete_finance_records_route():
+    user_id = session.get('user', {}).get('id')
+    data = request.get_json() or {}
+    record_ids = data.get('ids')
+    if not record_ids or not isinstance(record_ids, list):
+        return jsonify({"error": "List of record IDs is required"}), 400
+    return jsonify(delete_finance_records(record_ids, user_id))
 
 @app.route('/api/finance/<string:record_id>', methods=['DELETE'])
 @login_required

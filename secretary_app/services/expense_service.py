@@ -61,6 +61,26 @@ def delete_finance_record(record_id: str, user_id: str):
         print(f"[ERROR] delete_finance_record: {e}")
         return {"error": str(e)}
 
+
+def delete_finance_records(record_ids: list[str], user_id: str):
+    """
+    指定したIDリストの収支データを一括で削除する。
+    """
+    if not record_ids:
+        return {"message": "No records to delete", "data": []}
+    try:
+        response = (
+            supabase.table(TABLE_NAME)
+            .delete()
+            .in_("id", record_ids)
+            .eq("user_id", user_id)
+            .execute()
+        )
+        return {"message": f"{len(response.data)} finance records deleted", "data": response.data}
+    except (APIError, Exception) as e:
+        print(f"[ERROR] delete_finance_records: {e}")
+        return {"error": str(e)}
+
 # --------------------------------------------------------------------------
 # 統計情報（グラフなどに利用）
 # --------------------------------------------------------------------------

@@ -8,6 +8,7 @@
 </head>
 <body>
   <div class="container">
+    <div id="toast-container"></div>
     <div class="header">
       <h1>収支管理</h1>
       <div class="header-actions">
@@ -30,9 +31,9 @@
       <h2>収支の記録</h2>
       <div class="form-group">
         <label>種別</label>
-        <div class="radio-group">
-          <label><input type="radio" name="type" value="income"> 収入</label>
-          <label><input type="radio" name="type" value="expense" checked> 支出</label>
+        <div id="type-selector" class="type-selector">
+          <button data-value="expense" class="btn-type active">支出</button>
+          <button data-value="income" class="btn-type">収入</button>
         </div>
       </div>
       <div class="form-group">
@@ -41,7 +42,7 @@
       </div>
       <div class="form-group">
         <label>種類</label>
-        <select id="category" class="input"></select>
+        <div id="category-buttons" class="category-buttons"></div>
         <p id="no-cat" class="empty" style="display:none;">
           種類が登録されていません。
           <a href="{{ url_for('categories') }}">追加する</a>
@@ -55,10 +56,14 @@
     </section>
 
     <section class="card">
-      <h2>直近の記録</h2>
+      <div class="records-header">
+        <h2>直近の記録</h2>
+        <button id="delete-mode-btn" class="btn btn-secondary">削除モード</button>
+      </div>
       <table id="records">
         <thead>
           <tr>
+            <th class="checkbox-col" style="display: none;"><input type="checkbox" id="select-all-checkbox"></th>
             <th>日付</th>
             <th>種別</th>
             <th>種類</th>
@@ -68,6 +73,9 @@
         </thead>
         <tbody></tbody>
       </table>
+      <div class="records-footer">
+        <button id="execute-delete-btn" class="btn btn-danger" style="display: none;">選択した項目を削除</button>
+      </div>
     </section>
   </div>
   <script src="{{ url_for('static', filename='js/expense.js') }}"></script>
