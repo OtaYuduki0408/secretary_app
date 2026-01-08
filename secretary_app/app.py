@@ -314,8 +314,10 @@ def memo():
     return render_template('memo.html')
 
 @app.route('/calender')
+@login_required
 def calender_page():
-    return render_template('calender.html')
+    gcp_api_key = os.getenv('GCP_API_KEY')
+    return render_template('calender.html', gcp_api_key=gcp_api_key)
 
 
 # ============== Google OAuth ログイン ==============
