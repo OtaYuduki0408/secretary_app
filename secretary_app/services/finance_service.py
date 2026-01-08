@@ -13,7 +13,7 @@ def get_all_finance_records(user_id: str | None = None):
     """
     try:
         # DBから全データを取得
-        q = supabase.table(TABLE_FINANCE).select("*").order("date", desc=True).order("created_at", desc=True)
+        q = supabase.table(TABLE_FINANCE).select("*").order("date", desc=True)
         if user_id:
             q = q.eq("user_id", user_id)
         all_records = q.execute().data

@@ -448,7 +448,9 @@ def clear_categories_route():
 @login_required
 def get_finance_records_route():
     user_id = session.get('user', {}).get('id')
-    return jsonify(get_all_finance_records(user_id))
+    all_records = get_all_finance_records(user_id)
+    app.logger.debug(f"Fetched finance records: {all_records}")
+    return jsonify(all_records)
 
 @app.route('/api/finance', methods=['POST'])
 @login_required
