@@ -16,9 +16,11 @@ def register_user(name: str, email: str, password: str):
         try:
             exist = supabase.auth.admin.get_user_by_email(email)
             if exist and getattr(exist, "user", None):
+                # ユーザーが見つかった場合
                 return {"error": "このメールアドレスは既に登録されています。"}
-        except Exception:
-            # 見つからない場合は続行
+        except Exception as e:
+            # get_user_by_email がエラーを投げた場合 (例: 存在しないメールアドレス)
+            # ここではユーザーが存在しないと判断し、処理を続行
             pass
 
         # 管理者としてユーザー作成（メール確認済みにする）
