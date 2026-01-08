@@ -3,9 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Googleカレンダー管理</title>
+  <title>カレンダー管理</title>
 
-  <script src="https://apis.google.com/js/api.js"></script>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/calendar.css') }}">
 </head>
 <body>
@@ -14,10 +13,9 @@
 
   <!-- ヘッダー -->
   <header class="header">
-    <h1 class="title">Googleカレンダー管理</h1>
+    <h1 class="title">カレンダー管理</h1>
     <div class="actions">
       <a href="{{ url_for('main') }}" class="btn ghost">メインへ戻る</a>
-      <button id="authorize-button" class="btn primary">Googleログイン</button>
     </div>
   </header>
 
@@ -52,7 +50,7 @@
       </div>
 
       <div class="card-actions">
-        <button id="add-event-button" class="btn success" disabled>＋ 追加</button>
+        <button id="add-event-button" class="btn success">＋ 追加</button>
       </div>
     </section>
 
@@ -63,12 +61,12 @@
       <div class="grid">
         <label class="field full">
           <span class="label">イベントID</span>
-          <input id="event-id" class="input" placeholder="calendar.google.com などで取得できるID">
+          <input id="event-id" class="input" placeholder="削除したいイベントのID">
         </label>
       </div>
 
       <div class="card-actions">
-        <button id="delete-event-button" class="btn danger" disabled>削除</button>
+        <button id="delete-event-button" class="btn danger">削除</button>
       </div>
     </section>
 
@@ -89,7 +87,7 @@
       </div>
 
       <div class="card-actions">
-        <button id="check-event-button" class="btn ghost" disabled>確認</button>
+        <button id="check-event-button" class="btn ghost">確認</button>
       </div>
     </section>
 
@@ -100,51 +98,114 @@
     </section>
   </main>
 
-  <script type="module">
-    import { ScheduleManager } from "{{ url_for('static', filename='js/ScheduleManager.js') }}";
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const $ = s => document.querySelector(s);
+      const logEl = $("#log");
 
-    const manager = new ScheduleManager();
-    const $ = s => document.querySelector(s);
-    const logEl = $("#log");
+      const log = (msg, type = 'info') => {
+        const t = new Date().toLocaleTimeString();
+        const div = document.createElement('div');
+        div.className = `log-entry log-${type}`;
+        div.textContent = `[${t}] ${msg}`;
+        logEl.appendChild(div);
+        logEl.scrollTop = logEl.scrollHeight;
+      };
 
-    const log = (msg) => {
-      const t = new Date().toLocaleTimeString();
-      logEl.insertAdjacentHTML("beforeend", `<div>[${t}] ${msg}</div>`);
-      logEl.scrollTop = logEl.scrollHeight;
-    };
+      // --- API Functions ---
+      const api = {
+        async addEvent(title, startTime, endTime, description) {
+          try {
+            const res = await fetch('/api/local_calendar/events', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ title, start_time: startTime, end_time: endTime, description }),
+            });
+            const data = await res.json();
+            console.log("Server response:", res.status, data); // For debugging
+            if (!res.ok) throw new Error(data.error || `HTTP error! status: ${res.status}`);
+            log(`イベントを追加しました: 「${data.title}」 (ID: ${data.id})`, 'success');
+          } catch (e) {
+            log(`イベントの追加に失敗しました: ${e.message}`, 'error');
+            console.error("Add event failed:", e); // For debugging
+          }
+        },
+        async deleteEvent(eventId) {
+          if (!eventId) {
+            log('削除するイベントのIDを入力してください。', 'error');
+            return;
+          }
+          try {
+            const res = await fetch(`/api/local_calendar/events/${eventId}`, {
+              method: 'DELETE',
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'サーバーエラー');
+            log(`イベント(ID: ${eventId})を削除しました。`, 'success');
+          } catch (e) {
+            log(`イベント(ID: ${eventId})の削除に失敗しました: ${e.message}`, 'error');
+          }
+        },
+        async listEvents(startTime, endTime) {
+           try {
+            let url = '/api/local_calendar/events';
+            const params = new URLSearchParams();
+            if (startTime) params.append('start_time', new Date(startTime).toISOString());
+            if (endTime) params.append('end_time', new Date(endTime).toISOString());
+            if (params.toString()) url += `?${params.toString()}`;
 
-    // 認証
-    $("#authorize-button").addEventListener("click", () => manager.handleAuthClick());
+            const res = await fetch(url);
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'サーバーエラー');
 
-    // 認証後コールバック（popup/redirect から呼ばれる）
-    window.receiveAccessToken = (token) => {
-      log("Google認証成功！");
-      manager.setAccessToken(token);
-      $("#add-event-button").disabled = false;
-      $("#delete-event-button").disabled = false;
-      $("#check-event-button").disabled = false;
-    };
+            logEl.innerHTML = ''; // ログをクリア
+            if (data.length === 0) {
+              log('指定された期間にイベントはありません。');
+              return;
+            }
+            log(`${data.length}件のイベントが見つかりました:`);
+            data.forEach(event => {
+                const start = new Date(event.start_time).toLocaleString('ja-JP');
+                const end = new Date(event.end_time).toLocaleString('ja-JP');
+                log(`- ID:${event.id}, ${event.title} (${start} ~ ${end})`);
+            });
+           } catch (e) {
+            log(`イベントの取得に失敗しました: ${e.message}`, 'error');
+           }
+        }
+      };
 
-    // 追加
-    $("#add-event-button").addEventListener("click", async () => {
-      await manager.addEvent(
-        $("#event-title").value || "無題のイベント",
-        $("#event-desc").value || "",
-        $("#event-start").value,
-        $("#event-end").value,
-        log
-      );
-    });
+      // --- Event Listeners ---
+      $("#add-event-button").addEventListener("click", async () => {
+        const start = $("#event-start").value;
+        const end = $("#event-end").value;
+        if (!start || !end) {
+            log('開始日時と終了日時を入力してください。', 'error');
+            return;
+        }
+        await api.addEvent(
+          $("#event-title").value || "無題のイベント",
+          new Date(start).toISOString(),
+          new Date(end).toISOString(),
+          $("#event-desc").value || ""
+        );
+        $("#event-title").value = "";
+        $("#event-desc").value = "";
+        $("#event-start").value = "";
+        $("#event-end").value = "";
+      });
 
-    // 削除
-    $("#delete-event-button").addEventListener("click", async () => {
-      const id = $("#event-id").value.trim();
-      if (id) await manager.deleteEvent(id, log);
-    });
+      $("#delete-event-button").addEventListener("click", async () => {
+        const id = $("#event-id").value.trim();
+        await api.deleteEvent(id);
+        $("#event-id").value = "";
+      });
 
-    // 確認
-    $("#check-event-button").addEventListener("click", async () => {
-      await manager.listEvents($("#check-start").value, $("#check-end").value, log);
+      $("#check-event-button").addEventListener("click", async () => {
+        await api.listEvents($("#check-start").value, $("#check-end").value);
+      });
+
+      log('ローカルカレンダーの準備ができました。');
     });
   </script>
 </body>
