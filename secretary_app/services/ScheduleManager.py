@@ -1,8 +1,10 @@
+import json
 from datetime import datetime, timedelta
 from typing import Optional
 
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
+from googleapiclient.errors import HttpError
 from google.auth.transport.requests import Request
 
 from services.google_token_service import get_credentials, upsert_credentials
@@ -98,35 +100,51 @@ class ScheduleManager:
             return s
 
     def add_event(self, user_id: str, title: str, start_iso: str, end_iso: str | None = None, description: str = ""):
-        service = self._build_service(user_id)
+        try:
+            service = self._build_service(user_id)
 
-        # 入力の正規化（RFC3339に揃え、timeZoneは別で付与）
-        start_rfc3339 = self._to_rfc3339(start_iso)
-        if not end_iso:
-            # end が無い場合は +1 時間
+            # 入力の正規化（RFC3339に揃え、timeZoneは別で付与）
+            start_rfc3339 = self._to_rfc3339(start_iso)
+            if not end_iso:
+                # end が無い場合は +1 時間
+                try:
+                    base = datetime.fromisoformat(start_rfc3339.replace("Z", "+00:00"))
+                    end_iso = (base + timedelta(hours=1)).isoformat(timespec="seconds")
+                except Exception:
+                    # どうしてもパースできなければ start をそのまま基準にしておく
+                    end_iso = start_rfc3339
+            end_rfc3339 = self._to_rfc3339(end_iso)
+
+            event = {
+                "summary": title,
+                "description": description,
+                # タイムゾーンは日本時間に固定（必要ならユーザー設定に）
+                "start": {"dateTime": start_rfc3339, "timeZone": "Asia/Tokyo"},
+                "end": {"dateTime": end_rfc3339, "timeZone": "Asia/Tokyo"},
+            }
+            created = service.events().insert(calendarId="primary", body=event).execute()
+            return created
+        except HttpError as e:
             try:
-                base = datetime.fromisoformat(start_rfc3339.replace("Z", "+00:00"))
-                end_iso = (base + timedelta(hours=1)).isoformat(timespec="seconds")
-            except Exception:
-                # どうしてもパースできなければ start をそのまま基準にしておく
-                end_iso = start_rfc3339
-        end_rfc3339 = self._to_rfc3339(end_iso)
-
-        event = {
-            "summary": title,
-            "description": description,
-            # タイムゾーンは日本時間に固定（必要ならユーザー設定に）
-            "start": {"dateTime": start_rfc3339, "timeZone": "Asia/Tokyo"},
-            "end": {"dateTime": end_rfc3339, "timeZone": "Asia/Tokyo"},
-        }
-        created = service.events().insert(calendarId="primary", body=event).execute()
-        return created
+                error_details = json.loads(e.content.decode('utf-8'))
+                error_message = error_details.get('error', {}).get('message', 'Unknown error')
+                print(f"[ERROR] Google Calendar API error in add_event: {error_details}")
+                raise Exception(f"Google Calendar API Error: {error_message}") from e
+            except (json.JSONDecodeError, AttributeError):
+                error_message = str(e)
+                print(f"[ERROR] Google Calendar API error in add_event (could not parse error content): {error_message}")
+                raise Exception(f"Google Calendar API Error: {error_message}") from e
+        except Exception as e:
+            # その他の例外
+            print(f"[ERROR] An unexpected error occurred in add_event: {e}")
+            raise
 
     def delete_event(self, user_id: str, event_id: str):
         service = self._build_service(user_id)
         event_to_delete = service.events().get(calendarId="primary", eventId=event_id).execute()
         service.events().delete(calendarId="primary", eventId=event_id).execute()
         return {"status": "deleted", "id": event_id, "event": event_to_delete}
+
 
     def list_events(self, user_id: str, time_min: str | None = None, time_max: str | None = None, max_results: int = 50):
         service = self._build_service(user_id)

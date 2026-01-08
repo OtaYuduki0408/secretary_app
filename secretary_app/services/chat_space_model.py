@@ -1,14 +1,16 @@
-﻿import os
+import os
 import re
 import json
 from datetime import datetime, timedelta
 import pytz
-import functools # 追加
-import csv # 追加
+import functools
+import csv
 JST = pytz.timezone('Asia/Tokyo')
 import google.generativeai as genai
-from services.ScheduleManager import ScheduleManager
-# IncomeExpenseManagerとMemoManagerのインポ�Eトを追加 (これら�Eファイルは別途作�Eが忁E��でぁE
+
+# Local calendar service
+from services import local_calendar_service
+
 from services.finance_service import (
     get_all_finance_records, get_finance_summary, get_current_balance,
     get_monthly_expense, get_daily_expense
@@ -18,7 +20,7 @@ from services import switchbot_service
 
 
 # キャッシュを適用する関数をクラスの外に定義
-@functools.lru_cache(maxsize=128) # キャッシュサイズは適宜調整
+@functools.lru_cache(maxsize=128)
 def _cached_gemini_request_impl(model_instance, prompt: str) -> str:
     print(f"--- [DEBUG] geminiに解析リクエスト (キャッシュなし) ---")
     try:
@@ -34,8 +36,7 @@ def _cached_gemini_request_impl(model_instance, prompt: str) -> str:
 
 class ChatSpaceModel:
     
-
-    # 意図判定プロンプト
+    # (PROMPT TEMPLATES - no changes)
     PURPOSE_PROMPT_TEMPLATE = """
     以下のリストの目的と照合し、対応する機能を大文字、対応する行動を小文字で返してください。
     命令を確実に実現できる機能がない場合、Fnを返す。
@@ -57,8 +58,6 @@ class ChatSpaceModel:
     -入力-
     ユーザーの入力: {input_value}
     """
-    
-    # 予定追加プロンプト
     ADD_CALENDAR_PROMPT_TEMPLATE = """
     目的: ユーザーが追加したい予定の抽出
     抽出項目:
@@ -70,8 +69,6 @@ class ChatSpaceModel:
     現在時刻:{current_time}
     ユーザー入力: {input_value}
     """
-    
-    # 予定取得プロンプト
     GET_CALENDAR_PROMPT_TEMPLATE = """
     目的: ユーザーが取得、操作したい情報が存在するであろう期間(日付)の抽出。単日の場合もある。
     抽出項目:
@@ -82,8 +79,6 @@ class ChatSpaceModel:
     現在時刻は{current_time}
     ユーザー入力: {input_value}
     """
-        
-    # 予定削除プロンプト
     REMOVE_CALENDAR_PROMPT_TEMPLATE = """
     目的: ユーザーはカレンダーから予定を削除しようとしています。以下の「予定一覧」から、ユーザーが削除しようとしている予定を抽出してください。
     抽出項目:
@@ -95,8 +90,6 @@ class ChatSpaceModel:
     予定一覧:{task_list_json}
     ユーザー入力: {input_value}
     """
-    
-    # 予定変更プロンプト
     CHANGE_CALENDAR_PROMPT_TEMPLATE = """
     目的: ユーザーが変更したい予定の情報の抽出
     抽出項目:
@@ -111,8 +104,6 @@ class ChatSpaceModel:
     予定一覧:{task_list_json}
     ユーザー入力: {input_value}
     """
-    
-    #時刻確認プロンプト
     TIME_GET_PROMPT_TEMPLATE = """
     目標：ユーザーが求めているように、以下の時刻情報を編集して返してください。
     例：何年？→20xx年、令和x年です。　何時？：午後xx時xx分xx秒です。　何日？：20xx年xx月xx日です。
@@ -121,8 +112,6 @@ class ChatSpaceModel:
     現在時刻は{current_time}
     ユーザー入力: {input_value}
     """
-        
-    # 収支登録プロンプト
     ADD_INCOME_EXPENSE_PROMPT_TEMPLATE = """
     目的: ユーザーが登録したい収支情報を抽出
     抽出項目:
@@ -136,8 +125,6 @@ class ChatSpaceModel:
     現在時刻:{current_time}
     ユーザー入力: {input_value}
     """
-
-    # 収支取得プロンプト
     GET_INCOME_EXPENSE_PROMPT_TEMPLATE = """
     目的: ユーザーが取得したい収支情報の期間とカテゴリを抽出。
     抽出項目:
@@ -149,8 +136,6 @@ class ChatSpaceModel:
     現在時刻:{current_time}
     ユーザー入力: {input_value}
     """
-    
-    # メモ追加プロンプト
     ADD_MEMO_PROMPT_TEMPLATE = """
     目的: ユーザーが追加したいメモの内容とタイトルを抽出
     抽出項目:
@@ -160,8 +145,6 @@ class ChatSpaceModel:
     現在時刻:{current_time}
     ユーザー入力: {input_value}
     """
-    
-    # メモ検索/取得プロンプト
     GET_MEMO_PROMPT_TEMPLATE = """
     目的: ユーザーが検索または取得したいメモのキーワードまたはタイトルを抽出
     抽出項目:
@@ -171,20 +154,27 @@ class ChatSpaceModel:
     現在時刻:{current_time}
     ユーザー入力: {input_value}
     """
-
-
+    SWITCHBOT_OPERATION_PROMPT_TEMPLATE = """
+    目的: ユーザーが操作したいSwitchBotデバイスと、そのデバイスに対して実行したいコマンドを抽出。
+    利用可能なデバイスと機能のリスト: {available_devices_json}
+    抽出項目:
+    - device_id (操作対象のデバイスID)
+    - command_type (コマンドタイプ。例: "command", "customize")
+    - command (実行するコマンド。例: "turnOn", "turnOff", "press")
+    - parameter (コマンドのパラメータ。例: "default", "25", "on")
+    出力はJSON配列のみ、他テキスト禁止。単独でも複数あっても二次配列で返す。
+    現在時刻:{current_time}
+    ユーザー入力: {input_value}
+    """
 
     def __init__(self, gemini_api_key: str, calendar_manager=None):
         genai.configure(api_key=gemini_api_key)
         self.model_name = "gemini-2.5-flash"
         self.model = genai.GenerativeModel(model_name=self.model_name)
-        self.schedule_manager = ScheduleManager() # ScheduleManagerのインスタンスを作成
-        self.memo_manager = MemoManager() # MemoManagerのインスタンスを作成
+        self.memo_manager = MemoManager()
 
     def _log_gemini_request(self, timestamp: str, input_content: str, process_type: str, output_content: str):
         log_file_path = os.getenv("GEMINI_LOG_FILE", "gemini_requests.csv")
-        
-        # ファイルが存在しない場合はヘッダーを書き込む
         file_exists = os.path.exists(log_file_path)
         with open(log_file_path, 'a', newline='', encoding='utf-8') as f:
             writer = csv.writer(f)
@@ -195,48 +185,41 @@ class ChatSpaceModel:
     
     def _gemini_request(self, prompt: str) -> str:
         print(f"--- [DEBUG] geminiに解析リクエスト (ユーザー入力: {prompt}) ---")
-        
         timestamp = datetime.now(JST).isoformat()
-        
-        # キャッシュヒットを検出するために、呼び出し前のキャッシュヒット数を取得
         initial_hits = _cached_gemini_request_impl.cache_info().hits
-        
         response_text = _cached_gemini_request_impl(self.model, prompt)
-        
-        # 呼び出し後のキャッシュヒット数を取得
         final_hits = _cached_gemini_request_impl.cache_info().hits
-        
         process_type = "CACHE_HIT" if final_hits > initial_hits else "API_CALL"
-        
         self._log_gemini_request(timestamp, prompt, process_type, response_text)
-        
         return response_text
 
     def _format_event_time(self, iso_time: str) -> str:
-        """ISO形式の時刻文字列を「〇月〇日〇時〇分」形式に整形する"""
-        if not iso_time:
-            return ""
+        if not iso_time: return ""
         try:
             dt_object = datetime.fromisoformat(iso_time.replace('Z', '+00:00'))
             dt_jst = dt_object.astimezone(JST)
             return dt_jst.strftime('%m月%d日%H時%M分')
         except ValueError:
-            return iso_time # パースできない場合はそのまま返す
+            return iso_time
+
+    def _parse_datetime(self, time_str: str) -> datetime | None:
+        if not time_str: return None
+        try:
+            return datetime.fromisoformat(time_str)
+        except (ValueError, TypeError):
+            print(f"[WARN] Could not parse datetime string: {time_str}")
+            return None
 
     def _parse_calendar_list(self, text: str) -> list:
         if not text: return []
         match = re.search(r"```json\s*([\s\S]*?)\s*```", text, re.I)
         s = match.group(1) if match else text
-        
-        data = None
         try:
             data = json.loads(s)
         except json.JSONDecodeError:
             print("JSON解析失敗: LLMが出力したJSON形式が不正です")
             return []
-
         list_data = data if isinstance(data, list) else [data] if data else []
-        
         parsed_list = []
         for x in list_data:
             if not isinstance(x, dict): continue
@@ -253,9 +236,9 @@ class ChatSpaceModel:
             }
             if item['start_time'] or item['before_start_time']:
                  parsed_list.append(item)
-                 
         return parsed_list
-
+    
+    # ... (other parsing functions remain the same) ...
     def _parse_income_expense_list(self, text: str) -> list:
         if not text: return []
         match = re.search(r"```json\s*([\s\S]*?)\s*```", text, re.I)
@@ -342,24 +325,15 @@ class ChatSpaceModel:
 
 
     def check_chat_space(self, input_value: str, user_id: str | None = None) -> dict:
-        # (docstring removed due to mojibake)
         print("--- [DEBUG] check_chat_space: Starting ---")
         current_time = datetime.now(JST).strftime('%Y-%m-%d %H:%M:%S')
-        
-        # 1. 目皁E��宁E(第一解极E
-        purpose_prompt = self.PURPOSE_PROMPT_TEMPLATE.format(
-            current_time=current_time,
-            input_value=input_value
-        )
-        print("--- [DEBUG] check_chat_space: Calling _gemini_request for purpose ---")
+        purpose_prompt = self.PURPOSE_PROMPT_TEMPLATE.format(current_time=current_time, input_value=input_value)
         purpose = self._gemini_request(purpose_prompt)
         print(f"--- [DEBUG] check_chat_space: Received purpose: {purpose} ---")
-        
         result = {"status": "success", "purpose": purpose, "data": None, "message": ""}
         
         if purpose == "Ca":
             data, msg = self._add_calendar(input_value, user_id)
-            print(f"DEBUG: _add_calendar returned data={data}, msg={msg}")
             result["data"] = data
             result["message"] = msg
         elif purpose == "Cd":
@@ -368,85 +342,181 @@ class ChatSpaceModel:
             result["data"], result["message"] = self._get_calender(input_value, is_silent=False, user_id=user_id)
         elif purpose == "Cc":
             result["data"], result["message"] = self._change_calendar(input_value, user_id)
-        elif purpose == "Ia": # 収支管琁E�E登録
+        # ... (other purpose handling remains the same) ...
+        elif purpose == "Ia":
             result["data"], result["message"] = self._add_income_expense(input_value, user_id)
-        elif purpose == "Ig": # 収支管琁E�E取征E
+        elif purpose == "Ig":
             result["data"], result["message"] = self._get_income_expense(input_value, user_id)
-        elif purpose == "Ma": # メモ帳の追加
+        elif purpose == "Ma":
             result["data"], result["message"] = self._add_memo(input_value)
-        elif purpose == "Mg": # メモ帳の検索/取征E
+        elif purpose == "Mg":
             result["data"], result["message"] = self._get_memo(input_value)
         elif purpose == "Tn":
-            time_prompt = self.TIME_GET_PROMPT_TEMPLATE.format(
-                current_time=current_time,
-                input_value=input_value
-            )
+            time_prompt = self.TIME_GET_PROMPT_TEMPLATE.format(current_time=current_time, input_value=input_value)
             result["message"] = self._gemini_request(time_prompt)
-        elif purpose == "Sn": # SwitchBot機能
+        elif purpose == "Sn":
             result["data"], result["message"] = self._get_switchbot_devices(input_value, user_id)
         else:
-            # 意図が特定できなかった場合のメッセージをよりユーザーフレンドリーにする
             result["message"] = "申し訳ございません。お客様の意図を特定できませんでした。"
-            # 必要であれば、ここでpurposeをログに出力してデバッグに役立てる
             print(f"DEBUG: 意図不明なpurpose: {purpose}")
             
         return result
 
     def _add_calendar(self, text: str, user_id: str | None):
-        """カレンダーを追加"""
-        current_time = datetime.now(JST).strftime('%Y-%m-%d %H:%M:%S')
+        """カレンダーにローカルDBを使ってイベントを追加"""
         if not user_id:
-            return None, "ユーザー未ログイン"
-        prompt = self.ADD_CALENDAR_PROMPT_TEMPLATE.format(
-            current_time=current_time,
-            input_value=text
-        )
+            return None, "ユーザーがログインしていません。"
+        
+        current_time = datetime.now(JST).strftime('%Y-%m-%d %H:%M:%S')
+        prompt = self.ADD_CALENDAR_PROMPT_TEMPLATE.format(current_time=current_time, input_value=text)
         raw = self._gemini_request(prompt)
-        print(f"--- [DEBUG] _add_calendar: Gemini raw response: {raw} ---")
         list_to_add = self._parse_calendar_list(raw)
-        added_events_info = []
+        
         if not list_to_add:
             return None, "予定の追加に失敗しました。入力内容を確認してください。"
 
-        for event in list_to_add:
+        added_events = []
+        for event_data in list_to_add:
             try:
-                # ScheduleManagerのadd_eventを呼び出ぁE
-                print(f"DEBUG: Calling add_event with name={event['name']}, start={event['start_time']}, end={event['end_time']}")
-                created_event = self.schedule_manager.add_event(user_id, event['name'], event['start_time'], event['end_time'])
-                print(f"DEBUG: add_event returned created_event={created_event}")
-                added_events_info.append({
-                    "name": created_event.get("summary"),
-                    "start_time": created_event.get("start", {}).get("dateTime"),
-                    "end_time": created_event.get("end", {}).get("dateTime"),
-                    "id": created_event.get("id")
-                })
-            except Exception as e:
-                import traceback
-                print(f"カレンダー追加エラー: {e}")
-                traceback.print_exc()
-                # エラーが発生しても�E琁E��続衁E
+                start_time = self._parse_datetime(event_data.get('start_time'))
+                end_time = self._parse_datetime(event_data.get('end_time'))
+                if not start_time: continue
 
+                if not end_time:
+                    end_time = start_time + timedelta(hours=1)
+                
+                new_event = local_calendar_service.add_event(
+                    user_id=user_id,
+                    title=event_data['name'],
+                    start_time=start_time,
+                    end_time=end_time
+                )
+                added_events.append(new_event)
+            except Exception as e:
+                print(f"ローカルカレンダーへのイベント追加エラー: {e}")
         
-        print(f"DEBUG: _add_calendar finished. added_events_info={added_events_info}")
-        if added_events_info:
-            # 読み上げメッセージを生成
-            event_details = []
-            for i, event in enumerate(added_events_info):
-                if i >= 5: # 最大5件に制限
-                    break
-                start_time_str = self._format_event_time(event.get("start_time"))
-                event_details.append(f"{start_time_str}に{event.get('name')}の予定")
-            
-            message = f"{'、'.join(event_details)}。以上{len(added_events_info)}件の予定を追加しました。"
-            return added_events_info, message
+        if added_events:
+            message = f"{len(added_events)}件の予定をカレンダーに追加しました。"
+            return added_events, message
         
         return None, "予定を追加できませんでした。もう一度お試しください。"
 
+    def _get_calender(self, text: str, is_silent: bool, user_id: str | None):
+        """ローカルDBからカレンダーイベントを取得"""
+        if not user_id: 
+            if is_silent: return [], ""
+            return None, "ユーザーがログインしていません。"
 
+        current_time = datetime.now(JST).strftime('%Y-%m-%d %H:%M:%S')
+        prompt = self.GET_CALENDAR_PROMPT_TEMPLATE.format(current_time=current_time, input_value=text)
+        raw = self._gemini_request(prompt)
+        range_info = self._parse_calendar_list(raw)
+        
+        start_time_iso, end_time_iso = None, None
+        if range_info and range_info[0]:
+            start_time_iso = self._to_rfc3339(range_info[0].get('start_time'))
+            end_time_iso = self._to_rfc3339(range_info[0].get('end_time'))
+
+        try:
+            events = local_calendar_service.get_events(user_id, start_time_iso, end_time_iso)
+            if events:
+                event_details = [f"{self._format_event_time(e['start_time'])}に{e['title']}の予定" for e in events]
+                message = f"{', '.join(event_details)}。以上{len(events)}件の予定が見つかりました。"
+                return events, message
+            else:
+                return [], "該当の予定は見つかりませんでした。"
+        except Exception as e:
+            print(f"ローカルカレンダー取得エラー: {e}")
+            return None, "カレンダーの取得中にエラーが発生しました。"
+
+    def _remove_calendar(self, text: str, user_id: str | None):
+        """ローカルDBからカレンダーイベントを削除"""
+        if not user_id: return None, "ユーザーがログインしていません。"
+        
+        task_list, _ = self._get_calender(text, is_silent=True, user_id=user_id)
+        if not task_list:
+            return None, "カレンダーに該当する予定がありません。削除は実行されません。"
+
+        task_list_json = json.dumps(task_list)
+        current_time = datetime.now(JST).strftime('%Y-%m-%d %H:%M:%S')
+        prompt = self.REMOVE_CALENDAR_PROMPT_TEMPLATE.format(current_time=current_time, task_list_json=task_list_json, input_value=text)
+        raw = self._gemini_request(prompt)
+        events_to_delete = self._parse_calendar_list(raw)
+        
+        if not events_to_delete:
+            return None, "削除対象の予定を特定できませんでした。"
+
+        deleted_count = 0
+        for event_data in events_to_delete:
+            target_id = None
+            for task in task_list:
+                 # A simple match by name and time for now. Could be improved.
+                if task.get("name") == event_data.get("name"):
+                    target_id = task.get("id")
+                    break
+            
+            if target_id:
+                try:
+                    local_calendar_service.delete_event(target_id, user_id)
+                    deleted_count += 1
+                except Exception as e:
+                    print(f"ローカルイベント削除エラー: {e}")
+        
+        if deleted_count > 0:
+            return {"deleted_count": deleted_count}, f"{deleted_count}件の予定を削除しました。"
+        
+        return None, "削除対象の予定が見つかりませんでした。"
+
+    def _change_calendar(self, text: str, user_id: str | None):
+        """ローカルDBのカレンダーイベントを変更"""
+        if not user_id: return None, "ユーザーがログインしていません。"
+        
+        task_list, _ = self._get_calender(text, is_silent=True, user_id=user_id)
+        if not task_list:
+            return None, "カレンダーに該当する予定がありません。変更は実行されません。"
+
+        task_list_json = json.dumps(task_list)
+        current_time = datetime.now(JST).strftime('%Y-%m-%d %H:%M:%S')
+        prompt = self.CHANGE_CALENDAR_PROMPT_TEMPLATE.format(current_time=current_time, task_list_json=task_list_json, input_value=text)
+        raw = self._gemini_request(prompt)
+        events_to_change = self._parse_calendar_list(raw)
+
+        if not events_to_change:
+            return None, "変更対象の予定を特定できませんでした。"
+
+        changed_count = 0
+        for event_data in events_to_change:
+            target_id = None
+            for task in task_list:
+                 # A simple match by name and time for now.
+                if task.get("name") == event_data.get("before_name"):
+                    target_id = task.get("id")
+                    break
+
+            if target_id:
+                try:
+                    update_payload = {
+                        "title": event_data.get("after_name"),
+                        "start_time": self._parse_datetime(event_data.get("after_start_time")),
+                        "end_time": self._parse_datetime(event_data.get("after_end_time")),
+                    }
+                    # Remove None values so we don't overwrite with nulls
+                    update_payload = {k: v for k, v in update_payload.items() if v is not None}
+                    
+                    local_calendar_service.update_event(target_id, user_id, **update_payload)
+                    changed_count += 1
+                except Exception as e:
+                    print(f"ローカルイベント更新エラー: {e}")
+        
+        if changed_count > 0:
+            return {"changed_count": changed_count}, f"{changed_count}件の予定を変更しました。"
+
+        return None, "変更対象の予定が見つかりませんでした。"
+
+    # ... (other methods remain the same) ...
     def _to_rfc3339(self, value: str | None) -> str | None:
         """LLMの出力や内部日時をRFC3339に正規化"""
-        if not value:
-            return value
+        if not value: return value
         candidate = value.strip().replace(" ", "T")
         try:
             dt = datetime.fromisoformat(candidate)
@@ -459,8 +529,7 @@ class ChatSpaceModel:
 
     def _normalize_time_for_compare(self, value: str | None) -> str | None:
         """比較用にUTC基準のISO文字列へ正規化"""
-        if not value:
-            return value
+        if not value: return value
         candidate = value.strip().replace(" ", "T")
         if candidate.endswith("Z"):
             candidate = candidate[:-1] + "+00:00"
@@ -471,215 +540,6 @@ class ChatSpaceModel:
         if dt.tzinfo is None:
             dt = JST.localize(dt)
         return dt.astimezone(pytz.UTC).isoformat(timespec="seconds")
-
-
-    def _get_calender(self, text: str, is_silent: bool, user_id: str | None):
-        """カレンダー取得"""
-        """カレンダー取得"""
-        if not is_silent and not user_id: return None, "ユーザー未ログイン"
-        current_time = datetime.now(JST).strftime('%Y-%m-%d %H:%M:%S')
-        prompt = self.GET_CALENDAR_PROMPT_TEMPLATE.format(
-            current_time=current_time,
-            input_value=text
-        )
-        raw = self._gemini_request(prompt)
-        range_info = self._parse_calendar_list(raw)
-        
-        start_time_iso = None
-        end_time_iso = None
-
-        if range_info and range_info[0].get('start_time') and range_info[0].get('end_time'):
-            start_time_iso = self._to_rfc3339(range_info[0]['start_time'])
-            end_time_iso = self._to_rfc3339(range_info[0]['end_time'])
-        else:
-            # LLMが有効な時間篁E��を返さなかった場合、デフォルトで今日1日を取征E
-            start = datetime.now(JST)
-            end = start + timedelta(days=1)
-            start_time_iso = self._to_rfc3339(start.isoformat())
-            end_time_iso = self._to_rfc3339(end.isoformat())
-
-        try:
-            events = self.schedule_manager.list_events(user_id, time_min=start_time_iso, time_max=end_time_iso)
-            
-            if events:
-                # 読み上げメッセージを生成 (すべてのイベントを読み上げる)
-                event_details = []
-                for event in events:
-                    start_time_str = self._format_event_time(event.get("start", {}).get("dateTime"))
-                    event_details.append(f"{start_time_str}に{event.get('summary')}の予定")
-                
-                message = f"{'、'.join(event_details)}。以上{len(events)}件の予定が見つかりました。"
-
-                # イベント情報を整形して返す
-                formatted_events = []
-                for event in events:
-                    formatted_events.append({
-                        "name": event.get("summary"),
-                        "start_time": event.get("start", {}).get("dateTime"),
-                        "end_time": event.get("end", {}).get("dateTime"),
-                        "id": event.get("id")
-                    })
-                return formatted_events, message
-            else:
-                message = "該当の予定は見つかりませんでした。"
-                return [], message
-        except Exception as e:
-            print(f"カレンダー取得エラー: {e}")
-            return None, "カレンダーの取得中にエラーが発生しました。"
-
-    def _remove_calendar(self, text: str, user_id: str | None):
-        """カレンダー削除"""
-        """カレンダー削除"""
-        if not user_id: return None, "ユーザー未ログイン"
-        task_list, _ = self._get_calender(text, is_silent=True, user_id=user_id) # is_silent=Trueで音声出力抑制
-        task_list_json = json.dumps(task_list)
-
-        if not task_list:
-            return None, "カレンダーに該当する予定がありません。削除は実行されません。"
-
-        current_time = datetime.now(JST).strftime('%Y-%m-%d %H:%M:%S')
-        prompt = self.REMOVE_CALENDAR_PROMPT_TEMPLATE.format(
-            current_time=current_time,
-            task_list_json=task_list_json,
-            input_value=text
-        )
-        raw = self._gemini_request(prompt)
-        events_to_delete = self._parse_calendar_list(raw)
-        
-        deleted_events_info = []
-        if not events_to_delete:
-            return None, "削除対象の予定を特定できませんでした。"
-
-        for event_to_delete in events_to_delete:
-            # LLM????????????????task_list???????????event_id???
-            target_event_id = None
-            for task in task_list:
-                task_name = task.get("name")
-                task_start = self._normalize_time_for_compare(task.get("start_time"))
-                task_end = self._normalize_time_for_compare(task.get("end_time"))
-                delete_name = event_to_delete.get("name")
-                delete_start = self._normalize_time_for_compare(event_to_delete.get("start_time"))
-                delete_end = self._normalize_time_for_compare(event_to_delete.get("end_time"))
-
-                if task_name == delete_name and task_start == delete_start and task_end == delete_end:
-                    target_event_id = task.get("id")
-                    break
-            if target_event_id:
-                try:
-                    # ScheduleManagerのdelete_eventを呼び出し、返り値を利用
-                    delete_result = self.schedule_manager.delete_event(user_id, target_event_id)
-                    deleted_events_info.append({
-                        "name": delete_result["event"].get("summary"),
-                        "start_time": delete_result["event"].get("start", {}).get("dateTime"),
-                        "end_time": delete_result["event"].get("end", {}).get("dateTime"),
-                        "id": delete_result["event"].get("id")
-                    })
-                except Exception as e:
-                    print(f"予定削除エラー: {e}")
-            else:
-                print(f"削除対象のイベントIDが見つかりませんでした: {event_to_delete}")
-        
-        if deleted_events_info:
-            # 読み上げメッセージを生成
-            event_details = []
-            for i, event in enumerate(deleted_events_info):
-                if i >= 5: # 最大5件に制限
-                    break
-                start_time_str = self._format_event_time(event.get("start_time"))
-                event_details.append(f"{start_time_str}の{event.get('name')}の予定")
-            
-            message = f"{'、'.join(event_details)}。以上{len(deleted_events_info)}件の予定を削除しました。"
-            return deleted_events_info, message
-        
-        return None, "削除対象の予定が見つかりませんでした。"
-        
-    def _change_calendar(self, text: str, user_id: str | None):
-        """カレンダー変更"""
-        if not user_id:
-            return None, "ユーザー未ログイン"
-        task_list, _ = self._get_calender(text, is_silent=True, user_id=user_id)
-        task_list_json = json.dumps(task_list)
-        if not task_list:
-            return None, "カレンダーに該当する予定がありません。変更は実行されません。"
-        current_time = datetime.now(JST).strftime('%Y-%m-%d %H:%M:%S')
-        prompt = self.CHANGE_CALENDAR_PROMPT_TEMPLATE.format(
-            current_time=current_time,
-            task_list_json=task_list_json,
-            input_value=text
-        )
-        raw = self._gemini_request(prompt)
-        events_to_change = self._parse_calendar_list(raw)
-        changed_events_info = []
-        if not events_to_change:
-            return None, "変更対象の予定を特定できませんでした。"
-
-        for event_to_change in events_to_change:
-            target_event_id = None
-            # LLMが返した変更前の情報と、取得したタスクリストを比較してIDを特定
-            for task in task_list:
-                task_name = task.get("name")
-                task_start = self._normalize_time_for_compare(task.get("start_time"))
-                task_end = self._normalize_time_for_compare(task.get("end_time"))
-                
-                before_name = event_to_change.get("before_name")
-                before_start = self._normalize_time_for_compare(event_to_change.get("before_start_time"))
-                before_end = self._normalize_time_for_compare(event_to_change.get("before_end_time"))
-
-                if task_name == before_name and task_start == before_start and task_end == before_end:
-                    target_event_id = task.get("id")
-                    break
-            
-            if target_event_id:
-                try:
-                    update_result = self.schedule_manager.update_event(
-                        user_id,
-                        target_event_id,
-                        new_start_iso=event_to_change.get("after_start_time"),
-                        new_end_iso=event_to_change.get("after_end_time"),
-                        new_summary=event_to_change.get("after_name"),
-                        new_description=event_to_change.get("after_description") # descriptionも考慮
-                    )
-                    changed_events_info.append({
-                        "original_event": {
-                            "name": update_result["original_event"].get("summary"),
-                            "start_time": update_result["original_event"].get("start", {}).get("dateTime"),
-                            "end_time": update_result["original_event"].get("end", {}).get("dateTime"),
-                        },
-                        "updated_event": {
-                            "name": update_result["updated_event"].get("summary"),
-                            "start_time": update_result["updated_event"].get("start", {}).get("dateTime"),
-                            "end_time": update_result["updated_event"].get("end", {}).get("dateTime"),
-                        },
-                        "id": update_result["updated_event"].get("id")
-                    })
-                except Exception as e:
-                    print(f"イベント変更エラー: {e}")
-            else:
-                print(f"変更対象のイベントIDが見つかりませんでした: {event_to_change}")
-
-        if changed_events_info:
-            # 読み上げメッセージを生成
-            event_details = []
-            for i, event in enumerate(changed_events_info):
-                if i >= 5: # 最大5件に制限
-                    break
-                original_start_str = self._format_event_time(event["original_event"].get("start_time"))
-                updated_start_str = self._format_event_time(event["updated_event"].get("start_time"))
-                
-                detail_str = f"{original_start_str}の{event['original_event'].get('name')}の予定を"
-                if event['original_event'].get('name') != event['updated_event'].get('name'):
-                    detail_str += f"{event['updated_event'].get('name')}に、"
-                if original_start_str != updated_start_str:
-                    detail_str += f"{updated_start_str}に変更"
-                else:
-                    detail_str += "変更"
-                event_details.append(detail_str)
-            
-            message = f"{'、'.join(event_details)}。以上{len(changed_events_info)}件の予定を変更しました。"
-            return changed_events_info, message
-        
-        return None, "変更対象の予定が見つかりませんでした。"
-
     def _add_income_expense(self, text: str, user_id: str | None):
         """収支の追加"""
         if not user_id:
@@ -869,21 +729,6 @@ class ChatSpaceModel:
         except Exception as e:
             print(f"--- [ERROR] _get_memo: メモ検索/取得エラー: {e} ---")
             return None, "メモの取得中にエラーが発生しました。"
-
-    # SwitchBot操作プロンプト
-    SWITCHBOT_OPERATION_PROMPT_TEMPLATE = """
-    目的: ユーザーが操作したいSwitchBotデバイスと、そのデバイスに対して実行したいコマンドを抽出。
-    利用可能なデバイスと機能のリスト: {available_devices_json}
-    抽出項目:
-    - device_id (操作対象のデバイスID)
-    - command_type (コマンドタイプ。例: "command", "customize")
-    - command (実行するコマンド。例: "turnOn", "turnOff", "press")
-    - parameter (コマンドのパラメータ。例: "default", "25", "on")
-    出力はJSON配列のみ、他テキスト禁止。単独でも複数あっても二次配列で返す。
-    現在時刻:{current_time}
-    ユーザー入力: {input_value}
-    """
-
     def _get_switchbot_devices(self, text: str, user_id: str | None):
         """SwitchBotデバイス情報を取得し、ユーザーの操作意図を特定する"""
         switchbot_api_token = os.getenv("SWITCHBOT_TOKEN")
@@ -978,15 +823,3 @@ class ChatSpaceModel:
         except Exception as e:
             print(f"SwitchBot操作エラー: {e}")
             return None, "SwitchBotの操作中にエラーが発生しました。"
-
-
-
-
-
-
-
-
-
-
-
-

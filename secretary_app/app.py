@@ -4,6 +4,9 @@ import sys
 from datetime import datetime, timedelta
 from functools import wraps
 
+# プロジェクトルートをsys.pathに追加
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
 from flask import (
     Flask, render_template, jsonify, request, redirect, url_for, session, abort, g,
     send_from_directory,
@@ -15,9 +18,6 @@ from services.google_oauth import build_web_flow, get_google_redirect_uri
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
 import atexit
-
-# order配下のモジュール/ルートを使うためにパス追加
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'order'))
 
 import json
 from services.user_service import (
@@ -41,9 +41,11 @@ from services.chat_space_model import ChatSpaceModel
 from services.memo_routes import memo_bp
 from services.ScheduleManager import ScheduleManager
 from order.models import db
+from models.event import Event
 from order.custom_order_routes import custom_order_bp
 from order.command_routes import command_bp
 from routes.order_routes import order_bp
+from routes.calendar_routes import calendar_bp
 from order.evaluator import evaluate_triggers # 関数名を修正
 
 
@@ -80,6 +82,7 @@ scheduler = BackgroundScheduler(jobstores=jobstores, executors=executors, job_de
 app.register_blueprint(custom_order_bp, url_prefix='/api')
 app.register_blueprint(command_bp, url_prefix='/api')
 app.register_blueprint(order_bp, url_prefix='/order')
+app.register_blueprint(calendar_bp)
 
 from flask import Blueprint
 custom_order_pages_bp = Blueprint(
