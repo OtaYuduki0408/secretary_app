@@ -50,12 +50,6 @@ def register_user(name: str, email: str, password: str):
             return {"error": f"プロフィール作成に失敗しました: {getattr(prof, 'error', '')}"}
 
     except Exception as e:
-        import traceback
-        print("--- AN ERROR OCCURRED IN register_user ---")
-        print(f"Error Type: {type(e)}")
-        print(f"Error Details: {e}")
-        traceback.print_exc()
-        print("------------------------------------------")
         return {"error": str(e)}
 
 

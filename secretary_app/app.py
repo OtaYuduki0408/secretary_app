@@ -384,8 +384,13 @@ def register():
         name = request.form['name']
         email = request.form['email']
         password = request.form['password']
+        
+        print("--- [DEBUG] Calling register_user ---")
         result = register_user(name, email, password)
-        if 'error' in result:
+        print(f"--- [DEBUG] Result from register_user: {result} ---")
+        print(f"--- [DEBUG] Type of result: {type(result)} ---")
+
+        if result and 'error' in result:
             return render_template('register.html', error=result['error'])
         login_result = login_user(email, password)  # �F�؂��Ă���ԑ˃��O�C�����s��
         if 'error' in login_result:
