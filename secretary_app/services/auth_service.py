@@ -47,6 +47,16 @@ def register_user(name: str, email: str, password: str):
                 pass
             return {"error": f"プロフィール作成に失敗しました: {getattr(prof, 'error', '')}"}
 
+        return {
+            "message": "登録成功",
+            "user": {
+                "id": user_id,
+                "email": getattr(user_obj, "email", email),
+                "name": name,
+            },
+            "session": bool(session),
+        }
+
     except Exception as e:
         return {"error": str(e)}
 

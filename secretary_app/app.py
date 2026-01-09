@@ -1,4 +1,4 @@
-﻿# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 import os
 import sys
 from datetime import datetime, timedelta
@@ -154,7 +154,7 @@ SECRET_KEY = os.getenv('SECRET_KEY')
 if not SECRET_KEY:
     raise RuntimeError('SECRET_KEY 環境変数を設定してください。')
 app.secret_key = SECRET_KEY
-app.permanent_session_lifetime = timedelta(days=30)  # �ԑ˃Z�b�V�������炩�����g�p�Ԋm�点
+app.permanent_session_lifetime = timedelta(days=30)  # ԑ˃ZbV炩gpԊm点
 
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
 if not GEMINI_API_KEY:
@@ -395,14 +395,10 @@ def register():
 
         if result and 'error' in result:
             return render_template('register.html', error=result['error'])
-        login_result = login_user(email, password)  # �F�؂��Ă���ԑ˃��O�C�����s��
-        if 'error' in login_result:
-            return render_template(
-                'register.html',
-                error='登録は完了しましたが自動ログインに失敗しました。ログイン画面から再度お試しください。'
-            )
+        
+        # register_userの成功結果をそのまま利用する
         session.permanent = True
-        session['user'] = login_result['user']
+        session['user'] = result['user']
         return redirect(url_for('main'))
     return render_template('register.html')
 
