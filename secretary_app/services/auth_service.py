@@ -21,14 +21,14 @@ def register_user(name: str, email: str, password: str):
         if rpc_response.data:
             return {"error": "このメールアドレスは既に登録されています。"}
 
-        # 管理者としてユーザー作成（メール確認済みにする）
-        created = supabase.auth.admin.create_user({
+        # ユーザーを新規登録し、同時にサインインさせる
+        res = supabase.auth.sign_up({
             "email": email,
             "password": password,
-            "email_confirm": True,
         })
 
-        user_obj = getattr(created, "user", None) or created
+        user_obj = getattr(res, "user", None)
+        session = getattr(res, "session", None)
         user_id = getattr(user_obj, "id", None)
         if not user_id:
             return {"error": "ユーザー作成に失敗しました。"}
