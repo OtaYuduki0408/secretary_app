@@ -386,6 +386,16 @@ def finance():
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     if request.method == 'POST':
+        # --- START: Supabase Key Check ---
+        import os
+        SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+        print("--- [DEBUG] Checking SUPABASE_KEY in /register route ---")
+        if SUPABASE_KEY:
+            print(f"SUPABASE_KEY (partial): {SUPABASE_KEY[:5]}...{SUPABASE_KEY[-5:]}")
+        else:
+            print("SUPABASE_KEY: NOT SET")
+        print("------------------------------------------")
+        # --- END: Supabase Key Check ---
         name = request.form['name']
         email = request.form['email']
         password = request.form['password']

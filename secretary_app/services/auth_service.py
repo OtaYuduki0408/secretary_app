@@ -45,10 +45,8 @@ def register_user(name: str, email: str, password: str):
                 supabase.auth.admin.delete_user(user_id)
             except Exception:
                 pass
-            return {"error": f"プロフィール作成に失敗しました: {getattr(prof, 'error', '')}"}
-
     except Exception as e:
-        return {"error": str(e)}
+        return {"error": repr(e)}
 
 
 def login_user(email: str, password: str):
