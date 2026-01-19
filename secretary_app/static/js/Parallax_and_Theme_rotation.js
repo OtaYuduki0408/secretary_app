@@ -1,5 +1,3 @@
-
-
 import { check_chat_Space } from '/static/js/ChatSpace.js';
 
 /* =======================
