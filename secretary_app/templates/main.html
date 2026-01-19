@@ -57,21 +57,20 @@
 
     .user-badge {
       margin: 12px auto 0;
-      padding: 10px 18px;
+      padding: 8px 16px;
       border-radius: 999px;
-      background: rgba(10, 20, 32, 0.65);
-      border: 1px solid rgba(168, 182, 198, 0.6);
-      color: #e7edf5;
+      background: #f1f5f9; /* Light gray background */
+      border: 1px solid #e2e8f0; /* Slightly darker border */
+      color: #1f2937; /* Dark text color */
       display: inline-flex;
       align-items: center;
       gap: 8px;
-      font-size: 0.95rem;
-      backdrop-filter: blur(8px);
+      font-size: 0.9rem;
     }
 
     .user-name {
       font-weight: 600;
-      color: #7aa8ff;
+      color: #2563eb; /* A darker, more readable blue */
     }
 
     /* New Terminal UI Styles */
@@ -159,6 +158,52 @@
       padding: 2px 4px;
       border-radius: 4px;
     }
+
+    @media (max-width: 768px) {
+      body {
+        font-size: 15px; /* Adjust base font size for smaller screens */
+      }
+
+      main.shell {
+        padding: 16px; /* Reduce overall padding */
+      }
+
+      .user-badge {
+        font-size: 0.85rem;
+        padding: 6px 12px;
+      }
+
+      .terminal-window {
+        height: 320px; /* Slightly reduce height */
+        max-width: 100%;
+      }
+
+      .voice-log-panel {
+        font-size: 0.9rem;
+        padding: 12px;
+        line-height: 1.6;
+      }
+
+      .search input {
+        font-size: 1rem;
+      }
+
+      .mic-wrap .mic-btn {
+        width: 60px;
+        height: 60px;
+      }
+
+      .fab-group {
+        bottom: 12px;
+        right: 12px;
+        gap: 10px;
+      }
+
+      .fab, .fab svg {
+        width: 48px;
+        height: 48px;
+      }
+    }
   </style>
 </head>
 <body data-user-id="{{ user.id or '' }}">
@@ -174,6 +219,11 @@
   <main class="shell">
     <div aria-hidden="true"></div>
  
+    <div class="user-badge" aria-live="polite">
+      <span>ログイン中:</span>
+      <span class="user-name">{{ user_name }}</span>
+    </div>
+
     <section aria-label="メイン操作" class="ui-stack">
       <div class="mic-wrap">
         <button class="mic-btn glass" aria-label="音声入力を開始">
