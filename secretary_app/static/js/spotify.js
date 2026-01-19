@@ -964,7 +964,12 @@ bar?.shuffle?.addEventListener('click', async () => {
     historyClear?.addEventListener('click', ()=>{ saveHistory([]); renderHistory(); });
 
     // Search
-    searchForm?.addEventListener('submit', (e)=>{ e.preventDefault(); handleSearchSubmit((searchInput.value||'').trim()); });
+    searchForm?.addEventListener('submit', (e)=>{ 
+      e.preventDefault(); 
+      if (searchInput) {
+        handleSearchSubmit((searchInput.value||'').trim()); 
+      }
+    });
     async function handleSearchSubmit(q){
       if(!resultsList || !searchMessage) return;
       resultsList.innerHTML='';
