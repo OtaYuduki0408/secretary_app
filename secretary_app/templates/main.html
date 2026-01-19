@@ -57,21 +57,152 @@
 
     .user-badge {
       margin: 12px auto 0;
-      padding: 10px 18px;
+      padding: 8px 16px;
       border-radius: 999px;
-      background: rgba(10, 20, 32, 0.65);
-      border: 1px solid rgba(168, 182, 198, 0.6);
-      color: #e7edf5;
+      background: #f1f5f9; /* Light gray background */
+      border: 1px solid #e2e8f0; /* Slightly darker border */
+      color: #1f2937; /* Dark text color */
       display: inline-flex;
       align-items: center;
       gap: 8px;
-      font-size: 0.95rem;
-      backdrop-filter: blur(8px);
+      font-size: 0.9rem;
     }
 
     .user-name {
       font-weight: 600;
-      color: #7aa8ff;
+      color: #2563eb; /* A darker, more readable blue */
+    }
+
+    /* New Terminal UI Styles */
+    .ui-stack {
+      gap: 24px;
+    }
+
+    .terminal-window {
+      width: 100%;
+      max-width: 800px;
+      height: 350px;
+      border-radius: 12px;
+      background: #ffffff; /* White background */
+      border: 1px solid #d1d5db; /* Gray border */
+      box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .voice-log-panel {
+      flex-grow: 1;
+      padding: 20px;
+      overflow-y: auto;
+      color: #000000; /* Final log color: Black */
+      font-family: 'Consolas', 'Monaco', monospace;
+      font-size: 1rem;
+      line-height: 1.7;
+    }
+
+    .log-interim {
+        color: #6b7280; /* Interim log color: Gray */
+    }
+
+    .voice-log-panel::-webkit-scrollbar {
+      width: 8px;
+    }
+    .voice-log-panel::-webkit-scrollbar-track {
+      background: #f1f5f9;
+    }
+    .voice-log-panel::-webkit-scrollbar-thumb {
+      background-color: #cbd5e1;
+      border-radius: 4px;
+    }
+
+    .voice-log-entry {
+      opacity: 1;
+    }
+    .voice-log-entry + .voice-log-entry {
+        margin-top: 12px;
+    }
+
+    .search {
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      padding: 12px 20px;
+      background: #f8fafc; /* Light gray separator */
+      border-top: 1px solid #e2e8f0;
+    }
+    
+    .search .icon {
+      stroke: #64748b; /* Icon color */
+      margin-right: 12px;
+    }
+
+    .search input {
+      flex-grow: 1;
+      background: transparent;
+      border: none;
+      outline: none;
+      color: #000000;
+      font-size: 1.1rem;
+      font-family: 'Consolas', 'Monaco', monospace;
+    }
+
+    .search input::placeholder {
+      color: #9ca3af;
+    }
+
+    .highlight-wake-word {
+      color: #D97706; /* Darker, rich yellow/orange */
+      font-weight: 600;
+      background-color: #FEF3C7; /* Light yellow background */
+      padding: 2px 4px;
+      border-radius: 4px;
+    }
+
+    @media (max-width: 768px) {
+      body {
+        font-size: 15px; /* Adjust base font size for smaller screens */
+      }
+
+      main.shell {
+        padding: 16px; /* Reduce overall padding */
+      }
+
+      .user-badge {
+        font-size: 0.85rem;
+        padding: 6px 12px;
+      }
+
+      .terminal-window {
+        height: 320px; /* Slightly reduce height */
+        max-width: 100%;
+      }
+
+      .voice-log-panel {
+        font-size: 0.9rem;
+        padding: 12px;
+        line-height: 1.6;
+      }
+
+      .search input {
+        font-size: 1rem;
+      }
+
+      .mic-wrap .mic-btn {
+        width: 60px;
+        height: 60px;
+      }
+
+      .fab-group {
+        bottom: 12px;
+        right: 12px;
+        gap: 10px;
+      }
+
+      .fab, .fab svg {
+        width: 48px;
+        height: 48px;
+      }
     }
   </style>
 </head>
@@ -108,18 +239,22 @@
           </div>
         </button>
       </div>
-      <form id="search-form" class="search glass" role="search" aria-label="検索フォーム">
-        <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-          <circle cx="11" cy="11" r="7" stroke="#e7edf5" stroke-width="1.7"/>
-          <path d="M20 20l-3.6-3.6" stroke="#e7edf5" stroke-width="1.7" stroke-linecap="round"/>
-        </svg>
-        <input id="searchbox" type="text" inputmode="search" name="search" placeholder="入力" aria-label="入力" />
-      </form>
+
+      <div class="terminal-window glass">
+        <div id="voice-log-container" class="voice-log-panel">
+            <!-- Voice logs will be dynamically inserted here -->
+        </div>
+        <form id="search-form" class="search" role="search" aria-label="検索フォーム">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M4 12l2-2 3 3 3-3 2 2" stroke="#e7edf5" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M10 17l-3-3" stroke="#e7edf5" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <input id="searchbox" type="text" inputmode="search" name="search" placeholder="テキストでコマンドを入力..." aria-label="入力" />
+        </form>
+      </div>
     </section>
  
     <div aria-hidden="true"></div>
- 
-    <a href="{{ url_for('google_login') }}" id="authorize-button" class="btn btn-success">Googleログイン</a>
  
     <div class="fab-group">
       <a class="stats-btn fab" href="{{ url_for('logout') }}" aria-label="ログアウト" title="ログアウト">
@@ -161,11 +296,7 @@
   <span class="badge" aria-hidden="true">Today</span>
 </a>
 
-      <a class="spotify-btn fab" href="{{ url_for('spotify_login') }}" title="Spotify" aria-label="Spotifyを開く">
-        <svg width="34" height="34" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-          <path fill="#ffffff" d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zM17 14c-.8-1-2-.9-2.7-1.3-.8-.3-1.6-.3-2.3 0-1.4.6-2.6.2-3.4-.6-.7-.7-1.3-1.8-1.3-3 0-2.3 1.9-4.2 4.2-4.2 1.3 0 2.5.6 3.4 1.5.8.9 1.3 2.1 1.3 3.5 0 1.2-.4 2.3-1.2 3.2zM12 6a5 5 0 0 1-5 5c-.7 0-1.3.6-1.3 1.3 0 .7.6 1.3 1.3 1.3.8 0 1.5-.7 1.5-1.5V9.5h2.5V11c0 .8.7 1.5 1.5 1.5.8 0 1.5-.7 1.5-1.5V9.5h2.5V11c0 .8.7 1.5 1.5 1.5.8 0 1.5-.7 1.5-1.5 0-.7-.6-1.3-1.3-1.3a5 5 0 0 1-5 5z"/>
-        </svg>
-      </a>
+
       <a class="memo-btn fab" href="{{ url_for('memo') }}" aria-label="メモを開く" title="メモ">
         <svg width="34" height="34" viewBox="0 0 24 24" fill="none" aria-hidden="true">
           <rect x="4" y="4" width="16" height="16" rx="4" fill="#1f2a33" stroke="#a8b6c6" stroke-width="1.2"/>
@@ -207,23 +338,11 @@
   // ScheduleManager を明示的にインポートする
   import { ScheduleManager } from './static/js/ScheduleManager.js';
  
-  // 创建全局实例，让其他脚本可以访问
+  // 创建全局インスタンス，让其他脚本可以访问
   window.manager = new ScheduleManager();
  
   const log = (msg) => {
     console.log(msg);
-  };
- 
-  document.getElementById("authorize-button").addEventListener("click", () => {
-    window.manager.handleAuthClick();
-  });
- 
-  window.receiveAccessToken = (token) => {
-    log("Google認証成功!");
-    window.manager.setAccessToken(token);
-   
-    // 認証完了後のフィードバック
-    alert("Googleカレンダーにログインしました！");
   };
  
 // AIインジケータ制御スクリプト (両方に存在)
@@ -261,42 +380,6 @@
   });
 })();
 </script>
- 
-<div id="jackpot-cameo" aria-hidden="true">
-  <imd="cameo1" src="{{ url_for('static', filename='img/videoframe_79969.png') }}" alt="cameo-1" />
-  <img id="cameo2" src="{{ url_for('static', filename='img/videoframe_86269.png') }}" alt="cameo-2" />
-</div>
- 
-<div id="slot-overlay" aria-hidden="true">
-  <div class="slot-wrap">
-    <button id="slot-close" aria-label="閉じる">×</button>
-    <h2 class="slot-title">LUCKY SLOT</h2>
-    <div class="reels">
-      <div class="reel"><div class="cell" id="r0">7</div></div>
-      <div class="reel"><div class="cell" id="r1">7</div></div>
-      <div class="reel"><div class="cell" id="r2">7</div></div>
-    </div>
-    <div class="slot-controls">
-      <button id="slot-spin">SPIN</button>
-    </div>
-    <p id="slot-msg" style="min-height:1.6em;margin:.6rem 0 0;color:#cde4ff;"></p>
-  </div>
-</div>
- 
-<div id="btd" class="btd-overlay" aria-hidden="true" hidden>
-  <div class="btd-player-frame">
-    <div id="btd-player"></div>
-  </div>
-  <button id="btd-skip" class="btd-skip" aria-label="スキップ">SKIP</button>
-</div>
- 
-<div id="ora" aria-hidden="true">
-  <img src="{{ url_for('static', filename='img/ora.png') }}" alt="オラオラ！">
-</div>
- 
-<div id="cracks" aria-hidden="true"></div>
- 
-<div id="shatter" aria-hidden="true"></div>
 
 <div id="toast-stack" aria-live="polite" aria-atomic="true"></div>
  

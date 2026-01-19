@@ -6,12 +6,149 @@
   <title>カレンダー管理</title>
 
   <link rel="stylesheet" href="{{ url_for('static', filename='css/calendar.css') }}">
+  <style>
+    /* --- 基本設定とデザイン統一 --- */
+    :root {
+      /* style.cssのtheme-blueを参考に再定義 */
+      --theme-bg-1: #071426;
+      --theme-bg-2: #0b1e35;
+      --theme-accent-1: #3b82f6; /* 明るい青 */
+      --theme-accent-2: #1d4ed8; /* 濃い青 */
+      --theme-text-1: #f4f7fb;   /* 白に近いテキスト */
+      --theme-text-2: #cdd6df;   /* グレーのテキスト */
+      --theme-panel-1: #1c232a;  /* パネル背景 */
+      --theme-border: rgba(122, 168, 255, 0.2); /* ボーダー色 */
+
+      /* カレンダーのボーダー色をさらに目立たなくする */
+      --fc-border-color: rgba(122, 168, 255, 0.1); /* より暗い青系で透過度を上げる */
+    }
+    html {
+      /* UI全体を拡大するため、基本フォントサイズを大きくする */
+      font-size: 18px;
+    }
+    body {
+        font-family: 'Roboto', 'Noto Sans JP', sans-serif;
+        background: linear-gradient(180deg, var(--theme-bg-2), var(--theme-bg-1));
+        color: var(--theme-text-1);
+    }
+    .header {
+        background-color: transparent;
+    }
+    .container {
+        padding-top: 0;
+        padding-bottom: 2rem; /* 下部に余白を追加 */
+    }
+    #calendar {
+      max-width: 95vw;
+      margin: 1.5rem auto 0;
+      background-color: var(--theme-panel-1);
+      border: 1px solid var(--theme-border);
+      padding: 1.5rem;
+      border-radius: 18px;
+      box-shadow: 0 10px 30px rgba(0,0,0,.35);
+      color: var(--theme-text-1);
+    }
+    
+    /* --- FullCalendarのスタイル調整 --- */
+    .fc {
+        /* height: 100%; を削除。コンテンツに応じた高さにする */
+    }
+    .fc .fc-toolbar-title {
+        font-size: 1.5em;
+        color: var(--theme-text-1);
+    }
+    .fc .fc-button-primary {
+      background-color: var(--theme-accent-1);
+      border-color: var(--theme-accent-1);
+      font-size: 0.9rem;
+    }
+    .fc .fc-button-primary:hover, .fc .fc-button-primary:active {
+      background-color: var(--theme-accent-2);
+      border-color: var(--theme-accent-2);
+    }
+    .fc .fc-day-today {
+        background-color: rgba(59, 130, 246, 0.15);
+    }
+    .fc .fc-daygrid-day-number, .fc .fc-col-header-cell-cushion {
+        color: var(--theme-text-2);
+        font-size: 0.9rem;
+    }
+    .fc .fc-day-sun .fc-daygrid-day-number, .fc .fc-day-sun .fc-col-header-cell-cushion { color: #f87171; } /* 日曜は赤 */
+    .fc .fc-day-sat .fc-daygrid-day-number, .fc .fc-day-sat .fc-col-header-cell-cushion { color: #60a5fa; } /* 土曜は青 */
+    
+    /* 曜日の背景色を修正 */
+    .fc-theme-standard .fc-scrollgrid {
+        border: none; /* 全体のボーダーはカレンダーコンテナで制御するため、FCのボーダーは除去 */
+    }
+    .fc-theme-standard .fc-scrollgrid-sync-table,
+    .fc-theme-standard th {
+        background-color: var(--theme-panel-1); /* カレンダーの背景色に合わせる */
+        border-color: var(--fc-border-color); /* グリッド線と統一 */
+    }
+
+
+    /* イベントの視認性向上 */
+    .fc-event {
+        cursor: pointer;
+        padding: 4px 6px;
+        font-size: 0.85rem;
+        font-weight: 500;
+        border-radius: 4px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    }
+    .fc-event-local {
+        background-color: var(--theme-accent-1) !important;
+        border-color: var(--theme-accent-1) !important;
+        color: #fff !important;
+    }
+    .fc-event-holiday {
+        border: none !important;
+        font-weight: bold;
+        background-color: transparent !important;
+        color: #fca5a5 !important; /* 祝日は薄い赤文字 */
+    }
+    .fc-daygrid-day.fc-day-today .fc-event-holiday .fc-event-title {
+        color: #fca5a5 !important;
+    }
+    .fc-daygrid-dot-event.fc-event-holiday {
+        background-color: #fca5a5;
+    }
+
+    /* --- モーダルのバグ修正とデザイン調整 --- */
+    .modal-overlay {
+        position: fixed;
+        top: 0; left: 0; width: 100%; height: 100%;
+        background-color: rgba(0, 0, 0, 0.7);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 1001;
+        opacity: 0;
+        visibility: hidden;
+        transition: opacity 0.3s, visibility 0s 0.3s;
+        backdrop-filter: blur(5px);
+    }
+    .modal-overlay.is-visible {
+        opacity: 1;
+        visibility: visible;
+        transition: opacity 0.3s;
+    }
+    .modal-content {
+        background: var(--theme-panel-1);
+        border: 1px solid var(--theme-border);
+        box-shadow: 0 10px 30px rgba(0,0,0,.35);
+        border-radius: 18px;
+        width: 90%;
+        max-width: 550px;
+        transform: scale(0.95);
+        transition: transform 0.3s;
+    }
+    .modal-overlay.is-visible .modal-content {
+        transform: scale(1);
+    }
+  </style>
 </head>
 <body>
-  <!-- 背景 -->
-  <div class="page-bg" aria-hidden="true"></div>
-
-  <!-- ヘッダー -->
   <header class="header">
     <h1 class="title">カレンダー管理</h1>
     <div class="actions">
@@ -19,193 +156,133 @@
     </div>
   </header>
 
-  <!-- コンテナ -->
   <main class="container">
-    <!-- 追加 -->
-    <section class="card">
-      <h2 class="card-title">イベント追加</h2>
-
-      <div class="grid g-2">
-        <label class="field">
-          <span class="label">タイトル</span>
-          <input id="event-title" class="input" placeholder="例：打ち合わせ">
-        </label>
-
-        <label class="field">
-          <span class="label">説明</span>
-          <input id="event-desc" class="input" placeholder="任意（場所・メモなど）">
-        </label>
-      </div>
-
-      <div class="grid g-2">
-        <label class="field">
-          <span class="label">開始日時</span>
-          <input id="event-start" type="datetime-local" class="input">
-        </label>
-
-        <label class="field">
-          <span class="label">終了日時</span>
-          <input id="event-end" type="datetime-local" class="input">
-        </label>
-      </div>
-
-      <div class="card-actions">
-        <button id="add-event-button" class="btn success">＋ 追加</button>
-      </div>
-    </section>
-
-    <!-- 削除 -->
-    <section class="card">
-      <h2 class="card-title">イベント削除</h2>
-
-      <div class="grid">
-        <label class="field full">
-          <span class="label">イベントID</span>
-          <input id="event-id" class="input" placeholder="削除したいイベントのID">
-        </label>
-      </div>
-
-      <div class="card-actions">
-        <button id="delete-event-button" class="btn danger">削除</button>
-      </div>
-    </section>
-
-    <!-- 確認 -->
-    <section class="card">
-      <h2 class="card-title">イベント確認</h2>
-
-      <div class="grid g-2">
-        <label class="field">
-          <span class="label">開始日</span>
-          <input id="check-start" type="date" class="input">
-        </label>
-
-        <label class="field">
-          <span class="label">終了日</span>
-          <input id="check-end" type="date" class="input">
-        </label>
-      </div>
-
-      <div class="card-actions">
-        <button id="check-event-button" class="btn ghost">確認</button>
-      </div>
-    </section>
-
-    <!-- ログ -->
-    <section class="card">
-      <h2 class="card-title">ログ</h2>
-      <div id="log" class="log"></div>
-    </section>
+    <div id="calendar"></div>
   </main>
+
+  <div id="event-modal" class="modal-overlay">
+    <div class="modal-content card">
+        <h2 id="modal-title" class="modal-title card-title">イベントを追加</h2>
+        <div class="grid g-1">
+            <label class="field"><span class="label">タイトル</span><input id="event-title" class="input" placeholder="例：チームミーティング"></label>
+            <label class="field"><span class="label">説明</span><input id="event-desc" class="input" placeholder="任意（場所・メモなど）"></label>
+        </div>
+        <div class="grid g-2">
+            <label class="field"><span class="label">開始日時</span><input id="event-start" type="datetime-local" class="input"></label>
+            <label class="field"><span class="label">終了日時</span><input id="event-end" type="datetime-local" class="input"></label>
+        </div>
+        <div class="card-actions">
+            <button id="cancel-event-button" class="btn ghost">キャンセル</button>
+            <button id="save-event-button" class="btn success">保存</button>
+        </div>
+    </div>
+  </div>
+
+  <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.13/index.global.min.js'></script>
+  <script src='https://cdn.jsdelivr.net/npm/@fullcalendar/google-calendar@6.1.13/index.global.min.js'></script>
 
   <script>
     document.addEventListener('DOMContentLoaded', () => {
-      const $ = s => document.querySelector(s);
-      const logEl = $("#log");
+        const gcpApiKey = '{{ gcp_api_key|safe }}';
+        if (!gcpApiKey) console.warn('GCP_API_KEYが設定されていません。祝日カレンダーは表示されません。');
 
-      const log = (msg, type = 'info') => {
-        const t = new Date().toLocaleTimeString();
-        const div = document.createElement('div');
-        div.className = `log-entry log-${type}`;
-        div.textContent = `[${t}] ${msg}`;
-        logEl.appendChild(div);
-        logEl.scrollTop = logEl.scrollHeight;
-      };
+        const calendarEl = document.getElementById('calendar');
+        const modal = document.getElementById('event-modal');
+        const $ = s => document.querySelector(s);
 
-      // --- API Functions ---
-      const api = {
-        async addEvent(title, startTime, endTime, description) {
-          try {
-            const res = await fetch('/api/local_calendar/events', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ title, start_time: startTime, end_time: endTime, description }),
-            });
-            const data = await res.json();
-            console.log("Server response:", res.status, data); // For debugging
-            if (!res.ok) throw new Error(data.error || `HTTP error! status: ${res.status}`);
-            log(`イベントを追加しました: 「${data.title}」 (ID: ${data.id})`, 'success');
-          } catch (e) {
-            log(`イベントの追加に失敗しました: ${e.message}`, 'error');
-            console.error("Add event failed:", e); // For debugging
-          }
-        },
-        async deleteEvent(eventId) {
-          if (!eventId) {
-            log('削除するイベントのIDを入力してください。', 'error');
-            return;
-          }
-          try {
-            const res = await fetch(`/api/local_calendar/events/${eventId}`, {
-              method: 'DELETE',
-            });
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.error || 'サーバーエラー');
-            log(`イベント(ID: ${eventId})を削除しました。`, 'success');
-          } catch (e) {
-            log(`イベント(ID: ${eventId})の削除に失敗しました: ${e.message}`, 'error');
-          }
-        },
-        async listEvents(startTime, endTime) {
-           try {
-            let url = '/api/local_calendar/events';
-            const params = new URLSearchParams();
-            if (startTime) params.append('start_time', new Date(startTime).toISOString());
-            if (endTime) params.append('end_time', new Date(endTime).toISOString());
-            if (params.toString()) url += `?${params.toString()}`;
+        const calendar = new FullCalendar.Calendar(calendarEl, {
+            initialView: 'dayGridMonth',
+            headerToolbar: { left: 'prev,next today', center: 'title', right: 'dayGridMonth,timeGridWeek,timeGridDay' },
+            eventSources: [
+                {
+                    url: '/api/local_calendar/events',
+                    failure: () => alert('自分のイベント取得に失敗しました。'),
+                    eventDataTransform: data => ({
+                        id: data.id, title: data.title, start: data.start_time, end: data.end_time,
+                        description: data.description, classNames: ['fc-event-local']
+                    })
+                },
+                gcpApiKey ? {
+                    googleCalendarId: 'ja.japanese#holiday@group.v.calendar.google.com',
+                    className: 'fc-event-holiday',
+                    display: 'list-item'
+                } : {}
+            ],
+            googleCalendarApiKey: gcpApiKey,
+            locale: 'ja',
+            buttonText: { today: '今日', month: '月', week: '週', day: '日' },
+            allDayText: '終日',
+            height: 'auto', // 高さをコンテンツに合わせる
+            dateClick: (info) => {
+                openModal(info.dateStr);
+            },
+            eventClick: (info) => {
+                if (info.event.source.publicId === 'ja.japanese#holiday@group.v.calendar.google.com') return;
+                const desc = info.event.extendedProps.description ? `\n説明: ${info.event.extendedProps.description}` : '';
+                if (confirm(`イベント「${info.event.title}」を削除しますか？${desc}`)) {
+                    api.deleteEvent(info.event.id);
+                }
+            },
+        });
+        calendar.render();
 
-            const res = await fetch(url);
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.error || 'サーバーエラー');
+        const openModal = (dateStr) => {
+            $('#event-title').value = '';
+            $('#event-desc').value = '';
+            const clickedDate = new Date(dateStr);
+            if (dateStr.indexOf('T') === -1) clickedDate.setHours(9);
+            const startStr = new Date(clickedDate.getTime() - (clickedDate.getTimezoneOffset() * 60000)).toISOString().slice(0, 16);
+            clickedDate.setHours(clickedDate.getHours() + 1);
+            const endStr = new Date(clickedDate.getTime() - (clickedDate.getTimezoneOffset() * 60000)).toISOString().slice(0, 16);
+            $('#event-start').value = startStr;
+            $('#event-end').value = endStr;
+            modal.classList.add('is-visible');
+        };
 
-            logEl.innerHTML = ''; // ログをクリア
-            if (data.length === 0) {
-              log('指定された期間にイベントはありません。');
-              return;
+        const closeModal = () => modal.classList.remove('is-visible');
+
+        const api = {
+            async addEvent(title, startTime, endTime, description) {
+                try {
+                    const res = await fetch('/api/local_calendar/events', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ title, start_time: startTime, end_time: endTime, description }),
+                    });
+                    const data = await res.json();
+                    if (!res.ok) throw new Error(data.error || 'サーバーエラー');
+                    alert(`イベントを追加しました: 「${data.title}」`);
+                    calendar.refetchEvents();
+                    closeModal();
+                } catch (e) {
+                    alert(`イベントの追加に失敗しました: ${e.message}`);
+                }
+            },
+            async deleteEvent(eventId) {
+                try {
+                    const res = await fetch(`/api/local_calendar/events/${eventId}`, { method: 'DELETE' });
+                    if (!res.ok) throw new Error((await res.json()).error || 'サーバーエラー');
+                    alert(`イベント(ID: ${eventId})を削除しました。`);
+                    calendar.refetchEvents();
+                } catch (e) {
+                    alert(`イベントの削除に失敗しました: ${e.message}`);
+                }
             }
-            log(`${data.length}件のイベントが見つかりました:`);
-            data.forEach(event => {
-                const start = new Date(event.start_time).toLocaleString('ja-JP');
-                const end = new Date(event.end_time).toLocaleString('ja-JP');
-                log(`- ID:${event.id}, ${event.title} (${start} ~ ${end})`);
-            });
-           } catch (e) {
-            log(`イベントの取得に失敗しました: ${e.message}`, 'error');
-           }
-        }
-      };
+        };
 
-      // --- Event Listeners ---
-      $("#add-event-button").addEventListener("click", async () => {
-        const start = $("#event-start").value;
-        const end = $("#event-end").value;
-        if (!start || !end) {
-            log('開始日時と終了日時を入力してください。', 'error');
-            return;
-        }
-        await api.addEvent(
-          $("#event-title").value || "無題のイベント",
-          new Date(start).toISOString(),
-          new Date(end).toISOString(),
-          $("#event-desc").value || ""
-        );
-        $("#event-title").value = "";
-        $("#event-desc").value = "";
-        $("#event-start").value = "";
-        $("#event-end").value = "";
-      });
+        $('#save-event-button').addEventListener('click', async () => {
+            const title = $('#event-title').value.trim();
+            const start = $('#event-start').value;
+            const end = $('#event-end').value;
+            if (!title) { alert('タイトルを入力してください。'); return; }
+            if (!start || !end) { alert('開始日時と終了日時を入力してください。'); return; }
+            await api.addEvent(title, new Date(start).toISOString(), new Date(end).toISOString(), $('#event-desc').value || "");
+        });
 
-      $("#delete-event-button").addEventListener("click", async () => {
-        const id = $("#event-id").value.trim();
-        await api.deleteEvent(id);
-        $("#event-id").value = "";
-      });
-
-      $("#check-event-button").addEventListener("click", async () => {
-        await api.listEvents($("#check-start").value, $("#check-end").value);
-      });
-
-      log('ローカルカレンダーの準備ができました。');
+        $('#cancel-event-button').addEventListener('click', closeModal);
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) closeModal();
+        });
     });
   </script>
 </body>

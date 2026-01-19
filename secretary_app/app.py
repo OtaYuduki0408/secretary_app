@@ -12,8 +12,7 @@ from flask import (
     send_from_directory,
 )
 from flask_socketio import SocketIO
-from spotipy.oauth2 import SpotifyOAuth
-import spotipy
+
 from services.google_oauth import build_web_flow, get_google_redirect_uri
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
@@ -186,54 +185,9 @@ GOOGLE_SCOPES = [
 GOOGLE_REDIRECT_URI = get_google_redirect_uri()
 
 
-# ============== Spotify 設定 ==============
-SPOTIPY_CLIENT_ID = os.environ.get('SPOTIPY_CLIENT_ID')
-if not SPOTIPY_CLIENT_ID:
-    raise RuntimeError('SPOTIPY_CLIENT_ID 環境変数を設定してください。')
-SPOTIPY_CLIENT_SECRET = os.environ.get('SPOTIPHY_CLIENT_SECRET') or os.environ.get('SPOTIPY_CLIENT_SECRET')
-if not SPOTIPY_CLIENT_SECRET:
-    raise RuntimeError('SPOTIPY_CLIENT_SECRET (または SPOTIPHY_CLIENT_SECRET) 環境変数を設定してください。')
-SPOTIPY_REDIRECT_URI = os.environ.get('SPOTIPY_REDIRECT_URI', 'https://127.0.0.1:5000/spotify-callback')
 
-# スコープはスペース区切りの1つの文字列で管理
-# スコープはスペース区切りの1つの文字列で管理
-SPOTIFY_SCOPES = (
-    'streaming user-read-playback-state user-modify-playback-state '
-    'playlist-read-private playlist-read-collaborative user-top-read '
-    'playlist-modify-public playlist-modify-private'
-)
-REQUIRED_SPOTIFY_SCOPE = SPOTIFY_SCOPES
 
-def get_spotify_oauth():
-    return SpotifyOAuth(
-        client_id=SPOTIPY_CLIENT_ID,
-        client_secret=SPOTIPY_CLIENT_SECRET,
-        redirect_uri=SPOTIPY_REDIRECT_URI,
-        scope=SPOTIFY_SCOPES,
-        cache_path=None,
-    )
 
-# トークン情報
-def _get_token_info():
-    return session.get('spotify_token_info')
-
-def _save_token_info(token_info: dict):
-    session['spotify_token_info'] = token_info
-
-def _ensure_access_token() -> str:
-    token_info = _get_token_info()
-    if not token_info:
-        abort(401, description='Not authenticated to Spotify')
-    sp_oauth = get_spotify_oauth()
-    if sp_oauth.is_token_expired(token_info):
-        token_info = sp_oauth.refresh_access_token(token_info['refresh_token'])
-        _save_token_info(token_info)
-    return token_info['access_token']
-
-def _has_required_scopes(token_info, required_scope: str) -> bool:
-    cur = set((token_info or {}).get('scope', '').split())
-    need = set(required_scope.split())
-    return need.issubset(cur)
 
 
 # ============== 認証デコレータ ==============
@@ -314,8 +268,10 @@ def memo():
     return render_template('memo.html')
 
 @app.route('/calender')
+@login_required
 def calender_page():
-    return render_template('calender.html')
+    gcp_api_key = os.getenv('GCP_API_KEY')
+    return render_template('calender.html', gcp_api_key=gcp_api_key)
 
 
 # ============== Google OAuth ログイン ==============
@@ -384,6 +340,16 @@ def finance():
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     if request.method == 'POST':
+        # --- START: Supabase Key Check ---
+        import os
+        SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+        print("--- [DEBUG] Checking SUPABASE_KEY in /register route ---")
+        if SUPABASE_KEY:
+            print(f"SUPABASE_KEY (partial): {SUPABASE_KEY[:5]}...{SUPABASE_KEY[-5:]}")
+        else:
+            print("SUPABASE_KEY: NOT SET")
+        print("------------------------------------------")
+        # --- END: Supabase Key Check ---
         name = request.form['name']
         email = request.form['email']
         password = request.form['password']
@@ -418,7 +384,6 @@ def login():
 @app.route('/logout')
 def logout():
     session.pop('user', None)
-    session.pop('spotify_token_info', None)
     return redirect(url_for('login'))
 
 
@@ -537,145 +502,11 @@ def delete_user_route():
     return jsonify(delete_user(email))
 
 
-# ============== Spotify 認証/ページ ==============
-@app.route('/spotify-login')
-def spotify_login():
-    session.pop('spotify_token_info', None)
-    sp_oauth = get_spotify_oauth()
-    return redirect(sp_oauth.get_authorize_url() + '&show_dialog=true')
-
-@app.route('/spotify-relogin')
-def spotify_relogin():
-    session.pop('spotify_token_info', None)
-    sp_oauth = get_spotify_oauth()
-    return redirect(sp_oauth.get_authorize_url() + '&show_dialog=true')
-
-@app.route('/spotify-callback')
-def spotify_callback():
-    sp_oauth = get_spotify_oauth()
-    if request.args.get('error'):
-        err = request.args.get('error')
-        return render_template('spotify.html', is_authenticated=False,
-                               error_message=f'Spotify認証エラー: {err}')
-    code = request.args.get('code')
-    try:
-        token_info = sp_oauth.get_access_token(code)
-        session['spotify_token_info'] = token_info
-    except Exception as e:
-        return render_template('spotify.html', is_authenticated=False,
-                               error_message=f'トークン取得エラー: {e}')
-    return redirect(url_for('spotify_page'))
-
-@app.route('/spotify')
-def spotify_page():
-    sp_oauth = get_spotify_oauth()
-    token_info = _get_token_info()
-    if not token_info:
-        auth_url = sp_oauth.get_authorize_url()
-        return render_template('spotify.html', is_authenticated=False, auth_url=auth_url)
-    if sp_oauth.is_token_expired(token_info):
-        try:
-            token_info = sp_oauth.refresh_access_token(token_info['refresh_token'])
-            _save_token_info(token_info)
-        except Exception as e:
-            return render_template('spotify.html', is_authenticated=False,
-                                   error_message=f'トークン更新に失敗: {e}')
-    if not _has_required_scopes(token_info, REQUIRED_SPOTIFY_SCOPE):
-        return redirect(url_for('spotify_relogin'))
-    try:
-        sp = spotipy.Spotify(auth=token_info['access_token'])
-        user_data = sp.current_user()
-        top_tracks = sp.current_user_top_tracks(limit=5, time_range='medium_term')
-        playlists = []
-        results = sp.current_user_playlists(limit=50, offset=0)
-        while True:
-            playlists.extend(results.get('items', []))
-            if results.get('next'):
-                results = sp.next(results)
-            else:
-                break
-        return render_template(
-            'spotify.html', is_authenticated=True, user=user_data,
-            tracks=top_tracks.get('items', []), playlists=playlists,
-            focus_section=request.args.get('section', '')
-        )
-    except spotipy.exceptions.SpotifyException as e:
-        return render_template('spotify.html', is_authenticated=False,
-                               error_message=f'Spotify API エラー: {e}')
-    except Exception as e:
-        return render_template('spotify.html', is_authenticated=False,
-                               error_message=f'予期せぬエラー: {e}')
-
-@app.route('/api/spotify/token')
-def api_spotify_token():
-    sp_oauth = get_spotify_oauth()
-    token_info = session.get('spotify_token_info')
-    if not token_info:
-        return jsonify({'error': 'not_authenticated'}), 401
-    if sp_oauth.is_token_expired(token_info):
-        try:
-            token_info = sp_oauth.refresh_access_token(token_info['refresh_token'])
-            session['spotify_token_info'] = token_info
-        except Exception:
-            return jsonify({'error': 'refresh_failed'}), 401
-    if not _has_required_scopes(token_info, REQUIRED_SPOTIFY_SCOPE):
-        return jsonify({'error': 'invalid_scopes', 'scope': token_info.get('scope', '')}), 403
-    return jsonify({'access_token': token_info['access_token'], 'scope': token_info.get('scope', '')})
-
-@app.route('/api/spotify/scope')
-def spotify_scope():
-    token_info = session.get('spotify_token_info')
-    if not token_info:
-        return jsonify({'authenticated': False}), 401
-    return jsonify({'authenticated': True, 'scope': token_info.get('scope', ''),
-                    'has_all_required': _has_required_scopes(token_info, REQUIRED_SPOTIFY_SCOPE)})
 
 
-# ============== Spotify プレイヤーバー挿入 ==============
-PLAYER_BAR_SNIPPET = """
-  <div id="vs-playerbar" hidden>
-    <div class="vs-section vs-main-controls">
-      <button id="vs-prev" class="vs-button" title="Prev">&#9198;</button>
-      <button id="vs-play" class="vs-button" title="Play/Pause">&#9654;</button>
-      <button id="vs-next" class="vs-button" title="Next">&#9197;</button>
-    </div>
-    <div class="vs-section vs-timeline">
-      <span id="vs-time">0:00</span>
-      <input id="vs-seek" type="range" min="0" max="1000" value="0" />
-      <span id="vs-dur">0:00</span>
-    </div>
-    <div class="vs-section vs-options">
-      <button id="vs-loop" class="vs-button" title="Repeat">&#128257;</button>
-      <button id="vs-shuffle" class="vs-button" title="Shuffle">&#128256;</button>
-      <input id="vs-vol" type="range" min="0" max="100" value="80" title="Volume" />
-    </div>
-  </div>
-  <div id="toast" hidden aria-live="polite" aria-atomic="true"></div>
-"""
 
-@app.after_request
-def ensure_spotify_playerbar(response):
-    # すべてのレスポンスにキャッシュ無効化ヘッダーを追加
-    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
-    response.headers["Pragma"] = "no-cache"
-    response.headers["Expires"] = "0"
-    
-    content_type = (response.headers.get('Content-Type') or '').lower()
-    if (200 <= response.status_code < 300 and not response.direct_passthrough and 'text/html' in content_type):
-        body = response.get_data(as_text=True)
-        if '</body>' in body:
-            fragments = []
-            if 'id="vs-playerbar"' not in body:
-                fragments.append(PLAYER_BAR_SNIPPET)
-            if 'js/spotify.js' not in body:
-                script_path = url_for('static', filename='js/spotify.js')
-                fragments.append(f'<script src="{script_path}" defer></script>')
-            if 'sdk.scdn.co/spotify-player.js' not in body:
-                fragments.append('<script src="https://sdk.scdn.co/spotify-player.js" defer></script>')
-            if fragments:
-                body = body.replace('</body>', ''.join(fragments) + '</body>')
-                response.set_data(body)
-    return response
+
+
 
 
 # ============== Chat API・SwitchBot/カレンダー更新処理 ==============

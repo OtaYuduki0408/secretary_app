@@ -1,5 +1,3 @@
-
-
 import { check_chat_Space } from '/static/js/ChatSpace.js';
 
 /* =======================
@@ -61,49 +59,28 @@ function startTransform() { console.log('Transformを開始'); }
 function startOraOra() { console.log('オラオラを開始'); }
 
 if (input) {
-  // ----------------------------------------------------
-  // inputイベントを監視 (値の変更を検出)
-  // ----------------------------------------------------
-  input.addEventListener('input', (e) => {
-    console.log("値変更イベント e=", e); 
-    // 入力値を取得し、前後の空白を削除
-    let raw = (input.value||'').trim();
-    if (!raw) return;
-    const isConfirmed = raw.endsWith(';');
-    // 確定フラグがない場合（入力途中）は、一旦処理を中断
-    if (!isConfirmed) return; 
-    // 確定フラグがある場合、末尾の ; を取り除く
-    raw = raw.slice(0, -1).trim(); 
-    if (!raw) {
-        // もし ; だけが入力された場合は、ここで入力欄をクリアして終了
-        input.value = '';
-        return;
-    }
-    const v = raw.toLowerCase();
-    input.value = ''; // 入力欄をクリア（確定処理後）
-    console.log("入力確定を検知")
-    if (isBTD(raw))        { startBTDSequence(e); console.log("isBTDを実行"); return; }
-    if (v === 'transform') { startTransform(); console.log("transformを実行"); return; }
-    if (isORA(raw))        { startOraOra(); console.log("isORAを実行"); return; }
-    check_chat_Space(v);
-  });
-
-
   input.addEventListener('keydown', (e) => {
       if (e.key !== 'Enter') return;
-      
+      e.preventDefault(); // フォームの送信を確実に防ぐ
+
       let raw = (input.value || '').trim();
       if (!raw) return;
+      
+      // Log the input first
+      if (window.addTextLogEntry) {
+        window.addTextLogEntry(raw);
+      }
+
       input.value = '';
       
       const v = raw.toLowerCase();
-      // ... コマンド実行ロジック ...
+      // ... Special command logic ...
       if (isBTD(raw)) { startBTDSequence(e); return; } 
-       if (v === 'transform') { startTransform(); return; }
-      if (isORA(raw))        { startOraOra(); return; }
-      
-      // 上記の特殊コマンドに該当しない場合、通常処理へ
-      check_chat_Space(v);
+      if (v === 'transform') { startTransform(); return; }
+      if (isORA(raw)) { startOraOra(); return; }
+      
+      // Default action
+      check_chat_Space(v);
   });
 }
 

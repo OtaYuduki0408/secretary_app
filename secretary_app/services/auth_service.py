@@ -57,20 +57,8 @@ def register_user(name: str, email: str, password: str):
             "session": bool(session),
         }
 
-    except AuthApiError as e:
-        # AuthApiErrorを捕捉し、詳細な情報を返す
-        return {
-            "error": "AuthApiErrorが発生しました。",
-            "details": {
-                "status": getattr(e, 'status', 'N/A'),
-                "message": getattr(e, 'message', 'N/A'),
-                "args": e.args,
-                "dict": e.__dict__
-            }
-        }
     except Exception as e:
-        # その他の例外
-        return {"error": f"予期せぬエラー: {str(e)}"}
+        return {"error": repr(e)}
 
 
 def login_user(email: str, password: str):

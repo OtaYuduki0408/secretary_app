@@ -16,7 +16,7 @@ ufeff"画面ID","要素ID","要素名","種別","概要","アクション"
 "main","fab_expense","収支管理FAB","ボタン","支出入力画面へのナビゲーション","支出入力画面 (expense) に遷移する"
 "main","fab_finance","統計FAB","ボタン","財務統計画面へのナビゲーション","財務統計画面 (finance) に遷移する"
 "main","fab_calendar","カレンダーFAB","ボタン","カレンダー画面へのナビゲーション","カレンダー画面 (calender_page) に遷移する"
-"main","fab_spotify","Spotify FAB","ボタン","Spotify連携画面へのナビゲーション","Spotifyログイン画面 (spotify_login) に遷移する"
+
 "main","fab_memo","メモFAB","ボタン","メモ画面へのナビゲーション","メモ画面 (memo) に遷移する"
 "main","fab_custom_order","カスタム命令FAB","ボタン","カスタム命令画面へのナビゲーション","カスタム命令画面 (custom_order_index) に遷移する"
 "calender_page","main_link","メインへ戻る","ボタン","メイン画面に戻る","メイン画面 (main) に遷移する"
@@ -75,18 +75,18 @@ ufeff"画面ID","要素ID","要素名","種別","概要","アクション"
 "memo","bulk_mode_button","選択モード","ボタン","一括削除モードのオン/オフを切り替える",""
 "memo","memo_list","メモ一覧","表示エリア","メモを一覧表示。ピン留め、優先度、削除などの操作が可能。",""
 "memo","bulk_delete_footer","一括削除フッター","フッター","選択モード時に表示され、選択解除や一括削除を実行する",""
-"spotify_page","nav_links","ナビゲーション","リンク","各画面（Spotify一覧, プレイリスト, メイン画面）へのリンク","各画面へ遷移"
-"spotify_page","user_info","ユーザー情報","表示エリア","ログインユーザーのアイコンと名前を表示",""
-"spotify_page","top_tracks_list","最近よく聴くトラック","リスト","ユーザーのトップ5トラックを再生ボタン付きで表示",""
-"spotify_page","search_input","曲を検索","入力欄","曲名、アーティスト名などで検索",""
-"spotify_page","search_button","検索","ボタン","入力されたキーワードで曲を検索","Spotify APIを呼び出し検索"
-"spotify_page","voice_command_button","音声コマンド","ボタン","音声で曲の検索や操作を行う","音声認識を開始"
-"spotify_page","search_results","検索結果","リスト","検索結果の曲を一覧表示。再生、プレイリスト追加などの操作が可能。",""
-"spotify_page","create_playlist_form","新規プレイリスト作成","フォーム","名前、説明、公開設定を入力して新規プレイリストを作成","Spotify APIを呼び出しプレイリスト作成"
-"spotify_page","playlists_list","自分のプレイリスト","リスト","ユーザーのプレイリストを一覧表示。再生、シャッフル、削除などの操作が可能。",""
-"spotify_detail","header_meta","ヘッダー情報","表示エリア","プレイリストやアルバムのカバーアート、名前、所有者などのメタデータを表示",""
-"spotify_detail","tracks_list","トラック一覧","リスト","アイテムに含まれる曲を一覧表示。再生、Spotifyで開く、削除などの操作が可能。",""
-"spotify_detail","nav_links","ナビゲーション","リンク","Spotifyメイン画面や前の画面に戻る","各画面へ遷移"
+
+
+
+
+
+
+
+
+
+
+
+
 "slot","reels","リール","表示エリア","3つの回転するリールを表示",""
 "slot","lamps","ランプ類","表示エリア","Start, Replay, Wait, GOGO! Lampなどの状態表示ランプ",""
 "slot","meters","デジタルメーター","表示エリア","CREDIT, COUNT, PAYOUTを表示",""

@@ -81,6 +81,9 @@ export async function check_chat_Space(inputValue) {
 
     if (result.message) {
       console.log(`DEBUG: API応答メッセージ読み上げ: "${result.message}"`);
+      if (window.addResponseLogEntry) {
+        window.addResponseLogEntry(result.message);
+      }
       reader.speak(result.message);
     }
 
@@ -158,6 +161,7 @@ export async function check_chat_Space(inputValue) {
     fire('analysis:end');
   }
 }
+window.check_chat_Space = check_chat_Space;
 
 // ==============================
 // インジケーターイベント

@@ -5,15 +5,11 @@ const WAKE_WORDS = ['ボイスメイト', 'ぼいすめいと', 'voicemate', '�
 const VOICE_WATE_SOUND_PATH = '/static/voice/voice_wate.mp3';
 const RELODE_SOUND_PATH = '/static/voice/relode.mp3';
 const ERROR_SOUND_PATH = '/static/voice/error.mp3';
-const INPUT_COOLTIME_MS = 1000; // 1秒の入力クールタイム
+const INPUT_COOLTIME_MS = 500; // 0.5秒の入力クールタイム
 
 let recognition; // SpeechRecognitionインスタンス
 let currentMode = 'waiting'; // 'waiting' or 'listening'
 let recognitionTimeoutId; // 音声入力タイムアウトのID
-
-let commandQueue = null; // 完全確定前のコマンドを一時的に保持
-let inputCooltimeTimerId = null; // 入力クールタイムのタイマーID
-let isBackendProcessing = false; // バックエンド処理中フラグ
 
 // TTS (Text-to-Speech) 設定
 const speechSynth = window.speechSynthesis;
@@ -259,11 +255,11 @@ function playWakeWordSound() {
  * @param {string} newMode - 新しいモード
  */
 function setMode(newMode) {
-    if (currentMode === newMode) return; // 同じモードなら何もしない
+    if (currentMode === newMode) return;
 
     console.log(`DEBUG: モード変更: ${currentMode} -> ${newMode}`);
     currentMode = newMode;
-    clearTimeout(recognitionTimeoutId); // 既存のタイムアウトをクリア
+    clearTimeout(recognitionTimeoutId);
 
     const micButton = document.querySelector('.mic-btn');
     const searchBox = document.getElementById('searchbox');
@@ -271,10 +267,8 @@ function setMode(newMode) {
     if (currentMode === 'listening') {
         micButton.classList.add('active');
         searchBox.placeholder = "お話しください...";
-        searchBox.value = ''; // 入力欄をクリア
-        playSound(VOICE_WATE_SOUND_PATH); // 音声入力開始時のサウンド
+        playSound(VOICE_WATE_SOUND_PATH);
         
-        // 10秒後に自動でwaitingモードに戻るタイムアウトを設定
         recognitionTimeoutId = setTimeout(() => {
             if (currentMode === 'listening') {
                 console.log("コマンド入力タイムアウト。待機モードに戻ります。");
@@ -284,7 +278,6 @@ function setMode(newMode) {
     } else { // 'waiting'
         micButton.classList.remove('active');
         searchBox.placeholder = "「ボイスメイト」または「クイックコマンド」と呼びかけてください";
-        searchBox.value = '';
     }
 }
 
@@ -301,7 +294,7 @@ async function sendCommandToBackend(command) {
 
     isBackendProcessing = true; // バックエンド処理中フラグを立てる
     const searchBox = document.getElementById('searchbox');
-    searchBox.value = command + ';'; // searchBoxに最終的なコマンドを表示
+    // searchBox.value = command + ';'; // この行を削除またはコメントアウト
 
     try {
         const response = await fetch('/web_api/chat', {
@@ -330,234 +323,843 @@ async function sendCommandToBackend(command) {
 }
 
 // ============================================================================
+
 // イベントハンドラ
+
 // ============================================================================
 
+
+
 document.addEventListener('DOMContentLoaded', () => {
+
+
+
     console.log("DEBUG: DOMContentLoaded fired.");
 
-    const micButton = document.querySelector('.mic-btn');
-    const searchBox = document.getElementById('searchbox');
-    const searchForm = document.getElementById('search-form'); // main.htmlでidをsearch-formに変更
 
-    // Web Speech APIのサポートチェック
+
+
+
+
+
+    // --- Audio Unlock ---
+
+
+
+    const unlockAudio = () => {
+
+
+
+        if (userInteracted) return;
+
+
+
+        userInteracted = true;
+
+
+
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+
+
+
+        if (audioContext.state === 'suspended') {
+
+
+
+            audioContext.resume().then(() => console.log('AudioContext resumed successfully.'));
+
+
+
+        }
+
+
+
+        document.body.removeEventListener('click', unlockAudio);
+
+
+
+        document.body.removeEventListener('keydown', unlockAudio);
+
+
+
+    };
+
+
+
+    document.body.addEventListener('click', unlockAudio, { once: true });
+
+
+
+    document.body.addEventListener('keydown', unlockAudio, { once: true });
+
+
+
+
+
+
+
+    const micButton = document.querySelector('.mic-btn');
+
+
+
+    const searchBox = document.getElementById('searchbox');
+
+
+
+    const voiceLogContainer = document.getElementById('voice-log-container');
+
+
+
+
+
+
+
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+
+
     if (!SpeechRecognition) {
+
+
+
         console.error("Web Speech API はこのブラウザでサポートされていません。");
+
+
+
         micButton.disabled = true;
+
+
+
         searchBox.placeholder = "音声認識非対応";
+
+
+
         return;
+
+
+
     }
 
-    // SpeechRecognitionの初期化
+
+
+
+
+
+
     recognition = new SpeechRecognition();
+
+
+
     recognition.lang = 'ja-JP';
-    recognition.continuous = true; // 継続的な認識
-    recognition.interimResults = true; // 暫定結果を返す
+
+
+
+    recognition.continuous = true;
+
+
+
+    recognition.interimResults = true;
+
+
+
+
+
+
+
+    let lastTranscript = ''; // For diff-based logging
+
+
+
+
+
+
 
     // ------------------------------------------------------------------------
+
+
+
     // 音声認識イベント
+
+
+
     // ------------------------------------------------------------------------
+
+
+
     recognition.onresult = (event) => {
-        let finalTranscript = '';
-        let interimTranscript = '';
 
-        for (let i = event.resultIndex; i < event.results.length; ++i) {
-            const transcript = event.results[i][0].transcript;
-            if (event.results[i].isFinal) {
-                finalTranscript += transcript;
-            } else {
-                interimTranscript += transcript;
-            }
+
+
+        const last = event.results.length - 1;
+
+
+
+        const transcript = event.results[last][0].transcript;
+
+
+
+        const isFinal = event.results[last].isFinal;
+
+
+
+
+
+
+
+        let tempLogEntry = document.getElementById('interim-log');
+
+
+
+
+
+
+
+        // --- Diff-based Logging Logic ---
+
+
+
+        if (!tempLogEntry) {
+
+
+
+            tempLogEntry = document.createElement('div');
+
+
+
+            tempLogEntry.id = 'interim-log';
+
+
+
+            tempLogEntry.className = 'voice-log-entry log-interim';
+
+
+
+            voiceLogContainer.appendChild(tempLogEntry);
+
+
+
+            lastTranscript = ''; // Start new line, reset history
+
+
+
         }
-        // searchBoxに暫定結果を表示
-        searchBox.value = finalTranscript + interimTranscript;
 
-        // 1. ユーザーによる入力 (音声) - ウェイクワード検出
-        if (currentMode === 'waiting') {
-            const lowerTranscript = (finalTranscript + interimTranscript).toLowerCase();
-            if (WAKE_WORDS.some(word => lowerTranscript.includes(word))) {
-                console.log("DEBUG: ウェイクワードを検出");
-                if (!userInteracted) {
-                    userInteracted = true; // ウェイクワード検出時にもフラグを立てる
-                    new Audio().play().catch(e => console.log("ダミー音声再生エラー (無視可能):", e));
+
+
+
+
+
+
+        // Calculate diff and append
+
+
+
+        if (transcript.length > lastTranscript.length) {
+
+
+
+            const diff = transcript.substring(lastTranscript.length);
+
+
+
+            const diffSpan = document.createElement('span');
+
+
+
+            diffSpan.textContent = diff;
+
+
+
+            
+
+
+
+            // Highlight wake words within the diff
+
+
+
+            WAKE_WORDS.forEach(word => {
+
+
+
+                if (diff.toLowerCase().includes(word.toLowerCase())) {
+
+
+
+                     diffSpan.innerHTML = highlightWakeWords(diff);
+
+
+
                 }
-                playWakeWordSound(); // アラート音を鳴らす
-                setMode('listening'); // listeningモードに切り替え
-                // ウェイクワード検出時は、searchBoxはクリアされるので、ここでfinalTranscriptを処理しない
-                return; 
-            }
-        } 
-        
-        // 1. ユーザーによる入力 (音声) - 入力確定
-        if (currentMode === 'listening' && finalTranscript.trim()) {
-            console.log(`DEBUG: 音声入力確定: "${finalTranscript.trim()}"`);
-            processInput(finalTranscript.trim(), 'voice');
+
+
+
+            });
+
+
+
+
+
+
+
+            tempLogEntry.appendChild(diffSpan);
+
+
+
+            lastTranscript = transcript;
+
+
+
         }
+
+
+
+        
+
+
+
+        voiceLogContainer.scrollTop = voiceLogContainer.scrollHeight;
+
+
+
+
+
+
+
+        if (isFinal) {
+
+
+
+            tempLogEntry.classList.remove('log-interim');
+
+
+
+            tempLogEntry.removeAttribute('id');
+
+
+
+            lastTranscript = ''; // Reset for the next utterance
+
+
+
+        }
+
+
+
+        
+
+
+
+        // --- Mode and Command Logic ---
+
+
+
+        if (currentMode === 'waiting' && WAKE_WORDS.some(word => transcript.toLowerCase().includes(word.toLowerCase()))) {
+
+
+
+            console.log("DEBUG: ウェイクワードを検出");
+
+
+
+            playWakeWordSound();
+
+
+
+            setMode('listening');
+
+
+
+        } 
+
+
+
+        
+
+
+
+        if (currentMode === 'listening' && isFinal && transcript.trim()) {
+
+
+
+            console.log(`DEBUG: 音声入力確定: "${transcript.trim()}"`);
+
+
+
+            processInput(transcript.trim(), 'voice');
+
+
+
+        }
+
+
+
     };
+
+
+
+    
+
+
 
     recognition.onend = () => {
+
+
+
         console.log("DEBUG: recognition.onend fired.");
-        console.log("認識セッション終了。1秒後に再開します。");
+
+
+
+        const tempLogEntry = document.getElementById('interim-log');
+
+
+
+        if (tempLogEntry) {
+
+
+
+            tempLogEntry.classList.remove('log-interim');
+
+
+
+            tempLogEntry.removeAttribute('id');
+
+
+
+        }
+
+
+
+        lastTranscript = ''; // Reset on session end
+
+
+
+
+
+
+
         setTimeout(() => {
-            if (!recognition.recognizing) {
-                try {
-                    recognition.start();
-                } catch(e) {
-                    console.error("認識の再開に失敗:", e);
-                }
-            }
+
+
+
+            try {
+
+
+
+                if(recognition?.dontRestart) return; // for debugging
+
+
+
+                recognition.start();
+
+
+
+            } catch(e) {}
+
+
+
         }, 1000);
+
+
+
     };
+
+
+
     
+
+
+
     recognition.onerror = (event) => {
+
+
+
         console.error('DEBUG: 音声認識エラー:', event.error);
-        // 'no-speech'エラーは無視することが多いが、必要に応じて処理
-        if (event.error === 'no-speech') {
-            // 音声が検出されなかった場合、listeningモードからwaitingモードに戻す
-            if (currentMode === 'listening') {
-                setMode('waiting');
-            }
-            return;
+
+
+
+        if (event.error === 'no-speech' && currentMode === 'listening') {
+
+
+
+            setMode('waiting');
+
+
+
         }
+
+
+
+        lastTranscript = ''; // Reset on error
+
+
+
     };
 
-    // ------------------------------------------------------------------------
-    // UIイベント
-    // ------------------------------------------------------------------------
 
-    // 音声入力ボタンクリック
-    micButton.addEventListener('click', () => {
-        console.log("DEBUG: micButton clicked.");
-        if (!userInteracted) {
-            userInteracted = true; // 最初のクリックでフラグを立てる
-            // ここでダミーの音声再生を試みることで、AudioContextをアクティブにする
-            new Audio().play().catch(e => console.log("ダミー音声再生エラー (無視可能):", e));
-        }
 
-        if (currentMode === 'listening') {
-            setMode('waiting');
-        } else {
-            setMode('listening');
-        }
-    });
 
-    // テキストフォーム送信 (Enterキー)
-    searchForm.addEventListener('submit', (event) => {
-        event.preventDefault(); // フォームのデフォルト送信を防止
-        if (!userInteracted) {
-            userInteracted = true; // テキスト入力時にもフラグを立てる
-            new Audio().play().catch(e => console.log("ダミー音声再生エラー (無視可能):", e));
-        }
-        const inputText = searchBox.value.trim();
-        if (inputText) {
-            console.log(`DEBUG: テキスト入力確定: "${inputText}"`);
-            processInput(inputText, 'text');
-        }
-        searchBox.value = ''; // 送信後、入力欄をクリア
-    });
 
-    // ------------------------------------------------------------------------
-    // 入力処理のメインロジック
-    // ------------------------------------------------------------------------
+
 
     /**
-     * ユーザーからの入力を処理する
-     * @param {string} input - ユーザーの入力テキスト
-     * @param {'voice'|'text'} inputType - 入力の種類 ('voice' または 'text')
+
+
+
+     * テキスト内のウェイクワードをハイライトするHTMLを生成する
+
+
+
      */
-    function processInput(input, inputType) {
-        // 2. 入力却下 - ウェイクワードのみの場合
-        const lowerInput = input.toLowerCase();
-        if (WAKE_WORDS.includes(lowerInput)) {
-            console.log("DEBUG: ウェイクワードのみの入力のため却下。");
-            if (inputType === 'voice') {
-                // 音声入力の場合、即座に待機モードに戻る
-                // voice_wate.mp3の再生が完了するまで待ってからwaitingモードに戻る
-                setTimeout(() => {
-                    setMode('waiting');
-                }, 500); // voice_wate.mp3の再生時間に合わせて調整
-            } else {
-                // テキスト入力の場合、単に待機モードに戻る
-                setMode('waiting');
-            }
-            return;
-        }
 
-        // 6. バックエンド中の新規入力
-        if (isBackendProcessing) {
-            console.log("DEBUG: バックエンド処理中のため、新しい入力を却下します。");
-            playSound(ERROR_SOUND_PATH); // エラー音を再生
-            setMode('waiting'); // 待機モードに戻る
-            return;
-        }
 
-        // 3. 入力クールタイム (音声入力のみに適用)
-        if (inputType === 'voice') {
-            // クールタイム中の新しい音声入力があった場合、前のクールタイムをクリア
-            if (inputCooltimeTimerId) {
-                clearTimeout(inputCooltimeTimerId);
-                console.log("DEBUG: 既存の入力クールタイムをクリアしました。");
-            }
 
-            commandQueue = input; // コマンドをキューに格納
-            console.log(`DEBUG: コマンドをキューに格納 (クールタイム開始): "${commandQueue}"`);
+    function highlightWakeWords(text) {
 
-            inputCooltimeTimerId = setTimeout(() => {
-                // クールタイム終了後、完全確定したコマンドを処理
-                if (commandQueue) {
-                    console.log(`DEBUG: クールタイム終了。コマンドを完全確定: "${commandQueue}"`);
-                    handleFinalCommand(commandQueue);
-                    commandQueue = null; // 処理後キューをクリア
-                } else {
-                    console.log("DEBUG: クールタイム終了時、コマンドキューが空でした。");
-                    setMode('waiting');
-                }
-            }, INPUT_COOLTIME_MS);
-        } else { // テキスト入力はクールタイムなしで即時処理
-            handleFinalCommand(input);
-        }
-    }
 
-    /**
-     * 完全確定したコマンドを処理する
-     * @param {string} finalCommand - 完全確定したコマンド
-     */
-    function handleFinalCommand(finalCommand) {
-        playSound(RELODE_SOUND_PATH); // 音声確定時のアナウンス
 
-        // 4. ユーザーフィードバック
-        let feedbackMessage;
-        const lowerFinalCommand = finalCommand.toLowerCase();
-        // WAKE_WORDSに"クイックコマンド"が含まれているか、かつ入力が"クイックコマンド"で始まるか
-        if (WAKE_WORDS.includes('クイックコマンド') && lowerFinalCommand.startsWith('クイックコマンド')) {
-            feedbackMessage = `${finalCommand}を実行完了しました`;
-        } else {
-            feedbackMessage = `${finalCommand}でございますね。かしこまりました`;
-        }
-        
-        // ★追加: フィードバックテキストからウェイクワードを削除
-        let cleanedFeedbackMessage = feedbackMessage;
+        let highlightedText = text;
+
+
+
         WAKE_WORDS.forEach(word => {
-            // 大文字小文字を区別しない置換
+
+
+
             const regex = new RegExp(word, 'gi');
-            cleanedFeedbackMessage = cleanedFeedbackMessage.replace(regex, '');
+
+
+
+            highlightedText = highlightedText.replace(regex, `<span class="highlight-wake-word">${word}</span>`);
+
+
+
         });
 
-        speakText(cleanedFeedbackMessage); // 修正後のメッセージを発話
 
-        // 5. バックエンド送信
-        sendCommandToBackend(finalCommand);
+
+        return highlightedText;
+
+
+
     }
 
+
+
+
+
+
+
+    /**
+
+
+
+     * テキスト入力をログパネルに追加する
+
+
+
+     */
+
+
+
+    function addTextLogEntry(text) {
+
+
+
+        const textLogEntry = document.createElement('div');
+
+
+
+        textLogEntry.className = 'voice-log-entry';
+
+
+
+        const prefixSpan = document.createElement('span');
+
+
+
+        prefixSpan.textContent = 'テキスト>> ';
+
+
+
+        prefixSpan.style.color = '#64748b';
+
+
+
+        prefixSpan.style.marginRight = '8px';
+
+
+
+        const contentSpan = document.createElement('span');
+
+
+
+        contentSpan.textContent = text;
+
+
+
+        textLogEntry.appendChild(prefixSpan);
+
+
+
+        textLogEntry.appendChild(contentSpan);
+
+
+
+        voiceLogContainer.appendChild(textLogEntry);
+
+
+
+        voiceLogContainer.scrollTop = voiceLogContainer.scrollHeight;
+
+
+
+    }
+
+
+
+    window.addTextLogEntry = addTextLogEntry;
+
+
+
+
+
+
+
+    /**
+
+
+
+     * AIからの応答をログパネルに追加する
+
+
+
+     */
+
+
+
+    function addResponseLogEntry(text) {
+
+
+
+        const responseLogEntry = document.createElement('div');
+
+
+
+        responseLogEntry.className = 'voice-log-entry response-log';
+
+
+
+        const prefixSpan = document.createElement('span');
+
+
+
+        prefixSpan.textContent = '🤖 AI>> ';
+
+
+
+        prefixSpan.style.color = '#1d4ed8';
+
+
+
+        prefixSpan.style.fontWeight = 'bold';
+
+
+
+        prefixSpan.style.marginRight = '8px';
+
+
+
+        const contentSpan = document.createElement('span');
+
+
+
+        contentSpan.textContent = text;
+
+
+
+        responseLogEntry.appendChild(prefixSpan);
+
+
+
+        responseLogEntry.appendChild(contentSpan);
+
+
+
+        voiceLogContainer.appendChild(responseLogEntry);
+
+
+
+        voiceLogContainer.scrollTop = voiceLogContainer.scrollHeight;
+
+
+
+    }
+
+
+
+    window.addResponseLogEntry = addResponseLogEntry;
+
+
+
+
+
+
+
     // ------------------------------------------------------------------------
+
+
+
+    // UIイベント
+
+
+
+    // ------------------------------------------------------------------------
+
+
+
+    micButton.addEventListener('click', () => {
+
+
+
+        unlockAudio();
+
+
+
+        if (currentMode === 'listening') {
+
+
+
+            setMode('waiting');
+
+
+
+        } else {
+
+
+
+            setMode('listening');
+
+
+
+        }
+
+
+
+    });
+
+
+
+
+
+
+
+    // ------------------------------------------------------------------------
+
+
+
+    // 入力処理のメインロジック
+
+
+
+    // ------------------------------------------------------------------------
+
+
+
+    function processInput(input, inputType) {
+
+
+
+        if (!input.trim()) {
+
+
+
+            console.log("DEBUG: 空の入力のため却下。");
+
+
+
+            return;
+
+
+
+        }
+
+
+
+        if (window.check_chat_Space) {
+
+
+
+            window.check_chat_Space(input);
+
+
+
+        } else {
+
+
+
+            console.error("check_chat_Space is not available on window.");
+
+
+
+        }
+
+
+
+        if (inputType === 'voice') {
+
+
+
+            setMode('waiting');
+
+
+
+        }
+
+
+
+    }
+
+
+
+
+
+
+
+    // ------------------------------------------------------------------------
+
+
+
     // 初期起動
-    // ------------------------------------------------------------------------
-    setMode('waiting'); // 初期モード設定
-    try {
-        recognition.start(); // 音声認識開始
-    } catch(e) {
-        console.error("初期認識開始に失敗", e);
-    }
-});
 
+
+
+    // ------------------------------------------------------------------------
+
+
+
+    setMode('waiting');
+
+
+
+    try {
+
+
+
+        recognition.start();
+
+
+
+    } catch(e) {
+
+
+
+        console.error("初期認識開始に失敗", e);
+
+
+
+    }
+
+
+
+});
