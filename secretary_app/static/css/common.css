@@ -1,0 +1,600 @@
+/* common.css */
+
+/* --- Base Styles --- */
+html {
+  font-size: 16px; /* Base font size for rem calculations */
+  line-height: 1.5;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+body {
+  margin: 0;
+  padding: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+  color: #333; /* Default text color */
+  background-color: #f0f2f5; /* Default background */
+}
+
+/* --- Container for centering content --- */
+.main-wrapper {
+  max-width: 960px; /* Max width for content */
+  margin: 0 auto; /* Center content horizontally */
+  padding: 20px;
+}
+
+/* --- Card Component --- */
+.card {
+  background-color: #ffffff;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  padding: 20px;
+  margin-bottom: 20px;
+}
+
+/* --- Buttons --- */
+.btn {
+  display: inline-block;
+  padding: 10px 20px;
+  border: none;
+  border-radius: 4px;
+  font-size: 1rem;
+  cursor: pointer;
+  text-decoration: none;
+  text-align: center;
+  transition: background-color 0.2s ease;
+}
+.btn-primary {
+  background-color: #007bff;
+  color: #ffffff;
+}
+.btn-primary:hover {
+  background-color: #0056b3;
+}
+.btn-secondary {
+  background-color: #6c757d;
+  color: #ffffff;
+}
+.btn-secondary:hover {
+  background-color: #545b62;
+}
+.btn-danger {
+  background-color: #dc3545;
+  color: #ffffff;
+}
+.btn-danger:hover {
+  background-color: #bd2130;
+}
+.link-btn {
+  background: none;
+  color: #007bff;
+  text-decoration: underline;
+  padding: 0;
+  margin: 0;
+}
+.btn.ghost {
+    background: transparent;
+    color: #007bff;
+    border: 1px solid #007bff;
+}
+.btn.ghost:hover {
+    background: rgba(0, 123, 255, 0.1);
+}
+.btn.success {
+    background-color: #28a745;
+    color: #ffffff;
+}
+.btn.success:hover {
+    background-color: #218838;
+}
+
+/* --- Forms --- */
+.form-group {
+  margin-bottom: 15px;
+}
+.form-group label {
+  display: block;
+  margin-bottom: 5px;
+  font-weight: bold;
+}
+.input {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #ced4da;
+  border-radius: 4px;
+  box-sizing: border-box; /* Include padding in width */
+  font-size: 1rem;
+}
+.field {
+  display: block;
+}
+.field .label {
+  display: block;
+  margin-bottom: 5px;
+  font-weight: bold;
+}
+
+
+/* --- Table Styles (for responsiveness) --- */
+.table-responsive {
+  width: 100%;
+  overflow-x: auto; /* Enable horizontal scrolling for tables */
+  -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
+}
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 1rem;
+  background-color: #ffffff;
+  color: #333;
+}
+table th, table td {
+  padding: 0.75rem;
+  vertical-align: top;
+  border-top: 1px solid #dee2e6;
+  text-align: left;
+}
+table thead th {
+  vertical-align: bottom;
+  border-bottom: 2px solid #dee2e6;
+}
+table tbody + tbody {
+  border-top: 2px solid #dee2e6;
+}
+
+
+/* --- Specific to expense.html --- */
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+.header h1 {
+  margin: 0;
+  font-size: 1.8rem;
+}
+.header-actions {
+  display: flex;
+  gap: 10px;
+}
+.status-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 15px;
+  margin-top: 15px;
+}
+.status-grid p {
+  margin: 0;
+  padding: 10px;
+  background-color: #e9ecef;
+  border-radius: 4px;
+  font-size: 0.95rem;
+}
+.status-grid b {
+  font-size: 1.1rem;
+  font-weight: bold;
+}
+.type-selector {
+  display: flex;
+  gap: 10px;
+}
+.btn-type {
+  flex-grow: 1;
+  padding: 10px;
+  border: 1px solid #007bff;
+  border-radius: 4px;
+  background-color: #ffffff;
+  color: #007bff;
+  cursor: pointer;
+}
+.btn-type.active {
+  background-color: #007bff;
+  color: #ffffff;
+}
+.category-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.category-buttons button {
+  padding: 8px 12px;
+  border: 1px solid #ced4da;
+  border-radius: 20px;
+  background-color: #f8f9fa;
+  cursor: pointer;
+}
+.category-buttons button.active {
+  background-color: #28a745;
+  color: #ffffff;
+  border-color: #28a745;
+}
+.records-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+}
+.records-header h2 {
+  margin: 0;
+  font-size: 1.5rem;
+}
+.records-footer {
+  margin-top: 15px;
+}
+
+
+/* --- Specific to finance.html --- */
+.fd-button-container {
+  margin-bottom: 20px;
+  text-align: right;
+}
+.fd-section {
+  margin-bottom: 20px;
+  padding: 20px;
+  background-color: #ffffff;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+.fd-title {
+  font-size: 1.8rem;
+  margin-top: 0;
+  margin-bottom: 15px;
+  border-bottom: 1px solid #eee;
+  padding-bottom: 10px;
+}
+.fd-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 15px;
+}
+.fd-kpi {
+  background-color: #e9ecef;
+  padding: 15px;
+  border-radius: 4px;
+}
+.fd-kpi h3 {
+  font-size: 1rem;
+  margin-top: 0;
+  margin-bottom: 10px;
+  color: #555;
+}
+.fd-kpi .fd-num {
+  font-size: 1.5rem;
+  font-weight: bold;
+  color: #007bff;
+}
+.fd-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 20px;
+  align-items: center;
+}
+.fd-radio-group {
+  display: flex;
+  border: 1px solid #007bff;
+  border-radius: 4px;
+  overflow: hidden;
+}
+.fd-radio-group input[type="radio"] {
+  display: none;
+}
+.fd-radio-group label {
+  padding: 8px 15px;
+  cursor: pointer;
+  background-color: #ffffff;
+  color: #007bff;
+  border-right: 1px solid #007bff;
+  flex-grow: 1;
+  text-align: center;
+}
+.fd-radio-group label:last-child {
+  border-right: none;
+}
+.fd-radio-group input[type="radio"]:checked + label {
+  background-color: #007bff;
+  color: #ffffff;
+}
+.fd-input, .fd-select {
+  padding: 8px 12px;
+  border: 1px solid #ced4da;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  width: auto;
+}
+.fd-select[multiple] {
+  height: auto;
+  min-height: 80px;
+}
+.fd-date-range {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+.fd-date-input-group {
+  display: flex;
+  align-items: center;
+  border: 1px solid #ced4da;
+  border-radius: 4px;
+  overflow: hidden;
+}
+.fd-date-input-group input[type="date"] {
+  border: none;
+  padding: 8px;
+  outline: none;
+}
+.fd-date-input-group .fd-wheel-btn {
+  background-color: #e9ecef;
+  border: none;
+  padding: 8px 10px;
+  cursor: pointer;
+  font-size: 1rem;
+}
+.fd-charts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 20px;
+}
+.fd-chart {
+  max-width: 100%;
+  height: 250px; /* fixed height for charts */
+}
+.fd-form {
+  display: grid;
+  gap: 15px;
+}
+.fd-form label {
+  display: block;
+  font-weight: bold;
+}
+.fd-form input[type="number"], .fd-form select {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #ced4da;
+  border-radius: 4px;
+  box-sizing: border-box;
+}
+
+/* Date Wheel Dialog */
+.fd-wheel-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+.fd-wheel-dialog {
+  background-color: #ffffff;
+  border-radius: 8px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+  padding: 20px;
+  width: 300px;
+  text-align: center;
+}
+.fd-wheel-header {
+  margin-bottom: 15px;
+  font-size: 1.2rem;
+  font-weight: bold;
+}
+.fd-wheel-body {
+  display: flex;
+  justify-content: space-around;
+  margin-bottom: 20px;
+  position: relative;
+}
+.fd-wheel-column {
+  flex: 1;
+  overflow: hidden;
+  height: 150px;
+  border: 1px solid #eee; /* for debugging */
+}
+.fd-wheel-select {
+  width: 100%;
+  height: 100%;
+  border: none;
+  outline: none;
+  font-size: 1.2rem;
+  text-align: center;
+  background: transparent;
+}
+.fd-wheel-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+.fd-wheel-actions button {
+  padding: 8px 15px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.fd-wheel-cancel {
+  background-color: #ccc;
+  color: #333;
+}
+.fd-wheel-ok {
+  background-color: #007bff;
+  color: #fff;
+}
+
+
+/* --- Media Queries for Mobile --- */
+@media (max-width: 768px) {
+  html {
+    font-size: 14px; /* Slightly smaller base font for mobile */
+  }
+  .main-wrapper {
+    padding: 10px;
+  }
+  /* expense.html specific */
+  .header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+  .header-actions {
+    width: 100%;
+    justify-content: space-around;
+  }
+  .header-actions .link-btn {
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .status-grid {
+    grid-template-columns: 1fr; /* Stack status items vertically */
+  }
+  .records-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+  .records-header h2 {
+    width: 100%;
+  }
+  .records-header .btn-secondary {
+    width: 100%;
+  }
+  .table-responsive {
+    /* Table will just scroll horizontally */
+  }
+  table th, table td {
+    white-space: nowrap; /* Prevent text wrapping in table cells */
+  }
+  .category-buttons {
+    justify-content: center; /* Center category buttons */
+  }
+
+  /* finance.html specific */
+  .fd-button-container {
+    text-align: center;
+  }
+  .fd-section {
+    padding: 15px;
+  }
+  .fd-title {
+    font-size: 1.5rem;
+  }
+  .fd-summary {
+    grid-template-columns: 1fr; /* Stack KPI items vertically */
+  }
+  .fd-kpi .fd-num {
+    font-size: 1.3rem;
+  }
+  .fd-controls {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .fd-radio-group {
+    width: 100%;
+  }
+  .fd-input, .fd-select {
+    width: 100%;
+    box-sizing: border-box;
+  }
+  .fd-date-range {
+    flex-direction: column;
+    align-items: stretch;
+    width: 100%;
+  }
+  .fd-date-input-group {
+    width: 100%;
+  }
+  .fd-charts {
+    grid-template-columns: 1fr; /* Stack charts vertically */
+  }
+  .fd-wheel-dialog {
+    width: 90%; /* Make date wheel dialog wider */
+  }
+
+  /* calendar.html specific */
+  .header.calendar-header { /* Use a specific class for calendar header */
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+  .header.calendar-header .actions {
+    width: 100%;
+    text-align: right;
+  }
+  .header.calendar-header .actions .btn {
+    width: auto; /* Adjust width for smaller screens */
+    padding: 8px 15px;
+  }
+  
+  #calendar {
+    max-width: 100%;
+    padding: 10px;
+    margin-top: 1rem;
+    border-radius: 12px;
+  }
+
+  /* FullCalendar mobile adjustments */
+  .fc .fc-toolbar-title {
+    font-size: 1.2em;
+    text-align: center;
+  }
+  .fc .fc-toolbar-chunk:nth-child(2) { /* Center the title chunk */
+    order: -1; /* Move title above buttons */
+    width: 100%;
+    margin-bottom: 10px;
+  }
+  .fc-header-toolbar {
+    flex-direction: column;
+    align-items: center;
+  }
+  .fc-button-group {
+    flex-direction: row; /* Keep button groups horizontal */
+    width: 100%;
+    justify-content: space-around;
+    margin-bottom: 10px;
+  }
+  .fc-button {
+    flex-grow: 1; /* Make buttons expand */
+    margin: 0 2px !important; /* Adjust button spacing */
+    padding: 8px 0;
+  }
+  .fc .fc-col-header-cell, .fc .fc-daygrid-day-number {
+    font-size: 0.85rem; /* Smaller font for dates/days */
+  }
+  .fc-event {
+    font-size: 0.75rem; /* Smaller event text */
+    padding: 2px 4px;
+  }
+
+  /* Modal adjustments for small screens */
+  .modal-overlay .modal-content {
+    width: 95%;
+    padding: 15px;
+    border-radius: 12px;
+  }
+  .modal-overlay .modal-title {
+    font-size: 1.2rem;
+  }
+  .modal-overlay .grid.g-1, .modal-overlay .grid.g-2 {
+    grid-template-columns: 1fr; /* Stack form fields */
+    gap: 10px;
+  }
+  .modal-overlay .card-actions {
+    flex-direction: column;
+    gap: 10px;
+  }
+  .modal-overlay .card-actions .btn {
+    width: 100%;
+  }
+
+
+}
+
+/* --- main.html specific styles from here --- */
+.shell {
+  padding: 0 16px; /* Moved from templates/main.html */
+}
+
+/* The rest of the main.html specific styles */
