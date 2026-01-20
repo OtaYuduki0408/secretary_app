@@ -173,6 +173,7 @@
         </div>
         <div class="card-actions">
             <button id="cancel-event-button" class="btn ghost">キャンセル</button>
+            <button id="delete-event-button" class="btn danger" style="display: none;">削除</button>
             <button id="save-event-button" class="btn success">保存</button>
         </div>
     </div>
@@ -226,16 +227,45 @@
         });
         calendar.render();
 
-        const openModal = (dateStr) => {
-            $('#event-title').value = '';
-            $('#event-desc').value = '';
-            const clickedDate = new Date(dateStr);
-            if (dateStr.indexOf('T') === -1) clickedDate.setHours(9);
-            const startStr = new Date(clickedDate.getTime() - (clickedDate.getTimezoneOffset() * 60000)).toISOString().slice(0, 16);
-            clickedDate.setHours(clickedDate.getHours() + 1);
-            const endStr = new Date(clickedDate.getTime() - (clickedDate.getTimezoneOffset() * 60000)).toISOString().slice(0, 16);
-            $('#event-start').value = startStr;
-            $('#event-end').value = endStr;
+        let currentEventId = null; // 編集中のイベントIDを保持
+
+        const formatLocalDateTime = (date) => {
+            if (!date) return '';
+            const d = new Date(date);
+            const year = d.getFullYear();
+            const month = (d.getMonth() + 1).toString().padStart(2, '0');
+            const day = d.getDate().toString().padStart(2, '0');
+            const hours = d.getHours().toString().padStart(2, '0');
+            const minutes = d.getMinutes().toString().padStart(2, '0');
+            return `${year}-${month}-${day}T${hours}:${minutes}`;
+        };
+
+        const openModal = (event = null, dateStr = null) => {
+            if (event) { // 既存イベントの編集
+                currentEventId = event.id;
+                $('#modal-title').textContent = 'イベントを編集';
+                $('#event-title').value = event.title;
+                $('#event-desc').value = event.extendedProps.description || '';
+                // FullCalendarから取得したstart/endはDateオブジェクトなので、そのままformatLocalDateTimeに渡す
+                $('#event-start').value = formatLocalDateTime(event.start);
+                $('#event-end').value = formatLocalDateTime(event.end);
+                $('#save-event-button').textContent = '更新';
+                $('#delete-event-button').style.display = 'inline-block'; // 削除ボタンを表示
+            } else { // 新規イベントの追加
+                currentEventId = null;
+                $('#modal-title').textContent = 'イベントを追加';
+                $('#event-title').value = '';
+                $('#event-desc').value = '';
+                const clickedDate = new Date(dateStr);
+                if (dateStr.indexOf('T') === -1) {
+                    clickedDate.setHours(9, 0, 0, 0);
+                }
+                $('#event-start').value = formatLocalDateTime(clickedDate);
+                clickedDate.setHours(clickedDate.getHours() + 1);
+                $('#event-end').value = formatLocalDateTime(clickedDate);
+                $('#save-event-button').textContent = '保存';
+                $('#delete-event-button').style.display = 'none'; // 削除ボタンを非表示
+            }
             modal.classList.add('is-visible');
         };
 
@@ -264,11 +294,37 @@
                     if (!res.ok) throw new Error((await res.json()).error || 'サーバーエラー');
                     alert(`イベント(ID: ${eventId})を削除しました。`);
                     calendar.refetchEvents();
+                    closeModal(); // 削除後もモーダルを閉じる
                 } catch (e) {
                     alert(`イベントの削除に失敗しました: ${e.message}`);
                 }
+            },
+            async updateEvent(eventId, title, startTime, endTime, description) {
+                try {
+                    const res = await fetch(`/api/local_calendar/events/${eventId}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ title, start_time: startTime, end_time: endTime, description }),
+                    });
+                    const data = await res.json();
+                    if (!res.ok) throw new Error(data.error || 'サーバーエラー');
+                    alert(`イベントを更新しました: 「${data.title}」`);
+                    calendar.refetchEvents();
+                    closeModal();
+                } catch (e) {
+                    alert(`イベントの更新に失敗しました: ${e.message}`);
+                }
             }
         };
+
+        calendar.setOption('dateClick', (info) => {
+            openModal(null, info.dateStr); // 新規作成時はeventをnullにする
+        });
+
+        calendar.setOption('eventClick', (info) => {
+            if (info.event.source.publicId === 'ja.japanese#holiday@group.v.calendar.google.com') return;
+            openModal(info.event); // 編集時はeventオブジェクトを渡す
+        });
 
         $('#save-event-button').addEventListener('click', async () => {
             const title = $('#event-title').value.trim();
@@ -276,10 +332,20 @@
             const end = $('#event-end').value;
             if (!title) { alert('タイトルを入力してください。'); return; }
             if (!start || !end) { alert('開始日時と終了日時を入力してください。'); return; }
-            await api.addEvent(title, new Date(start).toISOString(), new Date(end).toISOString(), $('#event-desc').value || "");
+
+            if (currentEventId) {
+                await api.updateEvent(currentEventId, title, start, end, $('#event-desc').value || "");
+            } else {
+                await api.addEvent(title, start, end, $('#event-desc').value || "");
+            }
         });
 
         $('#cancel-event-button').addEventListener('click', closeModal);
+        $('#delete-event-button').addEventListener('click', async () => {
+            if (currentEventId && confirm('このイベントを削除しますか？')) {
+                await api.deleteEvent(currentEventId);
+            }
+        });
         modal.addEventListener('click', (e) => {
             if (e.target === modal) closeModal();
         });

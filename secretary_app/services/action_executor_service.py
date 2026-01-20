@@ -46,6 +46,54 @@ def _parse_time_param(param_value, current_dt: datetime):
     return param_value
 
 
+import services.local_calendar_service as local_calendar_service # local_calendar_serviceをインポート
+from supabase_client import supabase
+from datetime import datetime, timedelta
+from flask import current_app
+import json
+import base64
+from email.mime.text import MIMEText
+import google.auth
+from google.oauth2.credentials import Credentials
+from googleapiclient.discovery import build
+from services.google_token_service import get_credentials
+from services.ScheduleManager import ScheduleManager
+import pytz
+from google.auth.transport.requests import Request # メール送信時のクレデンシャル更新に必要
+from services.finance_service import ( # finance_serviceから必要な関数をインポート
+    get_current_balance,
+    get_monthly_expense,
+    get_daily_expense,
+    get_monthly_goal,
+    get_all_finance_records,
+    upsert_monthly_goal
+)
+from services.memo_service import get_all_memos # memo_serviceから必要な関数をインポート
+
+TABLE_NAME = "pending_user_actions"
+JST = pytz.timezone('Asia/Tokyo')
+
+
+def _format_event_time(iso_time: str, tz=JST) -> str:
+    """ISO形式の時刻文字列を「〇月〇日〇時〇分」形式に整形する"""
+    if not iso_time:
+        return ""
+    try:
+        # DBから取得した時刻はUTCなので、そのままfromisoformatでパースし、JSTに変換
+        dt_object = datetime.fromisoformat(iso_time).astimezone(tz)
+        return dt_object.strftime('%m月%d日%H時%M分')
+    except ValueError:
+        return iso_time # パースできない場合はそのまま返す
+
+def _parse_time_param(param_value, current_dt: datetime):
+    """'実行された年'などの特殊な値を実際の年月に変換するヘルパー関数"""
+    if param_value == '実行された年': return current_dt.year
+    if param_value == '実行された月': return current_dt.month
+    if param_value == '実行された日': return current_dt.day
+    if param_value == '実行された時刻': return f"{current_dt.hour:02d}:{current_dt.minute:02d}"
+    return param_value
+
+
 def _execute_calendar_read_aloud(user_id: str, detail_data: dict, triggered_at: datetime) -> dict:
     """
     カレンダーイベントを読み上げる。
@@ -57,9 +105,10 @@ def _execute_calendar_read_aloud(user_id: str, detail_data: dict, triggered_at: 
     Returns:
         dict: 実行結果。
     """
-    sm = current_app.calendar_manager
-    if not sm.is_authenticated(user_id):
-        return {"status": "error", "message": "Googleアカウントがリンクされていません。", "needs_link": True}
+    # Googleアカウント認証はローカルカレンダーでは不要なため削除/コメントアウト
+    # sm = current_app.calendar_manager
+    # if not sm.is_authenticated(user_id):
+    #    return {"status": "error", "message": "Googleアカウントがリンクされていません。", "needs_link": True}
 
     # detail_dataから検索範囲を抽出
     current_dt_jst = triggered_at.astimezone(JST) # 基準はJST
@@ -119,8 +168,9 @@ def _execute_calendar_read_aloud(user_id: str, detail_data: dict, triggered_at: 
         print(traceback.format_exc())
         return {"status": "error", "message": f"カレンダー読み上げに失敗しました: 日時解析エラー {e}"}
 
-    # ScheduleManagerを使ってイベントを取得
-    events = sm.list_events(user_id, time_min=start_datetime.isoformat(), time_max=end_datetime.isoformat())
+    # local_calendar_serviceを使ってイベントを取得
+    # get_eventsはISO形式のタイムスタンプを受け取るので、JSTでlocalizeされたdatetimeをisoformat()で渡す
+    events = local_calendar_service.get_events(user_id, start_datetime.isoformat(), end_datetime.isoformat())
 
     if not events:
         return {
@@ -154,23 +204,26 @@ def _execute_calendar_read_aloud(user_id: str, detail_data: dict, triggered_at: 
     speech_parts.append(f"登録されている予定が{len(events)}件見つかりました。")
 
     for event in events:
-        summary = event.get('summary', 'タイトルなし')
-        event_start_iso = event.get('start', {}).get('dateTime', event.get('start', {}).get('date'))
-        event_end_iso = event.get('end', {}).get('dateTime', event.get('end', {}).get('date'))
+        # local_calendar_serviceが返すイベントオブジェクトの構造に合わせる
+        summary = event.get('title', 'タイトルなし')
+        event_start_iso = event.get('start_time')
+        event_end_iso = event.get('end_time')
 
         start_time_fmt = ""
         end_time_fmt = ""
 
         if event_start_iso:
             try:
-                start_dt_obj = datetime.fromisoformat(event_start_iso.replace('Z', '+00:00')).astimezone(JST)
+                # DBから取得した時刻はUTCなので、JSTに変換して表示
+                start_dt_obj = datetime.fromisoformat(event_start_iso).astimezone(JST)
                 start_time_fmt = start_dt_obj.strftime('%p%I時%M分').replace('AM', '午前').replace('PM', '午後')
             except ValueError:
                 pass
         
         if event_end_iso:
             try:
-                end_dt_obj = datetime.fromisoformat(event_end_iso.replace('Z', '+00:00')).astimezone(JST)
+                # DBから取得した時刻はUTCなので、JSTに変換して表示
+                end_dt_obj = datetime.fromisoformat(event_end_iso).astimezone(JST)
                 end_time_fmt = end_dt_obj.strftime('%p%I時%M分').replace('AM', '午前').replace('PM', '午後')
             except ValueError:
                 pass
@@ -187,16 +240,17 @@ def _execute_calendar_read_aloud(user_id: str, detail_data: dict, triggered_at: 
     # フロントエンドで表示しやすいように整形したイベント情報も渡す
     display_events = []
     for event in events:
-        summary = event.get('summary', 'タイトルなし')
-        event_start_iso = event.get('start', {}).get('dateTime', event.get('start', {}).get('date'))
-        event_end_iso = event.get('end', {}).get('dateTime', event.get('end', {}).get('date'))
+        # local_calendar_serviceが返すイベントオブジェクトの構造に合わせる
+        summary = event.get('title', 'タイトルなし')
+        event_start_iso = event.get('start_time')
+        event_end_iso = event.get('end_time')
         
         display_events.append({
             "summary": summary,
             "start_time_iso": event_start_iso,
             "end_time_iso": event_end_iso,
-            "formatted_start_time": _format_event_time(event_start_iso),
-            "formatted_end_time": _format_event_time(event_end_iso),
+            "formatted_start_time": _format_event_time(event_start_iso), # _format_event_timeはUTCをJSTに変換
+            "formatted_end_time": _format_event_time(event_end_iso),   # _format_event_timeはUTCをJSTに変換
         })
 
     return {
