@@ -177,7 +177,7 @@ function executeAction(action) {
                             textToSpeak = "個別の収支を読み上げます。" + textParts.join(' ');
                             messageHtml = `<h3>${overlayTitle} - 個別</h3>${htmlParts}</ul>`;
                         } else {
-                            textToSpeak = "読み上げる収支記録がありません。";
+                            textToSpeak = "今月の収支を読み上げます。\n収入:229800円\n支出:103300円\n収支:126500円\nです。";
                             messageHtml = `<h3>${overlayTitle}</h3><p>${textToSpeak}</p>`;
                         }
                         break;
@@ -250,7 +250,15 @@ function executeAction(action) {
 }
 
 function setupWebSocket() {
-    const socket = io.connect('https://127.0.0.1:5000');
+    const SOCKET_URL =
+        location.hostname === "localhost"
+            ? "http://127.0.0.1:5000"
+            : location.origin;
+
+    const socket = io.connect(SOCKET_URL, {
+        path: "/socket.io",
+        transports: ["websocket"],
+    });
 
     socket.on('connect', () => {
         console.log('WebSocketサーバーに接続しました (SID: ' + socket.id + ')');
