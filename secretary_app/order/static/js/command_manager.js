@@ -443,7 +443,7 @@ export async function loadCommands() {
 
 // ★仮のユーザーID。実際にはサーバーから取得するか、セッションから取得する
 // TODO: ユーザー認証後に、サーバーから安全にユーザーIDをフロントエンドに渡す仕組みが必要
-const TEMP_USER_ID_FOR_POLLING = "user123"; // あなたのSupabaseユーザーのIDに置き換えてください
+const TEMP_USER_ID_FOR_POLLING = "593bc6a3-1894-47ed-9833-9ac270f84aa0"; // あなたのSupabaseユーザーのIDに置き換えてください
 
 export async function pollPendingActions() {
   console.log("--- DEBUG: pollPendingActions called ---");
