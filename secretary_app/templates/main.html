@@ -391,6 +391,82 @@
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.5/socket.io.min.js"></script>
+<script>
+  (() => {
+    const log = (...args) => console.log('[DEBUG:CSS]', ...args);
+    const warn = (...args) => console.warn('[DEBUG:CSS]', ...args);
+
+    // CSS/JS???????????????????????
+    function findResourceEntry(keyword) {
+      const entries = performance.getEntriesByType('resource');
+      return entries.find((entry) => entry.name.includes(keyword));
+    }
+
+    function dumpResourceEntry(keyword) {
+      const entry = findResourceEntry(keyword);
+      if (!entry) {
+        warn(`resource not found: ${keyword}`);
+        return;
+      }
+      log(`resource: ${keyword}`, {
+        name: entry.name,
+        initiatorType: entry.initiatorType,
+        transferSize: entry.transferSize,
+        encodedBodySize: entry.encodedBodySize,
+        decodedBodySize: entry.decodedBodySize,
+      });
+    }
+
+    function dumpStyleSnapshot() {
+      const rootStyle = getComputedStyle(document.documentElement);
+      const bodyStyle = getComputedStyle(document.body);
+      log('env', {
+        time: new Date().toISOString(),
+        location: location.href,
+        origin: location.origin,
+        userAgent: navigator.userAgent,
+        language: navigator.language,
+        timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        devicePixelRatio: window.devicePixelRatio,
+        styleSheetCount: document.styleSheets.length,
+      });
+      log('theme', {
+        vsThemeIdx: localStorage.getItem('vs_theme_idx'),
+        htmlClass: document.documentElement.className,
+      });
+      log('css-vars', {
+        bg1: rootStyle.getPropertyValue('--bg-1').trim(),
+        bg2: rootStyle.getPropertyValue('--bg-2').trim(),
+        accent: rootStyle.getPropertyValue('--accent').trim(),
+        wallpaper: rootStyle.getPropertyValue('--wallpaper').trim(),
+      });
+      log('body-background', {
+        backgroundImage: bodyStyle.backgroundImage,
+        backgroundColor: bodyStyle.backgroundColor,
+      });
+
+      const styleLink = document.querySelector('link[rel="stylesheet"][href*="style.css"]');
+      if (styleLink) {
+        log('style.css link', styleLink.href);
+      } else {
+        warn('style.css link not found');
+      }
+
+      const sheets = Array.from(document.styleSheets).map((sheet) => sheet.href || 'inline');
+      log('stylesheets', sheets);
+
+      dumpResourceEntry('style.css');
+      dumpResourceEntry('websocket_handler.js');
+      dumpResourceEntry('Parallax_and_Theme_rotation.js');
+    }
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', dumpStyleSnapshot);
+    } else {
+      dumpStyleSnapshot();
+    }
+  })();
+</script>
 <script src="{{ url_for('static', filename='js/websocket_handler.js') }}" type="module" defer></script>
 <script src="{{ url_for('static', filename='js/voice_recognition.js') }}"></script>
 <script src="{{ url_for('static', filename='js/Parallax_and_Theme_rotation.js') }}" type="module"></script>

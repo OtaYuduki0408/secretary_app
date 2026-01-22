@@ -1,0 +1,760 @@
+websocket_handler.js:3 websocket_handler.js loaded.
+（インデックス）:1 Access to XMLHttpRequest at 'https://127.0.0.1:5000/socket.io/?EIO=4&transport=polling&t=PlVDTzZ' from origin 'https://voicemate-11gi.onrender.com' has been blocked by CORS policy: Permission was denied for this request to access the `unknown` address space.
+manager.js:108  GET https://127.0.0.1:5000/socket.io/?EIO=4&transport=polling&t=PlVDTzZ net::ERR_FAILED
+value @ polling.js:298
+i @ polling.js:237
+value @ polling.js:190
+value @ polling.js:215
+value @ polling.js:96
+value @ polling.js:56
+value @ transport.js:46
+value @ socket.js:170
+a @ socket.js:111
+value @ manager.js:108
+s @ manager.js:39
+Ve @ index.js:29
+setupWebSocket @ websocket_handler.js:253
+（匿名） @ websocket_handler.js:300
+websocket_handler.js:271 WebSocket接続エラー: xhr poll error
+（匿名） @ websocket_handler.js:271
+（匿名） @ index.mjs:136
+value @ socket.js:439
+（匿名） @ index.mjs:136
+o @ manager.js:121
+（匿名） @ index.mjs:136
+value @ socket.js:541
+（匿名） @ index.mjs:136
+value @ transport.js:38
+（匿名） @ polling.js:218
+（匿名） @ index.mjs:136
+value @ polling.js:320
+（匿名） @ polling.js:294
+setTimeout
+r.value.r.onreadystatechange @ polling.js:293
+XMLHttpRequest.send
+value @ polling.js:298
+i @ polling.js:237
+value @ polling.js:190
+value @ polling.js:215
+value @ polling.js:96
+value @ polling.js:56
+value @ transport.js:46
+value @ socket.js:170
+a @ socket.js:111
+value @ manager.js:108
+s @ manager.js:39
+Ve @ index.js:29
+setupWebSocket @ websocket_handler.js:253
+（匿名） @ websocket_handler.js:300
+ChatSpace.js:8 ✅ ChatSpace.js ロード完了 (トースト機能付き)
+TextToSpeechReader.js:30 TextToSpeechReader: 初期化完了。
+ChatSpace.js:11 DEBUG: TextToSpeechReader初期化。利用可能な音声数: 23
+voice_recognition.js:337 DEBUG: DOMContentLoaded fired.
+（インデックス）:1 Access to XMLHttpRequest at 'https://127.0.0.1:5000/socket.io/?EIO=4&transport=polling&t=PlVDULJ' from origin 'https://voicemate-11gi.onrender.com' has been blocked by CORS policy: Permission was denied for this request to access the `unknown` address space.
+manager.js:108  GET https://127.0.0.1:5000/socket.io/?EIO=4&transport=polling&t=PlVDULJ net::ERR_FAILED
+value @ polling.js:298
+i @ polling.js:237
+value @ polling.js:190
+value @ polling.js:215
+value @ polling.js:96
+value @ polling.js:56
+value @ transport.js:46
+value @ socket.js:170
+a @ socket.js:111
+value @ manager.js:108
+（匿名） @ manager.js:328
+setTimeout
+value @ manager.js:321
+value @ manager.js:95
+o @ manager.js:127
+（匿名） @ index.mjs:136
+value @ socket.js:541
+（匿名） @ index.mjs:136
+value @ transport.js:38
+（匿名） @ polling.js:218
+（匿名） @ index.mjs:136
+value @ polling.js:320
+（匿名） @ polling.js:294
+setTimeout
+r.value.r.onreadystatechange @ polling.js:293
+XMLHttpRequest.send
+value @ polling.js:298
+i @ polling.js:237
+value @ polling.js:190
+value @ polling.js:215
+value @ polling.js:96
+value @ polling.js:56
+value @ transport.js:46
+value @ socket.js:170
+a @ socket.js:111
+value @ manager.js:108
+s @ manager.js:39
+Ve @ index.js:29
+setupWebSocket @ websocket_handler.js:253
+（匿名） @ websocket_handler.js:300
+websocket_handler.js:271 WebSocket接続エラー: xhr poll error
+（匿名） @ websocket_handler.js:271
+（匿名） @ index.mjs:136
+value @ socket.js:439
+（匿名） @ index.mjs:136
+o @ manager.js:121
+（匿名） @ index.mjs:136
+value @ socket.js:541
+（匿名） @ index.mjs:136
+value @ transport.js:38
+（匿名） @ polling.js:218
+（匿名） @ index.mjs:136
+value @ polling.js:320
+（匿名） @ polling.js:294
+setTimeout
+r.value.r.onreadystatechange @ polling.js:293
+XMLHttpRequest.send
+value @ polling.js:298
+i @ polling.js:237
+value @ polling.js:190
+value @ polling.js:215
+value @ polling.js:96
+value @ polling.js:56
+value @ transport.js:46
+value @ socket.js:170
+a @ socket.js:111
+value @ manager.js:108
+（匿名） @ manager.js:328
+setTimeout
+value @ manager.js:321
+value @ manager.js:95
+o @ manager.js:127
+（匿名） @ index.mjs:136
+value @ socket.js:541
+（匿名） @ index.mjs:136
+value @ transport.js:38
+（匿名） @ polling.js:218
+（匿名） @ index.mjs:136
+value @ polling.js:320
+（匿名） @ polling.js:294
+setTimeout
+r.value.r.onreadystatechange @ polling.js:293
+XMLHttpRequest.send
+value @ polling.js:298
+i @ polling.js:237
+value @ polling.js:190
+value @ polling.js:215
+value @ polling.js:96
+value @ polling.js:56
+value @ transport.js:46
+value @ socket.js:170
+a @ socket.js:111
+value @ manager.js:108
+s @ manager.js:39
+Ve @ index.js:29
+setupWebSocket @ websocket_handler.js:253
+（匿名） @ websocket_handler.js:300
+（インデックス）:1 Access to XMLHttpRequest at 'https://127.0.0.1:5000/socket.io/?EIO=4&transport=polling&t=PlVDUpg' from origin 'https://voicemate-11gi.onrender.com' has been blocked by CORS policy: Permission was denied for this request to access the `unknown` address space.
+manager.js:108  GET https://127.0.0.1:5000/socket.io/?EIO=4&transport=polling&t=PlVDUpg net::ERR_FAILED
+value @ polling.js:298
+i @ polling.js:237
+value @ polling.js:190
+value @ polling.js:215
+value @ polling.js:96
+value @ polling.js:56
+value @ transport.js:46
+value @ socket.js:170
+a @ socket.js:111
+value @ manager.js:108
+（匿名） @ manager.js:328
+setTimeout
+value @ manager.js:321
+（匿名） @ manager.js:331
+o @ manager.js:123
+（匿名） @ index.mjs:136
+value @ socket.js:541
+（匿名） @ index.mjs:136
+value @ transport.js:38
+（匿名） @ polling.js:218
+（匿名） @ index.mjs:136
+value @ polling.js:320
+（匿名） @ polling.js:294
+setTimeout
+r.value.r.onreadystatechange @ polling.js:293
+XMLHttpRequest.send
+value @ polling.js:298
+i @ polling.js:237
+value @ polling.js:190
+value @ polling.js:215
+value @ polling.js:96
+value @ polling.js:56
+value @ transport.js:46
+value @ socket.js:170
+a @ socket.js:111
+value @ manager.js:108
+（匿名） @ manager.js:328
+setTimeout
+value @ manager.js:321
+value @ manager.js:95
+o @ manager.js:127
+（匿名） @ index.mjs:136
+value @ socket.js:541
+（匿名） @ index.mjs:136
+value @ transport.js:38
+（匿名） @ polling.js:218
+（匿名） @ index.mjs:136
+value @ polling.js:320
+（匿名） @ polling.js:294
+setTimeout
+r.value.r.onreadystatechange @ polling.js:293
+XMLHttpRequest.send
+value @ polling.js:298
+i @ polling.js:237
+value @ polling.js:190
+value @ polling.js:215
+value @ polling.js:96
+value @ polling.js:56
+value @ transport.js:46
+value @ socket.js:170
+a @ socket.js:111
+value @ manager.js:108
+s @ manager.js:39
+Ve @ index.js:29
+setupWebSocket @ websocket_handler.js:253
+（匿名） @ websocket_handler.js:300
+websocket_handler.js:271 WebSocket接続エラー: xhr poll error
+（匿名） @ websocket_handler.js:271
+（匿名） @ index.mjs:136
+value @ socket.js:439
+（匿名） @ index.mjs:136
+o @ manager.js:121
+（匿名） @ index.mjs:136
+value @ socket.js:541
+（匿名） @ index.mjs:136
+value @ transport.js:38
+（匿名） @ polling.js:218
+（匿名） @ index.mjs:136
+value @ polling.js:320
+（匿名） @ polling.js:294
+setTimeout
+r.value.r.onreadystatechange @ polling.js:293
+XMLHttpRequest.send
+value @ polling.js:298
+i @ polling.js:237
+value @ polling.js:190
+value @ polling.js:215
+value @ polling.js:96
+value @ polling.js:56
+value @ transport.js:46
+value @ socket.js:170
+a @ socket.js:111
+value @ manager.js:108
+（匿名） @ manager.js:328
+setTimeout
+value @ manager.js:321
+（匿名） @ manager.js:331
+o @ manager.js:123
+（匿名） @ index.mjs:136
+value @ socket.js:541
+（匿名） @ index.mjs:136
+value @ transport.js:38
+（匿名） @ polling.js:218
+（匿名） @ index.mjs:136
+value @ polling.js:320
+（匿名） @ polling.js:294
+setTimeout
+r.value.r.onreadystatechange @ polling.js:293
+XMLHttpRequest.send
+value @ polling.js:298
+i @ polling.js:237
+value @ polling.js:190
+value @ polling.js:215
+value @ polling.js:96
+value @ polling.js:56
+value @ transport.js:46
+value @ socket.js:170
+a @ socket.js:111
+value @ manager.js:108
+（匿名） @ manager.js:328
+setTimeout
+value @ manager.js:321
+value @ manager.js:95
+o @ manager.js:127
+（匿名） @ index.mjs:136
+value @ socket.js:541
+（匿名） @ index.mjs:136
+value @ transport.js:38
+（匿名） @ polling.js:218
+（匿名） @ index.mjs:136
+value @ polling.js:320
+（匿名） @ polling.js:294
+setTimeout
+r.value.r.onreadystatechange @ polling.js:293
+XMLHttpRequest.send
+value @ polling.js:298
+i @ polling.js:237
+value @ polling.js:190
+value @ polling.js:215
+value @ polling.js:96
+value @ polling.js:56
+value @ transport.js:46
+value @ socket.js:170
+a @ socket.js:111
+value @ manager.js:108
+s @ manager.js:39
+Ve @ index.js:29
+setupWebSocket @ websocket_handler.js:253
+（匿名） @ websocket_handler.js:300
+（インデックス）:1 Access to XMLHttpRequest at 'https://127.0.0.1:5000/socket.io/?EIO=4&transport=polling&t=PlVDVOf' from origin 'https://voicemate-11gi.onrender.com' has been blocked by CORS policy: Permission was denied for this request to access the `unknown` address space.
+manager.js:108  GET https://127.0.0.1:5000/socket.io/?EIO=4&transport=polling&t=PlVDVOf net::ERR_FAILED
+value @ polling.js:298
+i @ polling.js:237
+value @ polling.js:190
+value @ polling.js:215
+value @ polling.js:96
+value @ polling.js:56
+value @ transport.js:46
+value @ socket.js:170
+a @ socket.js:111
+value @ manager.js:108
+（匿名） @ manager.js:328
+setTimeout
+value @ manager.js:321
+（匿名） @ manager.js:331
+o @ manager.js:123
+（匿名） @ index.mjs:136
+value @ socket.js:541
+（匿名） @ index.mjs:136
+value @ transport.js:38
+（匿名） @ polling.js:218
+（匿名） @ index.mjs:136
+value @ polling.js:320
+（匿名） @ polling.js:294
+setTimeout
+r.value.r.onreadystatechange @ polling.js:293
+XMLHttpRequest.send
+value @ polling.js:298
+i @ polling.js:237
+value @ polling.js:190
+value @ polling.js:215
+value @ polling.js:96
+value @ polling.js:56
+value @ transport.js:46
+value @ socket.js:170
+a @ socket.js:111
+value @ manager.js:108
+（匿名） @ manager.js:328
+setTimeout
+value @ manager.js:321
+（匿名） @ manager.js:331
+o @ manager.js:123
+（匿名） @ index.mjs:136
+value @ socket.js:541
+（匿名） @ index.mjs:136
+value @ transport.js:38
+（匿名） @ polling.js:218
+（匿名） @ index.mjs:136
+value @ polling.js:320
+（匿名） @ polling.js:294
+setTimeout
+r.value.r.onreadystatechange @ polling.js:293
+XMLHttpRequest.send
+value @ polling.js:298
+i @ polling.js:237
+value @ polling.js:190
+value @ polling.js:215
+value @ polling.js:96
+value @ polling.js:56
+value @ transport.js:46
+value @ socket.js:170
+a @ socket.js:111
+value @ manager.js:108
+（匿名） @ manager.js:328
+setTimeout
+value @ manager.js:321
+value @ manager.js:95
+o @ manager.js:127
+（匿名） @ index.mjs:136
+value @ socket.js:541
+（匿名） @ index.mjs:136
+value @ transport.js:38
+（匿名） @ polling.js:218
+（匿名） @ index.mjs:136
+value @ polling.js:320
+（匿名） @ polling.js:294
+setTimeout
+r.value.r.onreadystatechange @ polling.js:293
+XMLHttpRequest.send
+value @ polling.js:298
+i @ polling.js:237
+value @ polling.js:190
+value @ polling.js:215
+value @ polling.js:96
+value @ polling.js:56
+value @ transport.js:46
+value @ socket.js:170
+a @ socket.js:111
+value @ manager.js:108
+s @ manager.js:39
+Ve @ index.js:29
+setupWebSocket @ websocket_handler.js:253
+（匿名） @ websocket_handler.js:300
+websocket_handler.js:271 WebSocket接続エラー: xhr poll error
+（匿名） @ websocket_handler.js:271
+（匿名） @ index.mjs:136
+value @ socket.js:439
+（匿名） @ index.mjs:136
+o @ manager.js:121
+（匿名） @ index.mjs:136
+value @ socket.js:541
+（匿名） @ index.mjs:136
+value @ transport.js:38
+（匿名） @ polling.js:218
+（匿名） @ index.mjs:136
+value @ polling.js:320
+（匿名） @ polling.js:294
+setTimeout
+r.value.r.onreadystatechange @ polling.js:293
+XMLHttpRequest.send
+value @ polling.js:298
+i @ polling.js:237
+value @ polling.js:190
+value @ polling.js:215
+value @ polling.js:96
+value @ polling.js:56
+value @ transport.js:46
+value @ socket.js:170
+a @ socket.js:111
+value @ manager.js:108
+（匿名） @ manager.js:328
+setTimeout
+value @ manager.js:321
+（匿名） @ manager.js:331
+o @ manager.js:123
+（匿名） @ index.mjs:136
+value @ socket.js:541
+（匿名） @ index.mjs:136
+value @ transport.js:38
+（匿名） @ polling.js:218
+（匿名） @ index.mjs:136
+value @ polling.js:320
+（匿名） @ polling.js:294
+setTimeout
+r.value.r.onreadystatechange @ polling.js:293
+XMLHttpRequest.send
+value @ polling.js:298
+i @ polling.js:237
+value @ polling.js:190
+value @ polling.js:215
+value @ polling.js:96
+value @ polling.js:56
+value @ transport.js:46
+value @ socket.js:170
+a @ socket.js:111
+value @ manager.js:108
+（匿名） @ manager.js:328
+setTimeout
+value @ manager.js:321
+（匿名） @ manager.js:331
+o @ manager.js:123
+（匿名） @ index.mjs:136
+value @ socket.js:541
+（匿名） @ index.mjs:136
+value @ transport.js:38
+（匿名） @ polling.js:218
+（匿名） @ index.mjs:136
+value @ polling.js:320
+（匿名） @ polling.js:294
+setTimeout
+r.value.r.onreadystatechange @ polling.js:293
+XMLHttpRequest.send
+value @ polling.js:298
+i @ polling.js:237
+value @ polling.js:190
+value @ polling.js:215
+value @ polling.js:96
+value @ polling.js:56
+value @ transport.js:46
+value @ socket.js:170
+a @ socket.js:111
+value @ manager.js:108
+（匿名） @ manager.js:328
+setTimeout
+value @ manager.js:321
+value @ manager.js:95
+o @ manager.js:127
+（匿名） @ index.mjs:136
+value @ socket.js:541
+（匿名） @ index.mjs:136
+value @ transport.js:38
+（匿名） @ polling.js:218
+（匿名） @ index.mjs:136
+value @ polling.js:320
+（匿名） @ polling.js:294
+setTimeout
+r.value.r.onreadystatechange @ polling.js:293
+XMLHttpRequest.send
+value @ polling.js:298
+i @ polling.js:237
+value @ polling.js:190
+value @ polling.js:215
+value @ polling.js:96
+value @ polling.js:56
+value @ transport.js:46
+value @ socket.js:170
+a @ socket.js:111
+value @ manager.js:108
+s @ manager.js:39
+Ve @ index.js:29
+setupWebSocket @ websocket_handler.js:253
+（匿名） @ websocket_handler.js:300
+（インデックス）:1 Access to XMLHttpRequest at 'https://127.0.0.1:5000/socket.io/?EIO=4&transport=polling&t=PlVDWYH' from origin 'https://voicemate-11gi.onrender.com' has been blocked by CORS policy: Permission was denied for this request to access the `unknown` address space.
+manager.js:108  GET https://127.0.0.1:5000/socket.io/?EIO=4&transport=polling&t=PlVDWYH net::ERR_FAILED
+value @ polling.js:298
+i @ polling.js:237
+value @ polling.js:190
+value @ polling.js:215
+value @ polling.js:96
+value @ polling.js:56
+value @ transport.js:46
+value @ socket.js:170
+a @ socket.js:111
+value @ manager.js:108
+（匿名） @ manager.js:328
+setTimeout
+value @ manager.js:321
+（匿名） @ manager.js:331
+o @ manager.js:123
+（匿名） @ index.mjs:136
+value @ socket.js:541
+（匿名） @ index.mjs:136
+value @ transport.js:38
+（匿名） @ polling.js:218
+（匿名） @ index.mjs:136
+value @ polling.js:320
+（匿名） @ polling.js:294
+setTimeout
+r.value.r.onreadystatechange @ polling.js:293
+XMLHttpRequest.send
+value @ polling.js:298
+i @ polling.js:237
+value @ polling.js:190
+value @ polling.js:215
+value @ polling.js:96
+value @ polling.js:56
+value @ transport.js:46
+value @ socket.js:170
+a @ socket.js:111
+value @ manager.js:108
+（匿名） @ manager.js:328
+setTimeout
+value @ manager.js:321
+（匿名） @ manager.js:331
+o @ manager.js:123
+（匿名） @ index.mjs:136
+value @ socket.js:541
+（匿名） @ index.mjs:136
+value @ transport.js:38
+（匿名） @ polling.js:218
+（匿名） @ index.mjs:136
+value @ polling.js:320
+（匿名） @ polling.js:294
+setTimeout
+r.value.r.onreadystatechange @ polling.js:293
+XMLHttpRequest.send
+value @ polling.js:298
+i @ polling.js:237
+value @ polling.js:190
+value @ polling.js:215
+value @ polling.js:96
+value @ polling.js:56
+value @ transport.js:46
+value @ socket.js:170
+a @ socket.js:111
+value @ manager.js:108
+（匿名） @ manager.js:328
+setTimeout
+value @ manager.js:321
+（匿名） @ manager.js:331
+o @ manager.js:123
+（匿名） @ index.mjs:136
+value @ socket.js:541
+（匿名） @ index.mjs:136
+value @ transport.js:38
+（匿名） @ polling.js:218
+（匿名） @ index.mjs:136
+value @ polling.js:320
+（匿名） @ polling.js:294
+setTimeout
+r.value.r.onreadystatechange @ polling.js:293
+XMLHttpRequest.send
+value @ polling.js:298
+i @ polling.js:237
+value @ polling.js:190
+value @ polling.js:215
+value @ polling.js:96
+value @ polling.js:56
+value @ transport.js:46
+value @ socket.js:170
+a @ socket.js:111
+value @ manager.js:108
+（匿名） @ manager.js:328
+setTimeout
+value @ manager.js:321
+value @ manager.js:95
+o @ manager.js:127
+（匿名） @ index.mjs:136
+value @ socket.js:541
+（匿名） @ index.mjs:136
+value @ transport.js:38
+（匿名） @ polling.js:218
+（匿名） @ index.mjs:136
+value @ polling.js:320
+（匿名） @ polling.js:294
+setTimeout
+r.value.r.onreadystatechange @ polling.js:293
+XMLHttpRequest.send
+value @ polling.js:298
+i @ polling.js:237
+value @ polling.js:190
+value @ polling.js:215
+value @ polling.js:96
+value @ polling.js:56
+value @ transport.js:46
+value @ socket.js:170
+a @ socket.js:111
+value @ manager.js:108
+s @ manager.js:39
+Ve @ index.js:29
+setupWebSocket @ websocket_handler.js:253
+（匿名） @ websocket_handler.js:300
+websocket_handler.js:271 WebSocket接続エラー: xhr poll error
+（匿名） @ websocket_handler.js:271
+（匿名） @ index.mjs:136
+value @ socket.js:439
+（匿名） @ index.mjs:136
+o @ manager.js:121
+（匿名） @ index.mjs:136
+value @ socket.js:541
+（匿名） @ index.mjs:136
+value @ transport.js:38
+（匿名） @ polling.js:218
+（匿名） @ index.mjs:136
+value @ polling.js:320
+（匿名） @ polling.js:294
+setTimeout
+r.value.r.onreadystatechange @ polling.js:293
+XMLHttpRequest.send
+value @ polling.js:298
+i @ polling.js:237
+value @ polling.js:190
+value @ polling.js:215
+value @ polling.js:96
+value @ polling.js:56
+value @ transport.js:46
+value @ socket.js:170
+a @ socket.js:111
+value @ manager.js:108
+（匿名） @ manager.js:328
+setTimeout
+value @ manager.js:321
+（匿名） @ manager.js:331
+o @ manager.js:123
+（匿名） @ index.mjs:136
+value @ socket.js:541
+（匿名） @ index.mjs:136
+value @ transport.js:38
+（匿名） @ polling.js:218
+（匿名） @ index.mjs:136
+value @ polling.js:320
+（匿名） @ polling.js:294
+setTimeout
+r.value.r.onreadystatechange @ polling.js:293
+XMLHttpRequest.send
+value @ polling.js:298
+i @ polling.js:237
+value @ polling.js:190
+value @ polling.js:215
+value @ polling.js:96
+value @ polling.js:56
+value @ transport.js:46
+value @ socket.js:170
+a @ socket.js:111
+value @ manager.js:108
+（匿名） @ manager.js:328
+setTimeout
+value @ manager.js:321
+（匿名） @ manager.js:331
+o @ manager.js:123
+（匿名） @ index.mjs:136
+value @ socket.js:541
+（匿名） @ index.mjs:136
+value @ transport.js:38
+（匿名） @ polling.js:218
+（匿名） @ index.mjs:136
+value @ polling.js:320
+（匿名） @ polling.js:294
+setTimeout
+r.value.r.onreadystatechange @ polling.js:293
+XMLHttpRequest.send
+value @ polling.js:298
+i @ polling.js:237
+value @ polling.js:190
+value @ polling.js:215
+value @ polling.js:96
+value @ polling.js:56
+value @ transport.js:46
+value @ socket.js:170
+a @ socket.js:111
+value @ manager.js:108
+（匿名） @ manager.js:328
+setTimeout
+value @ manager.js:321
+（匿名） @ manager.js:331
+o @ manager.js:123
+（匿名） @ index.mjs:136
+value @ socket.js:541
+（匿名） @ index.mjs:136
+value @ transport.js:38
+（匿名） @ polling.js:218
+（匿名） @ index.mjs:136
+value @ polling.js:320
+（匿名） @ polling.js:294
+setTimeout
+r.value.r.onreadystatechange @ polling.js:293
+XMLHttpRequest.send
+value @ polling.js:298
+i @ polling.js:237
+value @ polling.js:190
+value @ polling.js:215
+value @ polling.js:96
+value @ polling.js:56
+value @ transport.js:46
+value @ socket.js:170
+a @ socket.js:111
+value @ manager.js:108
+（匿名） @ manager.js:328
+setTimeout
+value @ manager.js:321
+value @ manager.js:95
+o @ manager.js:127
+（匿名） @ index.mjs:136
+value @ socket.js:541
+（匿名） @ index.mjs:136
+value @ transport.js:38
+（匿名） @ polling.js:218
+（匿名） @ index.mjs:136
+value @ polling.js:320
+（匿名） @ polling.js:294
+setTimeout
+r.value.r.onreadystatechange @ polling.js:293
+XMLHttpRequest.send
+value @ polling.js:298
+i @ polling.js:237
+value @ polling.js:190
+value @ polling.js:215
+value @ polling.js:96
+value @ polling.js:56
+value @ transport.js:46
+value @ socket.js:170
+a @ socket.js:111
+value @ manager.js:108
+s @ manager.js:39
+Ve @ index.js:29
+setupWebSocket @ websocket_handler.js:253
+（匿名） @ websocket_handler.js:300
