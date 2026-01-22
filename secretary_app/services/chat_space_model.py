@@ -188,7 +188,6 @@ class ChatSpaceModel:
         timestamp = datetime.now(JST).isoformat()
         initial_hits = _cached_gemini_request_impl.cache_info().hits
         response_text = _cached_gemini_request_impl(self.model, prompt)
-        print(f"--- [DEBUG] gemini応答: {response_text} ---")
         final_hits = _cached_gemini_request_impl.cache_info().hits
         process_type = "CACHE_HIT" if final_hits > initial_hits else "API_CALL"
         self._log_gemini_request(timestamp, prompt, process_type, response_text)
@@ -268,28 +267,6 @@ class ChatSpaceModel:
                  parsed_list.append(item)
                  
         return parsed_list
-
-    def _parse_income_expense_range(self, text: str) -> dict | None:
-        """収支取得用の期間指定をパースする"""
-        if not text:
-            return None
-        match = re.search(r"```json\s*([\s\S]*?)\s*```", text, re.I)
-        s = match.group(1) if match else text
-        try:
-            data = json.loads(s)
-        except json.JSONDecodeError:
-            print("JSON解析エラー: 収支取得用の期間指定が不正です。")
-            return None
-        if isinstance(data, list):
-            data = data[0] if data else None
-        if not isinstance(data, dict):
-            return None
-        return {
-            "start_date": data.get("start_date"),
-            "end_date": data.get("end_date"),
-            "category": data.get("category"),
-            "memo": data.get("memo"),
-        }
 
     def _parse_memo_list(self, text: str) -> list:
         if not text: return []
@@ -571,12 +548,7 @@ class ChatSpaceModel:
 
         # expense_serviceからカテゴリ一覧を取得
         from services.expense_service import add_finance_record, get_unique_categories
-        from services.category_service import get_all_categories
-        registered_categories = get_all_categories()
-        registered_names = []
-        if isinstance(registered_categories, list):
-            registered_names = [item.get("name") for item in registered_categories if item.get("name")]
-        available_categories = list(dict.fromkeys(registered_names + get_unique_categories(user_id)))
+        available_categories = get_unique_categories(user_id)
         
         # デフォルトカテゴリ
         if not available_categories:
@@ -643,17 +615,16 @@ class ChatSpaceModel:
             input_value=text
         )
         raw = self._gemini_request(prompt)
-        range_info = self._parse_income_expense_range(raw)
+        range_info = self._parse_income_expense_list(raw)
 
-        start_date = range_info.get('start_date') if range_info else None
-        end_date = range_info.get('end_date') if range_info else None
-        category = range_info.get('category') if range_info else None
-        memo = range_info.get('memo') if range_info else None
+        start_date = None
+        end_date = None
+        category = None
 
-        if isinstance(category, str) and category.strip() in ["全て", "すべて"]:
-            category = None
-        if isinstance(memo, str) and memo.strip() in ["全て", "すべて"]:
-            memo = None
+        if range_info and range_info[0]:
+            start_date = range_info[0].get('start_date')
+            end_date = range_info[0].get('end_date')
+            category = range_info[0].get('category')
 
         # デフォルト値の設定
         if not start_date:
@@ -671,7 +642,7 @@ class ChatSpaceModel:
             for record in all_records:
                 record_date = datetime.fromisoformat(record["date"]).strftime('%Y-%m-%d')
                 if start_date <= record_date <= end_date:
-                    if (not category or record.get("category") == category) and (not memo or record.get("memo") == memo):
+                    if not category or record.get("category") == category:
                         filtered_records.append(record)
 
             print(f"--- [DEBUG] _get_income_expense: Filtered records: {filtered_records} ---")
