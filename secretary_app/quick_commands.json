@@ -61,5 +61,12 @@
             "command": "turnOff",
             "parameter": "default"
         }
+    },
+    {
+        "pattern": "クイックコマンド (.+)に(.+)の予定を追加",
+        "action": {
+            "type": "calendar_event",
+            "action": "add"
+        }
     }
 ]

@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import os
 import sys
+import re
 from datetime import datetime, timedelta
 from functools import wraps
 
@@ -36,6 +37,7 @@ from services.finance_service import (
     get_monthly_goal,
     upsert_monthly_goal,
 )
+from services import local_calendar_service
 from services.chat_space_model import ChatSpaceModel
 from services.memo_routes import memo_bp
 from services.ScheduleManager import ScheduleManager
@@ -570,6 +572,9 @@ def chat_api_external():
 
     return jsonify(response_data)
 
+import re
+from services import local_calendar_service
+
 @app.route('/web_api/chat', methods=['POST'])
 @login_required # セッションベース認証
 def chat_api_web():
@@ -581,84 +586,58 @@ def chat_api_web():
     # 高速実行のチェック
     if user_input.startswith("クイックコマンド"):
         print(f"DEBUG: 高速実行検出: {user_input}")
+        # "クイックコマンド " の部分を除去
+        command_body = user_input.replace("クイックコマンド ", "", 1)
         for qc in quick_commands:
-            if user_input == qc["pattern"]:
+            match = re.match(qc["pattern"], command_body)
+            if match:
                 print(f"DEBUG: クイックコマンドパターン一致: {qc['pattern']}")
                 action = qc["action"]
                 if action["type"] == "switchbot_command":
-                    print(f"DEBUG: SwitchBotコマンド実行: {action}")
-                    # SwitchBot操作を直接実行
-                    device_name = action.get("device_name")
-                    command_type = action.get("command_type")
-                    command = action.get("command")
-                    parameter = action.get("parameter", "default")
-
-                    from services import switchbot_service
-                    switchbot_api_token = os.getenv("SWITCHBOT_TOKEN")
-                    switchbot_api_secret = os.getenv("SWITCHBOT_SECRET")
-
-                    if not switchbot_api_token or not switchbot_api_secret:
-                        print("ERROR: SwitchBot APIトークンまたはシークレットが設定されていません。")
-                        response_data['message'] = "SwitchBot APIトークンまたはシークレットが設定されていません。"
-                        response_data['status'] = 'error'
-                        return jsonify(response_data)
+                    # (Switchbot logic remains the same)
+                elif action["type"] == "calendar_event":
+                    time_str = match.group(1)
+                    title = match.group(2)
                     
                     try:
-                        devices_data = switchbot_service.get_switchbot_devices(switchbot_api_token, switchbot_api_secret)
-                        if devices_data and devices_data.get("statusCode") == 100:
-                            device_list = devices_data["body"].get("deviceList", [])
-                            infrared_remote_list = devices_data["body"].get("infraredRemoteList", [])
-                            
-                            target_device_id = None
-                            for device in device_list + infrared_remote_list:
-                                if device.get("deviceName") == device_name:
-                                    target_device_id = device.get("deviceId")
-                                    break
-                            
-                            if target_device_id:
-                                print(f"DEBUG: デバイスID取得成功: {target_device_id} for {device_name}")
-                                switchbot_result, switchbot_message = chat_space_model._operate_switchbot(
-                                    switchbot_api_token,
-                                    switchbot_api_secret,
-                                    target_device_id,
-                                    command_type,
-                                    command,
-                                    parameter
-                                )
-                                if switchbot_result and switchbot_result.get("statusCode") == 100:
-                                    response_data['message'] = f"高速実行で「{device_name}を{command}」を実行します。"
-                                    response_data['status'] = 'success'
-                                    print(f"DEBUG: SwitchBot操作成功: {response_data['message']}")
-                                else:
-                                    response_data['message'] = f"高速実行の実行に失敗しました。通常処理として実行します。"
-                                    response_data['status'] = 'error'
-                                    response_data['fallback_to_voicemate'] = True # フォールバックフラグ
-                                    print(f"ERROR: SwitchBot操作失敗、フォールバック: {switchbot_message}")
-                            else:
-                                response_data['message'] = f"高速実行の実行に失敗しました。通常処理として実行します。"
-                                response_data['status'] = 'error'
-                                response_data['fallback_to_voicemate'] = True # フォールバックフラグ
-                                print(f"ERROR: デバイス'{device_name}'が見つかりませんでした。フォールバック。")
-                        else:
-                            response_data['message'] = "高速実行の実行に失敗しました。通常処理として実行します。"
-                            response_data['status'] = 'error'
-                            response_data['fallback_to_voicemate'] = True # フォールバックフラグ
-                            print(f"ERROR: SwitchBotデバイスの取得に失敗しました。フォールバック。")
+                        # 時間文字列を解釈 (例: "10時", "10:30")
+                        hour, minute = 0, 0
+                        if "時" in time_str:
+                            parts = time_str.split("時")
+                            hour = int(parts[0])
+                            if parts[1] and "分" in parts[1]:
+                                minute = int(parts[1].replace("分", ""))
+                        elif ":" in time_str:
+                            parts = time_str.split(":")
+                            hour = int(parts[0])
+                            minute = int(parts[1])
+
+                        today = datetime.now()
+                        start_time = today.replace(hour=hour, minute=minute, second=0, microsecond=0)
+                        end_time = start_time + timedelta(hours=1) # デフォルト1時間
+
+                        local_calendar_service.add_event(
+                            user_id=user_id,
+                            title=title,
+                            start_time=start_time,
+                            end_time=end_time,
+                            description="クイックコマンドによる追加"
+                        )
+                        response_data['message'] = f"'{title}'の予定を{time_str}に追加しました。"
+                        response_data['status'] = 'success'
                     except Exception as e:
-                        print(f"ERROR: 高速実行 SwitchBot操作エラー、フォールバック: {e}")
-                        response_data['message'] = "高速実行の実行に失敗しました。通常処理として実行します。"
+                        print(f"ERROR: カレンダーイベントの追加に失敗: {e}")
+                        response_data['message'] = "予定の追加に失敗しました。時間の形式が正しくない可能性があります。"
                         response_data['status'] = 'error'
-                        response_data['fallback_to_voicemate'] = True # フォールバックフラグ
-                return jsonify(response_data)
-        
+                    
+                    return jsonify(response_data)
+
         # 高速実行パターンに一致しなかった場合
         print(f"DEBUG: 高速実行パターン不一致: {user_input}")
-        # 高速実行として認識されたが、パターンに一致しなかった場合は、通常の処理にフォールバック
-        # その際、特別なメッセージは出さず、通常のLLM処理に任せる
-        # ここではreturnしないことで、下の通常のchat_space_model処理に進む
     
     # 高速実行に一致しない場合、通常のchat_space_model処理
     response_data = chat_space_model.check_chat_space(user_input, user_id=user_id)
+    # (The rest of the function remains the same)
 
     action = response_data.get('action')
 

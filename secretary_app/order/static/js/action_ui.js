@@ -10,8 +10,19 @@ export function createActionUI(prefix = '', initialValue = {}) {
 
   switch (category) {
     case "カレンダー":
-      if (sub === "追加" || sub === "削除") {
-        detailContainer.innerHTML = `<textarea class="action-detail-cal-text" placeholder="内容">${initialValue.text || ''}</textarea>`;
+      if (sub === "追加") {
+        detailContainer.innerHTML = `
+          <label>タイトル</label>
+          <input type="text" class="action-detail-cal-title" placeholder="予定のタイトル" value="${initialValue.title || ''}">
+          <label>開始日時</label>
+          <input type="datetime-local" class="action-detail-cal-start-time" value="${initialValue.start_time || ''}">
+          <label>終了日時</label>
+          <input type="datetime-local" class="action-detail-cal-end-time" value="${initialValue.end_time || ''}">
+          <label>説明</label>
+          <textarea class="action-detail-cal-description" placeholder="予定の説明">${initialValue.description || ''}</textarea>
+        `;
+      } else if (sub === "削除") {
+        detailContainer.innerHTML = `<textarea class="action-detail-cal-text" placeholder="削除する予定のタイトル">${initialValue.text || ''}</textarea>`;
       } else if (sub === "読み上げ") {
         const generateDatalist = (type) => {
           let options = '';

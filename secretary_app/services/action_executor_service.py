@@ -514,6 +514,8 @@ def _execute_alert(detail_data: dict) -> dict:
 
 
 
+from app import socketio, connected_users
+
 def execute_action(user_id: str, action_data: dict) -> dict: # triggered_atをaction_dataから取得するように変更
     """
     アクションデータを解析し、適切な処理を実行する。
@@ -535,7 +537,37 @@ def execute_action(user_id: str, action_data: dict) -> dict: # triggered_atをac
         return {"status": "error", "message": "アクション実行時にトリガー時刻が不明です。"}
     triggered_at = datetime.fromisoformat(triggered_at_iso)
 
-    if category == 'カレンダー' and sub == '読み上げ':
+    if category == 'カレンダー' and sub == '追加':
+        try:
+            title = detail.get('title')
+            start_time_str = detail.get('start_time')
+            end_time_str = detail.get('end_time')
+            description = detail.get('description')
+
+            if not title or not start_time_str or not end_time_str:
+                return {"status": "error", "message": "カレンダーイベントの追加に必要な情報が不足しています。"}
+
+            start_time = datetime.fromisoformat(start_time_str)
+            end_time = datetime.fromisoformat(end_time_str)
+
+            from services import local_calendar_service
+            new_event = local_calendar_service.add_event(
+                user_id=user_id,
+                title=title,
+                start_time=start_time,
+                end_time=end_time,
+                description=description
+            )
+            
+            # WebSocketでカレンダーの更新を通知
+            sid = connected_users.get(user_id)
+            if sid:
+                socketio.emit('calendar_updated', {'message': 'A new event was added.'}, room=sid)
+
+            return {"status": "success", "message": f"カレンダーに予定「{title}」を追加しました。"}
+        except Exception as e:
+            return {"status": "error", "message": f"カレンダーイベントの追加中にエラーが発生しました: {e}"}
+    elif category == 'カレンダー' and sub == '読み上げ':
         return _execute_calendar_read_aloud(user_id, detail, triggered_at)
     elif category == '収支管理' and sub == '読み上げ':
         return _execute_finance_read_aloud(user_id, detail, triggered_at)
