@@ -30,9 +30,11 @@ import { check_chat_Space } from '/static/js/ChatSpace.js';
   /* ===== Theme persistence ===== */
   const THEME_KEY = 'vs_theme_idx';
   const THEMES = ['dark', 'light', 'purple', 'blue', 'orange'];
+  const FORCE_THEME = 'blue';
   function removeAllThemes(){ document.documentElement.classList.remove('theme-light','theme-purple','theme-blue','theme-orange'); }
   function applyThemeByIdx(idx){
-    const i = ((idx % THEMES.length) + THEMES.length) % THEMES.length;
+    const forcedIdx = THEMES.indexOf(FORCE_THEME);
+    const i = forcedIdx >= 0 ? forcedIdx : ((idx % THEMES.length) + THEMES.length) % THEMES.length;
     const name = THEMES[i];
     removeAllThemes();
     if (name !== 'dark') document.documentElement.classList.add('theme-'+name);
