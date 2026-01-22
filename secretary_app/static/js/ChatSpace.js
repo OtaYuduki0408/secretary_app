@@ -79,12 +79,36 @@ export async function check_chat_Space(inputValue) {
     console.log("DEBUG: APIからの最終応答:", result); // ここにresultオブジェクト全体をログ出力
     fire('analysis:step', { index: 1, label: '処理完了' });
 
-    if (result.message) {
-      console.log(`DEBUG: API応答メッセージ読み上げ: "${result.message}"`);
-      if (window.addResponseLogEntry) {
-        window.addResponseLogEntry(result.message);
+    async function applyToneSetting(message) {
+      try {
+        const raw = localStorage.getItem('appSettings');
+        if (!raw) return message;
+        const settings = JSON.parse(raw);
+        const tone = settings?.main?.tone || '';
+        if (!tone.trim()) return message;
+        const response = await fetch('/web_api/transform_tone', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: message, tone }),
+        });
+        if (!response.ok) {
+          return message;
+        }
+        const data = await response.json();
+        return data?.message || message;
+      } catch (e) {
+        console.warn("口調の適用に失敗しました。", e);
+        return message;
       }
-      reader.speak(result.message);
+    }
+
+    if (result.message) {
+      const finalMessage = await applyToneSetting(result.message);
+      console.log(`DEBUG: API応答メッセージ読み上げ: "${finalMessage}"`);
+      if (window.addResponseLogEntry) {
+        window.addResponseLogEntry(finalMessage);
+      }
+      reader.speak(finalMessage);
     }
 
     // 高速実行へのフォールバック処理

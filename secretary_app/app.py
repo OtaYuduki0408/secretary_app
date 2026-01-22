@@ -719,6 +719,23 @@ def chat_api_web():
             response_data['status'] = 'error'
     app.logger.debug(f"DEBUG: chat_api_webからの最終レスポンス: {response_data}")
     return jsonify(response_data)# メモAPIのBlueprint
+
+@app.route('/web_api/transform_tone', methods=['POST'])
+@login_required
+def transform_tone_api():
+    data = request.get_json() or {}
+    text = data.get('text', '')
+    tone = data.get('tone', '')
+
+    if not text or not tone:
+        return jsonify({'message': text})
+
+    try:
+        transformed = chat_space_model.transform_tone(text, tone)
+        return jsonify({'message': transformed})
+    except Exception as e:
+        app.logger.error(f"口調変換に失敗しました: {e}")
+        return jsonify({'message': text})
 app.register_blueprint(memo_bp, url_prefix='/api/memos')
 
 @app.route('/api/execute_action', methods=['POST'])

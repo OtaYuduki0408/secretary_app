@@ -17,13 +17,25 @@
 
     if (general.fontFamily) {
       root.style.setProperty('--app-font', general.fontFamily);
+      body.style.fontFamily = general.fontFamily;
     } else {
       root.style.removeProperty('--app-font');
+      body.style.removeProperty('font-family');
     }
 
     if (main.backgroundColor) {
+      root.style.backgroundColor = main.backgroundColor;
       body.style.backgroundColor = main.backgroundColor;
       body.style.backgroundImage = 'none';
+    }
+    if (!main.backgroundColor) {
+      root.style.removeProperty('background-color');
+      body.style.removeProperty('background-color');
+      body.style.removeProperty('background-image');
+    }
+
+    if (!body.style.minHeight) {
+      body.style.minHeight = '100vh';
     }
   };
 

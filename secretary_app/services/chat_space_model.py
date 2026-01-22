@@ -177,6 +177,15 @@ class ChatSpaceModel:
         response_text = _cached_gemini_request_impl(self.model, prompt)
         return response_text
 
+    def transform_tone(self, text: str, tone: str) -> str:
+        if not text or not tone:
+            return text
+        prompt = (
+            f"以下のテキストを{tone}にして。意味は変えず、自然な会話口調にして。\\n"
+            f"---\\n{text}"
+        )
+        return self._gemini_request(prompt)
+
     def _format_event_time(self, iso_time: str) -> str:
         if not iso_time: return ""
         try:

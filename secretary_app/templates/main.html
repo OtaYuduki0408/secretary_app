@@ -177,6 +177,15 @@
       font-family: var(--app-font, inherit);
     }
 
+    body.custom-bg {
+      background: var(--custom-bg, #0b1f38);
+    }
+
+    body.custom-bg .parallax,
+    body.custom-bg .ui-backdrop {
+      display: none;
+    }
+
     .character-buddy {
       position: fixed;
       left: 24px;
@@ -560,8 +569,21 @@
       }
 
       if (main.backgroundColor) {
+        root.style.setProperty('--custom-bg', main.backgroundColor);
         body.style.backgroundColor = main.backgroundColor;
         body.style.backgroundImage = 'none';
+        body.classList.add('custom-bg');
+        root.style.setProperty('--bg-1', main.backgroundColor);
+        root.style.setProperty('--bg-2', main.backgroundColor);
+        root.style.setProperty('--wallpaper', `linear-gradient(180deg, ${main.backgroundColor} 0%, ${main.backgroundColor} 100%)`);
+        root.style.setProperty('--wallpaper-darken', 'rgba(0,0,0,0)');
+      } else {
+        body.classList.remove('custom-bg');
+        root.style.removeProperty('--custom-bg');
+        root.style.removeProperty('--bg-1');
+        root.style.removeProperty('--bg-2');
+        root.style.removeProperty('--wallpaper');
+        root.style.removeProperty('--wallpaper-darken');
       }
 
       const sizeValue = characterSettings.size || 220;

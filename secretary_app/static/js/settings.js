@@ -6,6 +6,7 @@
     main: {
       backgroundColor: '#0b1f38',
       voiceName: '',
+      tone: '',
     },
     character: {
       enabled: true,
@@ -17,6 +18,7 @@
   const elements = {
     fontFamily: document.getElementById('font-family'),
     mainBgColor: document.getElementById('main-bg-color'),
+    toneSetting: document.getElementById('tone-setting'),
     voiceSelect: document.getElementById('voice-select'),
     characterEnabled: document.getElementById('character-enabled'),
     characterSize: document.getElementById('character-size'),
@@ -97,6 +99,7 @@
 
   if (elements.fontFamily) elements.fontFamily.value = settings.general.fontFamily;
   if (elements.mainBgColor) elements.mainBgColor.value = settings.main.backgroundColor;
+  if (elements.toneSetting) elements.toneSetting.value = settings.main.tone || '';
   if (elements.voiceSelect) elements.voiceSelect.value = settings.main.voiceName;
   if (elements.characterEnabled) elements.characterEnabled.checked = settings.character.enabled !== false;
   if (elements.characterSize) elements.characterSize.value = settings.character.size;
@@ -119,6 +122,11 @@
     settings.main.backgroundColor = event.target.value;
     saveSettings(settings);
     applyToPage(settings);
+  });
+
+  elements.toneSetting?.addEventListener('input', (event) => {
+    settings.main.tone = event.target.value;
+    saveSettings(settings);
   });
 
   elements.voiceSelect?.addEventListener('change', (event) => {
