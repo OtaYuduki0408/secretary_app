@@ -155,6 +155,8 @@ class ChatSpaceModel:
     - title (string, partial match)
     - content (string, partial match)
     - priority (integer 1-5, empty if not specified)
+    - start_date (YYYY-MM-DD, optional)
+    - end_date (YYYY-MM-DD, optional)
     Output: JSON array only.
     Current time:{current_time}
     User input: {input_value}
@@ -166,6 +168,8 @@ class ChatSpaceModel:
     - title (string, partial match)
     - content (string, partial match)
     - priority (integer 1-5, empty if not specified)
+    - start_date (YYYY-MM-DD, optional)
+    - end_date (YYYY-MM-DD, optional)
     Output: JSON array only.
     Current time:{current_time}
     User input: {input_value}
@@ -317,9 +321,11 @@ class ChatSpaceModel:
                 'title': x.get('title') or '',
                 'content': x.get('content') or '',
                 'keyword': x.get('keyword') or '',
-                'priority': priority
+                'priority': priority,
+                'start_date': x.get('start_date') or x.get('start') or '',
+                'end_date': x.get('end_date') or x.get('end') or ''
             }
-            if item['title'] or item['content'] or item['keyword'] or item['priority'] is not None:
+            if item['title'] or item['content'] or item['keyword'] or item['priority'] is not None or item['start_date'] or item['end_date']:
                  parsed_list.append(item)
                  
         return parsed_list
@@ -758,15 +764,19 @@ class ChatSpaceModel:
         title = None
         content = None
         priority = None
+        start_date = None
+        end_date = None
 
         if search_info and search_info[0]:
             keyword = search_info[0].get('keyword')
             title = search_info[0].get('title')
             content = search_info[0].get('content')
             priority = search_info[0].get('priority')
+            start_date = search_info[0].get('start_date')
+            end_date = search_info[0].get('end_date')
 
-        if not keyword and not title and not content and priority is None:
-            return None, "Missing search conditions. Provide title/content/keyword/priority."
+        if not keyword and not title and not content and priority is None and not start_date and not end_date:
+            return None, "Missing search conditions. Provide title/content/keyword/priority/date range."
 
         search_type = "all"
         search_keyword = ""
@@ -784,6 +794,8 @@ class ChatSpaceModel:
             user_id=user_id,
             keyword=search_keyword,
             search_type=search_type,
+            start_date=start_date or "",
+            end_date=end_date or "",
             title=title or "",
             content=content or "",
             priority=priority
@@ -814,15 +826,19 @@ class ChatSpaceModel:
         title = None
         content = None
         priority = None
+        start_date = None
+        end_date = None
 
         if delete_info and delete_info[0]:
             keyword = delete_info[0].get('keyword')
             title = delete_info[0].get('title')
             content = delete_info[0].get('content')
             priority = delete_info[0].get('priority')
+            start_date = delete_info[0].get('start_date')
+            end_date = delete_info[0].get('end_date')
 
-        if not keyword and not title and not content and priority is None:
-            return None, "Missing delete conditions. Provide title/content/keyword/priority."
+        if not keyword and not title and not content and priority is None and not start_date and not end_date:
+            return None, "Missing delete conditions. Provide title/content/keyword/priority/date range."
 
         search_type = "all"
         search_keyword = ""
@@ -840,6 +856,8 @@ class ChatSpaceModel:
             user_id=user_id,
             keyword=search_keyword,
             search_type=search_type,
+            start_date=start_date or "",
+            end_date=end_date or "",
             title=title or "",
             content=content or "",
             priority=priority
