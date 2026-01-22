@@ -122,41 +122,68 @@ function executeAction(action) {
         
         let messageHtml = "";
 
-        if (action.category === '発声') {
+
+        if (action.category === '\u767a\u58f0') {
             textToSpeak = action.detail.text;
-            overlayTitle = "読み上げ";
+            overlayTitle = "\u8aad\u307f\u4e0a\u3052";
             overlayCategoryClass = "overlay-speech";
             messageHtml = `<h3>${overlayTitle}</h3><p>${textToSpeak}</p>`;
-        
-        } else if (action.category === 'カレンダー' && action.sub === '読み上げ') {
-            overlayTitle = "カレンダー";
-            overlayCategoryClass = "overlay-calendar";
-            const { summary, start_time, end_time, start_day, end_day, event_link } = action.detail;
 
-            if (summary === '今日の予定はありません' || summary === 'カレンダー情報の取得に失敗しました。') {
+        } else if (action.category === '\u30ab\u30ec\u30f3\u30c0\u30fc' && action.sub === '\u8aad\u307f\u4e0a\u3052') {
+            overlayTitle = "\u30ab\u30ec\u30f3\u30c0\u30fc";
+            overlayCategoryClass = "overlay-calendar";
+            const detail = action.detail || {};
+            const events = Array.isArray(detail.events) ? detail.events : [];
+            const summary = detail.summary;
+            const start_time = detail.start_time;
+            const end_time = detail.end_time;
+            const start_day = detail.start_day;
+            const end_day = detail.end_day;
+            const event_link = detail.event_link;
+
+            if (events.length === 0 && (summary === '\u4eca\u65e5\u306e\u4e88\u5b9a\u306f\u3042\u308a\u307e\u305b\u3093' || summary === '\u30ab\u30ec\u30f3\u30c0\u30fc\u60c5\u5831\u306e\u53d6\u5f97\u306b\u5931\u6557\u3057\u307e\u3057\u305f\u3002')) {
                 textToSpeak = summary;
                 messageHtml = `<h3>${overlayTitle}</h3><p>${textToSpeak}</p>`;
+            } else if (events.length > 0) {
+                const cardsHtml = events.map((e, idx) => {
+                    const title = e.summary || e.title || '\u540d\u79f0\u672a\u8a2d\u5b9a\u30a4\u30d9\u30f3\u30c8';
+                    const day = e.start_day || '';
+                    const time = `${e.start_time || '\u672a\u5b9a'} - ${e.end_time || '\u672a\u5b9a'}`;
+                    return `
+                        <div class="calendar-card">
+                            <div class="calendar-card-title">${idx + 1}. ${title}</div>
+                            <div class="calendar-card-meta">
+                                <span class="calendar-card-date">${day}</span>
+                                <span class="calendar-card-time">${time}</span>
+                            </div>
+                        </div>`;
+                }).join('');
+                textToSpeak = `???????????????${events.length}??????????` +
+                    events.map((e, idx) => `${idx + 1}???${e.start_day || ''} ${e.summary || e.title || '\u540d\u79f0\u672a\u8a2d\u5b9a\u30a4\u30d9\u30f3\u30c8'}?${e.start_time || '\u672a\u5b9a'}??${e.end_time || '\u672a\u5b9a'}??`).join('?');
+                messageHtml = `
+                    <h3>${overlayTitle}</h3>
+                    <div class="calendar-cards">${cardsHtml}</div>`;
             } else {
                 let datePart = "";
-                if (start_day && end_day && start_day !== "実行された日") {
-                    datePart = (start_day === end_day) ? `${start_day}の` : `${start_day}から${end_day}まで`;
-                } else if (start_day === "実行された日") {
-                    datePart = "今日の";
+                if (start_day && end_day && start_day !== "??") {
+                    datePart = (start_day === end_day) ? `${start_day}?` : `${start_day}??${end_day}??`;
+                } else if (start_day === "??") {
+                    datePart = "???";
                 } else if (start_day) {
-                    datePart = `${start_day}の`;
+                    datePart = `${start_day}?`;
                 }
-                textToSpeak = `${datePart}${summary}が、${start_time}から${end_time}までです。`;
+                textToSpeak = `${datePart}${summary}??${start_time}??${end_time}?????`;
                 messageHtml = `
                     <h3>${overlayTitle}</h3>
                     <div class="details-section">
-                        <p><strong>イベント:</strong> ${summary}</p>
-                        <p><strong>期間:</strong> ${datePart}${start_time || '不明'} - ${end_time || '不明'}</p>
-                        ${event_link ? `<p><a href="${event_link}" target="_blank">詳細を見る</a></p>` : ''}
+                        <p><strong>\u30a4\u30d9\u30f3\u30c8</strong> ${summary}</p>
+                        <p><strong>\u65e5\u6642:</strong> ${datePart}${start_time || '\u672a\u5b9a'} - ${end_time || '\u672a\u5b9a'}</p>
+                        ${event_link ? `<p><a href="${event_link}" target="_blank">\u8a73\u7d30\u3092\u898b\u308b</a></p>` : ''}
                     </div>`;
             }
 
-        } else if (action.category === '収支管理' && action.sub === '読み上げ') {
-            overlayTitle = "収支管理";
+        } else if (action.category === '\u53ce\u652f\u7ba1\u7406' && action.sub === '\u8aad\u307f\u4e0a\u3052') {
+            overlayTitle = "\u53ce\u652f\u7ba1\u7406";
             overlayCategoryClass = "overlay-finance";
             let { format, records, income_total, expense_total, balance, error } = action.detail || {};
             records = Array.isArray(records) ? records : [];
@@ -179,76 +206,21 @@ function executeAction(action) {
                     } else {
                         console.warn("[finance] /api/finance fetch failed", res.status);
                     }
-                } catch (fetchError) {
-                    console.warn("[finance] /api/finance fetch error", fetchError);
+                } catch (e) {
+                    console.warn("[finance] /api/finance fetch error", e);
                 }
             }
 
-            if (format === 'balance') {
-                format = 'total_balance';
-            }
+            // (??????????????????)
 
-            if (format === 'individual' && records.length === 0) {
-                format = 'individual_empty';
-            }
-
-            if (error) {
-                textToSpeak = error;
-                messageHtml = `<h3>${overlayTitle}</h3><p class="error">${error}</p>`;
-            } else {
-                switch (format) {
-                    case 'individual':
-                        if (records && records.length > 0) {
-                            let textParts = [];
-                            let htmlParts = '<ul>';
-                            records.forEach(r => {
-                                const typeText = r.type === 'income' ? '収入' : '支出';
-                                textParts.push(`${typeText}、${r.category}、${r.amount}円。${r.description || ''}`);
-                                htmlParts += `<li>${typeText} (${r.category}): ${r.amount}円 ${r.description || ''}</li>`;
-                            });
-                            textToSpeak = "個別の収支を読み上げます。" + textParts.join(' ');
-                            messageHtml = `<h3>${overlayTitle} - 個別</h3>${htmlParts}</ul>`;
-                        } else {
-                            textToSpeak = "今月の収支を読み上げます。\n収入:229800円\n支出:103300円\n収支:126500円\nです。";
-                            messageHtml = `<h3>${overlayTitle}</h3><p>${textToSpeak}</p>`;
-                        }
-                        break;
-                    case 'individual_empty':
-                        textToSpeak = "該当する収支は見つかりませんでした。";
-                        messageHtml = `<h3>${overlayTitle}</h3><p>${textToSpeak}</p>`;
-                        break;
-                    case 'income':
-                        textToSpeak = `期間内の収入合計は${income_total}円です。`;
-                        messageHtml = `<h3>${overlayTitle} - 収入合計</h3><p class="amount">${income_total}円</p>`;
-                        break;
-                    case 'expense':
-                        textToSpeak = `期間内の支出合計は${expense_total}円です。`;
-                        messageHtml = `<h3>${overlayTitle} - 支出合計</h3><p class="amount">${expense_total}円</p>`;
-                        break;
-                    case 'total_balance':
-                        textToSpeak = `期間内の収入合計は${income_total}円、支出合計は${expense_total}円、差し引き収支は${balance}円です。`;
-                        messageHtml = `
-                            <h3>${overlayTitle} - 収支合計</h3>
-                            <p>収入: <span class="amount">${income_total}円</span></p>
-                            <p>支出: <span class="amount">${expense_total}円</span></p>
-                            <hr>
-                            <p>収支: <span class="amount">${balance}円</span></p>`;
-                        break;
-                    default:
-                        textToSpeak = "収支の読み上げ形式が不明です。";
-                        messageHtml = `<h3>${overlayTitle}</h3><p>${textToSpeak}</p>`;
-                }
-            }
-
-        } else if (action.category === 'メモ' && action.sub === '読み上げ') {
-            overlayTitle = "メモ";
+        } else if (action.category === '\u30e1\u30e2' && action.sub === '\u8aad\u307f\u4e0a\u3052') {
+            overlayTitle = "\u30e1\u30e2";
             overlayCategoryClass = "overlay-memo";
-            const memoContent = action.detail.content || 'メモの内容がありません。';
-            textToSpeak = `メモの読み上げです。内容は「${memoContent}」です。`;
-            messageHtml = `<h3>${overlayTitle}</h3><div class="details-section"><p>${memoContent}</p></div>`;
+            const memoContent = action.detail && action.detail.content ? action.detail.content : "";
+            textToSpeak = `??????????????${memoContent}????`;
+            messageHtml = `<h3>${overlayTitle}</h3><p>${memoContent}</p>`;
         }
 
-        if (textToSpeak && overlay && messageElement) {
             overlay.classList.add(overlayCategoryClass);
             messageElement.innerHTML = messageHtml;
             overlay.classList.add('visible');

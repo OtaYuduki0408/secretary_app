@@ -1153,7 +1153,7 @@
 
 /* カテゴリごとの背景色 - ここは後で微調整 */
 .read-aloud-overlay.overlay-calendar {
-    background: linear-gradient(135deg, rgba(44, 62, 80, 0.95), rgba(52, 73, 94, 0.95)); /* 濃い青 */
+    background: linear-gradient(135deg, rgba(0, 112, 255, 0.95), rgba(0, 176, 255, 0.95)); /* 濃い青 */
 }
 .read-aloud-overlay.overlay-finance {
     background: linear-gradient(135deg, rgba(39, 174, 96, 0.95), rgba(46, 204, 113, 0.95)); /* 緑 */
@@ -1320,4 +1320,37 @@ main.shell > div[aria-hidden="true"] {
     width:28px;
     height:28px;
   }
+}
+
+
+/* Calendar cards in overlay */
+.overlay-message .calendar-cards {
+    display: grid;
+    gap: 12px;
+    margin-top: 12px;
+}
+.overlay-message .calendar-card {
+    background: rgba(255, 255, 255, 0.12);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    border-radius: 12px;
+    padding: 12px 14px;
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.25);
+}
+.overlay-message .calendar-card-title {
+    font-weight: 700;
+    font-size: 1.05em;
+    color: #ffffff;
+    margin-bottom: 6px;
+}
+.overlay-message .calendar-card-meta {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 8px 12px;
+    color: rgba(255, 255, 255, 0.9);
+    font-size: 0.95em;
+}
+.overlay-message .calendar-card-time {
+    color: #ffe08a;
+    font-weight: 600;
 }

@@ -89,20 +89,31 @@ def evaluate_triggers(app_logger):
                         app_logger.debug(f"list_events returned {len(events)} events.")
 
                         if events:
-                            upcoming_events = [e for e in events if datetime.fromisoformat(e['start_time']).astimezone(JST) >= now_jst]
-                            event = upcoming_events[0] if upcoming_events else events[0]
-                            
-                            action['detail'].update({
-                                'summary': event.get('title', '名称未設定イベント'),
-                                'start_time': datetime.fromisoformat(event['start_time']).astimezone(JST).strftime('%H:%M'),
-                                'end_time': datetime.fromisoformat(event['end_time']).astimezone(JST).strftime('%H:%M'),
-                                'start_day': datetime.fromisoformat(event['start_time']).astimezone(JST).strftime('%Y年%m月%d日'),
-                                'end_day': datetime.fromisoformat(event['end_time']).astimezone(JST).strftime('%Y年%m月%d日'),
-                                'event_link': None
-                            })
-                            app_logger.debug(f"Injected calendar event details: summary={action['detail']['summary']}")
+                            event_items = []
+                            for e in events:
+                                try:
+                                    start_dt = datetime.fromisoformat(e['start_time']).astimezone(JST)
+                                    end_dt = datetime.fromisoformat(e['end_time']).astimezone(JST)
+                                    event_items.append({
+                                        'summary': e.get('title', '?????????'),
+                                        'start_time': start_dt.strftime('%H:%M'),
+                                        'end_time': end_dt.strftime('%H:%M'),
+                                        'start_day': start_dt.strftime('%Y?%m?%d?'),
+                                        'end_day': end_dt.strftime('%Y?%m?%d?'),
+                                        'event_link': None
+                                    })
+                                except Exception as err:
+                                    app_logger.debug(f"Failed to parse event for read aloud: {err}")
+
+                            if event_items:
+                                action['detail']['events'] = event_items
+                                action['detail'].update(event_items[0])
+                                action['detail']['summary'] = event_items[0]['summary']
+                                app_logger.debug(f"Injected calendar event details: count={len(event_items)}")
+                            else:
+                                action['detail']['summary'] = '???????????'
                         else:
-                            action['detail']['summary'] = '今日の予定はありません'
+                            action['detail']['summary'] = '???????????'
                     except Exception as e:
                         app_logger.error(f"Error processing calendar action for user {user_id}: {e}")
                         action['detail']['summary'] = 'カレンダー情報の取得に失敗しました。'
