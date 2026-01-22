@@ -256,6 +256,7 @@ function executeAction(action) {
                         textToSpeak = `期間内の支出合計は${expense_total}円です。`;
                         messageHtml = `<h3>${overlayTitle} - 支出合計</h3><p class="amount">${expense_total}円</p>`;
                         break;
+                    case 'balance':
                     case 'total_balance':
                         textToSpeak = `期間内の収入合計は${income_total}円、支出合計は${expense_total}円、差し引き収支は${balance}円です。`;
                         messageHtml = `

@@ -1,17 +1,15 @@
-# C:\Users\y_oota\Documents\secretary_app\secretary_app\order\evaluator.py
+# order/evaluator.py
 from supabase_client import supabase
-from datetime import datetime, timedelta
+from datetime import datetime
 import pytz
 from services import local_calendar_service
-from services.finance_service import get_finance_summary, get_all_finance_records
+from services.finance_service import get_all_finance_records
 
 # タイムゾーン設定
 JST = pytz.timezone('Asia/Tokyo')
 
 def _evaluate_time_trigger(trigger, now_jst, current_time_str, current_day_of_week_jp):
-    """
-    時間トリガーが発動条件を満たしているか評価する。
-    """
+    # 時間トリガーの評価
     trigger_value = trigger.get('value')
     if not trigger_value:
         return False
@@ -35,15 +33,14 @@ def _evaluate_time_trigger(trigger, now_jst, current_time_str, current_day_of_we
     day_of_week_match = True
     if trigger_day_of_week:
         day_of_week_match = (current_day_of_week_jp in trigger_day_of_week)
-    
+
     return time_match and date_match and day_of_week_match
 
+
 def evaluate_triggers(app_logger):
-    """
-    毎分実行され、トリガーを評価し、ディスパッチすべきコマンドのリストを返す。
-    """
+    # 毎分のトリガー評価
     app_logger.debug(f"[{datetime.now()}] Evaluating triggers...")
-    
+
     dispatch_list = []
     try:
         response = supabase.table('custom_orders').select('id, user_id, order_data').execute()
@@ -51,7 +48,7 @@ def evaluate_triggers(app_logger):
     except Exception as e:
         app_logger.error(f"Error fetching custom orders from Supabase: {e}")
         return dispatch_list
-    
+
     if not orders:
         return dispatch_list
 
@@ -63,7 +60,7 @@ def evaluate_triggers(app_logger):
     for order in orders:
         user_id = order.get('user_id')
         order_data = order.get('order_data')
-        
+
         if not order_data or not order_data.get('triggers'):
             continue
 
@@ -74,17 +71,15 @@ def evaluate_triggers(app_logger):
         if _evaluate_time_trigger(trigger, now_jst, current_time_str, current_day_of_week_jp):
             app_logger.debug(f"Trigger activated for user {user_id}. Processing actions...")
             app_logger.debug(f"DEBUG: Actions in order_data before processing: {order_data.get('actions', [])}")
-            
+
             modified_actions = []
-            finance_summary_calculated = False
-            income_total, expense_total, balance = 0, 0, 0
 
             for action in order_data.get('actions', []):
                 if action.get('category') == 'カレンダー' and action.get('sub') == '読み上げ':
                     try:
                         today_start = now_jst.replace(hour=0, minute=0, second=0, microsecond=0)
                         today_end = now_jst.replace(hour=23, minute=59, second=59, microsecond=999999)
-                        
+
                         events = local_calendar_service.get_events(user_id, today_start.isoformat(), today_end.isoformat())
                         app_logger.debug(f"list_events returned {len(events)} events.")
 
@@ -95,7 +90,7 @@ def evaluate_triggers(app_logger):
                                     start_dt = datetime.fromisoformat(e['start_time']).astimezone(JST)
                                     end_dt = datetime.fromisoformat(e['end_time']).astimezone(JST)
                                     event_items.append({
-                                        'summary': e.get('title', '?????????'),
+                                        'summary': e.get('title', '予定'),
                                         'start_time': start_dt.strftime('%H:%M'),
                                         'end_time': end_dt.strftime('%H:%M'),
                                         'start_day': f"{start_dt.year}年{start_dt.month}月{start_dt.day}日",
@@ -111,37 +106,12 @@ def evaluate_triggers(app_logger):
                                 action['detail']['summary'] = event_items[0]['summary']
                                 app_logger.debug(f"Injected calendar event details: count={len(event_items)}")
                             else:
-                                action['detail']['summary'] = '???????????'
+                                action['detail']['summary'] = '今日の予定はありません'
                         else:
-                            action['detail']['summary'] = '???????????'
+                            action['detail']['summary'] = '今日の予定はありません'
                     except Exception as e:
                         app_logger.error(f"Error processing calendar action for user {user_id}: {e}")
                         action['detail']['summary'] = 'カレンダー情報の取得に失敗しました。'
-
-                elif action.get('category') == '????' and action.get('sub') == '????':
-                    try:
-                        format_type = action.get('detail', {}).get('format')
-                        app_logger.debug(f"Processing finance action for format: {format_type}")
-
-                        all_records = get_all_finance_records(user_id)
-                        income_total = sum(r.get('amount', 0) for r in all_records if r.get('type') == 'income')
-                        expense_total = sum(r.get('amount', 0) for r in all_records if r.get('type') == 'expense')
-                        balance = income_total - expense_total
-
-                        if format_type == 'individual':
-                            action.setdefault('detail', {})['records'] = all_records
-                            app_logger.debug(f"Injected {len(all_records)} individual finance records.")
-                        else:
-                            detail = action.setdefault('detail', {})
-                            detail['income_total'] = income_total
-                            detail['expense_total'] = expense_total
-                            detail['balance'] = balance
-                            app_logger.debug(
-                                f"Injected finance summary: income={income_total}, expense={expense_total}, balance={balance}"
-                            )
-                    except Exception as e:
-                        app_logger.error(f"Error processing finance action for user {user_id}: {e}", exc_info=True)
-                        action.setdefault('detail', {})['error'] = '???????????????'
 
                 elif action.get('category') == '収支管理' and action.get('sub') == '読み上げ':
                     try:
@@ -169,9 +139,8 @@ def evaluate_triggers(app_logger):
                         action.setdefault('detail', {})['error'] = '収支情報の取得に失敗しました。'
 
                 modified_actions.append(action)
-            
+
             order_data['actions'] = modified_actions
             dispatch_list.append((user_id, order_data))
-    
-    return dispatch_list
 
+    return dispatch_list
