@@ -14,7 +14,10 @@ from services.finance_service import (
     get_all_finance_records, get_finance_summary, get_current_balance,
     get_monthly_expense, get_daily_expense
 )
-from services.MemoManager import MemoManager
+from services.memo_service import add_memo as add_memo_record
+from services.memo_service import get_all_memos as get_all_memo_records
+from services.memo_service import delete_memo as delete_memo_record
+from services.memo_service import delete_memos_bulk as delete_memos_bulk_records
 from services import switchbot_service
 
 
@@ -136,41 +139,58 @@ class ChatSpaceModel:
     ユーザー入力: {input_value}
     """
     ADD_MEMO_PROMPT_TEMPLATE = """
-    目的: ユーザーが追加したいメモの内容とタイトルを抽出
-    抽出項目:
-    - title (メモのタイトル)
-    - content (メモの内容)
-    出力はJSON配列のみ、他テキスト禁止。単独でも複数あっても二次配列で返す。
-    現在時刻:{current_time}
-    ユーザー入力: {input_value}
+    Purpose: Add memo. Extract fields and return JSON array only.
+    Fields:
+    - title (string)
+    - content (string)
+    - priority (integer 1-5, empty if not specified)
+    Output: JSON array only.
+    Current time:{current_time}
+    User input: {input_value}
     """
     GET_MEMO_PROMPT_TEMPLATE = """
-    目的: ユーザーが検索または取得したいメモのキーワードまたはタイトルを抽出
-    抽出項目:
-    - keyword (検索キーワード、任意)
-    - title (メモのタイトル、任意)
-    出力はJSON配列のみ、他テキスト禁止。一つの辞書で渡して。
-    現在時刻:{current_time}
-    ユーザー入力: {input_value}
+    Purpose: Search memos. Extract fields and return JSON array only.
+    Fields:
+    - keyword (string, partial match)
+    - title (string, partial match)
+    - content (string, partial match)
+    - priority (integer 1-5, empty if not specified)
+    Output: JSON array only.
+    Current time:{current_time}
+    User input: {input_value}
     """
+    DELETE_MEMO_PROMPT_TEMPLATE = """
+    Purpose: Delete memos. Extract fields and return JSON array only.
+    Fields:
+    - keyword (string, partial match)
+    - title (string, partial match)
+    - content (string, partial match)
+    - priority (integer 1-5, empty if not specified)
+    Output: JSON array only.
+    Current time:{current_time}
+    User input: {input_value}
+    """
+
     SWITCHBOT_OPERATION_PROMPT_TEMPLATE = """
-    目的: ユーザーが操作したいSwitchBotデバイスと、そのデバイスに対して実行したいコマンドを抽出。
-    利用可能なデバイスと機能のリスト: {available_devices_json}
-    抽出項目:
-    - device_id (操作対象のデバイスID)
-    - command_type (コマンドタイプ。例: "command", "customize")
-    - command (実行するコマンド。例: "turnOn", "turnOff", "press")
-    - parameter (コマンドのパラメータ。例: "default", "25", "on")
-    出力はJSON配列のみ、他テキスト禁止。単独でも複数あっても二次配列で返す。
-    現在時刻:{current_time}
-    ユーザー入力: {input_value}
+    Purpose: Identify SwitchBot device and command to execute.
+    Fields:
+    - device_id
+    - command_type (command/customize)
+    - command (turnOn/turnOff/press)
+    - parameter (default/number/on)
+    Output: JSON array only.
+    Current time:{current_time}
+    User input: {input_value}
+    Available devices: {available_devices_json}
     """
+
 
     def __init__(self, gemini_api_key: str, calendar_manager=None):
         genai.configure(api_key=gemini_api_key)
         self.model_name = "gemini-2.5-flash"
         self.model = genai.GenerativeModel(model_name=self.model_name)
-        self.memo_manager = MemoManager()
+        # メモはSupabaseに保存するため、ここでは初期化不要
+        self.memo_manager = None
 
     def _gemini_request(self, prompt: str) -> str:
         print(f"--- [DEBUG] geminiに解析リクエスト (ユーザー入力: {prompt}) ---")
@@ -285,12 +305,21 @@ class ChatSpaceModel:
         parsed_list = []
         for x in list_data:
             if not isinstance(x, dict): continue
+            priority_value = x.get('priority')
+            priority = None
+            if isinstance(priority_value, (int, float)):
+                priority = int(priority_value)
+            elif isinstance(priority_value, str):
+                stripped = priority_value.strip()
+                if stripped.isdigit():
+                    priority = int(stripped)
             item = {
                 'title': x.get('title') or '',
                 'content': x.get('content') or '',
-                'keyword': x.get('keyword') or ''
+                'keyword': x.get('keyword') or '',
+                'priority': priority
             }
-            if item['title'] or item['content'] or item['keyword']:
+            if item['title'] or item['content'] or item['keyword'] or item['priority'] is not None:
                  parsed_list.append(item)
                  
         return parsed_list
@@ -350,9 +379,11 @@ class ChatSpaceModel:
         elif purpose == "Ig":
             result["data"], result["message"] = self._get_income_expense(cleaned_input, user_id)
         elif purpose == "Ma":
-            result["data"], result["message"] = self._add_memo(cleaned_input)
+            result["data"], result["message"] = self._add_memo(cleaned_input, user_id)
         elif purpose == "Mg":
-            result["data"], result["message"] = self._get_memo(cleaned_input)
+            result["data"], result["message"] = self._get_memo(cleaned_input, user_id)
+        elif purpose == "Md":
+            result["data"], result["message"] = self._delete_memo(cleaned_input, user_id)
         elif purpose == "Tn":
             time_prompt = self.TIME_GET_PROMPT_TEMPLATE.format(current_time=current_time, input_value=cleaned_input)
             result["message"] = self._gemini_request(time_prompt)
@@ -674,8 +705,10 @@ class ChatSpaceModel:
             print(f"収支取得エラー: {e}")
             return None, "収支の取得中にエラーが発生しました。"
 
-    def _add_memo(self, text: str):
-        """メFモ追加"""
+    def _add_memo(self, text: str, user_id: str | None):
+        """Add memo"""
+        if not user_id:
+            return None, "User is not logged in."
         current_time = datetime.now(JST).strftime('%Y-%m-%d %H:%M:%S')
         prompt = self.ADD_MEMO_PROMPT_TEMPLATE.format(
             current_time=current_time,
@@ -686,59 +719,157 @@ class ChatSpaceModel:
 
         added_info = []
         if not memos_to_add:
-            return None, "メモの追加に失敗しました。入力内容を確認してください。"
+            return None, "Missing fields for memo. Please specify title/content/priority."
 
         for memo in memos_to_add:
             try:
-                created_memo = self.memo_manager.add_memo(memo['title'], memo['content'])
+                created_memo = add_memo_record(
+                    user_id=user_id,
+                    title=memo.get('title') or '',
+                    content=memo.get('content') or '',
+                    is_pinned=False,
+                    priority=memo.get('priority')
+                )
+                if isinstance(created_memo, dict) and created_memo.get('error'):
+                    continue
                 added_info.append(created_memo)
             except Exception as e:
-                print(f"メモ追加エラー: {e}")
-        
-        if added_info:
-            message = f"{len(added_info)}件のメモを追加しました。"
-            return added_info, message
-        
-        return None, "メモの追加は行われませんでした。"
+                print(f"memo add error: {e}")
 
-    def _get_memo(self, text: str):
-        """メモ検索/取得"""
+        if added_info:
+            message = f"Added {len(added_info)} memo(s)."
+            return added_info, message
+
+        return None, "Failed to add memo."
+
+    def _get_memo(self, text: str, user_id: str | None):
+        """Search memos"""
+        if not user_id:
+            return None, "User is not logged in."
         current_time = datetime.now(JST).strftime('%Y-%m-%d %H:%M:%S')
         prompt = self.GET_MEMO_PROMPT_TEMPLATE.format(
             current_time=current_time,
             input_value=text
         )
-        print(f"--- [DEBUG] _get_memo: Prompt for Gemini: {prompt} ---")
         raw = self._gemini_request(prompt)
-        print(f"--- [DEBUG] _get_memo: Gemini raw response: {raw} ---")
         search_info = self._parse_memo_list(raw)
-        print(f"--- [DEBUG] _get_memo: Parsed memo search info: {search_info} ---")
 
         keyword = None
         title = None
+        content = None
+        priority = None
 
         if search_info and search_info[0]:
             keyword = search_info[0].get('keyword')
             title = search_info[0].get('title')
-        
-        if not keyword and not title:
-            return None, "メモの検索に必要なキーワードまたはタイトルが指定されていません。"
+            content = search_info[0].get('content')
+            priority = search_info[0].get('priority')
 
-        try:
-            print(f"--- [DEBUG] _get_memo: Calling MemoManager.search_memos with keyword='{keyword}', title='{title}' ---")
-            memos = self.memo_manager.search_memos(keyword=keyword, title=title)
-            print(f"--- [DEBUG] _get_memo: MemoManager.search_memos returned: {memos} ---")
-            
-            if memos:
-                message = f"{len(memos)}件のメモが見つかりました。"
-                return memos, message
-            else:
-                message = "該当するメモは見つかりませんでした。"
-                return [], message
-        except Exception as e:
-            print(f"--- [ERROR] _get_memo: メモ検索/取得エラー: {e} ---")
-            return None, "メモの取得中にエラーが発生しました。"
+        if not keyword and not title and not content and priority is None:
+            return None, "Missing search conditions. Provide title/content/keyword/priority."
+
+        search_type = "all"
+        search_keyword = ""
+        if keyword:
+            search_keyword = keyword
+            search_type = "all"
+        elif title:
+            search_keyword = title
+            search_type = "title"
+        elif content:
+            search_keyword = content
+            search_type = "content"
+
+        memos = get_all_memo_records(
+            user_id=user_id,
+            keyword=search_keyword,
+            search_type=search_type,
+            title=title or "",
+            content=content or "",
+            priority=priority
+        )
+
+        if isinstance(memos, dict) and memos.get('error'):
+            return None, "Memo search error."
+
+        if memos:
+            message = f"Found {len(memos)} memo(s)."
+            return memos, message
+
+        return [], "No matching memos found."
+
+    def _delete_memo(self, text: str, user_id: str | None):
+        """Delete memos"""
+        if not user_id:
+            return None, "User is not logged in."
+        current_time = datetime.now(JST).strftime('%Y-%m-%d %H:%M:%S')
+        prompt = self.DELETE_MEMO_PROMPT_TEMPLATE.format(
+            current_time=current_time,
+            input_value=text
+        )
+        raw = self._gemini_request(prompt)
+        delete_info = self._parse_memo_list(raw)
+
+        keyword = None
+        title = None
+        content = None
+        priority = None
+
+        if delete_info and delete_info[0]:
+            keyword = delete_info[0].get('keyword')
+            title = delete_info[0].get('title')
+            content = delete_info[0].get('content')
+            priority = delete_info[0].get('priority')
+
+        if not keyword and not title and not content and priority is None:
+            return None, "Missing delete conditions. Provide title/content/keyword/priority."
+
+        search_type = "all"
+        search_keyword = ""
+        if keyword:
+            search_keyword = keyword
+            search_type = "all"
+        elif title:
+            search_keyword = title
+            search_type = "title"
+        elif content:
+            search_keyword = content
+            search_type = "content"
+
+        memos = get_all_memo_records(
+            user_id=user_id,
+            keyword=search_keyword,
+            search_type=search_type,
+            title=title or "",
+            content=content or "",
+            priority=priority
+        )
+
+        if isinstance(memos, dict) and memos.get('error'):
+            return None, "Failed to fetch delete targets."
+
+        if not memos:
+            return [], "No matching memos to delete."
+
+        memo_ids = [m.get('id') for m in memos if m.get('id')]
+        if not memo_ids:
+            return [], "No memo IDs found to delete."
+
+        if len(memo_ids) == 1:
+            result = delete_memo_record(user_id=user_id, memo_id=memo_ids[0])
+            if isinstance(result, dict) and result.get('error'):
+                return None, "Delete failed."
+            return {"deleted_count": 1}, "Deleted 1 memo."
+
+        result = delete_memos_bulk_records(user_id=user_id, memo_ids=memo_ids)
+        if isinstance(result, dict) and result.get('error'):
+            return None, "Bulk delete failed."
+
+        return {"deleted_count": len(memo_ids)}, f"Deleted {len(memo_ids)} memos."
+
     def _get_switchbot_devices(self, text: str, user_id: str | None):
+self, text: str, user_id: str | None):
+self, text: str, user_id: str | None):
         """SwitchBotデバイス情報を取得し、ユーザーの操作意図を特定する"""
         switchbot_api_token = os.getenv("SWITCHBOT_TOKEN")
         switchbot_api_secret = os.getenv("SWITCHBOT_SECRET")
