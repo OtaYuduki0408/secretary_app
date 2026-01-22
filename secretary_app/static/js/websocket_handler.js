@@ -97,6 +97,40 @@ async function getActionsToExecute(conditions) {
 }
 
 /**
+ * オーバーレイの終了ボタンを追加する
+ * @param {HTMLElement} overlay - オーバーレイ要素
+ */
+function ensureOverlayCloseButton(overlay) {
+    if (!overlay) return;
+    if (overlay.querySelector('.overlay-close-btn')) return;
+
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'overlay-close-btn';
+    btn.textContent = '閉じる';
+    btn.setAttribute('aria-label', 'オーバーレイを閉じる');
+    btn.style.position = 'absolute';
+    btn.style.top = '16px';
+    btn.style.right = '16px';
+    btn.style.zIndex = '2';
+    btn.style.padding = '6px 10px';
+    btn.style.borderRadius = '8px';
+    btn.style.border = '1px solid rgba(255,255,255,0.4)';
+    btn.style.background = 'rgba(0,0,0,0.45)';
+    btn.style.color = '#fff';
+    btn.style.cursor = 'pointer';
+
+    btn.addEventListener('click', () => {
+        overlay.classList.remove('visible');
+        if (typeof speechSynthesis !== 'undefined') {
+            speechSynthesis.cancel();
+        }
+    });
+
+    overlay.appendChild(btn);
+}
+
+/**
  * 指定されたアクションを実行する
  * @param {object} action - 実行するアクション
  * @returns {Promise<void>} アクションの完了を示すPromise
@@ -116,6 +150,8 @@ function executeAction(action) {
             console.warn("overlay要素が見つかりません。", { overlay, messageElement });
             return resolve();
         }
+
+        ensureOverlayCloseButton(overlay);
 
         overlay.classList.remove('overlay-calendar', 'overlay-finance', 'overlay-memo', 'overlay-speech');
 
