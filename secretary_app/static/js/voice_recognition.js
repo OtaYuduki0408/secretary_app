@@ -466,7 +466,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
 
-    let lastTranscript = ''; // For diff-based logging
+    let lastTranscript = ''; // diff-based logging用
+    let displayOffset = 0; // ウェイクワード以降を表示するための開始位置
 
 
 
@@ -540,6 +541,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
             lastTranscript = ''; // Start new line, reset history
 
+            displayOffset = 0;
+
 
 
         }
@@ -550,15 +553,72 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
 
+        let displayTranscript = transcript;
+
+        const findWakeWordIndex = (text) => {
+            let earliestIndex = -1;
+            WAKE_WORDS.forEach(word => {
+                const idx = text.toLowerCase().indexOf(word.toLowerCase());
+                if (idx !== -1 && (earliestIndex === -1 || idx < earliestIndex)) {
+                    earliestIndex = idx;
+                }
+            });
+            return earliestIndex;
+        };
+
+        const setEntryContent = (entry, text) => {
+            entry.innerHTML = '';
+            if (!text) return;
+            const span = document.createElement('span');
+            span.innerHTML = highlightWakeWords(text);
+            entry.appendChild(span);
+        };
+
+        if (currentMode === 'waiting') {
+            const wakeIndex = findWakeWordIndex(transcript);
+            if (wakeIndex !== -1) {
+                const beforeWake = transcript.slice(0, wakeIndex).trim();
+                if (tempLogEntry) {
+                    if (beforeWake) {
+                        setEntryContent(tempLogEntry, beforeWake);
+                        tempLogEntry.classList.remove('log-interim');
+                        tempLogEntry.removeAttribute('id');
+                    } else {
+                        tempLogEntry.remove();
+                    }
+                }
+
+                tempLogEntry = document.createElement('div');
+                tempLogEntry.id = 'interim-log';
+                tempLogEntry.className = 'voice-log-entry log-interim';
+                voiceLogContainer.appendChild(tempLogEntry);
+
+                displayOffset = wakeIndex;
+                displayTranscript = transcript.slice(displayOffset);
+                lastTranscript = '';
+            }
+        }
+
+        if (displayOffset > 0) {
+            const wakeIndexInTranscript = findWakeWordIndex(transcript);
+            if (wakeIndexInTranscript !== -1) {
+                displayOffset = wakeIndexInTranscript;
+            }
+        }
+
+        if (displayOffset > 0 && transcript.length >= displayOffset) {
+            displayTranscript = transcript.slice(displayOffset);
+        }
+
         // Calculate diff and append
 
 
 
-        if (transcript.length > lastTranscript.length) {
+        if (displayTranscript.length > lastTranscript.length) {
 
 
 
-            const diff = transcript.substring(lastTranscript.length);
+            const diff = displayTranscript.substring(lastTranscript.length);
 
 
 
@@ -606,7 +666,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
 
-            lastTranscript = transcript;
+            lastTranscript = displayTranscript;
 
 
 
@@ -626,7 +686,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
 
+        let finalCommand = '';
+
         if (isFinal) {
+            finalCommand = displayOffset > 0
+                ? transcript.slice(displayOffset).trim()
+                : transcript.trim();
+
+            if (currentMode === 'listening' && finalCommand) {
+                setEntryContent(tempLogEntry, finalCommand);
+            }
 
 
 
@@ -639,6 +708,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
             lastTranscript = ''; // Reset for the next utterance
+            displayOffset = 0;
 
 
 
@@ -678,7 +748,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
 
-        if (currentMode === 'listening' && isFinal && transcript.trim()) {
+        if (currentMode === 'listening' && isFinal && finalCommand) {
 
 
 
@@ -686,7 +756,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
 
-            processInput(transcript.trim(), 'voice');
+            processInput(finalCommand, 'voice');
 
 
 
@@ -731,6 +801,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
         lastTranscript = ''; // Reset on session end
+        displayOffset = 0;
 
 
 
@@ -791,6 +862,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
         lastTranscript = ''; // Reset on error
+        displayOffset = 0;
 
 
 
