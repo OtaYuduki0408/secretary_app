@@ -574,8 +574,10 @@ document.addEventListener('DOMContentLoaded', () => {
             entry.appendChild(span);
         };
 
+        const wakeIndexInTranscript = findWakeWordIndex(transcript);
+
         if (currentMode === 'waiting') {
-            const wakeIndex = findWakeWordIndex(transcript);
+            const wakeIndex = wakeIndexInTranscript;
             if (wakeIndex !== -1) {
                 const beforeWake = transcript.slice(0, wakeIndex).trim();
                 if (tempLogEntry) {
@@ -599,10 +601,11 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
-        if (displayOffset > 0) {
-            const wakeIndexInTranscript = findWakeWordIndex(transcript);
+        if (currentMode === 'listening') {
             if (wakeIndexInTranscript !== -1) {
                 displayOffset = wakeIndexInTranscript;
+            } else {
+                displayOffset = 0;
             }
         }
 
