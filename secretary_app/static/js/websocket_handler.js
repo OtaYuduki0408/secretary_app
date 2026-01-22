@@ -1,4 +1,4 @@
-// C:\Users\y_oota\Documents\secretary_app\secretary_app\static\js\websocket_handler.js
+// static/js/websocket_handler.js
 
 console.log("websocket_handler.js loaded.");
 
@@ -112,42 +112,47 @@ function executeAction(action) {
         const timeElement = document.getElementById('overlay-time');
         const messageElement = document.getElementById('overlay-message');
 
+        if (!overlay || !messageElement) {
+            console.warn("overlay要素が見つかりません。", { overlay, messageElement });
+            return resolve();
+        }
+
         overlay.classList.remove('overlay-calendar', 'overlay-finance', 'overlay-memo', 'overlay-speech');
-        
+
         const now = new Date();
         const formattedTime = now.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
         if (timeElement) {
             timeElement.textContent = formattedTime;
         }
-        
+
         let messageHtml = "";
 
         if (action.category === '発声') {
-            textToSpeak = action.detail.text;
+            textToSpeak = action.detail?.text || "";
             overlayTitle = "読み上げ";
             overlayCategoryClass = "overlay-speech";
             messageHtml = `<h3>${overlayTitle}</h3><p>${textToSpeak}</p>`;
-        
-} else if (action.category === '?????' && action.sub === '????') {
-            overlayTitle = "?????";
+
+        } else if (action.category === 'カレンダー' && action.sub === '読み上げ') {
+            overlayTitle = "カレンダー";
             overlayCategoryClass = "overlay-calendar";
             const detail = action.detail || {};
             const events = Array.isArray(detail.events) ? detail.events : [];
-            const summary = detail.summary;
-            const start_time = detail.start_time;
-            const end_time = detail.end_time;
-            const start_day = detail.start_day;
-            const end_day = detail.end_day;
+            const summary = detail.summary || "";
+            const start_time = detail.start_time || "";
+            const end_time = detail.end_time || "";
+            const start_day = detail.start_day || "";
+            const end_day = detail.end_day || "";
             const event_link = detail.event_link;
 
-            if (events.length === 0 && (summary === '???????????' || summary === '??????????????????')) {
+            if (events.length === 0 && (summary === '今日の予定はありません' || summary === 'カレンダー情報の取得に失敗しました。')) {
                 textToSpeak = summary;
                 messageHtml = `<h3>${overlayTitle}</h3><p>${textToSpeak}</p>`;
             } else if (events.length > 0) {
                 const cardsHtml = events.map((e, idx) => {
-                    const title = e.summary || e.title || '?????????';
+                    const title = e.summary || e.title || '予定';
                     const day = e.start_day || '';
-                    const time = `${e.start_time || '??'} - ${e.end_time || '??'}`;
+                    const time = `${e.start_time || '--:--'} - ${e.end_time || '--:--'}`;
                     return `
                         <div class="calendar-card">
                             <div class="calendar-card-title">${idx + 1}. ${title}</div>
@@ -157,34 +162,34 @@ function executeAction(action) {
                             </div>
                         </div>`;
                 }).join('');
-                textToSpeak = `???????????????${events.length}??????????` +
-                    events.map((e, idx) => `${idx + 1}???${e.start_day || ''} ${e.summary || e.title || '?????????'}?${e.start_time || '??'}??${e.end_time || '??'}??`).join('?');
+                textToSpeak = `カレンダーの予定が${events.length}件あります。` +
+                    events.map((e, idx) => `${idx + 1}件目、${e.start_day || ''} ${e.summary || e.title || '予定'}、${e.start_time || '--:--'}から${e.end_time || '--:--'}まで。`).join(' ');
                 messageHtml = `
                     <h3>${overlayTitle}</h3>
                     <div class="calendar-cards">${cardsHtml}</div>`;
             } else {
                 let datePart = "";
-                if (start_day && end_day && start_day !== "??????") {
-                    datePart = (start_day === end_day) ? `${start_day}?` : `${start_day}??${end_day}??`;
-                } else if (start_day === "??????") {
-                    datePart = "???";
+                if (start_day && end_day && start_day !== "実行された日") {
+                    datePart = (start_day === end_day) ? `${start_day}の` : `${start_day}から${end_day}まで`;
+                } else if (start_day === "実行された日") {
+                    datePart = "今日の";
                 } else if (start_day) {
-                    datePart = `${start_day}?`;
+                    datePart = `${start_day}の`;
                 }
-                textToSpeak = `${datePart}${summary}??${start_time}??${end_time}?????`;
+                textToSpeak = `${datePart}${summary}が、${start_time}から${end_time}までです。`;
                 messageHtml = `
                     <h3>${overlayTitle}</h3>
                     <div class="details-section">
-                        <p><strong>????:</strong> ${summary}</p>
-                        <p><strong>??:</strong> ${datePart}${start_time || '??'} - ${end_time || '??'}</p>
-                        ${event_link ? `<p><a href="${event_link}" target="_blank">?????</a></p>` : ''}
+                        <p><strong>イベント:</strong> ${summary || '予定の詳細がありません'}</p>
+                        <p><strong>期間:</strong> ${datePart}${start_time || '不明'} - ${end_time || '不明'}</p>
+                        ${event_link ? `<p><a href="${event_link}" target="_blank">詳細を見る</a></p>` : ''}
                     </div>`;
             }
 
         } else if (action.category === '収支管理' && action.sub === '読み上げ') {
             overlayTitle = "収支管理";
             overlayCategoryClass = "overlay-finance";
-            const { format, records, income_total, expense_total, balance, error } = action.detail;
+            const { format, records, income_total, expense_total, balance, error } = action.detail || {};
 
             if (error) {
                 textToSpeak = error;
@@ -233,15 +238,12 @@ function executeAction(action) {
         } else if (action.category === 'メモ' && action.sub === '読み上げ') {
             overlayTitle = "メモ";
             overlayCategoryClass = "overlay-memo";
-            const memoContent = action.detail.content || 'メモの内容がありません。';
+            const memoContent = action.detail?.content || 'メモの内容がありません。';
             textToSpeak = `メモの読み上げです。内容は「${memoContent}」です。`;
             messageHtml = `<h3>${overlayTitle}</h3><div class="details-section"><p>${memoContent}</p></div>`;
         }
 
-        if (!overlay) console.warn("[DEBUG] overlay element not found");
-        if (!messageElement) console.warn("[DEBUG] overlay message element not found");
-        console.log("[DEBUG] overlay textToSpeak length:", textToSpeak.length, "messageHtml length:", messageHtml.length);
-        if (textToSpeak && overlay && messageElement) {
+        if (textToSpeak) {
             overlay.classList.add(overlayCategoryClass);
             messageElement.innerHTML = messageHtml;
             overlay.classList.add('visible');
@@ -266,7 +268,7 @@ function executeAction(action) {
                 speechPromise = Promise.resolve();
             }
 
-            const minDisplayPromise = new Promise(resolveDisplay => setTimeout(resolveDisplay, 2000)); 
+            const minDisplayPromise = new Promise(resolveDisplay => setTimeout(resolveDisplay, 2000));
 
             Promise.all([speechPromise, minDisplayPromise]).then(() => {
                 overlay.classList.remove('visible');
