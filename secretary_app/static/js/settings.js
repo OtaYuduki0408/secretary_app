@@ -76,6 +76,23 @@
     }
   };
 
+  const previewVoice = (voiceName) => {
+    const synth = window.speechSynthesis;
+    if (!synth) return;
+    if (synth.speaking) {
+      synth.cancel();
+    }
+    const utterance = new SpeechSynthesisUtterance('この声でよろしいですか？');
+    if (voiceName) {
+      const voices = synth.getVoices();
+      const selectedVoice = voices.find((voice) => voice.name === voiceName);
+      if (selectedVoice) {
+        utterance.voice = selectedVoice;
+      }
+    }
+    synth.speak(utterance);
+  };
+
   const settings = loadSettings();
 
   if (elements.fontFamily) elements.fontFamily.value = settings.general.fontFamily;
@@ -107,6 +124,7 @@
   elements.voiceSelect?.addEventListener('change', (event) => {
     settings.main.voiceName = event.target.value;
     saveSettings(settings);
+    previewVoice(settings.main.voiceName);
   });
 
   elements.characterEnabled?.addEventListener('change', (event) => {
