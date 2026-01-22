@@ -1,7 +1,7 @@
 // ============================================================================
 // グローバル変数と定数
 // ============================================================================
-const WAKE_WORDS = ['ボイスメイト', 'ぼいすめいと', 'voicemate', '高速実行', 'クイックコマンド'];
+let WAKE_WORDS = ['サイレントメイト', 'ぼいすめいと', 'voicemate', '高速実行', 'クイックコマンド'];
 const VOICE_WATE_SOUND_PATH = '/static/voice/voice_wate.mp3';
 const RELODE_SOUND_PATH = '/static/voice/relode.mp3';
 const ERROR_SOUND_PATH = '/static/voice/error.mp3';
@@ -10,6 +10,17 @@ const INPUT_COOLTIME_MS = 500; // 0.5秒の入力クールタイム
 let recognition; // SpeechRecognitionインスタンス
 let currentMode = 'waiting'; // 'waiting' or 'listening'
 let recognitionTimeoutId; // 音声入力タイムアウトのID
+
+// モバイル環境のみの制御
+const isMobileDevice = (() => {
+    const ua = navigator.userAgent || '';
+    return /Android|iPhone|iPad|iPod|Mobile/i.test(ua) || 'ontouchstart' in window;
+})();
+let lastFinalCommand = '';
+let lastFinalCommandAt = 0;
+let lastRestartAt = 0;
+const MOBILE_DUPLICATE_SUPPRESS_MS = 2500;
+const MOBILE_RESTART_COOLDOWN_MS = 3000;
 
 // TTS (Text-to-Speech) 設定
 const speechSynth = window.speechSynthesis;
@@ -20,6 +31,29 @@ speechUtterance.rate = 1;
 speechUtterance.pitch = 1;
 
 let userInteracted = false; // ユーザーがページとインタラクトしたかどうかのフラグ
+
+// 設定から呼びかけワードを読み込む
+function loadWakeWordsFromSettings() {
+    try {
+        const raw = localStorage.getItem('appSettings');
+        if (!raw) return;
+        const settings = JSON.parse(raw);
+        const wakeWordsRaw = settings?.main?.wakeWords || '';
+        if (!wakeWordsRaw) return;
+        const words = wakeWordsRaw
+            .split(',')
+            .map(word => word.trim())
+            .filter(Boolean);
+        if (words.length > 0) {
+            WAKE_WORDS = words;
+        }
+    } catch (e) {
+        console.warn('呼びかけワード設定の読み込みに失敗しました。', e);
+    }
+}
+
+loadWakeWordsFromSettings();
+document.addEventListener('app-settings:updated', loadWakeWordsFromSettings);
 
 // ============================================================================
 // ヘルパー関数
@@ -277,7 +311,9 @@ function setMode(newMode) {
         }, 10000);
     } else { // 'waiting'
         micButton.classList.remove('active');
-        searchBox.placeholder = "「ボイスメイト」または「クイックコマンド」と呼びかけてください";
+        const primaryWakeWord = WAKE_WORDS[0] || 'サイレントメイト';
+        const secondaryWakeWord = WAKE_WORDS[1] || 'クイックコマンド';
+        searchBox.placeholder = `「${primaryWakeWord}」または「${secondaryWakeWord}」と呼びかけてください`;
     }
 }
 
@@ -739,8 +775,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
 
-            addTextLogEntry('音声認識ボタン');
-            addTextLogEntry('音声認識ボタン');
             setMode('listening');
 
 
@@ -754,17 +788,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
         if (currentMode === 'listening' && isFinal && finalCommand) {
-
-
+            const now = Date.now();
+            if (isMobileDevice) {
+                const normalized = finalCommand.trim();
+                const isDuplicate = normalized === lastFinalCommand && (now - lastFinalCommandAt) < MOBILE_DUPLICATE_SUPPRESS_MS;
+                if (isDuplicate) {
+                    console.log('DEBUG: モバイルの重複認識を抑制');
+                    return;
+                }
+                lastFinalCommand = normalized;
+                lastFinalCommandAt = now;
+            }
 
             console.log(`DEBUG: 音声入力確定: "${transcript.trim()}"`);
-
-
-
             processInput(finalCommand, 'voice');
-
-
-
         }
 
 
@@ -815,25 +852,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
         setTimeout(() => {
-
-
-
             try {
-
-
-
-                if(recognition?.dontRestart) return; // for debugging
-
-
-
+                if (recognition?.dontRestart) return; // for debugging
+                if (isMobileDevice) {
+                    const now = Date.now();
+                    if (document.visibilityState !== 'visible') return;
+                    if (now - lastRestartAt < MOBILE_RESTART_COOLDOWN_MS) return;
+                    lastRestartAt = now;
+                }
                 recognition.start();
-
-
-
             } catch(e) {}
-
-
-
         }, 1000);
 
 

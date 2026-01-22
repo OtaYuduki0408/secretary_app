@@ -32,6 +32,7 @@ body.co-body {
   font-family: "Noto Sans JP", "Inter", system-ui, sans-serif;
   background: var(--co-gradient);
   color: var(--co-text);
+  background-attachment: fixed;
 }
 
 .co-shell {

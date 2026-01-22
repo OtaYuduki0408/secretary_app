@@ -163,7 +163,6 @@
   <div id="event-modal" class="modal-overlay">
     <div class="modal-content card">
         <h2 id="modal-title" class="modal-title card-title">イベントを追加</h2>
-        <input type="hidden" id="event-id">
         <div class="grid g-1">
             <label class="field"><span class="label">タイトル</span><input id="event-title" class="input" placeholder="例：チームミーティング"></label>
             <label class="field"><span class="label">説明</span><input id="event-desc" class="input" placeholder="任意（場所・メモなど）"></label>
@@ -192,8 +191,6 @@
         const modal = document.getElementById('event-modal');
         const $ = s => document.querySelector(s);
 
-        let currentEventId = null;
-
         const calendar = new FullCalendar.Calendar(calendarEl, {
             initialView: 'dayGridMonth',
             headerToolbar: { left: 'prev,next today', center: 'title', right: 'dayGridMonth,timeGridWeek,timeGridDay' },
@@ -218,56 +215,69 @@
             allDayText: '終日',
             height: 'auto', // 高さをコンテンツに合わせる
             dateClick: (info) => {
-                openModal({ dateStr: info.dateStr });
+                openModal(info.dateStr);
             },
             eventClick: (info) => {
                 if (info.event.source.publicId === 'ja.japanese#holiday@group.v.calendar.google.com') return;
-                openModal({ event: info.event });
+                const desc = info.event.extendedProps.description ? `\n説明: ${info.event.extendedProps.description}` : '';
+                if (confirm(`イベント「${info.event.title}」を削除しますか？${desc}`)) {
+                    api.deleteEvent(info.event.id);
+                }
             },
         });
         calendar.render();
 
-        const openModal = ({ dateStr, event }) => {
-            if (event) {
-                // 編集モード
+        let currentEventId = null; // 編集中のイベントIDを保持
+
+        const formatLocalDateTime = (date) => {
+            if (!date) return '';
+            const d = new Date(date);
+            const year = d.getFullYear();
+            const month = (d.getMonth() + 1).toString().padStart(2, '0');
+            const day = d.getDate().toString().padStart(2, '0');
+            const hours = d.getHours().toString().padStart(2, '0');
+            const minutes = d.getMinutes().toString().padStart(2, '0');
+            return `${year}-${month}-${day}T${hours}:${minutes}`;
+        };
+
+        const openModal = (event = null, dateStr = null) => {
+            if (event) { // 既存イベントの編集
                 currentEventId = event.id;
                 $('#modal-title').textContent = 'イベントを編集';
                 $('#event-title').value = event.title;
                 $('#event-desc').value = event.extendedProps.description || '';
-                const start = new Date(event.start.getTime() - (new Date().getTimezoneOffset() * 60000)).toISOString().slice(0, 16);
-                const end = new Date(event.end.getTime() - (new Date().getTimezoneOffset() * 60000)).toISOString().slice(0, 16);
-                $('#event-start').value = start;
-                $('#event-end').value = end;
-                $('#delete-event-button').style.display = 'inline-block';
-            } else {
-                // 新規作成モード
+                // FullCalendarから取得したstart/endはDateオブジェクトなので、そのままformatLocalDateTimeに渡す
+                $('#event-start').value = formatLocalDateTime(event.start);
+                $('#event-end').value = formatLocalDateTime(event.end);
+                $('#save-event-button').textContent = '更新';
+                $('#delete-event-button').style.display = 'inline-block'; // 削除ボタンを表示
+            } else { // 新規イベントの追加
                 currentEventId = null;
                 $('#modal-title').textContent = 'イベントを追加';
                 $('#event-title').value = '';
                 $('#event-desc').value = '';
                 const clickedDate = new Date(dateStr);
-                if (dateStr.indexOf('T') === -1) clickedDate.setHours(9);
-                const startStr = new Date(clickedDate.getTime() - (clickedDate.getTimezoneOffset() * 60000)).toISOString().slice(0, 16);
+                if (dateStr.indexOf('T') === -1) {
+                    clickedDate.setHours(9, 0, 0, 0);
+                }
+                $('#event-start').value = formatLocalDateTime(clickedDate);
                 clickedDate.setHours(clickedDate.getHours() + 1);
-                const endStr = new Date(clickedDate.getTime() - (clickedDate.getTimezoneOffset() * 60000)).toISOString().slice(0, 16);
-                $('#event-start').value = startStr;
-                $('#event-end').value = endStr;
-                $('#delete-event-button').style.display = 'none';
+                $('#event-end').value = formatLocalDateTime(clickedDate);
+                $('#save-event-button').textContent = '保存';
+                $('#delete-event-button').style.display = 'none'; // 削除ボタンを非表示
             }
             modal.classList.add('is-visible');
         };
 
-        const closeModal = () => {
-            modal.classList.remove('is-visible');
-        };
+        const closeModal = () => modal.classList.remove('is-visible');
 
         const api = {
-            async addEvent(eventData) {
+            async addEvent(title, startTime, endTime, description) {
                 try {
                     const res = await fetch('/api/local_calendar/events', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(eventData),
+                        body: JSON.stringify({ title, start_time: startTime, end_time: endTime, description }),
                     });
                     const data = await res.json();
                     if (!res.ok) throw new Error(data.error || 'サーバーエラー');
@@ -278,12 +288,23 @@
                     alert(`イベントの追加に失敗しました: ${e.message}`);
                 }
             },
-            async updateEvent(eventId, eventData) {
+            async deleteEvent(eventId) {
+                try {
+                    const res = await fetch(`/api/local_calendar/events/${eventId}`, { method: 'DELETE' });
+                    if (!res.ok) throw new Error((await res.json()).error || 'サーバーエラー');
+                    alert(`イベント(ID: ${eventId})を削除しました。`);
+                    calendar.refetchEvents();
+                    closeModal(); // 削除後もモーダルを閉じる
+                } catch (e) {
+                    alert(`イベントの削除に失敗しました: ${e.message}`);
+                }
+            },
+            async updateEvent(eventId, title, startTime, endTime, description) {
                 try {
                     const res = await fetch(`/api/local_calendar/events/${eventId}`, {
                         method: 'PUT',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(eventData),
+                        body: JSON.stringify({ title, start_time: startTime, end_time: endTime, description }),
                     });
                     const data = await res.json();
                     if (!res.ok) throw new Error(data.error || 'サーバーエラー');
@@ -293,51 +314,44 @@
                 } catch (e) {
                     alert(`イベントの更新に失敗しました: ${e.message}`);
                 }
-            },
-            async deleteEvent(eventId) {
-                if (!confirm(`イベント(ID: ${eventId})を本当に削除しますか？`)) return;
-                try {
-                    const res = await fetch(`/api/local_calendar/events/${eventId}`, { method: 'DELETE' });
-                    if (!res.ok) throw new Error((await res.json()).error || 'サーバーエラー');
-                    alert(`イベント(ID: ${eventId})を削除しました。`);
-                    calendar.refetchEvents();
-                    closeModal();
-                } catch (e) {
-                    alert(`イベントの削除に失敗しました: ${e.message}`);
-                }
             }
         };
+
+        calendar.setOption('dateClick', (info) => {
+            openModal(null, info.dateStr); // 新規作成時はeventをnullにする
+        });
+
+        calendar.setOption('eventClick', (info) => {
+            if (info.event.source.publicId === 'ja.japanese#holiday@group.v.calendar.google.com') return;
+            openModal(info.event); // 編集時はeventオブジェクトを渡す
+        });
 
         $('#save-event-button').addEventListener('click', async () => {
             const title = $('#event-title').value.trim();
             const start = $('#event-start').value;
             const end = $('#event-end').value;
-            const description = $('#event-desc').value.trim();
-
             if (!title) { alert('タイトルを入力してください。'); return; }
             if (!start || !end) { alert('開始日時と終了日時を入力してください。'); return; }
-            
-            const eventData = {
-                title,
-                start_time: new Date(start).toISOString(),
-                end_time: new Date(end).toISOString(),
-                description
+
+            const toIsoUtc = (value) => {
+                const dt = new Date(value);
+                if (Number.isNaN(dt.getTime())) return value;
+                return dt.toISOString();
             };
 
             if (currentEventId) {
-                await api.updateEvent(currentEventId, eventData);
+                await api.updateEvent(currentEventId, title, toIsoUtc(start), toIsoUtc(end), $('#event-desc').value || "");
             } else {
-                await api.addEvent(eventData);
-            }
-        });
-
-        $('#delete-event-button').addEventListener('click', () => {
-            if (currentEventId) {
-                api.deleteEvent(currentEventId);
+                await api.addEvent(title, toIsoUtc(start), toIsoUtc(end), $('#event-desc').value || "");
             }
         });
 
         $('#cancel-event-button').addEventListener('click', closeModal);
+        $('#delete-event-button').addEventListener('click', async () => {
+            if (currentEventId && confirm('このイベントを削除しますか？')) {
+                await api.deleteEvent(currentEventId);
+            }
+        });
         modal.addEventListener('click', (e) => {
             if (e.target === modal) closeModal();
         });
@@ -367,5 +381,6 @@
         });
     });
   </script>
+  <script src="{{ url_for('static', filename='js/app_settings_apply.js') }}"></script>
 </body>
 </html>

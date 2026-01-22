@@ -21,6 +21,7 @@ html,body{
   background:radial-gradient(circle at 20% 20%, rgba(56,189,248,.15), transparent 40%),
              radial-gradient(circle at 80% 20%, rgba(14,165,233,.25), transparent 45%),
              linear-gradient(180deg,#0b1220,#0f172a);
+  background-attachment: fixed;
 }
 
 .container{
@@ -297,6 +298,40 @@ tbody tr:hover{
   }
   .actions .btn{
     width:100%;
+  }
+}
+
+@media (max-width:520px){
+  .container{
+    width:calc(100% - 24px);
+    margin:24px auto 70px;
+  }
+  .header{
+    flex-direction:column;
+    align-items:flex-start;
+    gap:12px;
+  }
+  .header-actions{
+    width:100%;
+    flex-direction:column;
+    align-items:stretch;
+  }
+  .header-actions .link-btn,
+  .actions .btn{
+    width:100%;
+    text-align:center;
+  }
+  .card{
+    padding:18px;
+  }
+  table{
+    display:block;
+    overflow-x:auto;
+    min-width:520px;
+  }
+  th,
+  td{
+    white-space:nowrap;
   }
 }
 

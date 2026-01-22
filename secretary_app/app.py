@@ -41,6 +41,8 @@ from services import local_calendar_service
 from services.chat_space_model import ChatSpaceModel
 from services.memo_routes import memo_bp
 from services.ScheduleManager import ScheduleManager
+from services.user_settings_service import get_user_settings, upsert_user_settings
+from services.custom_order_service import get_all_orders
 from order.models import db
 from models.event import Event
 from order.custom_order_routes import custom_order_bp
@@ -106,6 +108,12 @@ def edit_command_page(order_id=None):
 
 app.register_blueprint(custom_order_pages_bp, url_prefix='/custom_order')
 
+@app.route('/img/<path:filename>')
+def serve_img_file(filename):
+    # キャラクター画像を配信する
+    img_dir = os.path.join(app.root_path, 'img')
+    return send_from_directory(img_dir, filename)
+
 
 # ============== WebSocket 接続管理 ==============
 @socketio.on('connect')
@@ -162,6 +170,7 @@ GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
 if not GEMINI_API_KEY:
     app.logger.warning('Warning: GEMINI_API_KEY not set. ChatSpaceModel may not work.')
 chat_space_model = ChatSpaceModel(gemini_api_key=GEMINI_API_KEY)
+chat_space_model.set_logger(app.logger)
 calendar_manager = ScheduleManager()
 app.calendar_manager = calendar_manager # ScheduleManagerインスタンスをアプリにアタッチ
 
@@ -269,6 +278,11 @@ def oauth_callback2():
 @app.route('/memo')
 def memo():
     return render_template('memo.html')
+
+@app.route('/settings')
+@login_required
+def settings_page():
+    return render_template('settings.html')
 
 @app.route('/calender')
 @login_required
@@ -574,7 +588,326 @@ def chat_api_external():
     return jsonify(response_data)
 
 import re
+import copy
+import pytz
+
+JST = pytz.timezone('Asia/Tokyo')
 from services import local_calendar_service
+from services.memo_service import get_all_memos as get_all_memo_records
+
+
+def _normalize_keyword_list(raw):
+    if raw is None:
+        return []
+    if isinstance(raw, list):
+        items = []
+        for item in raw:
+            if item is None:
+                continue
+            items.extend(_normalize_keyword_list(item))
+        return items
+    if not isinstance(raw, str):
+        raw = str(raw)
+    parts = re.split(r"[,\n、]+", raw)
+    return [p.strip() for p in parts if p.strip()]
+
+
+def _match_keywords(text, keywords):
+    if not text or not keywords:
+        return False
+    lowered = text.lower()
+    return any(k.lower() in lowered for k in keywords)
+
+
+def _evaluate_filters(filters, text):
+    if not filters:
+        return True
+    target = (text or "").lower()
+    result = None
+    for idx, f in enumerate(filters):
+        token = (f.get('text') or '').strip()
+        if not token:
+            continue
+        contains = token.lower() in target
+        logic = (f.get('logic') or '').upper()
+        if idx == 0:
+            current = (not contains) if logic == 'NOT' else contains
+        else:
+            current = contains
+        if result is None:
+            result = current
+            continue
+        if logic == 'AND':
+            result = result and current
+        elif logic == 'OR':
+            result = result or current
+        elif logic == 'NOT':
+            result = result and (not current)
+        elif logic == 'NAND':
+            result = not (result and current)
+        elif logic == 'NOR':
+            result = not (result or current)
+        elif logic == 'XOR':
+            result = (result and not current) or (not result and current)
+        elif logic == 'XNOR':
+            result = (result and current) or (not result and not current)
+        else:
+            result = result and current
+    return True if result is None else result
+
+
+def _map_purpose_to_action(purpose):
+    if not isinstance(purpose, str) or len(purpose) < 2:
+        return None, None
+    category_map = {
+        'C': 'カレンダー',
+        'I': '収支管理',
+        'M': 'メモ',
+    }
+    action_map = {
+        'a': '追加',
+        'd': '削除',
+        'c': '変更',
+        'g': '取得',
+        's': '検索',
+    }
+    category = category_map.get(purpose[0])
+    action = action_map.get(purpose[1])
+    return category, action
+
+
+def _parse_int_or_now(value, now_value):
+    if value is None:
+        return now_value
+    if isinstance(value, int):
+        return value
+    if isinstance(value, str):
+        raw = value.strip()
+        if not raw or "実行された" in raw:
+            return now_value
+        if raw.isdigit():
+            return int(raw)
+    return now_value
+
+
+def _parse_time_or_default(value, default_time):
+    if not value:
+        return default_time
+    if isinstance(value, str):
+        raw = value.strip()
+        if not raw or "実行された" in raw:
+            return default_time
+        if ":" in raw:
+            return raw
+    return default_time
+
+
+def _build_range_from_detail(detail, now_jst):
+    start_year = _parse_int_or_now(detail.get('start_year'), now_jst.year)
+    start_month = _parse_int_or_now(detail.get('start_month'), now_jst.month)
+    start_day = _parse_int_or_now(detail.get('start_day'), now_jst.day)
+    end_year = _parse_int_or_now(detail.get('end_year'), now_jst.year)
+    end_month = _parse_int_or_now(detail.get('end_month'), now_jst.month)
+    end_day = _parse_int_or_now(detail.get('end_day'), now_jst.day)
+
+    start_time = _parse_time_or_default(detail.get('start_time'), "00:00")
+    end_time = _parse_time_or_default(detail.get('end_time'), "23:59")
+
+    start_hour, start_minute = [int(x) for x in start_time.split(":")[:2]]
+    end_hour, end_minute = [int(x) for x in end_time.split(":")[:2]]
+
+    start_dt = JST.localize(datetime(start_year, start_month, start_day, start_hour, start_minute))
+    end_dt = JST.localize(datetime(end_year, end_month, end_day, end_hour, end_minute, 59))
+    return start_dt, end_dt
+
+
+def _date_range_to_utc_iso(start_dt, end_dt):
+    start_utc = start_dt.astimezone(pytz.UTC).isoformat()
+    end_utc = end_dt.astimezone(pytz.UTC).isoformat()
+    return start_utc, end_utc
+
+
+def _enrich_calendar_read(detail, user_id, now_jst, app_logger):
+    start_dt, end_dt = _build_range_from_detail(detail, now_jst)
+    events = local_calendar_service.get_events(user_id, start_dt.isoformat(), end_dt.isoformat())
+    app_logger.debug(f"[INPUT_TRIGGER] calendar events={len(events)}")
+    if not events:
+        detail['summary'] = '今日の予定はありません'
+        detail['events'] = []
+        return detail
+    event_items = []
+    for e in events:
+        try:
+            start_local = datetime.fromisoformat(e['start_time']).astimezone(JST)
+            end_local = datetime.fromisoformat(e['end_time']).astimezone(JST)
+            event_items.append({
+                'summary': e.get('title', '予定'),
+                'start_time': start_local.strftime('%H:%M'),
+                'end_time': end_local.strftime('%H:%M'),
+                'start_day': f"{start_local.year}年{start_local.month}月{start_local.day}日",
+                'end_day': f"{end_local.year}年{end_local.month}月{end_local.day}日",
+                'event_link': None
+            })
+        except Exception as err:
+            app_logger.debug(f"[INPUT_TRIGGER] calendar parse error: {err}")
+    if event_items:
+        detail['events'] = event_items
+        detail.update(event_items[0])
+        detail['summary'] = event_items[0]['summary']
+    else:
+        detail['summary'] = '今日の予定はありません'
+        detail['events'] = []
+    return detail
+
+
+def _enrich_finance_read(detail, user_id, now_jst, app_logger):
+    format_type = detail.get('format')
+    records = get_all_finance_records(user_id)
+    start_dt, end_dt = _build_range_from_detail(detail, now_jst)
+    filtered = []
+    for r in records:
+        date_str = r.get('date')
+        if not date_str:
+            continue
+        try:
+            record_dt = datetime.fromisoformat(date_str)
+        except ValueError:
+            continue
+        if record_dt.tzinfo is None:
+            record_dt = JST.localize(record_dt)
+        if start_dt <= record_dt <= end_dt:
+            filtered.append(r)
+
+    income_total = sum(r.get('amount', 0) for r in filtered if r.get('type') == 'income')
+    expense_total = sum(r.get('amount', 0) for r in filtered if r.get('type') == 'expense')
+    balance = income_total - expense_total
+
+    if format_type == 'individual':
+        detail['records'] = filtered
+    else:
+        detail['income_total'] = income_total
+        detail['expense_total'] = expense_total
+        detail['balance'] = balance
+    app_logger.debug(f"[INPUT_TRIGGER] finance format={format_type} income={income_total} expense={expense_total} balance={balance}")
+    return detail
+
+
+def _enrich_memo_read(detail, user_id, now_jst, app_logger):
+    start_dt, end_dt = _build_range_from_detail(detail, now_jst)
+    start_utc, end_utc = _date_range_to_utc_iso(start_dt, end_dt)
+    memos = get_all_memo_records(user_id=user_id, start_date=start_utc, end_date=end_utc)
+    if isinstance(memos, dict) and memos.get('error'):
+        detail['content'] = 'メモの取得に失敗しました。'
+        return detail
+    if not memos:
+        detail['content'] = '該当するメモは見つかりませんでした。'
+        return detail
+    parts = []
+    for memo in memos[:5]:
+        title = memo.get('title') or '無題'
+        content = memo.get('content') or '内容なし'
+        parts.append(f"タイトル: {title} / 内容: {content}")
+    detail['content'] = " / ".join(parts)
+    return detail
+
+
+def _enrich_actions_for_dispatch(order_payload, user_id, app_logger):
+    now_jst = datetime.now(JST)
+    steps = order_payload.get('steps') or []
+    actions = order_payload.get('actions') or []
+
+    def enrich_action(action):
+        if not isinstance(action, dict):
+            return action
+        category = action.get('category')
+        sub = action.get('sub')
+        detail = action.get('detail') or {}
+        if category == 'カレンダー' and sub == '読み上げ':
+            action['detail'] = _enrich_calendar_read(detail, user_id, now_jst, app_logger)
+        elif category == '収支管理' and sub == '読み上げ':
+            action['detail'] = _enrich_finance_read(detail, user_id, now_jst, app_logger)
+        elif category == 'メモ' and sub == '読み上げ':
+            action['detail'] = _enrich_memo_read(detail, user_id, now_jst, app_logger)
+        return action
+
+    if isinstance(steps, list) and steps:
+        for step in steps:
+            if not isinstance(step, dict):
+                continue
+            action = step.get('action')
+            if action:
+                step['action'] = enrich_action(action)
+        order_payload['steps'] = steps
+    else:
+        order_payload['actions'] = [enrich_action(a) for a in actions]
+    return order_payload
+
+
+def _dispatch_order_payload(user_id, order_payload):
+    sid = connected_users.get(user_id)
+    if not sid:
+        app.logger.debug(f"[INPUT_TRIGGER] User {user_id} is not connected. Command not dispatched.")
+        return
+    socketio.emit('dispatch_command', order_payload, room=sid)
+    app.logger.debug(f"[INPUT_TRIGGER] Dispatched command to user {user_id}.")
+
+
+def _handle_input_triggers(user_input, response_data, user_id):
+    if not user_id:
+        return False
+    if response_data.get('status') != 'success':
+        return False
+    orders = get_all_orders(user_id)
+    if isinstance(orders, dict) and orders.get('error'):
+        app.logger.debug(f"[INPUT_TRIGGER] get_all_orders error: {orders.get('error')}")
+        return False
+    purpose = response_data.get('purpose')
+    purpose_category, purpose_action = _map_purpose_to_action(purpose)
+    triggered = False
+    for order in orders:
+        triggers = order.get('triggers') or []
+        if not triggers:
+            continue
+        trigger = triggers[0]
+        category = trigger.get('category')
+        sub = trigger.get('sub')
+        value = trigger.get('value') or {}
+        if category == 'ボイス':
+            keywords = _normalize_keyword_list(value.get('keywords') or value.get('keyword') or value.get('value'))
+            if _match_keywords(user_input, keywords):
+                payload = {k: order.get(k) for k in ['triggers', 'actions', 'conditions', 'steps'] if k in order}
+                payload = _enrich_actions_for_dispatch(payload, user_id, app.logger)
+                app.logger.debug(f"[INPUT_TRIGGER] Voice matched keywords={keywords}")
+                _dispatch_order_payload(user_id, payload)
+                triggered = True
+            continue
+
+        if sub != '入力があったら':
+            continue
+        if category != purpose_category:
+            continue
+        actions = value.get('actions') or []
+        if actions and purpose_action not in actions:
+            continue
+
+        if category in ('カレンダー', 'メモ'):
+            filters = value.get('filters') or []
+            if not _evaluate_filters(filters, user_input):
+                continue
+
+        if category == '収支管理' and purpose_action == '追加':
+            genres = value.get('genres') or []
+            if genres and response_data.get('data'):
+                matched = any((r.get('category') in genres) for r in response_data.get('data') if isinstance(r, dict))
+                if not matched:
+                    continue
+
+        payload = {k: order.get(k) for k in ['triggers', 'actions', 'conditions', 'steps'] if k in order}
+        payload = _enrich_actions_for_dispatch(payload, user_id, app.logger)
+        app.logger.debug(f"[INPUT_TRIGGER] Matched trigger category={category} action={purpose_action}")
+        _dispatch_order_payload(user_id, payload)
+        triggered = True
+    return triggered
 
 @app.route('/web_api/chat', methods=['POST'])
 @login_required # セッションベース認証
@@ -583,6 +916,17 @@ def chat_api_web():
     user_input = data.get('inputValue', '')
     user_id = session.get('user', {}).get('id') # セッションからuser_idを取得
     response_data = {"status": "success", "message": ""}
+
+    if chat_space_model.is_cancelled(user_id):
+        app.logger.debug("DEBUG: force-cancel flag active. Rejecting input.")
+        response_data = {
+            "status": "success",
+            "message": "",
+            "abort_command": True,
+            "suppress_tts": True,
+            "cancelled": True
+        }
+        return jsonify(response_data)
 
     # 高速実行のチェック
     if user_input.startswith("クイックコマンド"):
@@ -706,8 +1050,65 @@ def chat_api_web():
                 app.logger.debug(f"DEBUG: Googleアカウントがリンクされていません。response_data: {response_data}")
                 return jsonify(response_data), 401
             response_data['status'] = 'error'
+    triggered_by_voice = _handle_input_triggers(user_input, response_data, user_id)
+    if triggered_by_voice:
+        response_data['suppress_tts'] = True
+        response_data['message'] = ""
     app.logger.debug(f"DEBUG: chat_api_webからの最終レスポンス: {response_data}")
     return jsonify(response_data)# メモAPIのBlueprint
+
+@app.route('/web_api/transform_tone', methods=['POST'])
+@login_required
+def transform_tone_api():
+    data = request.get_json() or {}
+    text = data.get('text', '')
+    tone = data.get('tone', '')
+
+    if not text or not tone:
+        return jsonify({'message': text})
+
+    try:
+        transformed = chat_space_model.transform_tone(text, tone)
+        return jsonify({'message': transformed})
+    except Exception as e:
+        app.logger.error(f"口調変換に失敗しました: {e}")
+        return jsonify({'message': text})
+
+@app.route('/web_api/abort', methods=['POST'])
+@login_required
+def abort_api():
+    user_id = session.get('user', {}).get('id')
+    if not user_id:
+        return jsonify({
+            'status': 'error',
+            'abort_command': True,
+            'suppress_tts': True
+        }), 401
+    chat_space_model.request_cancel(user_id, logger=app.logger)
+    return jsonify({
+        'status': 'success',
+        'abort_command': True,
+        'suppress_tts': True,
+        'cancelled': True
+    })
+
+@app.route('/api/user_settings', methods=['GET', 'PUT'])
+@login_required
+def user_settings_api():
+    user_id = session.get('user', {}).get('id')
+    if not user_id:
+        return jsonify({'error': 'ユーザーが見つかりません'}), 401
+
+    if request.method == 'GET':
+        settings = get_user_settings(user_id) or {}
+        return jsonify({'settings': settings})
+
+    data = request.get_json() or {}
+    settings = data.get('settings')
+    if not isinstance(settings, dict):
+        return jsonify({'error': 'settingsが不正です'}), 400
+    upsert_user_settings(user_id, settings)
+    return jsonify({'settings': settings})
 app.register_blueprint(memo_bp, url_prefix='/api/memos')
 
 @app.route('/api/execute_action', methods=['POST'])
@@ -769,4 +1170,4 @@ if __name__ == '__main__':
         )
         scheduler.start()
         
-    socketio.run(app, host='0.0.0.0', port=5000, debug=False, ssl_context='adhoc', use_reloader=False)
+    socketio.run(app, host='0.0.0.0', port=5000, debug=True, ssl_context='adhoc', use_reloader=False)

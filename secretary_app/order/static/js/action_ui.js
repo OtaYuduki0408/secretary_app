@@ -380,12 +380,25 @@ export function createActionUI(prefix = '', initialValue = {}) {
       break;
     case "アラート":
       if (sub === "実行") {
+        const alertSounds = [
+          { value: "bet.mp3", label: "bet.mp3" },
+          { value: "big.m4a", label: "big.m4a" },
+          { value: "botan.m4a", label: "botan.m4a" },
+          { value: "error.mp3", label: "error.mp3" },
+          { value: "gako.mp3", label: "gako.mp3" },
+          { value: "relode.mp3", label: "relode.mp3" },
+          { value: "rr.m4a", label: "rr.m4a" },
+          { value: "spin.mp3", label: "spin.mp3" },
+          { value: "voice_wate.mp3", label: "voice_wate.mp3" }
+        ];
+        const options = alertSounds.map(sound => {
+          const selected = initialValue.sound === sound.value ? 'selected' : '';
+          return `<option value="${sound.value}" ${selected}>${sound.label}</option>`;
+        }).join('');
         detailContainer.innerHTML = `
           <label>アラート音</label>
           <select class="action-detail-alert-sound">
-            <option value="sound1" ${initialValue.sound === 'sound1' ? 'selected' : ''}>音1</option>
-            <option value="sound2" ${initialValue.sound === 'sound2' ? 'selected' : ''}>音2</option>
-            <option value="sound3" ${initialValue.sound === 'sound3' ? 'selected' : ''}>音3</option>
+            ${options}
           </select>
         `;
       }

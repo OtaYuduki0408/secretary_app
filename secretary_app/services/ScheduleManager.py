@@ -8,6 +8,7 @@ from googleapiclient.errors import HttpError
 from google.auth.transport.requests import Request
 
 from services.google_token_service import get_credentials, upsert_credentials
+import pytz # pytzをインポート
 
 
 SCOPES = [
@@ -19,6 +20,8 @@ SCOPES = [
     "https://www.googleapis.com/auth/calendar",
 ]
 
+# JST (Asia/Tokyo) タイムゾーンを定義
+JST = pytz.timezone('Asia/Tokyo')
 
 class ScheduleManager:
     """
@@ -32,20 +35,36 @@ class ScheduleManager:
 
     # 認証情報の取得/更新 ----------------------------------------------------
     def _load_creds_for_user(self, user_id: str) -> Optional[Credentials]:
+        print(f"DEBUG: Attempting to load credentials for user: {user_id}")
         data = get_credentials(user_id)
         if not data:
+            print(f"DEBUG: No credentials found for user: {user_id} in Supabase.")
             return None
+        print(f"DEBUG: Credentials data loaded from Supabase for user: {user_id}")
         try:
             creds = Credentials.from_authorized_user_info(data, scopes=self.scopes)
-        except Exception:
+            print(f"DEBUG: Credentials object created for user: {user_id}. Valid: {creds.valid}, Expired: {creds.expired}")
+        except Exception as e:
+            print(f"ERROR: Failed to create Credentials object for user: {user_id}. Error: {e}")
+            import traceback
+            print(traceback.format_exc())
             return None
         # 期限切れなら更新
         try:
             if creds and creds.expired and creds.refresh_token:
+                print(f"DEBUG: Credentials expired for user: {user_id}. Attempting to refresh.")
                 creds.refresh(Request())
                 self._save_creds_for_user(user_id, creds)
-        except Exception:
-            pass
+                print(f"DEBUG: Credentials refreshed and saved for user: {user_id}.")
+            elif creds and creds.expired and not creds.refresh_token:
+                print(f"DEBUG: Credentials expired for user: {user_id}, but no refresh token available.")
+            elif creds:
+                print(f"DEBUG: Credentials not expired for user: {user_id}.")
+        except Exception as e:
+            print(f"ERROR: Failed to refresh credentials for user: {user_id}. Error: {e}")
+            import traceback
+            print(traceback.format_exc())
+            return None
         return creds
 
     def _save_creds_for_user(self, user_id: str, creds: Credentials) -> None:
@@ -148,14 +167,38 @@ class ScheduleManager:
 
     def list_events(self, user_id: str, time_min: str | None = None, time_max: str | None = None, max_results: int = 50):
         service = self._build_service(user_id)
-        if not time_min:
-            time_min = datetime.utcnow().isoformat() + "Z"
-        if not time_max:
-            time_max = (datetime.utcnow() + timedelta(days=7)).isoformat() + "Z"
+
+        # time_minとtime_maxがJSTのISO形式で渡されることを想定し、UTCに変換
+        if time_min:
+            try:
+                # 'Z' がない場合があるため、一度 naive な datetime オブジェクトとしてパースし、JSTとしてローカライズ
+                dt_obj_naive = datetime.fromisoformat(time_min.replace('Z', ''))
+                dt_obj_jst = JST.localize(dt_obj_naive, is_dst=None)
+                time_min_utc = dt_obj_jst.astimezone(pytz.utc).isoformat()
+            except ValueError:
+                # パースに失敗した場合はそのまま渡す（API側でエラーになる可能性あり）
+                time_min_utc = time_min
+        else:
+            # デフォルトは現在時刻から
+            time_min_utc = datetime.utcnow().isoformat() + "Z"
+
+        if time_max:
+            try:
+                # 'Z' がない場合があるため、一度 naive な datetime オブジェクトとしてパースし、JSTとしてローカライズ
+                dt_obj_naive = datetime.fromisoformat(time_max.replace('Z', ''))
+                dt_obj_jst = JST.localize(dt_obj_naive, is_dst=None)
+                time_max_utc = dt_obj_jst.astimezone(pytz.utc).isoformat()
+            except ValueError:
+                # パースに失敗した場合はそのまま渡す（API側でエラーになる可能性あり）
+                time_max_utc = time_max
+        else:
+            # デフォルトは現在時刻から7日後
+            time_max_utc = (datetime.utcnow() + timedelta(days=7)).isoformat() + "Z"
+            
         events_result = service.events().list(
             calendarId="primary",
-            timeMin=time_min,
-            timeMax=time_max,
+            timeMin=time_min_utc,
+            timeMax=time_max_utc,
             maxResults=max_results,
             singleEvents=True,
             orderBy="startTime",

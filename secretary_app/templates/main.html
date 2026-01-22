@@ -79,10 +79,12 @@
     }
 
     .terminal-window {
-      width: 100%;
-      max-width: 800px;
-      height: 350px;
-      border-radius: 12px;
+      width: min(700px, 100%);
+      max-width: 100%;
+      min-height: 320px;
+      height: min(420px, 65vh);
+      margin: 0 auto clamp(18px, 3vh, 26px);
+      border-radius: 16px;
       background: #ffffff; /* White background */
       border: 1px solid #d1d5db; /* Gray border */
       box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
@@ -93,7 +95,7 @@
 
     .voice-log-panel {
       flex-grow: 1;
-      padding: 20px;
+      padding: clamp(16px, 3vw, 24px);
       overflow-y: auto;
       color: #000000; /* Final log color: Black */
       font-family: 'Consolas', 'Monaco', monospace;
@@ -125,25 +127,37 @@
 
     .search {
       flex-shrink: 0;
-      display: flex;
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr);
       align-items: center;
-      padding: 12px 20px;
-      background: #f8fafc; /* Light gray separator */
-      border-top: 1px solid #e2e8f0;
+      gap: 16px;
+      width: min(960px, 92vw);
+      padding: 16px clamp(22px, 4vw, 30px);
+      margin: 0 auto;
+      box-sizing: border-box;
+      background: rgba(8,12,18,0.55);
+      border: 1px solid rgba(255,255,255,0.14);
+      border-radius: 999px;
+      box-shadow: 0 12px 34px rgba(0,0,0,0.45);
     }
     
     .search .icon {
       stroke: #64748b; /* Icon color */
-      margin-right: 12px;
+      margin-right: 0;
+      width: 32px;
+      height: 32px;
+      flex-shrink: 0;
+      align-self: center;
     }
 
     .search input {
       flex-grow: 1;
+      width: 100%;
       background: transparent;
       border: none;
       outline: none;
       color: #000000;
-      font-size: 1.1rem;
+      font-size: 1.05rem;
       font-family: 'Consolas', 'Monaco', monospace;
     }
 
@@ -159,49 +173,156 @@
       border-radius: 4px;
     }
 
+    .abort-row {
+      margin-bottom: 10px;
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+    }
+
+    .abort-btn {
+      border: 1px solid rgba(255, 84, 84, 0.9);
+      background: rgba(255, 34, 34, 0.22);
+      color: #ffe6e6;
+      padding: 10px 16px;
+      border-radius: 999px;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      cursor: pointer;
+      transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.12s ease, opacity 0.12s ease;
+      text-transform: uppercase;
+    }
+
+    .abort-btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 10px 22px rgba(255, 60, 60, 0.35);
+      background: rgba(255, 40, 40, 0.35);
+    }
+
+    .abort-btn:disabled {
+      cursor: not-allowed;
+      box-shadow: none;
+    }
+
+    .abort-btn.is-active {
+      box-shadow: 0 12px 26px rgba(255, 60, 60, 0.5);
+      background: rgba(255, 24, 24, 0.7);
+      border-color: rgba(255, 140, 140, 0.95);
+      color: #fff;
+    }
+
+    body {
+      font-family: var(--app-font, inherit);
+    }
+
+    .character-buddy {
+      position: fixed;
+      left: 24px;
+      bottom: 24px;
+      width: min(var(--character-size, 220px), 32vw);
+      z-index: 1200;
+      pointer-events: none;
+      filter: var(--character-filter, none);
+    }
+
+    .character-buddy img {
+      width: 100%;
+      height: auto;
+      display: none;
+    }
+
+    .character-buddy img.active {
+      display: block;
+    }
+
     @media (max-width: 768px) {
       body {
         font-size: 15px; /* Adjust base font size for smaller screens */
       }
 
       main.shell {
-        padding: 16px; /* Reduce overall padding */
+        padding: clamp(16px, 4vw, 24px); /* Reduce overall padding */
       }
 
       .user-badge {
         font-size: 0.85rem;
         padding: 6px 12px;
+        width: 100%;
+        justify-content: center;
       }
 
       .terminal-window {
-        height: 320px; /* Slightly reduce height */
-        max-width: 100%;
+        min-height: clamp(260px, 60vh, 360px);
+        height: auto;
       }
 
       .voice-log-panel {
         font-size: 0.9rem;
-        padding: 12px;
+        padding: 14px;
         line-height: 1.6;
       }
+
+    .search {
+      grid-template-columns: 1fr;
+      width: 100%;
+      margin: 0;
+      padding: 12px;
+      border-radius: 20px;
+    }
 
       .search input {
         font-size: 1rem;
       }
 
       .mic-wrap .mic-btn {
-        width: 60px;
-        height: 60px;
+        width: min(220px, 60vw);
+        height: min(220px, 60vw);
       }
 
-      .fab-group {
-        bottom: 12px;
-        right: 12px;
-        gap: 10px;
+    .fab-group {
+      position: static;
+      display: flex;
+      flex-wrap: wrap;
+      width: 100%;
+      justify-content: center;
+      margin-top: 18px;
+      gap: 18px;
+    }
+
+    .fab, .fab svg {
+      width: 52px;
+      height: 52px;
+    }
+
+    .character-buddy {
+      left: 12px;
+      bottom: 12px;
+      width: min(var(--character-size, 160px), 38vw);
+    }
+    }
+
+    @media (max-width: 480px) {
+      .terminal-window {
+        min-height: clamp(240px, 55vh, 320px);
+      }
+
+      .voice-log-panel {
+        font-size: 0.85rem;
+        padding: 12px;
+      }
+
+      .search {
+        grid-template-columns: 1fr;
+        text-align: center;
       }
 
       .fab, .fab svg {
         width: 48px;
         height: 48px;
+      }
+
+      .character-buddy {
+        width: min(140px, 44vw);
       }
     }
   </style>
@@ -244,6 +365,9 @@
         <div id="voice-log-container" class="voice-log-panel">
             <!-- Voice logs will be dynamically inserted here -->
         </div>
+        <div class="abort-row">
+          <button id="force-abort-btn" class="abort-btn" type="button" aria-label="強制終了" disabled>強制終了</button>
+        </div>
         <form id="search-form" class="search" role="search" aria-label="検索フォーム">
           <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
             <path d="M4 12l2-2 3 3 3-3 2 2" stroke="#e7edf5" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
@@ -257,7 +381,7 @@
     <div aria-hidden="true"></div>
  
     <div class="fab-group">
-      <a class="stats-btn fab" href="{{ url_for('logout') }}" aria-label="ログアウト" title="ログアウト">
+      <a id="logout-link" class="stats-btn fab" href="{{ url_for('logout') }}" aria-label="ログアウト" title="ログアウト">
         <svg width="34" height="34" viewBox="0 0 24 24" fill="none" aria-hidden="true">
           <rect x="4" y="4" width="16" height="16" rx="4" fill="#1f2a33" stroke="#a8b6c6" stroke-width="1.2"/>
           <path d="M10 8h4v8h-4z" fill="#7aa8ff" opacity="0.85"/>
@@ -318,9 +442,22 @@
           <path d="M7.8,7.8 l-1.4,-1.4" stroke="#a8b6c6" stroke-width="1.2" stroke-linecap="round"/>
         </svg>
       </a>
+      <a class="custom-order-btn fab" href="{{ url_for('settings_page') }}" aria-label="設定を開く" title="設定">
+        <svg width="34" height="34" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <rect x="4" y="4" width="16" height="16" rx="4" fill="#1f2a33" stroke="#a8b6c6" stroke-width="1.2"/>
+          <path d="M12 8v8M8 12h8" stroke="#7aa8ff" stroke-width="1.6" stroke-linecap="round"/>
+          <circle cx="12" cy="12" r="3.2" stroke="#a8b6c6" stroke-width="1.2"/>
+        </svg>
+      </a>
     </div>  </main>
 
   <a href="{{ url_for('register') }}">ユーザー登録</a>
+
+  <div id="character-buddy" class="character-buddy" aria-hidden="true">
+    <img id="character-frame-idle" class="active" src="{{ url_for('serve_img_file', filename='サイレントメイト君_差分0.png') }}" alt="">
+    <img id="character-frame-1" src="{{ url_for('serve_img_file', filename='サイレントメイト君_差分1.png') }}" alt="">
+    <img id="character-frame-2" src="{{ url_for('serve_img_file', filename='サイレントメイト君_差分2.png') }}" alt="">
+  </div>
  
   <div id="ai-indicator" aria-live="polite" style="position:fixed;right:14px;bottom:14px;z-index:14000;display:none;">
     <div style="min-width:240px;background:#0f172a;border:1px solid #334155;border-radius:12px;padding:12px 14px;box-shadow:0 12px 40px rgba(0,0,0,.45);color:#e5e7eb">
@@ -391,6 +528,177 @@
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.5/socket.io.min.js"></script>
+<script>
+  (() => {
+    const logoutLink = document.getElementById('logout-link');
+    if (!logoutLink) return;
+    logoutLink.addEventListener('click', (event) => {
+      if (!confirm('ログアウトしますか？')) {
+        event.preventDefault();
+      }
+    });
+  })();
+</script>
+<script>
+  (() => {
+    const body = document.body;
+    const root = document.documentElement;
+    const character = document.getElementById('character-buddy');
+
+    const hexToRgb = (hex) => {
+      const raw = hex.replace('#', '');
+      const full = raw.length === 3 ? raw.split('').map((c) => c + c).join('') : raw;
+      const num = parseInt(full, 16);
+      if (Number.isNaN(num)) return { r: 177, g: 214, b: 86 };
+      return { r: (num >> 16) & 255, g: (num >> 8) & 255, b: num & 255 };
+    };
+
+    const rgbToHsl = (r, g, b) => {
+      r /= 255;
+      g /= 255;
+      b /= 255;
+      const max = Math.max(r, g, b);
+      const min = Math.min(r, g, b);
+      let h = 0;
+      let s = 0;
+      const l = (max + min) / 2;
+      if (max !== min) {
+        const d = max - min;
+        s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+        switch (max) {
+          case r:
+            h = (g - b) / d + (g < b ? 6 : 0);
+            break;
+          case g:
+            h = (b - r) / d + 2;
+            break;
+          default:
+            h = (r - g) / d + 4;
+        }
+        h /= 6;
+      }
+      return { h: h * 360, s, l };
+    };
+
+    const baseColor = { r: 177, g: 214, b: 86 };
+    const baseHsl = rgbToHsl(baseColor.r, baseColor.g, baseColor.b);
+
+    const buildColorFilter = (hex) => {
+      const target = hexToRgb(hex);
+      const targetHsl = rgbToHsl(target.r, target.g, target.b);
+      const hueRotate = targetHsl.h - baseHsl.h;
+      const saturate = baseHsl.s > 0 ? targetHsl.s / baseHsl.s : 1;
+      const brightness = baseHsl.l > 0 ? targetHsl.l / baseHsl.l : 1;
+      return `hue-rotate(${hueRotate.toFixed(1)}deg) saturate(${saturate.toFixed(2)}) brightness(${brightness.toFixed(2)})`;
+    };
+
+    const applySettings = () => {
+      let settings = null;
+      try {
+        const raw = localStorage.getItem('appSettings');
+        settings = raw ? JSON.parse(raw) : null;
+      } catch (e) {
+        console.warn('設定の読み込みに失敗しました。', e);
+      }
+
+      const general = settings?.general || {};
+      const main = settings?.main || {};
+      const characterSettings = settings?.character || {};
+
+      if (general.fontFamily) {
+        root.style.setProperty('--app-font', general.fontFamily);
+      } else {
+        root.style.removeProperty('--app-font');
+      }
+
+      const clamp = (value) => Math.min(255, Math.max(0, Math.round(value)));
+      const scale = (value, factor) => clamp(value * factor);
+      if (main.backgroundColor) {
+        const color = hexToRgb(main.backgroundColor);
+        const dark = `rgb(${scale(color.r, 0.55)}, ${scale(color.g, 0.55)}, ${scale(color.b, 0.55)})`;
+        const mid = `rgb(${scale(color.r, 0.78)}, ${scale(color.g, 0.78)}, ${scale(color.b, 0.78)})`;
+        const glow1 = `rgba(${color.r}, ${color.g}, ${color.b}, 0.18)`;
+        const glow2 = `rgba(${color.r}, ${color.g}, ${color.b}, 0.12)`;
+        root.style.setProperty('--bg-1', dark);
+        root.style.setProperty('--bg-2', mid);
+        root.style.setProperty('--wallpaper', `radial-gradient(circle at 18% 22%, ${glow1}, transparent 45%), radial-gradient(circle at 70% 10%, ${glow2}, transparent 55%), linear-gradient(180deg, ${mid} 0%, ${dark} 100%)`);
+        root.style.setProperty('--wallpaper-darken', 'rgba(6,12,32,.18)');
+      } else {
+        root.style.removeProperty('--bg-1');
+        root.style.removeProperty('--bg-2');
+        root.style.removeProperty('--wallpaper');
+        root.style.removeProperty('--wallpaper-darken');
+      }
+
+      if (main.stripeColor) {
+        const stripe = hexToRgb(main.stripeColor);
+        root.style.setProperty('--stripe-color', `rgba(${stripe.r}, ${stripe.g}, ${stripe.b}, 0.35)`);
+      } else {
+        root.style.removeProperty('--stripe-color');
+      }
+
+      if (main.buttonColor) {
+        const btn = hexToRgb(main.buttonColor);
+        root.style.setProperty('--main-btn-color', `rgb(${btn.r}, ${btn.g}, ${btn.b})`);
+      } else {
+        root.style.removeProperty('--main-btn-color');
+      }
+
+      const sizeValue = characterSettings.size || 220;
+      root.style.setProperty('--character-size', `${sizeValue}px`);
+
+      const colorValue = characterSettings.color || '#B1D656';
+      root.style.setProperty('--character-filter', buildColorFilter(colorValue));
+
+      if (character) {
+        const isEnabled = characterSettings.enabled !== false;
+        character.style.display = isEnabled ? 'block' : 'none';
+      }
+    };
+
+    applySettings();
+    window.addEventListener('storage', applySettings);
+  })();
+</script>
+<script>
+  (() => {
+    const idleFrame = document.getElementById('character-frame-idle');
+    const frameA = document.getElementById('character-frame-1');
+    const frameB = document.getElementById('character-frame-2');
+    if (!idleFrame || !frameA || !frameB) return;
+
+    const talkFrames = [frameA, frameB];
+    let talkIndex = 0;
+    let timerId = null;
+
+    const showFrame = (index) => {
+      idleFrame.classList.toggle('active', index === 'idle');
+      talkFrames.forEach((frame, i) => frame.classList.toggle('active', index === i));
+    };
+
+    const startTalking = () => {
+      if (timerId) return;
+      let idx = talkIndex;
+      timerId = setInterval(() => {
+        idx = idx === 0 ? 1 : 0;
+        showFrame(idx);
+        talkIndex = idx;
+      }, 220);
+    };
+
+    const stopTalking = () => {
+      if (timerId) {
+        clearInterval(timerId);
+        timerId = null;
+      }
+      showFrame('idle');
+    };
+
+    showFrame('idle');
+    document.addEventListener('voice:playstart', startTalking);
+    document.addEventListener('voice:playend', stopTalking);
+  })();
+</script>
 <script>
   (() => {
     const log = (...args) => console.log('[DEBUG:CSS]', ...args);

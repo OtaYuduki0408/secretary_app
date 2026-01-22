@@ -8,7 +8,10 @@ def get_all_memos(
     keyword: str = "",
     search_type: str = "all",
     start_date: str = "",
-    end_date: str = ""
+    end_date: str = "",
+    title: str = "",
+    content: str = "",
+    priority: int | None = None
 ):
     """
     指定ユーザーのメモを取得する。
@@ -25,6 +28,11 @@ def get_all_memos(
             .order("created_at", desc=True)
         )
 
+        if title:
+            query = query.ilike("title", f"%{title}%")
+        if content:
+            query = query.ilike("content", f"%{content}%")
+
         if keyword:
             pattern = f"%{keyword}%"
             if search_type == "title":
@@ -33,6 +41,9 @@ def get_all_memos(
                 query = query.ilike("content", pattern)
             else:
                 query = query.or_(f"title.ilike.{pattern},content.ilike.{pattern}")
+
+        if priority is not None:
+            query = query.eq("priority", priority)
 
         if start_date:
             query = query.gte("created_at", start_date)

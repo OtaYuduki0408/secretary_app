@@ -1,4 +1,4 @@
-import { TRIGGER_CATEGORIES } from './constants.js';
+import { TRIGGER_CATEGORIES_MAIN } from './constants.js';
 import { populateSelect, updateSubOptions } from './ui_helpers.js';
 import { createTriggerUI, updateTriggerInputFields } from './trigger_ui.js';
 import { addConditionBlock, addAction } from './block_operations.js';
@@ -6,10 +6,10 @@ import { registerCommand, loadCommands, pollPendingActions } from './command_man
 
 document.addEventListener("DOMContentLoaded",()=>{
   console.log("DOMContentLoaded event fired.");
-  populateSelect("trigger_category", TRIGGER_CATEGORIES);
+  populateSelect("trigger_category", TRIGGER_CATEGORIES_MAIN);
   
   document.getElementById("trigger_category").addEventListener("change",()=>{
-    updateSubOptions("trigger_category","trigger_sub",TRIGGER_CATEGORIES);
+    updateSubOptions("trigger_category","trigger_sub",TRIGGER_CATEGORIES_MAIN);
     createTriggerUI(''); // updateSubOptionsの後にcreateTriggerUIを呼ぶ
   });
   document.getElementById("trigger_sub").addEventListener("change",()=>createTriggerUI(''));

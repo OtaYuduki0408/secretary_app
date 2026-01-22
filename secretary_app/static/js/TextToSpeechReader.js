@@ -41,22 +41,59 @@ export class TextToSpeechReader { // ★ここに 'export' を追加しました
             return;
         }
 
+        // 設定ページで選択された音声があれば優先する
+        let preferredVoiceName = '';
+        let voiceRate = 1;
+        let voicePitch = 1;
+        let voiceVolume = 1;
+        try {
+            const raw = localStorage.getItem('appSettings');
+            if (raw) {
+                const settings = JSON.parse(raw);
+                preferredVoiceName = settings?.main?.voiceName || '';
+                voiceRate = settings?.main?.voiceRate ?? 1;
+                voicePitch = settings?.main?.voicePitch ?? 1;
+                voiceVolume = settings?.main?.voiceVolume ?? 1;
+            }
+        } catch (e) {
+            console.warn("音声設定の読み込みに失敗しました。", e);
+        }
+
         if (this.synth.speaking) {
             console.log("現在、別の読み上げ中です。一旦停止します。");
+            document.dispatchEvent(new CustomEvent('voice:playend'));
             this.synth.cancel(); // 既に読み上げ中のものがあればキャンセル
         }
 
         // 読み上げ内容を設定する Utterance オブジェクトを作成
         const utterance = new SpeechSynthesisUtterance(text);
 
-        // 言語に対応した音声を選択
-        const selectedVoice = this.voices.find(voice => voice.lang === lang);
+        // 選択済み音声があれば優先、なければ言語に対応した音声を選択
+        const selectedVoice = preferredVoiceName
+            ? this.voices.find(voice => voice.name === preferredVoiceName)
+            : this.voices.find(voice => voice.lang === lang);
         if (selectedVoice) {
             utterance.voice = selectedVoice;
         } else {
             // 指定言語の音声が見つからない場合、デフォルトの音声を使用
             console.warn(`指定された言語 (${lang}) の音声が見つかりませんでした。デフォルト音声を使用します。`);
         }
+
+        utterance.rate = voiceRate;
+        utterance.pitch = voicePitch;
+        utterance.volume = voiceVolume;
+
+        utterance.onstart = () => {
+            document.dispatchEvent(new CustomEvent('voice:playstart'));
+        };
+
+        utterance.onend = () => {
+            document.dispatchEvent(new CustomEvent('voice:playend'));
+        };
+
+        utterance.onerror = () => {
+            document.dispatchEvent(new CustomEvent('voice:playend'));
+        };
 
         // 読み上げ開始
         this.synth.speak(utterance);
@@ -68,6 +105,7 @@ export class TextToSpeechReader { // ★ここに 'export' を追加しました
     stop() {
         if (this.synth.speaking) {
             this.synth.cancel();
+            document.dispatchEvent(new CustomEvent('voice:playend'));
             console.log("読み上げを停止しました。");
         }
     }

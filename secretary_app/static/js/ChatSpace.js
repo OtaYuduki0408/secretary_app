@@ -12,6 +12,86 @@ console.log(`DEBUG: TextToSpeechReader初期化。利用可能な音声数: ${re
 // window.managerが存在しない場合のフォールバック（ChatSpace.jsのロジックを維持）
 const manager = window.manager || new ScheduleManager(); 
 
+let abortRequested = false;
+let abortUntil = 0;
+
+function setAbortCooldown(ms = 10000) {
+  abortUntil = Date.now() + ms;
+}
+
+function isAbortCooldownActive() {
+  return Date.now() < abortUntil;
+}
+
+function stopStandardTts() {
+  abortRequested = true;
+  try {
+    if (reader) reader.stop();
+  } catch (e) {
+    console.warn("読み上げ停止に失敗しました。", e);
+  }
+  if (typeof speechSynthesis !== 'undefined') {
+    speechSynthesis.cancel();
+  }
+  document.dispatchEvent(new CustomEvent('voice:playend'));
+  if (typeof window.__chatLoadingIndicatorStop === 'function') {
+    window.__chatLoadingIndicatorStop();
+    window.__chatLoadingIndicatorStop = null;
+  }
+}
+
+async function requestAbortToServer(source = 'button') {
+  setAbortCooldown();
+  stopStandardTts();
+  try {
+    const response = await fetch('/web_api/abort', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ source })
+    });
+    const data = await response.json();
+    if (window.addResponseLogEntry) {
+      window.addResponseLogEntry("強制終了しました。");
+      if (data?.cancelled === true) {
+        window.addResponseLogEntry("処理を正常に終了させました。");
+      } else if (data?.cancelled === false) {
+        window.addResponseLogEntry("処理は実行されてしまいました。");
+      }
+    }
+  } catch (e) {
+    console.warn("強制終了の通知に失敗しました。", e);
+    if (window.addResponseLogEntry) {
+      window.addResponseLogEntry("強制終了の通知に失敗しました。");
+    }
+  }
+}
+
+function setAbortButtonVisible(visible) {
+  const btn = document.getElementById('force-abort-btn');
+  if (!btn) return;
+  btn.disabled = !visible;
+  btn.setAttribute('aria-hidden', visible ? 'false' : 'true');
+  btn.setAttribute('aria-disabled', visible ? 'false' : 'true');
+  btn.style.opacity = visible ? '1' : '0.45';
+  btn.style.pointerEvents = visible ? 'auto' : 'none';
+  if (visible) {
+    btn.classList.add('is-active');
+  } else {
+    btn.classList.remove('is-active');
+  }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  const btn = document.getElementById('force-abort-btn');
+  if (btn) {
+    btn.addEventListener('click', () => requestAbortToServer('button'));
+    setAbortButtonVisible(false);
+  }
+});
+
+document.addEventListener('analysis:start', () => setAbortButtonVisible(true));
+document.addEventListener('analysis:end', () => setAbortButtonVisible(false));
+
 // ==============================
 // 共通ヘルパー関数
 // ==============================
@@ -51,16 +131,121 @@ function log(message) {
   // 例: showToast(message);
 }
 
+// ??????????????????
+function stripWakeWords(text) {
+  if (!text) return text;
+  try {
+    const raw = localStorage.getItem('appSettings');
+    if (!raw) return text;
+    const settings = JSON.parse(raw);
+    const wakeWordsRaw = settings?.main?.wakeWords || '';
+    if (!wakeWordsRaw) return text;
+    const words = wakeWordsRaw
+      .split(',')
+      .map(word => word.trim())
+      .filter(Boolean);
+    if (words.length === 0) return text;
+    let cleaned = text;
+    words.forEach((word) => {
+      cleaned = cleaned.replaceAll(word, '');
+    });
+    cleaned = cleaned.replace(/\s+/g, ' ').trim();
+    return cleaned || text;
+  } catch (e) {
+    console.warn('?????????????????', e);
+    return text;
+  }
+}
+
+
 /**
  * ユーザー入力を受け付け、LLMで解析・処理を分岐するメインエントリポイント。
  * @param {string} inputValue - ユーザーの入力テキスト
  */
 export async function check_chat_Space(inputValue) {
+  if (isAbortCooldownActive()) {
+    if (window.addResponseLogEntry) {
+      window.addResponseLogEntry("???????????????????");
+    }
+    return;
+  }
   fire('analysis:start', { steps: ['処理開始'] });
   console.time("チャット解析 総所要時間");
   console.log("入力検知:", inputValue);
+  const cleanedInput = stripWakeWords(inputValue);
   // console.log(`DEBUG: ユーザー入力読み上げ: "${inputValue}でございますね。かしこまりました。"`); // デバッグログ削除
-  reader.speak(`${inputValue}ですね。`);
+
+  async function applyToneSetting(message, applyTarget) {
+    try {
+      const raw = localStorage.getItem('appSettings');
+      if (!raw) return message;
+      const settings = JSON.parse(raw);
+      const toneByTarget = {
+        response: settings?.main?.toneResponse || '',
+        error: settings?.main?.toneError || '',
+      };
+      const tone = applyTarget ? toneByTarget[applyTarget] : '';
+      if (!tone || !tone.trim()) {
+        return message;
+      }
+      const response = await fetch('/web_api/transform_tone', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: message, tone }),
+      });
+      if (!response.ok) {
+        return message;
+      }
+      const data = await response.json();
+      return data?.message || message;
+    } catch (e) {
+      console.warn("口調の適用に失敗しました。", e);
+      return message;
+    }
+  }
+
+  let inputConfirmText = null;
+  try {
+    const raw = localStorage.getItem('appSettings');
+    if (raw) {
+      const settings = JSON.parse(raw);
+      const enabled = settings?.main?.inputConfirmEnabled !== false;
+      const template = settings?.main?.inputConfirmTemplate || 'でございますね。かしこまりました。';
+      if (enabled) {
+        inputConfirmText = `${inputValue}${template}`;
+      }
+    }
+  } catch (e) {
+    console.warn("入力確認設定の読み込みに失敗しました。", e);
+  }
+  if (inputConfirmText) {
+    reader.speak(inputConfirmText);
+  }
+
+  // 読み込み中の動的表示を追加
+  const loadingIndicator = (() => {
+    const container = document.getElementById('voice-log-container');
+    if (!container) return null;
+    let dots = 0;
+    let timerId = null;
+    const entry = document.createElement('div');
+    entry.className = 'voice-log-entry log-interim';
+    entry.textContent = '読み込み中';
+    container.appendChild(entry);
+    container.scrollTop = container.scrollHeight;
+    timerId = setInterval(() => {
+      dots = (dots + 1) % 4;
+      entry.textContent = `読み込み中${'.'.repeat(dots)}`;
+    }, 450);
+    const stopper = {
+      stop: () => {
+        if (timerId) clearInterval(timerId);
+        if (entry.parentNode) entry.remove();
+      }
+    };
+    window.__chatLoadingIndicatorStop = stopper.stop;
+    return stopper;
+  })();
 
   try {
     const response = await fetch('/web_api/chat', {
@@ -68,7 +253,7 @@ export async function check_chat_Space(inputValue) {
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ inputValue: inputValue }),
+      body: JSON.stringify({ inputValue: cleanedInput }),
     });
 
     if (!response.ok) {
@@ -79,12 +264,27 @@ export async function check_chat_Space(inputValue) {
     console.log("DEBUG: APIからの最終応答:", result); // ここにresultオブジェクト全体をログ出力
     fire('analysis:step', { index: 1, label: '処理完了' });
 
-    if (result.message) {
-      console.log(`DEBUG: API応答メッセージ読み上げ: "${result.message}"`);
+    if (result.abort_command) {
+      setAbortCooldown();
+      stopStandardTts();
       if (window.addResponseLogEntry) {
-        window.addResponseLogEntry(result.message);
+        window.addResponseLogEntry("強制終了しました。");
+        if (result.cancelled === true) {
+          window.addResponseLogEntry("処理を正常に終了させました。");
+        } else if (result.cancelled === false) {
+          window.addResponseLogEntry("処理は実行されてしまいました。");
+        }
       }
-      reader.speak(result.message);
+      return;
+    }
+
+    if (result.message && !result.suppress_tts) {
+      const finalMessage = await applyToneSetting(result.message, 'response');
+      console.log(`DEBUG: API応答メッセージ読み上げ: "${finalMessage}"`);
+      if (window.addResponseLogEntry) {
+        window.addResponseLogEntry(finalMessage);
+      }
+      reader.speak(finalMessage);
     }
 
     // 高速実行へのフォールバック処理
@@ -94,7 +294,7 @@ export async function check_chat_Space(inputValue) {
       await new Promise(resolve => setTimeout(resolve, 2000)); // 2秒待機
 
       // 元のinputValueから「高速実行て、再度check_chat_Spaceを呼び出す
-      const originalCommand = inputValue.replace(高速実行);
+      const originalCommand = cleanedInput.replace(高速実行);
       console.log(`DEBUG: フォールバック後の入力: "${originalCommand}"`);
       await check_chat_Space(originalCommand);
       return; // フォールバック処理が完了したら、以降の処理はスキップ
@@ -155,8 +355,13 @@ export async function check_chat_Space(inputValue) {
 
   } catch (error) {
     console.error("ChatSpace API呼び出しエラー:", error);
-    reader.speak("申し訳ございません。処理中にエラーが発生しました。");
+    const errorMessage = await applyToneSetting("申し訳ございません。処理中にエラーが発生しました。", 'error');
+    reader.speak(errorMessage);
   } finally {
+    if (loadingIndicator) {
+      loadingIndicator.stop();
+    }
+    abortRequested = false;
     console.timeEnd("チャット解析 総所要時間");
     fire('analysis:end');
   }
