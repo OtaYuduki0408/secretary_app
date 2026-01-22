@@ -153,6 +153,19 @@ def evaluate_triggers(app_logger):
                 #             app_logger.error(f"DEBUG_INFO: Failed to even run get_finance_summary for debugging: {debug_e}")
                 #         action['detail']['error'] = '収支情報の取得に失敗しました。'
 
+                elif action.get('category') == '収支管理' and action.get('sub') == '読み上げ':
+                    try:
+                        format_type = action.get('detail', {}).get('format')
+                        app_logger.debug(f"Processing finance action for format: {format_type}")
+
+                        if format_type == 'individual':
+                            all_records = get_all_finance_records(user_id)
+                            action.setdefault('detail', {})['records'] = all_records
+                            app_logger.debug(f"Injected {len(all_records)} individual finance records.")
+                    except Exception as e:
+                        app_logger.error(f"Error processing finance action for user {user_id}: {e}", exc_info=True)
+                        action.setdefault('detail', {})['error'] = '収支情報の取得に失敗しました。'
+
                 modified_actions.append(action)
             
             order_data['actions'] = modified_actions
