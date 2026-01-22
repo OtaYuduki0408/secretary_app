@@ -176,7 +176,7 @@ export async function check_chat_Space(inputValue) {
     console.log("DEBUG: APIからの最終応答:", result); // ここにresultオブジェクト全体をログ出力
     fire('analysis:step', { index: 1, label: '処理完了' });
 
-    if (result.message) {
+    if (result.message && !result.suppress_tts) {
       const finalMessage = await applyToneSetting(result.message, 'response');
       console.log(`DEBUG: API応答メッセージ読み上げ: "${finalMessage}"`);
       if (window.addResponseLogEntry) {

@@ -853,15 +853,16 @@ def _dispatch_order_payload(user_id, order_payload):
 
 def _handle_input_triggers(user_input, response_data, user_id):
     if not user_id:
-        return
+        return False
     if response_data.get('status') != 'success':
-        return
+        return False
     orders = get_all_orders(user_id)
     if isinstance(orders, dict) and orders.get('error'):
         app.logger.debug(f"[INPUT_TRIGGER] get_all_orders error: {orders.get('error')}")
-        return
+        return False
     purpose = response_data.get('purpose')
     purpose_category, purpose_action = _map_purpose_to_action(purpose)
+    triggered = False
     for order in orders:
         triggers = order.get('triggers') or []
         if not triggers:
@@ -877,6 +878,7 @@ def _handle_input_triggers(user_input, response_data, user_id):
                 payload = _enrich_actions_for_dispatch(payload, user_id, app.logger)
                 app.logger.debug(f"[INPUT_TRIGGER] Voice matched keywords={keywords}")
                 _dispatch_order_payload(user_id, payload)
+                triggered = True
             continue
 
         if sub != '入力があったら':
@@ -903,6 +905,8 @@ def _handle_input_triggers(user_input, response_data, user_id):
         payload = _enrich_actions_for_dispatch(payload, user_id, app.logger)
         app.logger.debug(f"[INPUT_TRIGGER] Matched trigger category={category} action={purpose_action}")
         _dispatch_order_payload(user_id, payload)
+        triggered = True
+    return triggered
 
 @app.route('/web_api/chat', methods=['POST'])
 @login_required # セッションベース認証
@@ -1034,7 +1038,10 @@ def chat_api_web():
                 app.logger.debug(f"DEBUG: Googleアカウントがリンクされていません。response_data: {response_data}")
                 return jsonify(response_data), 401
             response_data['status'] = 'error'
-    _handle_input_triggers(user_input, response_data, user_id)
+    triggered_by_voice = _handle_input_triggers(user_input, response_data, user_id)
+    if triggered_by_voice:
+        response_data['suppress_tts'] = True
+        response_data['message'] = ""
     app.logger.debug(f"DEBUG: chat_api_webからの最終レスポンス: {response_data}")
     return jsonify(response_data)# メモAPIのBlueprint
 
