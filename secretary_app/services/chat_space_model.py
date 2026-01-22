@@ -174,7 +174,6 @@ class ChatSpaceModel:
         self.memo_manager = MemoManager()
 
     def _log_gemini_request(self, timestamp: str, input_content: str, process_type: str, output_content: str):
-        log_file_path = os.getenv("GEMINI_LOG_FILE", "gemini_requests.csv")
         file_exists = os.path.exists(log_file_path)
         with open(log_file_path, 'a', newline='', encoding='utf-8') as f:
             writer = csv.writer(f)
