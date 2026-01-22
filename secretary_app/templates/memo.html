@@ -5,6 +5,25 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Keepメモ</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/memo.css') }}">
+  <style>
+    .memo.editing {
+      background-color: #f0f8ff; /* Light blue background for editing state */
+    }
+    .edit-title-input,
+    .edit-content-textarea {
+      width: 100%;
+      padding: 8px;
+      margin-bottom: 8px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+    }
+    .edit-controls {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      margin-top: 8px;
+    }
+  </style>
 </head>
 <body class="memo-page">
   <div class="memo-shell">
@@ -302,6 +321,15 @@
       });
       controls.appendChild(pinCheckbox);
 
+      // 編集ボタン
+      const editBtn = document.createElement("button");
+      editBtn.type = "button";
+      editBtn.className = "icon-btn edit-btn";
+      editBtn.textContent = "✏️";
+      editBtn.title = "編集";
+      editBtn.addEventListener("click", () => toggleEditMode(wrapper, memo));
+      controls.appendChild(editBtn);
+
       // 削除ボタン
       const deleteBtn = document.createElement("button");
       deleteBtn.type = "button";
@@ -337,6 +365,75 @@
 
       return wrapper;
     }
+
+    function toggleEditMode(memoElement, memo) {
+      const isEditing = memoElement.classList.contains("editing");
+
+      // Clean up previous edit/view states
+      const oldTitle = memoElement.querySelector("strong, .edit-title-input");
+      const oldContent = memoElement.querySelector("p, .edit-content-textarea");
+      const oldControls = memoElement.querySelector(".edit-controls");
+
+      if (isEditing) {
+        // --- 編集モードを終了（キャンセル） ---
+        memoElement.classList.remove("editing");
+
+        const title = document.createElement("strong");
+        title.textContent = memo.title || "無題のメモ";
+        if (oldTitle) oldTitle.replaceWith(title);
+
+        const content = document.createElement("p");
+        content.textContent = memo.content || "";
+        if(oldContent) oldContent.replaceWith(content);
+
+        if (oldControls) oldControls.remove();
+
+      } else {
+        // --- 編集モードを開始 ---
+        memoElement.classList.add("editing");
+
+        const titleInput = document.createElement("input");
+        titleInput.type = "text";
+        titleInput.className = "edit-title-input";
+        titleInput.value = memo.title;
+        if (oldTitle) oldTitle.replaceWith(titleInput);
+
+
+        const contentArea = document.createElement("textarea");
+        contentArea.className = "edit-content-textarea";
+        contentArea.rows = "4";
+        contentArea.value = memo.content;
+        if(oldContent) oldContent.replaceWith(contentArea);
+
+        const editControls = document.createElement("div");
+        editControls.className = "edit-controls";
+
+        const saveBtn = document.createElement("button");
+        saveBtn.className = "primary-btn";
+        saveBtn.textContent = "保存";
+        saveBtn.onclick = async () => {
+          const newTitle = titleInput.value;
+          const newContent = contentArea.value;
+          await updateMemo(memo.id, { title: newTitle, content: newContent });
+          // The memo list will be re-fetched by updateMemo, so we don't need to do anything else.
+        };
+
+        const cancelBtn = document.createElement("button");
+        cancelBtn.className = "ghost-btn";
+        cancelBtn.textContent = "キャンセル";
+        cancelBtn.onclick = () => {
+             // Re-create the element to revert changes
+            const newMemoElement = createMemoElement(memo);
+            memoElement.replaceWith(newMemoElement);
+        };
+
+        editControls.appendChild(saveBtn);
+        editControls.appendChild(cancelBtn);
+        memoElement.appendChild(editControls);
+        titleInput.focus();
+      }
+    }
+
 
     async function updateMemo(id, data) {
       if ("priority" in data && (data.priority === "" || data.priority === null)) {
