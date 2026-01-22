@@ -26,17 +26,31 @@
     if (main.backgroundColor) {
       root.style.backgroundColor = main.backgroundColor;
       body.style.backgroundColor = main.backgroundColor;
+      root.style.backgroundImage = 'none';
       body.style.backgroundImage = 'none';
+      root.style.backgroundRepeat = 'no-repeat';
+      body.style.backgroundRepeat = 'no-repeat';
+      root.style.backgroundAttachment = 'fixed';
+      body.style.backgroundAttachment = 'fixed';
+      root.style.backgroundSize = 'cover';
+      body.style.backgroundSize = 'cover';
     }
     if (!main.backgroundColor) {
       root.style.removeProperty('background-color');
       body.style.removeProperty('background-color');
       body.style.removeProperty('background-image');
+      root.style.removeProperty('background-image');
+      root.style.removeProperty('background-repeat');
+      body.style.removeProperty('background-repeat');
+      root.style.removeProperty('background-attachment');
+      body.style.removeProperty('background-attachment');
+      root.style.removeProperty('background-size');
+      body.style.removeProperty('background-size');
     }
 
-    if (!body.style.minHeight) {
-      body.style.minHeight = '100vh';
-    }
+    root.style.minHeight = '100%';
+    root.style.height = '100%';
+    body.style.minHeight = '100%';
   };
 
   if (document.readyState === 'loading') {

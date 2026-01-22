@@ -177,15 +177,6 @@
       font-family: var(--app-font, inherit);
     }
 
-    body.custom-bg {
-      background: var(--custom-bg, #0b1f38);
-    }
-
-    body.custom-bg .parallax,
-    body.custom-bg .ui-backdrop {
-      display: none;
-    }
-
     .character-buddy {
       position: fixed;
       left: 24px;
@@ -349,7 +340,7 @@
     <div aria-hidden="true"></div>
  
     <div class="fab-group">
-      <a class="stats-btn fab" href="{{ url_for('logout') }}" aria-label="ログアウト" title="ログアウト">
+      <a id="logout-link" class="stats-btn fab" href="{{ url_for('logout') }}" aria-label="ログアウト" title="ログアウト">
         <svg width="34" height="34" viewBox="0 0 24 24" fill="none" aria-hidden="true">
           <rect x="4" y="4" width="16" height="16" rx="4" fill="#1f2a33" stroke="#a8b6c6" stroke-width="1.2"/>
           <path d="M10 8h4v8h-4z" fill="#7aa8ff" opacity="0.85"/>
@@ -498,6 +489,17 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.5/socket.io.min.js"></script>
 <script>
   (() => {
+    const logoutLink = document.getElementById('logout-link');
+    if (!logoutLink) return;
+    logoutLink.addEventListener('click', (event) => {
+      if (!confirm('ログアウトしますか？')) {
+        event.preventDefault();
+      }
+    });
+  })();
+</script>
+<script>
+  (() => {
     const body = document.body;
     const root = document.documentElement;
     const character = document.getElementById('character-buddy');
@@ -568,18 +570,19 @@
         root.style.removeProperty('--app-font');
       }
 
+      const clamp = (value) => Math.min(255, Math.max(0, Math.round(value)));
+      const scale = (value, factor) => clamp(value * factor);
       if (main.backgroundColor) {
-        root.style.setProperty('--custom-bg', main.backgroundColor);
-        body.style.backgroundColor = main.backgroundColor;
-        body.style.backgroundImage = 'none';
-        body.classList.add('custom-bg');
-        root.style.setProperty('--bg-1', main.backgroundColor);
-        root.style.setProperty('--bg-2', main.backgroundColor);
-        root.style.setProperty('--wallpaper', `linear-gradient(180deg, ${main.backgroundColor} 0%, ${main.backgroundColor} 100%)`);
-        root.style.setProperty('--wallpaper-darken', 'rgba(0,0,0,0)');
+        const color = hexToRgb(main.backgroundColor);
+        const dark = `rgb(${scale(color.r, 0.55)}, ${scale(color.g, 0.55)}, ${scale(color.b, 0.55)})`;
+        const mid = `rgb(${scale(color.r, 0.78)}, ${scale(color.g, 0.78)}, ${scale(color.b, 0.78)})`;
+        const glow1 = `rgba(${color.r}, ${color.g}, ${color.b}, 0.18)`;
+        const glow2 = `rgba(${color.r}, ${color.g}, ${color.b}, 0.12)`;
+        root.style.setProperty('--bg-1', dark);
+        root.style.setProperty('--bg-2', mid);
+        root.style.setProperty('--wallpaper', `radial-gradient(circle at 18% 22%, ${glow1}, transparent 45%), radial-gradient(circle at 70% 10%, ${glow2}, transparent 55%), linear-gradient(180deg, ${mid} 0%, ${dark} 100%)`);
+        root.style.setProperty('--wallpaper-darken', 'rgba(6,12,32,.18)');
       } else {
-        body.classList.remove('custom-bg');
-        root.style.removeProperty('--custom-bg');
         root.style.removeProperty('--bg-1');
         root.style.removeProperty('--bg-2');
         root.style.removeProperty('--wallpaper');

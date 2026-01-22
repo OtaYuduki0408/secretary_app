@@ -147,6 +147,19 @@ form[action="/register"] button[type="submit"]:active{
   flex:1;
   text-align:center;
 }
+.cta-footer .cta-btn{
+  text-decoration:none;
+  color:#0f172a;
+  background:linear-gradient(135deg,var(--accent),var(--accent-strong));
+  border-radius:18px;
+  padding:12px 22px;
+  font-weight:700;
+  box-shadow:0 10px 25px rgba(14,165,233,.35);
+  display:inline-block;
+}
+.cta-footer .cta-btn:hover{
+  filter:brightness(1.05);
+}
 
 .auth-links{
   width:100%;

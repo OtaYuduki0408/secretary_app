@@ -3,10 +3,6 @@
 <link rel="stylesheet" href="{{ url_for('static', filename='css/login.css') }}">
 
 <div class="auth-shell">
-  <div class="auth-header">
-    <a href="{{ url_for('main') }}" class="link-btn">メインに戻る</a>
-  </div>
-
   <h2>ログイン</h2>
 
   <form method="post" action="/login">
@@ -24,8 +20,7 @@
   {% endif %}
 
   <div class="cta-footer">
-    <a href="{{ url_for('register') }}" class="link-btn">新規登録はこちら</a>
-    <a href="{{ url_for('main') }}" class="link-btn">メインへ戻る</a>
+    <a href="{{ url_for('register') }}" class="cta-btn">新規登録はこちら</a>
   </div>
 </div>
 {% endblock %}
