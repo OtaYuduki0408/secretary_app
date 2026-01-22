@@ -868,8 +868,6 @@ class ChatSpaceModel:
         return {"deleted_count": len(memo_ids)}, f"Deleted {len(memo_ids)} memos."
 
     def _get_switchbot_devices(self, text: str, user_id: str | None):
-self, text: str, user_id: str | None):
-self, text: str, user_id: str | None):
         """SwitchBotデバイス情報を取得し、ユーザーの操作意図を特定する"""
         switchbot_api_token = os.getenv("SWITCHBOT_TOKEN")
         switchbot_api_secret = os.getenv("SWITCHBOT_SECRET")
