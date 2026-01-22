@@ -98,8 +98,8 @@ def evaluate_triggers(app_logger):
                                         'summary': e.get('title', '?????????'),
                                         'start_time': start_dt.strftime('%H:%M'),
                                         'end_time': end_dt.strftime('%H:%M'),
-                                        'start_day': start_dt.strftime('%Y?%m?%d?'),
-                                        'end_day': end_dt.strftime('%Y?%m?%d?'),
+                                        'start_day': f"{start_dt.year}年{start_dt.month}月{start_dt.day}日",
+                                        'end_day': f"{end_dt.year}年{end_dt.month}月{end_dt.day}日",
                                         'event_link': None
                                     })
                                 except Exception as err:
