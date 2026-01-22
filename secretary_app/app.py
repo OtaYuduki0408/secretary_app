@@ -916,6 +916,19 @@ def chat_api_web():
     user_id = session.get('user', {}).get('id') # セッションからuser_idを取得
     response_data = {"status": "success", "message": ""}
 
+    try:
+        if chat_space_model.is_abort_command(user_input):
+            response_data = {
+                "status": "success",
+                "message": "強制終了しました。進行中の処理はキャンセルできませんでした。",
+                "abort_command": True,
+                "suppress_tts": True
+            }
+            app.logger.debug("DEBUG: 強制終了コマンドを検知しました。")
+            return jsonify(response_data)
+    except Exception as e:
+        app.logger.error(f"強制終了判定に失敗しました: {e}")
+
     # 高速実行のチェック
     if user_input.startswith("クイックコマンド"):
         app.logger.debug(f"DEBUG: 高速実行検出: {user_input}")
@@ -1061,6 +1074,24 @@ def transform_tone_api():
     except Exception as e:
         app.logger.error(f"口調変換に失敗しました: {e}")
         return jsonify({'message': text})
+
+@app.route('/web_api/abort', methods=['POST'])
+@login_required
+def abort_api():
+    user_id = session.get('user', {}).get('id')
+    if not user_id:
+        return jsonify({
+            'status': 'error',
+            'message': '強制終了に失敗しました（ユーザー未認証）。',
+            'abort_command': True,
+            'suppress_tts': True
+        }), 401
+    return jsonify({
+        'status': 'success',
+        'message': '強制終了しました。進行中の処理はキャンセルできませんでした。',
+        'abort_command': True,
+        'suppress_tts': True
+    })
 
 @app.route('/api/user_settings', methods=['GET', 'PUT'])
 @login_required

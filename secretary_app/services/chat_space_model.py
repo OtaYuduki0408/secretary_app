@@ -194,6 +194,15 @@ class ChatSpaceModel:
     User input: {input_value}
     Available devices: {available_devices_json}
     """
+    ABORT_PROMPT_TEMPLATE = """
+    目的: 入力が強制終了/停止/中断の命令かどうかを判定する。
+    出力は Y または N のみ。その他の文字は禁止。
+    例:
+    入力: 処理を中断して -> Y
+    入力: 停止して -> Y
+    入力: 予定を追加して -> N
+    入力: {input_value}
+    """
 
 
     def __init__(self, gemini_api_key: str, calendar_manager=None):
@@ -202,6 +211,14 @@ class ChatSpaceModel:
         self.model = genai.GenerativeModel(model_name=self.model_name)
         # メモはSupabaseに保存するため、ここでは初期化不要
         self.memo_manager = None
+
+    def is_abort_command(self, text: str) -> bool:
+        if not text:
+            return False
+        prompt = self.ABORT_PROMPT_TEMPLATE.format(input_value=text)
+        raw = self._gemini_request(prompt)
+        answer = (raw or '').strip().lower()
+        return answer.startswith('y')
 
     def _gemini_request(self, prompt: str) -> str:
         print(f"--- [DEBUG] geminiに解析リクエスト (ユーザー入力: {prompt}) ---")

@@ -12,6 +12,63 @@ console.log(`DEBUG: TextToSpeechReader初期化。利用可能な音声数: ${re
 // window.managerが存在しない場合のフォールバック（ChatSpace.jsのロジックを維持）
 const manager = window.manager || new ScheduleManager(); 
 
+let abortRequested = false;
+
+function stopStandardTts() {
+  abortRequested = true;
+  try {
+    if (reader) reader.stop();
+  } catch (e) {
+    console.warn("読み上げ停止に失敗しました。", e);
+  }
+  if (typeof speechSynthesis !== 'undefined') {
+    speechSynthesis.cancel();
+  }
+  document.dispatchEvent(new CustomEvent('voice:playend'));
+  if (typeof window.__chatLoadingIndicatorStop === 'function') {
+    window.__chatLoadingIndicatorStop();
+    window.__chatLoadingIndicatorStop = null;
+  }
+}
+
+async function requestAbortToServer(source = 'button') {
+  stopStandardTts();
+  try {
+    const response = await fetch('/web_api/abort', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ source })
+    });
+    const data = await response.json();
+    if (data?.message && window.addResponseLogEntry) {
+      window.addResponseLogEntry(data.message);
+    }
+  } catch (e) {
+    console.warn("強制終了の通知に失敗しました。", e);
+    if (window.addResponseLogEntry) {
+      window.addResponseLogEntry("強制終了の通知に失敗しました。");
+    }
+  }
+}
+
+function setAbortButtonVisible(visible) {
+  const btn = document.getElementById('force-abort-btn');
+  if (!btn) return;
+  btn.disabled = !visible;
+  btn.setAttribute('aria-hidden', visible ? 'false' : 'true');
+  btn.style.opacity = visible ? '1' : '0.45';
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  const btn = document.getElementById('force-abort-btn');
+  if (btn) {
+    btn.addEventListener('click', () => requestAbortToServer('button'));
+  }
+});
+
+document.addEventListener('analysis:start', () => setAbortButtonVisible(true));
+document.addEventListener('analysis:end', () => setAbortButtonVisible(false));
+
 // ==============================
 // 共通ヘルパー関数
 // ==============================
@@ -151,12 +208,14 @@ export async function check_chat_Space(inputValue) {
       dots = (dots + 1) % 4;
       entry.textContent = `読み込み中${'.'.repeat(dots)}`;
     }, 450);
-    return {
+    const stopper = {
       stop: () => {
         if (timerId) clearInterval(timerId);
         if (entry.parentNode) entry.remove();
       }
     };
+    window.__chatLoadingIndicatorStop = stopper.stop;
+    return stopper;
   })();
 
   try {
@@ -175,6 +234,14 @@ export async function check_chat_Space(inputValue) {
     const result = await response.json();
     console.log("DEBUG: APIからの最終応答:", result); // ここにresultオブジェクト全体をログ出力
     fire('analysis:step', { index: 1, label: '処理完了' });
+
+    if (result.abort_command) {
+      stopStandardTts();
+      if (result.message && window.addResponseLogEntry) {
+        window.addResponseLogEntry(result.message);
+      }
+      return;
+    }
 
     if (result.message && !result.suppress_tts) {
       const finalMessage = await applyToneSetting(result.message, 'response');
@@ -259,6 +326,7 @@ export async function check_chat_Space(inputValue) {
     if (loadingIndicator) {
       loadingIndicator.stop();
     }
+    abortRequested = false;
     console.timeEnd("チャット解析 総所要時間");
     fire('analysis:end');
   }
