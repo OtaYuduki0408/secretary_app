@@ -218,3 +218,23 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator{
     width:100%;
   }
 }
+
+@media (max-width:520px){
+  .container{
+    width:calc(100% - 24px);
+    margin:24px auto 70px;
+  }
+  .card{
+    padding:18px;
+  }
+  .card-actions{
+    gap:10px;
+  }
+  .card-actions .btn,
+  .actions .btn{
+    width:100%;
+  }
+  .title{
+    font-size:1.5rem;
+  }
+}

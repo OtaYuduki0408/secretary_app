@@ -13,6 +13,7 @@
 html,body{
   margin:0;
   min-height:100%;
+  min-height:100svh;
   font-family:"Noto Sans JP","Hiragino Kaku Gothic ProN",YuGothic,Meiryo,sans-serif;
   color:var(--text);
   background:
@@ -21,18 +22,31 @@ html,body{
     linear-gradient(180deg,#0b1220,#0f172a);
 }
 
-h2{
-  width:min(560px,92%);
-  margin:48px auto 16px;
+.auth-shell{
+  width:min(600px,94%);
+  min-height:100svh;
+  margin:0 auto;
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+  align-items:center;
+  gap:18px;
+  padding:clamp(24px,5vw,56px) 0;
+}
+
+.auth-shell h2{
+  width:100%;
+  margin:0 0 12px;
   letter-spacing:.04em;
-  font-size:1.9rem;
+  font-size:1.7rem;
+  text-align:center;
 }
 
 .auth-header{
-  width:min(560px,92%);
-  margin:32px auto 0;
+  width:100%;
   display:flex;
-  justify-content:flex-end;
+  justify-content:center;
+  margin:0;
 }
 
 .auth-header .link-btn{
@@ -53,8 +67,8 @@ h2{
 
 form[action="/login"],
 form[action="/register"]{
-  width:min(560px,92%);
-  margin:0 auto 40px;
+  width:100%;
+  margin:0;
   padding:26px;
   background:var(--panel);
   border:1px solid rgba(148,163,184,.2);
@@ -99,7 +113,7 @@ form[action="/register"] input[type="text"]:focus{
 form[action="/login"] button[type="submit"],
 form[action="/register"] button[type="submit"]{
   width:100%;
-  margin-top:18px;
+  margin-top:26px;
   border:none;
   border-radius:18px;
   padding:12px 22px;
@@ -122,9 +136,21 @@ form[action="/register"] button[type="submit"]:active{
   transform:translateY(1px);
 }
 
+.cta-footer{
+  width:100%;
+  display:flex;
+  gap:12px;
+  justify-content:space-between;
+  align-items:center;
+}
+.cta-footer a{
+  flex:1;
+  text-align:center;
+}
+
 .auth-links{
-  width:min(560px,92%);
-  margin:0 auto 24px;
+  width:100%;
+  margin:0;
   text-align:right;
 }
 
@@ -141,7 +167,42 @@ form[action="/register"] button[type="submit"]:active{
 }
 
 .error-msg{
-  width:min(560px,92%);
-  margin:8px auto 0;
+  width:100%;
+  margin:8px 0 0;
   color:#fecaca;
 }
+
+@media (max-width:520px){
+  .auth-shell{
+    width:min(420px,94%);
+    padding:32px 0 48px;
+    gap:14px;
+  }
+  .auth-shell h2{
+    font-size:1.4rem;
+    margin-top:6px;
+  }
+  form[action="/login"],
+  form[action="/register"]{
+    padding:20px;
+  }
+  .auth-header{
+    flex-direction:column;
+    gap:12px;
+  }
+  .auth-links{
+    text-align:center;
+    margin-top:8px;
+  }
+  .cta-footer{
+    flex-direction:column;
+  }
+  .cta-footer a{
+    width:100%;
+  }
+  .auth-header .link-btn{
+    width:100%;
+    text-align:center;
+  }
+}
+

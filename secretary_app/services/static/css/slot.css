@@ -150,3 +150,33 @@ html,body{margin:0;background:#101010;font-family:Inter,system-ui,"Segoe UI",Rob
     #slot-overlay .slot-wrap{ padding-bottom: max(16px, env(safe-area-inset-bottom)); }
   }
 }
+
+@media (max-width:600px){
+  :root{
+    --cabinet-w: 100vw;
+    --cell: 72px;
+  }
+  .cabinet{
+    margin:12px auto 24px;
+    padding:12px;
+  }
+  .panel{
+    grid-template-columns:1fr;
+  }
+  .meters{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+  .bottom{
+    flex-direction:column;
+    gap:12px;
+  }
+  .buttons{
+    width:100%;
+    justify-content:space-between;
+    flex-wrap:wrap;
+  }
+  .btn{
+    flex:1 1 45%;
+    text-align:center;
+  }
+}

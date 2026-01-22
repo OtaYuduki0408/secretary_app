@@ -259,8 +259,35 @@ body::after{
   .header h1{ font-size:1.35rem; }
 
 }
-
 .header-actions{ display:flex; align-items:center; gap:10px; }
+
+@media (max-width: 540px){
+  .container{
+    max-width:100%;
+    padding:0 14px;
+    margin:24px auto 80px;
+  }
+  .header{
+    flex-direction:column;
+    align-items:flex-start;
+    gap:12px;
+  }
+  .header a,
+  .link-btn{
+    width:100%;
+    text-align:center;
+  }
+  .card{
+    padding:18px;
+  }
+  .chips{
+    flex-direction:column;
+    align-items:stretch;
+  }
+  .chip{
+    width:100%;
+  }
+}
 
 
 

@@ -399,3 +399,28 @@ body.bulk-delete-mode .pin-checkbox{
     flex-direction:column;
   }
 }
+
+@media (max-width:520px){
+  .memo-shell{
+    width:calc(100% - 24px);
+    margin:24px auto 90px;
+  }
+  .memo-page-header,
+  .memo-header-actions,
+  .add-options,
+  .filter-options,
+  .memo-controls,
+  .search-bar{
+    flex-direction:column;
+    align-items:stretch;
+    gap:12px;
+  }
+  .pill-btn,
+  .primary-btn,
+  .ghost-btn,
+  .secondary-btn,
+  .danger-btn{
+    width:100%;
+    text-align:center;
+  }
+}
