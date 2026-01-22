@@ -118,50 +118,52 @@ def evaluate_triggers(app_logger):
                         app_logger.error(f"Error processing calendar action for user {user_id}: {e}")
                         action['detail']['summary'] = 'カレンダー情報の取得に失敗しました。'
 
-                # elif action.get('category') == '収支管理' and action.get('sub') == '読み上げ':
-                #     try:
-                #         format_type = action['detail'].get('format')
-                #         app_logger.debug(f"Processing finance action for format: {format_type}")
+                elif action.get('category') == '????' and action.get('sub') == '????':
+                    try:
+                        format_type = action.get('detail', {}).get('format')
+                        app_logger.debug(f"Processing finance action for format: {format_type}")
 
-                #         if format_type == 'individual':
-                #             all_records = get_all_finance_records(user_id)
-                #             action['detail']['records'] = all_records
-                #             app_logger.debug(f"Injected {len(all_records)} individual finance records.")
-                        
-                #         else: # income, expense, balance の場合
-                #             if not finance_summary_calculated:
-                #                 income_stats, expense_stats = get_finance_summary(user_id)
-                #                 income_total = sum(item.get('amount', 0) for item in income_stats)
-                #                 expense_total = sum(item.get('amount', 0) for item in expense_stats)
-                #                 balance = income_total - expense_total
-                #                 finance_summary_calculated = True
-                #                 app_logger.debug(f"Calculated finance summary: income={income_total}, expense={expense_total}")
-                            
-                #             action['detail']['income_total'] = income_total
-                #             action['detail']['expense_total'] = expense_total
-                #             action['detail']['balance'] = balance
-                #             app_logger.debug(f"Injected finance summary into action for format: {format_type}")
+                        all_records = get_all_finance_records(user_id)
+                        income_total = sum(r.get('amount', 0) for r in all_records if r.get('type') == 'income')
+                        expense_total = sum(r.get('amount', 0) for r in all_records if r.get('type') == 'expense')
+                        balance = income_total - expense_total
 
-                #     except Exception as e:
-                #         app_logger.error(f"Error processing finance action for user {user_id}: {e}", exc_info=True)
-                #         try:
-                #             # For debugging: Log the type and value of what get_finance_summary returns
-                #             income_stats_debug, expense_stats_debug = get_finance_summary(user_id)
-                #             app_logger.error(f"DEBUG_INFO: income_stats type={type(income_stats_debug)}, value={income_stats_debug}")
-                #             app_logger.error(f"DEBUG_INFO: expense_stats type={type(expense_stats_debug)}, value={expense_stats_debug}")
-                #         except Exception as debug_e:
-                #             app_logger.error(f"DEBUG_INFO: Failed to even run get_finance_summary for debugging: {debug_e}")
-                #         action['detail']['error'] = '収支情報の取得に失敗しました。'
+                        if format_type == 'individual':
+                            action.setdefault('detail', {})['records'] = all_records
+                            app_logger.debug(f"Injected {len(all_records)} individual finance records.")
+                        else:
+                            detail = action.setdefault('detail', {})
+                            detail['income_total'] = income_total
+                            detail['expense_total'] = expense_total
+                            detail['balance'] = balance
+                            app_logger.debug(
+                                f"Injected finance summary: income={income_total}, expense={expense_total}, balance={balance}"
+                            )
+                    except Exception as e:
+                        app_logger.error(f"Error processing finance action for user {user_id}: {e}", exc_info=True)
+                        action.setdefault('detail', {})['error'] = '???????????????'
 
                 elif action.get('category') == '収支管理' and action.get('sub') == '読み上げ':
                     try:
                         format_type = action.get('detail', {}).get('format')
                         app_logger.debug(f"Processing finance action for format: {format_type}")
 
+                        all_records = get_all_finance_records(user_id)
+                        income_total = sum(r.get('amount', 0) for r in all_records if r.get('type') == 'income')
+                        expense_total = sum(r.get('amount', 0) for r in all_records if r.get('type') == 'expense')
+                        balance = income_total - expense_total
+
                         if format_type == 'individual':
-                            all_records = get_all_finance_records(user_id)
                             action.setdefault('detail', {})['records'] = all_records
                             app_logger.debug(f"Injected {len(all_records)} individual finance records.")
+                        else:
+                            detail = action.setdefault('detail', {})
+                            detail['income_total'] = income_total
+                            detail['expense_total'] = expense_total
+                            detail['balance'] = balance
+                            app_logger.debug(
+                                f"Injected finance summary: income={income_total}, expense={expense_total}, balance={balance}"
+                            )
                     except Exception as e:
                         app_logger.error(f"Error processing finance action for user {user_id}: {e}", exc_info=True)
                         action.setdefault('detail', {})['error'] = '収支情報の取得に失敗しました。'
