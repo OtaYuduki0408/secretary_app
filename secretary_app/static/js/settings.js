@@ -9,6 +9,7 @@
       tone: '',
       stripeColor: '#7aa8ff',
       buttonColor: '#7aa8ff',
+      wakeWords: 'サイレントメイト,ぼいすめいと,voicemate,高速実行,クイックコマンド',
     },
     character: {
       enabled: true,
@@ -28,6 +29,7 @@
     accentColor: document.getElementById('accent-color'),
     mutedColor: document.getElementById('muted-color'),
     mainBgColor: document.getElementById('main-bg-color'),
+    wakeWord: document.getElementById('wake-word'),
     stripeColor: document.getElementById('stripe-color'),
     mainButtonColor: document.getElementById('main-button-color'),
     toneSetting: document.getElementById('tone-setting'),
@@ -116,6 +118,7 @@
   if (elements.accentColor) elements.accentColor.value = settings.theme.accentColor;
   if (elements.mutedColor) elements.mutedColor.value = settings.theme.mutedColor;
   if (elements.mainBgColor) elements.mainBgColor.value = settings.main.backgroundColor;
+  if (elements.wakeWord) elements.wakeWord.value = settings.main.wakeWords || '';
   if (elements.stripeColor) elements.stripeColor.value = settings.main.stripeColor || '#7aa8ff';
   if (elements.mainButtonColor) elements.mainButtonColor.value = settings.main.buttonColor || '#7aa8ff';
   if (elements.toneSetting) elements.toneSetting.value = settings.main.tone || '';
@@ -203,6 +206,12 @@
     settings.main.backgroundColor = event.target.value;
     saveSettings(settings);
     applyToPage(settings);
+    document.dispatchEvent(new CustomEvent('app-settings:updated'));
+  });
+
+  elements.wakeWord?.addEventListener('input', (event) => {
+    settings.main.wakeWords = event.target.value;
+    saveSettings(settings);
     document.dispatchEvent(new CustomEvent('app-settings:updated'));
   });
 

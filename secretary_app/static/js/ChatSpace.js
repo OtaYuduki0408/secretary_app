@@ -60,7 +60,55 @@ export async function check_chat_Space(inputValue) {
   console.time("チャット解析 総所要時間");
   console.log("入力検知:", inputValue);
   // console.log(`DEBUG: ユーザー入力読み上げ: "${inputValue}でございますね。かしこまりました。"`); // デバッグログ削除
-  reader.speak(`${inputValue}ですね。`);
+
+  async function applyToneSetting(message) {
+    try {
+      const raw = localStorage.getItem('appSettings');
+      if (!raw) return message;
+      const settings = JSON.parse(raw);
+      const tone = settings?.main?.tone || '';
+      if (!tone.trim()) return message;
+      const response = await fetch('/web_api/transform_tone', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: message, tone }),
+      });
+      if (!response.ok) {
+        return message;
+      }
+      const data = await response.json();
+      return data?.message || message;
+    } catch (e) {
+      console.warn("口調の適用に失敗しました。", e);
+      return message;
+    }
+  }
+
+  const initialSpeakText = await applyToneSetting(`${inputValue}ですね。`);
+  reader.speak(initialSpeakText);
+
+  // 読み込み中の動的表示を追加
+  const loadingIndicator = (() => {
+    const container = document.getElementById('voice-log-container');
+    if (!container) return null;
+    let dots = 0;
+    let timerId = null;
+    const entry = document.createElement('div');
+    entry.className = 'voice-log-entry log-interim';
+    entry.textContent = '読み込み中';
+    container.appendChild(entry);
+    container.scrollTop = container.scrollHeight;
+    timerId = setInterval(() => {
+      dots = (dots + 1) % 4;
+      entry.textContent = `読み込み中${'.'.repeat(dots)}`;
+    }, 450);
+    return {
+      stop: () => {
+        if (timerId) clearInterval(timerId);
+        if (entry.parentNode) entry.remove();
+      }
+    };
+  })();
 
   try {
     const response = await fetch('/web_api/chat', {
@@ -78,29 +126,6 @@ export async function check_chat_Space(inputValue) {
     const result = await response.json();
     console.log("DEBUG: APIからの最終応答:", result); // ここにresultオブジェクト全体をログ出力
     fire('analysis:step', { index: 1, label: '処理完了' });
-
-    async function applyToneSetting(message) {
-      try {
-        const raw = localStorage.getItem('appSettings');
-        if (!raw) return message;
-        const settings = JSON.parse(raw);
-        const tone = settings?.main?.tone || '';
-        if (!tone.trim()) return message;
-        const response = await fetch('/web_api/transform_tone', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ text: message, tone }),
-        });
-        if (!response.ok) {
-          return message;
-        }
-        const data = await response.json();
-        return data?.message || message;
-      } catch (e) {
-        console.warn("口調の適用に失敗しました。", e);
-        return message;
-      }
-    }
 
     if (result.message) {
       const finalMessage = await applyToneSetting(result.message);
@@ -179,8 +204,12 @@ export async function check_chat_Space(inputValue) {
 
   } catch (error) {
     console.error("ChatSpace API呼び出しエラー:", error);
-    reader.speak("申し訳ございません。処理中にエラーが発生しました。");
+    const errorMessage = await applyToneSetting("申し訳ございません。処理中にエラーが発生しました。");
+    reader.speak(errorMessage);
   } finally {
+    if (loadingIndicator) {
+      loadingIndicator.stop();
+    }
     console.timeEnd("チャット解析 総所要時間");
     fire('analysis:end');
   }

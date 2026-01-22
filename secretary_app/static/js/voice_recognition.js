@@ -1,7 +1,7 @@
 // ============================================================================
 // グローバル変数と定数
 // ============================================================================
-const WAKE_WORDS = ['サイレントメイト', 'ぼいすめいと', 'voicemate', '高速実行', 'クイックコマンド'];
+let WAKE_WORDS = ['サイレントメイト', 'ぼいすめいと', 'voicemate', '高速実行', 'クイックコマンド'];
 const VOICE_WATE_SOUND_PATH = '/static/voice/voice_wate.mp3';
 const RELODE_SOUND_PATH = '/static/voice/relode.mp3';
 const ERROR_SOUND_PATH = '/static/voice/error.mp3';
@@ -20,6 +20,29 @@ speechUtterance.rate = 1;
 speechUtterance.pitch = 1;
 
 let userInteracted = false; // ユーザーがページとインタラクトしたかどうかのフラグ
+
+// 設定から呼びかけワードを読み込む
+function loadWakeWordsFromSettings() {
+    try {
+        const raw = localStorage.getItem('appSettings');
+        if (!raw) return;
+        const settings = JSON.parse(raw);
+        const wakeWordsRaw = settings?.main?.wakeWords || '';
+        if (!wakeWordsRaw) return;
+        const words = wakeWordsRaw
+            .split(',')
+            .map(word => word.trim())
+            .filter(Boolean);
+        if (words.length > 0) {
+            WAKE_WORDS = words;
+        }
+    } catch (e) {
+        console.warn('呼びかけワード設定の読み込みに失敗しました。', e);
+    }
+}
+
+loadWakeWordsFromSettings();
+document.addEventListener('app-settings:updated', loadWakeWordsFromSettings);
 
 // ============================================================================
 // ヘルパー関数
@@ -277,7 +300,9 @@ function setMode(newMode) {
         }, 10000);
     } else { // 'waiting'
         micButton.classList.remove('active');
-        searchBox.placeholder = "「サイレントメイト」または「クイックコマンド」と呼びかけてください";
+        const primaryWakeWord = WAKE_WORDS[0] || 'サイレントメイト';
+        const secondaryWakeWord = WAKE_WORDS[1] || 'クイックコマンド';
+        searchBox.placeholder = `「${primaryWakeWord}」または「${secondaryWakeWord}」と呼びかけてください`;
     }
 }
 
