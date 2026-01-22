@@ -228,6 +228,30 @@ function getVoiceSettings() {
         return { rate: 1, pitch: 1, volume: 1 };
     }
 }
+
+const ALERT_SOUND_MAP = {
+    sound1: "bet.mp3",
+    sound2: "error.mp3",
+    sound3: "gako.mp3",
+    default: "bet.mp3",
+};
+
+function resolveAlertSoundFilename(soundType) {
+    if (!soundType) return ALERT_SOUND_MAP.default;
+    if (ALERT_SOUND_MAP[soundType]) return ALERT_SOUND_MAP[soundType];
+    return soundType;
+}
+
+function playAlertSound(soundType) {
+    const filename = resolveAlertSoundFilename(soundType);
+    const audio = new Audio(`/static/voice/${filename}`);
+    audio.addEventListener('error', () => {
+        console.error('アラート音の再生に失敗しました:', filename);
+    });
+    audio.play().catch((e) => {
+        console.error('アラート音の再生に失敗しました:', e);
+    });
+}
 /**
  * 指定されたアクションを実行する
  * @param {object} action - 実行するアクション
@@ -266,6 +290,14 @@ function executeAction(action) {
             overlayTitle = "読み上げ";
             overlayCategoryClass = "overlay-speech";
             messageHtml = `<h3>${overlayTitle}</h3><p>${textToSpeak}</p>`;
+
+        } else if (action.category === 'アラート' && action.sub === '実行') {
+            overlayTitle = "アラート";
+            overlayCategoryClass = "overlay-speech";
+            const soundType = action.detail?.sound || 'default';
+            playAlertSound(soundType);
+            textToSpeak = `アラート音を再生します。`;
+            messageHtml = `<h3>${overlayTitle}</h3><p>アラート音: ${soundType}</p>`;
 
         } else if (action.category === 'カレンダー' && action.sub === '読み上げ') {
             overlayTitle = "カレンダー";

@@ -548,9 +548,17 @@ export async function pollPendingActions() {
           }
         } else if (actionData.category === 'アラート' && actionData.sub === '実行') {
           // アラートアクションの場合、アラート音を鳴らす
-          const alertSound = actionData.detail.sound;
+          const alertSound = actionData.detail.sound || 'default';
           console.log("アラート音鳴動: " + alertSound);
-          // TODO: 実際のアラート音再生ロジック（HTML Audio要素など）
+          const soundMap = { sound1: 'bet.mp3', sound2: 'error.mp3', sound3: 'gako.mp3', default: 'bet.mp3' };
+          const filename = soundMap[alertSound] || alertSound;
+          const audio = new Audio(`/static/voice/${filename}`);
+          audio.addEventListener('error', () => {
+            console.error("アラート音の再生に失敗しました:", filename);
+          });
+          audio.play().catch((e) => {
+            console.error("アラート音の再生に失敗しました:", e);
+          });
           message += " -> " + alertSound;
         } else if (executionResult) {
           message += " -> 実行結果: " + executionResult;

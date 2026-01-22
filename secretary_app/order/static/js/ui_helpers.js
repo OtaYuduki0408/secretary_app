@@ -109,5 +109,14 @@ export function updateSubOptions(categoryId, subId, data) {
     } else {
       sub.style.display = 'block';
     }
+  } else if (categoryId.includes('action')) {
+    if (cat && cat !== "カレンダー") {
+      sub.style.display = 'none';
+      if (data[cat] && data[cat].length > 0) {
+        sub.value = data[cat][0];
+      }
+    } else {
+      sub.style.display = 'block';
+    }
   }
 }
