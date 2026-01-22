@@ -349,6 +349,30 @@
         modal.addEventListener('click', (e) => {
             if (e.target === modal) closeModal();
         });
+
+        // WebSocket for real-time updates
+        const socket = io(); // Connect to the WebSocket server
+        const userId = '{{ session.user.id }}'; // Assuming user ID is available in session
+        if (userId) {
+            socket.emit('authenticate', { user_id: userId });
+            console.log('Authenticating WebSocket with user_id:', userId);
+        } else {
+            console.error('User ID is not available for WebSocket authentication.');
+        }
+
+        socket.on('connect', () => {
+            console.log('WebSocket connected. Session ID:', socket.id);
+        });
+
+        socket.on('disconnect', () => {
+            console.log('WebSocket disconnected.');
+        });
+
+        socket.on('calendar_updated', (data) => {
+            console.log('Calendar updated via WebSocket:', data);
+            calendar.refetchEvents(); // Refresh FullCalendar events
+            alert('カレンダーが更新されました。');
+        });
     });
   </script>
 </body>

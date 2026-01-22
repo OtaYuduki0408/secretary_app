@@ -23,7 +23,12 @@ export function parseActionArray(actionRoot) {
 
       switch (category) {
         case "カレンダー":
-          if (sub === "追加" || sub === "削除") {
+          if (sub === "追加") {
+            detail.title = detailContainer.querySelector(".action-detail-cal-title")?.value;
+            detail.start_time = detailContainer.querySelector(".action-detail-cal-start-time")?.value;
+            detail.end_time = detailContainer.querySelector(".action-detail-cal-end-time")?.value;
+            detail.description = detailContainer.querySelector(".action-detail-cal-description")?.value;
+          } else if (sub === "削除") {
             detail.text = detailContainer.querySelector(".action-detail-cal-text")?.value;
           } else if (sub === "読み上げ") {
             detail.start_year = detailContainer.querySelector(".action-detail-cal-read-start-year")?.value;
