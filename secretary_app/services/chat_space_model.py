@@ -4,7 +4,6 @@ import json
 from datetime import datetime, timedelta
 import pytz
 import functools
-import csv
 JST = pytz.timezone('Asia/Tokyo')
 import google.generativeai as genai
 
@@ -173,23 +172,9 @@ class ChatSpaceModel:
         self.model = genai.GenerativeModel(model_name=self.model_name)
         self.memo_manager = MemoManager()
 
-    def _log_gemini_request(self, timestamp: str, input_content: str, process_type: str, output_content: str):
-        file_exists = os.path.exists(log_file_path)
-        with open(log_file_path, 'a', newline='', encoding='utf-8') as f:
-            writer = csv.writer(f)
-            if not file_exists:
-                writer.writerow(["Timestamp", "Input Content", "Process Type", "Output Content"])
-            writer.writerow([timestamp, input_content, process_type, output_content])
-        print(f"--- [DEBUG] Geminiリクエストログを記録: {process_type} ---")
-    
     def _gemini_request(self, prompt: str) -> str:
         print(f"--- [DEBUG] geminiに解析リクエスト (ユーザー入力: {prompt}) ---")
-        timestamp = datetime.now(JST).isoformat()
-        initial_hits = _cached_gemini_request_impl.cache_info().hits
         response_text = _cached_gemini_request_impl(self.model, prompt)
-        final_hits = _cached_gemini_request_impl.cache_info().hits
-        process_type = "CACHE_HIT" if final_hits > initial_hits else "API_CALL"
-        self._log_gemini_request(timestamp, prompt, process_type, response_text)
         return response_text
 
     def _format_event_time(self, iso_time: str) -> str:
@@ -219,8 +204,14 @@ class ChatSpaceModel:
             print("JSON解析失敗: LLMが出力したJSON形式が不正です")
             return []
         list_data = data if isinstance(data, list) else [data] if data else []
+        flattened = []
+        for item in list_data:
+            if isinstance(item, list):
+                flattened.extend(item)
+            else:
+                flattened.append(item)
         parsed_list = []
-        for x in list_data:
+        for x in flattened:
             if not isinstance(x, dict): continue
             item = {
                 'name': x.get('name') or x.get('title') or x.get('event') or x.get('summary') or '',
@@ -325,36 +316,38 @@ class ChatSpaceModel:
 
     def check_chat_space(self, input_value: str, user_id: str | None = None) -> dict:
         print("--- [DEBUG] check_chat_space: Starting ---")
+        # ???????????Gemini???
+        cleaned_input = re.sub(r"\b??????\b", "", input_value or "").strip()
         current_time = datetime.now(JST).strftime('%Y-%m-%d %H:%M:%S')
-        purpose_prompt = self.PURPOSE_PROMPT_TEMPLATE.format(current_time=current_time, input_value=input_value)
+        purpose_prompt = self.PURPOSE_PROMPT_TEMPLATE.format(current_time=current_time, input_value=cleaned_input)
         purpose = self._gemini_request(purpose_prompt)
         print(f"--- [DEBUG] check_chat_space: Received purpose: {purpose} ---")
         result = {"status": "success", "purpose": purpose, "data": None, "message": ""}
         
         if purpose == "Ca":
-            data, msg = self._add_calendar(input_value, user_id)
+            data, msg = self._add_calendar(cleaned_input, user_id)
             result["data"] = data
             result["message"] = msg
         elif purpose == "Cd":
-            result["data"], result["message"] = self._remove_calendar(input_value, user_id)
+            result["data"], result["message"] = self._remove_calendar(cleaned_input, user_id)
         elif purpose == "Cg":
-            result["data"], result["message"] = self._get_calender(input_value, is_silent=False, user_id=user_id)
+            result["data"], result["message"] = self._get_calender(cleaned_input, is_silent=False, user_id=user_id)
         elif purpose == "Cc":
-            result["data"], result["message"] = self._change_calendar(input_value, user_id)
+            result["data"], result["message"] = self._change_calendar(cleaned_input, user_id)
         # ... (other purpose handling remains the same) ...
         elif purpose == "Ia":
-            result["data"], result["message"] = self._add_income_expense(input_value, user_id)
+            result["data"], result["message"] = self._add_income_expense(cleaned_input, user_id)
         elif purpose == "Ig":
-            result["data"], result["message"] = self._get_income_expense(input_value, user_id)
+            result["data"], result["message"] = self._get_income_expense(cleaned_input, user_id)
         elif purpose == "Ma":
-            result["data"], result["message"] = self._add_memo(input_value)
+            result["data"], result["message"] = self._add_memo(cleaned_input)
         elif purpose == "Mg":
-            result["data"], result["message"] = self._get_memo(input_value)
+            result["data"], result["message"] = self._get_memo(cleaned_input)
         elif purpose == "Tn":
-            time_prompt = self.TIME_GET_PROMPT_TEMPLATE.format(current_time=current_time, input_value=input_value)
+            time_prompt = self.TIME_GET_PROMPT_TEMPLATE.format(current_time=current_time, cleaned_input=cleaned_input)
             result["message"] = self._gemini_request(time_prompt)
         elif purpose == "Sn":
-            result["data"], result["message"] = self._get_switchbot_devices(input_value, user_id)
+            result["data"], result["message"] = self._get_switchbot_devices(cleaned_input, user_id)
         else:
             result["message"] = "申し訳ございません。お客様の意図を特定できませんでした。"
             print(f"DEBUG: 意図不明なpurpose: {purpose}")
