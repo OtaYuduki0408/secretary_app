@@ -2,7 +2,7 @@
 from supabase_client import supabase
 from datetime import datetime, timedelta
 import pytz
-from services.ScheduleManager import ScheduleManager
+from services import local_calendar_service
 from services.finance_service import get_finance_summary, get_all_finance_records
 
 # タイムゾーン設定
@@ -45,8 +45,6 @@ def evaluate_triggers(app_logger):
     app_logger.debug(f"[{datetime.now()}] Evaluating triggers...")
     
     dispatch_list = []
-    sm = ScheduleManager()
-
     try:
         response = supabase.table('custom_orders').select('id, user_id, order_data').execute()
         orders = response.data
@@ -87,20 +85,20 @@ def evaluate_triggers(app_logger):
                         today_start = now_jst.replace(hour=0, minute=0, second=0, microsecond=0)
                         today_end = now_jst.replace(hour=23, minute=59, second=59, microsecond=999999)
                         
-                        events = sm.list_events(user_id=user_id, time_min=today_start.isoformat(), time_max=today_end.isoformat())
+                        events = local_calendar_service.get_events(user_id, today_start.isoformat(), today_end.isoformat())
                         app_logger.debug(f"list_events returned {len(events)} events.")
 
                         if events:
-                            upcoming_events = [e for e in events if datetime.fromisoformat(e['start']['dateTime']).astimezone(JST) >= now_jst]
+                            upcoming_events = [e for e in events if datetime.fromisoformat(e['start_time']).astimezone(JST) >= now_jst]
                             event = upcoming_events[0] if upcoming_events else events[0]
                             
                             action['detail'].update({
-                                'summary': event.get('summary', '名称未設定イベント'),
-                                'start_time': datetime.fromisoformat(event['start']['dateTime']).astimezone(JST).strftime('%H:%M'),
-                                'end_time': datetime.fromisoformat(event['end']['dateTime']).astimezone(JST).strftime('%H:%M'),
-                                'start_day': datetime.fromisoformat(event['start']['dateTime']).astimezone(JST).strftime('%Y年%m月%d日'),
-                                'end_day': datetime.fromisoformat(event['end']['dateTime']).astimezone(JST).strftime('%Y年%m月%d日'),
-                                'event_link': event.get('htmlLink')
+                                'summary': event.get('title', '名称未設定イベント'),
+                                'start_time': datetime.fromisoformat(event['start_time']).astimezone(JST).strftime('%H:%M'),
+                                'end_time': datetime.fromisoformat(event['end_time']).astimezone(JST).strftime('%H:%M'),
+                                'start_day': datetime.fromisoformat(event['start_time']).astimezone(JST).strftime('%Y年%m月%d日'),
+                                'end_day': datetime.fromisoformat(event['end_time']).astimezone(JST).strftime('%Y年%m月%d日'),
+                                'event_link': None
                             })
                             app_logger.debug(f"Injected calendar event details: summary={action['detail']['summary']}")
                         else:
