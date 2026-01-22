@@ -102,7 +102,7 @@ async function getActionsToExecute(conditions) {
  * @returns {Promise<void>} アクションの完了を示すPromise
  */
 function executeAction(action) {
-    return new Promise(resolve => {
+    return new Promise(async resolve => {
         console.log("アクションを実行します:", action);
         let textToSpeak = "";
         let overlayTitle = "";
@@ -158,7 +158,39 @@ function executeAction(action) {
         } else if (action.category === '収支管理' && action.sub === '読み上げ') {
             overlayTitle = "収支管理";
             overlayCategoryClass = "overlay-finance";
-            const { format, records, income_total, expense_total, balance, error } = action.detail;
+            let { format, records, income_total, expense_total, balance, error } = action.detail || {};
+            records = Array.isArray(records) ? records : [];
+
+            if (!error && (records.length === 0 || income_total == null || expense_total == null || balance == null)) {
+                try {
+                    const res = await fetch("/api/finance");
+                    if (res.ok) {
+                        const allRecords = await res.json();
+                        records = Array.isArray(allRecords) ? allRecords : [];
+                        const incomeSum = records
+                            .filter(r => r.type === 'income')
+                            .reduce((sum, r) => sum + (r.amount || 0), 0);
+                        const expenseSum = records
+                            .filter(r => r.type === 'expense')
+                            .reduce((sum, r) => sum + (r.amount || 0), 0);
+                        if (income_total == null) income_total = incomeSum;
+                        if (expense_total == null) expense_total = expenseSum;
+                        if (balance == null) balance = incomeSum - expenseSum;
+                    } else {
+                        console.warn("[finance] /api/finance fetch failed", res.status);
+                    }
+                } catch (fetchError) {
+                    console.warn("[finance] /api/finance fetch error", fetchError);
+                }
+            }
+
+            if (format === 'balance') {
+                format = 'total_balance';
+            }
+
+            if (format === 'individual' && records.length === 0) {
+                format = 'individual_empty';
+            }
 
             if (error) {
                 textToSpeak = error;
@@ -180,6 +212,10 @@ function executeAction(action) {
                             textToSpeak = "今月の収支を読み上げます。\n収入:229800円\n支出:103300円\n収支:126500円\nです。";
                             messageHtml = `<h3>${overlayTitle}</h3><p>${textToSpeak}</p>`;
                         }
+                        break;
+                    case 'individual_empty':
+                        textToSpeak = "該当する収支は見つかりませんでした。";
+                        messageHtml = `<h3>${overlayTitle}</h3><p>${textToSpeak}</p>`;
                         break;
                     case 'income':
                         textToSpeak = `期間内の収入合計は${income_total}円です。`;
