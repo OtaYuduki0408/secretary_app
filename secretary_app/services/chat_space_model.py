@@ -161,6 +161,13 @@ class ChatSpaceModel:
     Current time:{current_time}
     User input: {input_value}
     """
+    MEMO_SEARCH_KIND_PROMPT_TEMPLATE = """
+    Purpose: Decide which fields should be used to search memos.
+    Output: JSON only with keys among [time,title,priority,content,keyword].
+    Example: {{"time": true, "title": true, "priority": false, "content": false, "keyword": false}}
+    Current time:{current_time}
+    User input: {input_value}
+    """
     DELETE_MEMO_PROMPT_TEMPLATE = """
     Purpose: Delete memos. Extract fields and return JSON array only.
     Fields:
@@ -329,6 +336,25 @@ class ChatSpaceModel:
                  parsed_list.append(item)
                  
         return parsed_list
+
+    def _parse_memo_search_kind(self, text: str) -> dict:
+        if not text:
+            return {}
+        match = re.search(r"```json\s*([\s\S]*?)\s*```", text, re.I)
+        s = match.group(1) if match else text
+        try:
+            data = json.loads(s)
+        except json.JSONDecodeError:
+            return {}
+        if not isinstance(data, dict):
+            return {}
+        return {
+            "time": bool(data.get("time")),
+            "title": bool(data.get("title")),
+            "priority": bool(data.get("priority")),
+            "content": bool(data.get("content")),
+            "keyword": bool(data.get("keyword")),
+        }
 
     def _parse_switchbot_operation_list(self, text: str) -> list:
         if not text: return []
@@ -586,6 +612,17 @@ class ChatSpaceModel:
         if dt.tzinfo is None:
             dt = JST.localize(dt)
         return dt.astimezone(pytz.UTC).isoformat(timespec="seconds")
+    def _date_range_to_utc_iso(self, start_date: str, end_date: str) -> tuple[str, str]:
+        """JST??????UTC?ISO??????"""
+        start_dt = datetime.strptime(start_date, "%Y-%m-%d")
+        end_dt = datetime.strptime(end_date, "%Y-%m-%d")
+        start_jst = JST.localize(start_dt.replace(hour=0, minute=0, second=0, microsecond=0))
+        end_jst = JST.localize(end_dt.replace(hour=23, minute=59, second=59, microsecond=999999))
+        start_utc = start_jst.astimezone(pytz.UTC).isoformat()
+        end_utc = end_jst.astimezone(pytz.UTC).isoformat()
+        return start_utc, end_utc
+
+
     def _add_income_expense(self, text: str, user_id: str | None):
         """収支の追加"""
         if not user_id:
@@ -752,7 +789,16 @@ class ChatSpaceModel:
         """Search memos"""
         if not user_id:
             return None, "User is not logged in."
+
         current_time = datetime.now(JST).strftime('%Y-%m-%d %H:%M:%S')
+        kind_prompt = self.MEMO_SEARCH_KIND_PROMPT_TEMPLATE.format(
+            current_time=current_time,
+            input_value=text
+        )
+        kind_raw = self._gemini_request(kind_prompt)
+        kind = self._parse_memo_search_kind(kind_raw)
+
+        # time range first (default to last month)
         prompt = self.GET_MEMO_PROMPT_TEMPLATE.format(
             current_time=current_time,
             input_value=text
@@ -775,18 +821,29 @@ class ChatSpaceModel:
             start_date = search_info[0].get('start_date')
             end_date = search_info[0].get('end_date')
 
-        if not keyword and not title and not content and priority is None and not start_date and not end_date:
-            return None, "Missing search conditions. Provide title/content/keyword/priority/date range."
+        if not start_date or not end_date:
+            today = datetime.now(JST)
+            start_date = (today - timedelta(days=30)).strftime('%Y-%m-%d')
+            end_date = today.strftime('%Y-%m-%d')
+
+        # Decide which fields to use based on kind
+        # Convert date range to UTC ISO for DB filtering
+        start_date_utc, end_date_utc = self._date_range_to_utc_iso(start_date, end_date)
+
+        use_title = bool(kind.get('title'))
+        use_priority = bool(kind.get('priority'))
+        use_content = bool(kind.get('content'))
+        use_keyword = bool(kind.get('keyword'))
 
         search_type = "all"
         search_keyword = ""
-        if keyword:
+        if use_keyword and keyword:
             search_keyword = keyword
             search_type = "all"
-        elif title:
+        elif use_title and title:
             search_keyword = title
             search_type = "title"
-        elif content:
+        elif use_content and content:
             search_keyword = content
             search_type = "content"
 
@@ -794,18 +851,25 @@ class ChatSpaceModel:
             user_id=user_id,
             keyword=search_keyword,
             search_type=search_type,
-            start_date=start_date or "",
-            end_date=end_date or "",
+            start_date=start_date_utc,
+            end_date=end_date_utc,
             title=title or "",
             content=content or "",
-            priority=priority
+            priority=priority if use_priority else None
         )
 
         if isinstance(memos, dict) and memos.get('error'):
             return None, "Memo search error."
 
         if memos:
-            message = f"Found {len(memos)} memo(s)."
+            speak_parts = []
+            for memo in memos[:5]:
+                title_part = memo.get("title") or "無題"
+                content_part = memo.get("content") or "内容なし"
+                speak_parts.append(f"タイトルは{title_part}。内容は{content_part}。")
+            message = "メモの読み上げです。" + " ".join(speak_parts)
+            if len(memos) > 5:
+                message += f"ほか{len(memos) - 5}件あります。"
             return memos, message
 
         return [], "No matching memos found."
@@ -852,12 +916,17 @@ class ChatSpaceModel:
             search_keyword = content
             search_type = "content"
 
+        if start_date and end_date:
+            start_date_utc, end_date_utc = self._date_range_to_utc_iso(start_date, end_date)
+        else:
+            start_date_utc, end_date_utc = "", ""
+
         memos = get_all_memo_records(
             user_id=user_id,
             keyword=search_keyword,
             search_type=search_type,
-            start_date=start_date or "",
-            end_date=end_date or "",
+            start_date=start_date_utc,
+            end_date=end_date_utc,
             title=title or "",
             content=content or "",
             priority=priority
