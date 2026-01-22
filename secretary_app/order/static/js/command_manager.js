@@ -2,7 +2,7 @@ import { addConditionBlock, addAction } from './block_operations.js';
 import { populateSelect, updateSubOptions } from './ui_helpers.js';
 import { createTriggerUI, saveAddressToDB } from './trigger_ui.js';
 import { createActionUI } from './action_ui.js'; // createActionUI も必要
-import { TRIGGER_CATEGORIES, ACTION_CATEGORIES } from './constants.js';
+import { TRIGGER_CATEGORIES, TRIGGER_CATEGORIES_MAIN, ACTION_CATEGORIES } from './constants.js';
 
 export function parseActionArray(actionRoot) {
   if (!actionRoot) return [];
@@ -150,17 +150,6 @@ function parseConditionBlock(block) {
                 value.end_month = valueContainer.querySelector(`[id$="trigger_value_cal_end_month"]`)?.value;
                 value.end_day = valueContainer.querySelector(`[id$="trigger_value_cal_end_day"]`)?.value;
                 value.end_time = valueContainer.querySelector(`[id$="trigger_value_cal_end_time"]`)?.value;
-              } else if (sub === "この予定があるなら") {
-                value.search_type = valueContainer.querySelector(`[id$="trigger_value_cal_search_type"]`)?.value;
-                value.title = valueContainer.querySelector(`[id$="trigger_value_cal_event_title"]`)?.value;
-                value.start_year = valueContainer.querySelector(`[id$="trigger_value_cal_event_start_year"]`)?.value;
-                value.start_month = valueContainer.querySelector(`[id$="trigger_value_cal_event_start_month"]`)?.value;
-                value.start_day = valueContainer.querySelector(`[id$="trigger_value_cal_event_start_day"]`)?.value;
-                value.start_time = valueContainer.querySelector(`[id$="trigger_value_cal_event_start_time"]`)?.value;
-                value.end_year = valueContainer.querySelector(`[id$="trigger_value_cal_event_end_year"]`)?.value;
-                value.end_month = valueContainer.querySelector(`[id$="trigger_value_cal_event_end_month"]`)?.value;
-                value.end_day = valueContainer.querySelector(`[id$="trigger_value_cal_event_end_day"]`)?.value;
-                value.end_time = valueContainer.querySelector(`[id$="trigger_value_cal_event_end_time"]`)?.value;
               }
               break;
             case "収支管理":
@@ -192,6 +181,9 @@ function parseConditionBlock(block) {
               value.end_month = valueContainer.querySelector(`[id$='_time_end_month']`)?.value;
               value.end_day = valueContainer.querySelector(`[id$='_time_end_day']`)?.value;
               value.end_time = valueContainer.querySelector(`[id$='_time_end_time']`)?.value;
+              break;
+            case "ボイス":
+              value.keywords = valueContainer.querySelector(`[id$="trigger_value_voice_keywords"]`)?.value;
               break;
             default:
               value.value = valueContainer.querySelector(`[id$="trigger_value"]`)?.value;
@@ -253,7 +245,7 @@ export function loadCommandToForm(cmd){
 
     triggerCategorySelect.value = trigger.category || "";
     
-    updateSubOptions(triggerCategorySelect.id, triggerSubSelect.id, TRIGGER_CATEGORIES);
+    updateSubOptions(triggerCategorySelect.id, triggerSubSelect.id, TRIGGER_CATEGORIES_MAIN);
     
     triggerSubSelect.value = trigger.sub || "";
 
@@ -392,6 +384,9 @@ export async function registerCommand(){
       triggerValue.day_of_week = [...triggerContainer.querySelectorAll("#trigger_value_time_day_of_week_buttons button.selected")].map(btn => btn.dataset.value);
       triggerValue.time_start = triggerContainer.querySelector("#trigger_value_time_time_start")?.value;
       // triggerValue.time_end = triggerContainer.querySelector("#trigger_value_time_time_end")?.value; // 時間カテゴリのメインUIにはtime_endがないため削除
+      break;
+    case "ボイス":
+      triggerValue.keywords = triggerContainer.querySelector("#trigger_value_voice_keywords")?.value;
       break;
     default:
       triggerValue.value = triggerContainer.querySelector("#trigger_value")?.value;

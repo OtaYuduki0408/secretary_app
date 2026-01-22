@@ -3,7 +3,13 @@ from supabase_client import supabase
 from datetime import datetime
 import pytz
 from services import local_calendar_service
-from services.finance_service import get_all_finance_records
+from services.finance_service import (
+    get_all_finance_records,
+    get_current_balance,
+    get_monthly_expense,
+    get_daily_expense,
+    get_monthly_goal,
+)
 
 # タイムゾーン設定
 JST = pytz.timezone('Asia/Tokyo')
@@ -75,6 +81,190 @@ def _collect_actions_from_steps(steps):
     return actions
 
 
+def _safe_int(value):
+    if value is None:
+        return None
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float):
+        return int(value)
+    if isinstance(value, str):
+        raw = value.strip()
+        if not raw or "実行された" in raw:
+            return None
+        if raw.isdigit():
+            return int(raw)
+    return None
+
+
+def _safe_float(value):
+    if value is None:
+        return None
+    if isinstance(value, (int, float)):
+        return float(value)
+    if isinstance(value, str):
+        raw = value.strip()
+        if not raw or "実行された" in raw:
+            return None
+        try:
+            return float(raw)
+        except ValueError:
+            return None
+    return None
+
+
+def _normalize_jst(dt):
+    if dt.tzinfo is None:
+        return JST.localize(dt)
+    return dt.astimezone(JST)
+
+
+def _build_datetime_from_parts(year, month, day, time_str, default_dt):
+    year_val = _safe_int(year) or default_dt.year
+    month_val = _safe_int(month) or default_dt.month
+    day_val = _safe_int(day) or default_dt.day
+    hour_val = default_dt.hour
+    minute_val = default_dt.minute
+    if isinstance(time_str, str) and time_str.strip():
+        try:
+            parts = time_str.strip().split(":")
+            if len(parts) >= 2:
+                hour_val = int(parts[0])
+                minute_val = int(parts[1])
+        except (ValueError, TypeError):
+            pass
+    try:
+        return JST.localize(datetime(year_val, month_val, day_val, hour_val, minute_val))
+    except ValueError:
+        return None
+
+
+def _match_contains(text, keyword):
+    if not keyword:
+        return True
+    if not text:
+        return False
+    return keyword.lower() in text.lower()
+
+
+def _evaluate_calendar_time_trigger(trigger_value, now_jst, current_time_str, app_logger=None, user_id=None):
+    title = (trigger_value or {}).get('title') or ''
+    day_of_week = (trigger_value or {}).get('day_of_week') or []
+    start_year = (trigger_value or {}).get('start_year')
+    start_month = (trigger_value or {}).get('start_month')
+    start_day = (trigger_value or {}).get('start_day')
+    start_time = (trigger_value or {}).get('start_time')
+
+    today_start = now_jst.replace(hour=0, minute=0, second=0, microsecond=0)
+    today_end = now_jst.replace(hour=23, minute=59, second=59, microsecond=999999)
+    events = local_calendar_service.get_events(user_id, today_start.isoformat(), today_end.isoformat())
+    app_logger.debug(f"[CAL_TRIGGER_TIME] events={len(events)} user_id={user_id}")
+
+    day_mapping = {'Mon': '月', 'Tue': '火', 'Wed': '水', 'Thu': '木', 'Fri': '金', 'Sat': '土', 'Sun': '日'}
+
+    for e in events:
+        try:
+            event_start = _normalize_jst(datetime.fromisoformat(e['start_time']))
+        except Exception:
+            continue
+        if event_start.strftime('%H:%M') != current_time_str:
+            continue
+
+        if title and not _match_contains(e.get('title', ''), title):
+            continue
+
+        if day_of_week:
+            event_day = day_mapping.get(event_start.strftime('%a'), '')
+            if event_day not in day_of_week:
+                continue
+
+        if _safe_int(start_year) and event_start.year != _safe_int(start_year):
+            continue
+        if _safe_int(start_month) and event_start.month != _safe_int(start_month):
+            continue
+        if _safe_int(start_day) and event_start.day != _safe_int(start_day):
+            continue
+        if isinstance(start_time, str) and start_time.strip():
+            if event_start.strftime('%H:%M') != start_time.strip():
+                continue
+
+        app_logger.debug(f"[CAL_TRIGGER_TIME] matched event: {e.get('title')}")
+        return True
+    return False
+
+
+
+
+def _get_finance_item_value(item, user_id, now_jst, app_logger=None):
+    if item == 'total_balance':
+        return get_current_balance(user_id)
+    if item == 'remaining_to_target':
+        goal = get_monthly_goal(user_id)
+        goal_amount = (goal or {}).get('goal_amount')
+        if goal_amount is None:
+            return None
+        current_balance = get_current_balance(user_id)
+        return max(float(goal_amount) - float(current_balance), 0.0)
+    if item == 'monthly_expense':
+        return get_monthly_expense(user_id)
+    if item == 'monthly_expense_no_necessities':
+        if app_logger:
+            app_logger.debug("[FIN_TRIGGER] monthly_expense_no_necessities: 必需品判定がないため月間支出を使用")
+        return get_monthly_expense(user_id)
+    if item == 'monthly_income':
+        records = get_all_finance_records(user_id)
+        current_month = now_jst.strftime('%Y-%m')
+        return sum(
+            r.get('amount', 0) for r in records
+            if r.get('type') == 'income' and datetime.fromisoformat(r["date"]).strftime('%Y-%m') == current_month
+        )
+    if item == 'daily_expense':
+        return get_daily_expense(user_id)
+    if item == 'daily_expense_no_necessities':
+        if app_logger:
+            app_logger.debug("[FIN_TRIGGER] daily_expense_no_necessities: 必需品判定がないため日次支出を使用")
+        return get_daily_expense(user_id)
+    return None
+
+
+def _evaluate_finance_threshold_trigger(trigger_value, now_jst, app_logger=None, user_id=None):
+    item = (trigger_value or {}).get('item') or ''
+    amount = _safe_float((trigger_value or {}).get('amount'))
+    percentage = _safe_float((trigger_value or {}).get('percentage'))
+
+    value = _get_finance_item_value(item, user_id, now_jst, app_logger)
+    if value is None:
+        app_logger.debug(f"[FIN_TRIGGER] value is None for item={item}")
+        return False
+
+    goal_amount = None
+    if percentage is not None:
+        goal = get_monthly_goal(user_id)
+        goal_amount = (goal or {}).get('goal_amount')
+        if goal_amount is None:
+            app_logger.debug("[FIN_TRIGGER] percentage provided but goal_amount is None")
+            return False
+
+    triggered = False
+    if item == 'remaining_to_target':
+        if amount is not None:
+            triggered = value <= amount
+        elif percentage is not None and goal_amount is not None:
+            threshold = float(goal_amount) * (percentage / 100.0)
+            triggered = value <= threshold
+    else:
+        if amount is not None:
+            triggered = value >= amount
+        elif percentage is not None and goal_amount is not None:
+            threshold = float(goal_amount) * (percentage / 100.0)
+            triggered = value >= threshold
+
+    app_logger.debug(
+        f"[FIN_TRIGGER] item={item} value={value} amount={amount} percentage={percentage} triggered={triggered}"
+    )
+    return triggered
+
+
 def evaluate_triggers(app_logger):
     # 定期的にトリガーを評価
     app_logger.debug(f"[{datetime.now()}] Evaluating triggers...")
@@ -106,10 +296,22 @@ def evaluate_triggers(app_logger):
 
         trigger = order_data['triggers'][0]
         app_logger.debug(f"[TRIGGER] {trigger}")
-        if trigger.get('category') != '時間':
+        trigger_category = trigger.get('category')
+        trigger_sub = trigger.get('sub')
+        trigger_value = trigger.get('value') or {}
+
+        should_fire = False
+        if trigger_category == '時間':
+            should_fire = _evaluate_time_trigger(trigger, now_jst, current_time_str, current_day_of_week_jp, app_logger)
+        elif trigger_category == 'カレンダー' and trigger_sub == '予定の時間になったら':
+            should_fire = _evaluate_calendar_time_trigger(trigger_value, now_jst, current_time_str, app_logger, user_id)
+        elif trigger_category == '収支管理' and trigger_sub == '特定金額になったら':
+            should_fire = _evaluate_finance_threshold_trigger(trigger_value, now_jst, app_logger, user_id)
+        else:
+            app_logger.debug(f"[TRIGGER] skip category={trigger_category} sub={trigger_sub}")
             continue
 
-        if _evaluate_time_trigger(trigger, now_jst, current_time_str, current_day_of_week_jp, app_logger):
+        if should_fire:
             app_logger.debug(f"Trigger activated for user {user_id}. Processing actions...")
             steps = order_data.get('steps')
             actions_to_process = []

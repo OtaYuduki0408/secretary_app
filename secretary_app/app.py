@@ -42,6 +42,7 @@ from services.chat_space_model import ChatSpaceModel
 from services.memo_routes import memo_bp
 from services.ScheduleManager import ScheduleManager
 from services.user_settings_service import get_user_settings, upsert_user_settings
+from services.custom_order_service import get_all_orders
 from order.models import db
 from models.event import Event
 from order.custom_order_routes import custom_order_bp
@@ -588,6 +589,147 @@ def chat_api_external():
 import re
 from services import local_calendar_service
 
+
+def _normalize_keyword_list(raw):
+    if raw is None:
+        return []
+    if isinstance(raw, list):
+        items = []
+        for item in raw:
+            if item is None:
+                continue
+            items.extend(_normalize_keyword_list(item))
+        return items
+    if not isinstance(raw, str):
+        raw = str(raw)
+    parts = re.split(r"[,\n、]+", raw)
+    return [p.strip() for p in parts if p.strip()]
+
+
+def _match_keywords(text, keywords):
+    if not text or not keywords:
+        return False
+    lowered = text.lower()
+    return any(k.lower() in lowered for k in keywords)
+
+
+def _evaluate_filters(filters, text):
+    if not filters:
+        return True
+    target = (text or "").lower()
+    result = None
+    for idx, f in enumerate(filters):
+        token = (f.get('text') or '').strip()
+        if not token:
+            continue
+        contains = token.lower() in target
+        logic = (f.get('logic') or '').upper()
+        if idx == 0:
+            current = (not contains) if logic == 'NOT' else contains
+        else:
+            current = contains
+        if result is None:
+            result = current
+            continue
+        if logic == 'AND':
+            result = result and current
+        elif logic == 'OR':
+            result = result or current
+        elif logic == 'NOT':
+            result = result and (not current)
+        elif logic == 'NAND':
+            result = not (result and current)
+        elif logic == 'NOR':
+            result = not (result or current)
+        elif logic == 'XOR':
+            result = (result and not current) or (not result and current)
+        elif logic == 'XNOR':
+            result = (result and current) or (not result and not current)
+        else:
+            result = result and current
+    return True if result is None else result
+
+
+def _map_purpose_to_action(purpose):
+    if not isinstance(purpose, str) or len(purpose) < 2:
+        return None, None
+    category_map = {
+        'C': 'カレンダー',
+        'I': '収支管理',
+        'M': 'メモ',
+    }
+    action_map = {
+        'a': '追加',
+        'd': '削除',
+        'c': '変更',
+        'g': '取得',
+        's': '検索',
+    }
+    category = category_map.get(purpose[0])
+    action = action_map.get(purpose[1])
+    return category, action
+
+
+def _dispatch_order_payload(user_id, order_payload):
+    sid = connected_users.get(user_id)
+    if not sid:
+        app.logger.debug(f"[INPUT_TRIGGER] User {user_id} is not connected. Command not dispatched.")
+        return
+    socketio.emit('dispatch_command', order_payload, room=sid)
+    app.logger.debug(f"[INPUT_TRIGGER] Dispatched command to user {user_id}.")
+
+
+def _handle_input_triggers(user_input, response_data, user_id):
+    if not user_id:
+        return
+    if response_data.get('status') != 'success':
+        return
+    orders = get_all_orders(user_id)
+    if isinstance(orders, dict) and orders.get('error'):
+        app.logger.debug(f"[INPUT_TRIGGER] get_all_orders error: {orders.get('error')}")
+        return
+    purpose = response_data.get('purpose')
+    purpose_category, purpose_action = _map_purpose_to_action(purpose)
+    for order in orders:
+        triggers = order.get('triggers') or []
+        if not triggers:
+            continue
+        trigger = triggers[0]
+        category = trigger.get('category')
+        sub = trigger.get('sub')
+        value = trigger.get('value') or {}
+        if category == 'ボイス':
+            keywords = _normalize_keyword_list(value.get('keywords') or value.get('keyword') or value.get('value'))
+            if _match_keywords(user_input, keywords):
+                payload = {k: order.get(k) for k in ['triggers', 'actions', 'conditions', 'steps'] if k in order}
+                app.logger.debug(f"[INPUT_TRIGGER] Voice matched keywords={keywords}")
+                _dispatch_order_payload(user_id, payload)
+            continue
+
+        if sub != '入力があったら':
+            continue
+        if category != purpose_category:
+            continue
+        actions = value.get('actions') or []
+        if actions and purpose_action not in actions:
+            continue
+
+        if category in ('カレンダー', 'メモ'):
+            filters = value.get('filters') or []
+            if not _evaluate_filters(filters, user_input):
+                continue
+
+        if category == '収支管理' and purpose_action == '追加':
+            genres = value.get('genres') or []
+            if genres and response_data.get('data'):
+                matched = any((r.get('category') in genres) for r in response_data.get('data') if isinstance(r, dict))
+                if not matched:
+                    continue
+
+        payload = {k: order.get(k) for k in ['triggers', 'actions', 'conditions', 'steps'] if k in order}
+        app.logger.debug(f"[INPUT_TRIGGER] Matched trigger category={category} action={purpose_action}")
+        _dispatch_order_payload(user_id, payload)
+
 @app.route('/web_api/chat', methods=['POST'])
 @login_required # セッションベース認証
 def chat_api_web():
@@ -718,6 +860,7 @@ def chat_api_web():
                 app.logger.debug(f"DEBUG: Googleアカウントがリンクされていません。response_data: {response_data}")
                 return jsonify(response_data), 401
             response_data['status'] = 'error'
+    _handle_input_triggers(user_input, response_data, user_id)
     app.logger.debug(f"DEBUG: chat_api_webからの最終レスポンス: {response_data}")
     return jsonify(response_data)# メモAPIのBlueprint
 
