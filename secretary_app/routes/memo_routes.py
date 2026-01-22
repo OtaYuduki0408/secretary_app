@@ -40,3 +40,12 @@ def delete_memo_route(memo_id):
         # メモが存在しない、または削除に失敗した場合
         return jsonify(result), 404 
     return jsonify({"message": f"メモ(ID={memo_id})を削除しました"})
+
+@memo_bp.route('/<string:memo_id>', methods=['PUT'])
+def update_memo_route(memo_id):
+    data = request.get_json()
+    result = update_memo(memo_id=memo_id, data=data)
+
+    if "error" in result:
+        return jsonify(result), 404
+    return jsonify({"message": f"メモ(ID={memo_id})を更新しました", "memo": result})
