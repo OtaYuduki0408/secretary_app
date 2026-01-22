@@ -14,6 +14,34 @@ def _evaluate_time_trigger(trigger, now_jst, current_time_str, current_day_of_we
     if not trigger_value:
         return False
 
+def _collect_actions_from_condition(condition):
+    actions = []
+    if not isinstance(condition, dict):
+        return actions
+    actions.extend(condition.get('actions', []) or [])
+    for nested in condition.get('nested', []) or []:
+        actions.extend(_collect_actions_from_condition(nested))
+    return actions
+
+
+def _collect_actions_from_steps(steps):
+    actions = []
+    if not isinstance(steps, list):
+        return actions
+    for step in steps:
+        if not isinstance(step, dict):
+            continue
+        if step.get('kind') == 'action' or step.get('type') == 'action':
+            action = step.get('action') or (step if step.get('category') else None)
+            if action:
+                actions.append(action)
+            continue
+        if step.get('kind') == 'condition' or step.get('type') == 'condition' or step.get('expr') or step.get('type') in ('if', 'else'):
+            condition = step.get('condition') or step
+            actions.extend(_collect_actions_from_condition(condition))
+    return actions
+
+
     trigger_year = trigger_value.get('year')
     trigger_month = trigger_value.get('month')
     trigger_day = trigger_value.get('day')
@@ -70,12 +98,23 @@ def evaluate_triggers(app_logger):
 
         if _evaluate_time_trigger(trigger, now_jst, current_time_str, current_day_of_week_jp):
             app_logger.debug(f"Trigger activated for user {user_id}. Processing actions...")
-            app_logger.debug(f"DEBUG: Actions in order_data before processing: {order_data.get('actions', [])}")
+            steps = order_data.get('steps')
+            actions_to_process = []
+            if isinstance(steps, list) and steps:
+                actions_to_process = _collect_actions_from_steps(steps)
+                app_logger.debug(f"DEBUG: Actions in order_data steps before processing: {actions_to_process}")
+            else:
+                actions_to_process.extend(order_data.get('actions', []) or [])
+                for condition in order_data.get('conditions', []) or []:
+                    actions_to_process.extend(_collect_actions_from_condition(condition))
+                app_logger.debug(f"DEBUG: Actions in order_data before processing: {actions_to_process}")
 
             modified_actions = []
 
-            for action in order_data.get('actions', []):
-                if action.get('category') == 'カレンダー' and action.get('sub') == '読み上げ':
+            for action in actions_to_process:
+                if not isinstance(action, dict):
+                    continue
+                if action.get('category') == '?????' and action.get('sub') == '????':
                     try:
                         today_start = now_jst.replace(hour=0, minute=0, second=0, microsecond=0)
                         today_end = now_jst.replace(hour=23, minute=59, second=59, microsecond=999999)
@@ -90,30 +129,30 @@ def evaluate_triggers(app_logger):
                                     start_dt = datetime.fromisoformat(e['start_time']).astimezone(JST)
                                     end_dt = datetime.fromisoformat(e['end_time']).astimezone(JST)
                                     event_items.append({
-                                        'summary': e.get('title', '予定'),
+                                        'summary': e.get('title', '??'),
                                         'start_time': start_dt.strftime('%H:%M'),
                                         'end_time': end_dt.strftime('%H:%M'),
-                                        'start_day': f"{start_dt.year}年{start_dt.month}月{start_dt.day}日",
-                                        'end_day': f"{end_dt.year}年{end_dt.month}月{end_dt.day}日",
+                                        'start_day': f"{start_dt.year}?{start_dt.month}?{start_dt.day}?",
+                                        'end_day': f"{end_dt.year}?{end_dt.month}?{end_dt.day}?",
                                         'event_link': None
                                     })
                                 except Exception as err:
                                     app_logger.debug(f"Failed to parse event for read aloud: {err}")
 
                             if event_items:
-                                action['detail']['events'] = event_items
+                                action.setdefault('detail', {})['events'] = event_items
                                 action['detail'].update(event_items[0])
                                 action['detail']['summary'] = event_items[0]['summary']
                                 app_logger.debug(f"Injected calendar event details: count={len(event_items)}")
                             else:
-                                action['detail']['summary'] = '今日の予定はありません'
+                                action.setdefault('detail', {})['summary'] = '???????????'
                         else:
-                            action['detail']['summary'] = '今日の予定はありません'
+                            action.setdefault('detail', {})['summary'] = '???????????'
                     except Exception as e:
                         app_logger.error(f"Error processing calendar action for user {user_id}: {e}")
-                        action['detail']['summary'] = 'カレンダー情報の取得に失敗しました。'
+                        action.setdefault('detail', {})['summary'] = '????????????????????'
 
-                elif action.get('category') == '収支管理' and action.get('sub') == '読み上げ':
+                elif action.get('category') == '????' and action.get('sub') == '????':
                     try:
                         format_type = action.get('detail', {}).get('format')
                         app_logger.debug(f"Processing finance action for format: {format_type}")
@@ -136,11 +175,12 @@ def evaluate_triggers(app_logger):
                             )
                     except Exception as e:
                         app_logger.error(f"Error processing finance action for user {user_id}: {e}", exc_info=True)
-                        action.setdefault('detail', {})['error'] = '収支情報の取得に失敗しました。'
+                        action.setdefault('detail', {})['error'] = '?????????????????'
 
                 modified_actions.append(action)
 
-            order_data['actions'] = modified_actions
+            if not (isinstance(steps, list) and steps):
+                order_data['actions'] = modified_actions
             dispatch_list.append((user_id, order_data))
 
     return dispatch_list

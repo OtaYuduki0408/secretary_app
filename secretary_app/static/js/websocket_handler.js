@@ -96,6 +96,58 @@ async function getActionsToExecute(conditions) {
     return null;
 }
 
+
+function extractConditionFromStep(step) {
+    if (!step) return null;
+    if (step.kind === 'condition') return step.condition || null;
+    if (step.type === 'condition' && step.condition) return step.condition;
+    if (step.expr || step.type === 'if' || step.type === 'else') return step;
+    return null;
+}
+
+function extractActionFromStep(step) {
+    if (!step) return null;
+    if (step.kind === 'action') return step.action || null;
+    if (step.type === 'action' && step.action) return step.action;
+    if (step.category) return step;
+    return null;
+}
+
+async function executeStepsInOrder(steps) {
+    if (!Array.isArray(steps) || steps.length === 0) {
+        return;
+    }
+
+    let i = 0;
+    while (i < steps.length) {
+        const currentStep = steps[i];
+        const condition = extractConditionFromStep(currentStep);
+
+        if (condition) {
+            const conditionGroup = [];
+            while (i < steps.length) {
+                const nextCondition = extractConditionFromStep(steps[i]);
+                if (!nextCondition) break;
+                conditionGroup.push(nextCondition);
+                i += 1;
+            }
+            const actionsToExecute = await getActionsToExecute(conditionGroup);
+            if (actionsToExecute && actionsToExecute.length > 0) {
+                for (const action of actionsToExecute) {
+                    await executeAction(action);
+                }
+            }
+            continue;
+        }
+
+        const action = extractActionFromStep(currentStep);
+        if (action) {
+            await executeAction(action);
+        }
+        i += 1;
+    }
+}
+
 /**
  * オーバーレイの終了ボタンを追加する
  * @param {HTMLElement} overlay - オーバーレイ要素
@@ -399,6 +451,12 @@ function setupWebSocket() {
 
     socket.on('dispatch_command', async (order_data) => {
         console.log('サーバーからコマンドディスパッチを受け取りました:', order_data);
+        const steps = Array.isArray(order_data.steps) ? order_data.steps : [];
+        if (steps.length > 0) {
+            await executeStepsInOrder(steps);
+            return;
+        }
+
         const conditions = order_data.conditions || [];
         const top_level_actions = order_data.actions || [];
 
@@ -410,12 +468,12 @@ function setupWebSocket() {
         }
 
         if (actionsToExecute && actionsToExecute.length > 0) {
-            console.log("条件を満たしました。アクションを実行します。");
+            console.log("??????????????????????");
             for (const action of actionsToExecute) {
                 await executeAction(action);
             }
         } else {
-            console.log("実行すべきアクションはありませんでした。");
+            console.log("????????????????????");
         }
     });
 }
