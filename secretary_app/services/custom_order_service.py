@@ -17,7 +17,8 @@ def get_all_orders(user_id: str):
 
         return response.data or []
     except Exception as e:
-        print(f"❗ get_all_orders エラー: {e}")
+        from flask import current_app
+        current_app.logger.error(f"❗ get_all_orders エラー: {e}")
         return {"error": f"データベースからの命令読み込みに失敗しました: {str(e)}"}
 
 def create_order(user_id: str, data: dict):
@@ -37,7 +38,8 @@ def create_order(user_id: str, data: dict):
             return response.data[0]
         return {"error": "命令の挿入に失敗しました"}
     except Exception as e:
-        print(f"❗ create_order エラー: {e}")
+        from flask import current_app
+        current_app.logger.error(f"❗ create_order エラー: {e}")
         return {"error": str(e)}
 
 def update_order(user_id: str, order_id: int, data: dict):
@@ -63,7 +65,8 @@ def update_order(user_id: str, order_id: int, data: dict):
             return response.data[0]
         return {"error": "指定したIDの命令は存在しないか、権限がありません"}
     except Exception as e:
-        print(f"❗ update_order エラー: {e}")
+        from flask import current_app
+        current_app.logger.error(f"❗ update_order エラー: {e}")
         return {"error": str(e)}
 
 def delete_order(user_id: str, order_id: int):
@@ -81,5 +84,6 @@ def delete_order(user_id: str, order_id: int):
             return {"error": "指定したIDの命令は存在しないか、権限がありません"}
         return {"message": f"命令(ID={order_id})を削除しました"}
     except Exception as e:
-        print(f"❗ delete_order エラー: {e}")
+        from flask import current_app
+        current_app.logger.error(f"❗ delete_order エラー: {e}")
         return {"error": str(e)}

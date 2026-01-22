@@ -67,7 +67,8 @@ def add_memo(user_id: str, title: str, content: str, is_pinned: bool, priority: 
             return response.data[0]
         return {"error": "メモの挿入に失敗しました"}
     except Exception as e:
-        print("❗ add_memo エラー:", e)
+        from flask import current_app
+        current_app.logger.error(f"❗ add_memo エラー: {e}")
         return {"error": str(e)}
 
 
@@ -90,7 +91,8 @@ def delete_memo(user_id: str, memo_id: str):
             return {"error": "指定したIDのメモは存在しません"}
         return {"message": f"メモ(ID={memo_id})を削除しました"}
     except Exception as e:
-        print("❗ delete_memo エラー:", e)
+        from flask import current_app
+        current_app.logger.error(f"❗ delete_memo エラー: {e}")
         return {"error": str(e)}
 
 
@@ -113,7 +115,8 @@ def update_memo(user_id: str, memo_id: str, data: dict):
             return response.data[0]
         return {"error": "指定したIDのメモは存在しません"}
     except Exception as e:
-        print("❗ update_memo エラー:", e)
+        from flask import current_app
+        current_app.logger.error(f"❗ update_memo エラー: {e}")
         return {"error": str(e)}
 
 
@@ -136,5 +139,6 @@ def delete_memos_bulk(user_id: str, memo_ids: list):
             return {"error": "指定したIDのメモは存在せず、削除に失敗しました"}
         return {"message": f"{len(response.data)}件のメモを削除しました"}
     except Exception as e:
-        print("❗ delete_memos_bulk エラー:", e)
+        from flask import current_app
+        current_app.logger.error(f"❗ delete_memos_bulk エラー: {e}")
         return {"error": str(e)}

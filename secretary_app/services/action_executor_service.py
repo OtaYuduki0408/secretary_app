@@ -115,8 +115,8 @@ def _execute_calendar_read_aloud(user_id: str, detail_data: dict, triggered_at: 
 
     except Exception as e:
         import traceback
-        print(f"カレンダー読み上げ: 日時解析エラー: {e}")
-        print(traceback.format_exc())
+        current_app.logger.error(f"カレンダー読み上げ: 日時解析エラー: {e}")
+        current_app.logger.error(traceback.format_exc())
         return {"status": "error", "message": f"カレンダー読み上げに失敗しました: 日時解析エラー {e}"}
 
     # ScheduleManagerを使ってイベントを取得
@@ -275,7 +275,7 @@ def _execute_finance_read_aloud(user_id: str, detail_data: dict, triggered_at: d
             end_datetime = JST.localize(datetime(e_year, e_month, e_day, e_hour, e_minute))
 
         except Exception as e:
-            print(f"収支読み上げ: 日時解析エラー: {e}")
+            current_app.logger.error(f"収支読み上げ: 日時解析エラー: {e}")
             return {"status": "error", "message": f"日時形式の解析に失敗しました: {e}"}
 
         date_range_str = f"{start_datetime.strftime('%Y年%m月%d日')}から{end_datetime.strftime('%Y年%m月%d日')}"
@@ -402,7 +402,7 @@ def _execute_memo_read_aloud(user_id: str, detail_data: dict, triggered_at: date
         start_datetime = JST.localize(start_datetime)
         end_datetime = JST.localize(end_datetime)
     except Exception as e:
-        print(f"メモ読み上げ: 日時解析エラー: {e}")
+        current_app.logger.error(f"メモ読み上げ: 日時解析エラー: {e}")
         # エラーが発生しても続行できるよう、ここではエラーを返さない（全体をフィルタリングしない）
 
     # get_all_memos関数には直接datetimeオブジェクトを渡せないため、isoformatに変換
@@ -484,7 +484,7 @@ def _execute_email_send(user_id: str, detail_data: dict) -> dict:
         
         return {"status": "success", "message": f"メールを{to_email}に送信しました。件名: {subject}"}
     except Exception as e:
-        print(f"メール送信エラー: {e}")
+        current_app.logger.error(f"メール送信エラー: {e}")
         return {"status": "error", "message": f"メール送信に失敗しました: {str(e)}"}
 
 
@@ -533,7 +533,7 @@ def execute_action(user_id: str, action_data: dict) -> dict: # triggered_atをac
     # action_data内のtriggered_atを使用
     triggered_at_iso = action_data.get('triggered_at')
     if not triggered_at_iso:
-        print("ERROR: action_dataにtriggered_atが含まれていません。")
+        current_app.logger.error("ERROR: action_dataにtriggered_atが含まれていません。")
         return {"status": "error", "message": "アクション実行時にトリガー時刻が不明です。"}
     triggered_at = datetime.fromisoformat(triggered_at_iso)
 
@@ -544,11 +544,15 @@ def execute_action(user_id: str, action_data: dict) -> dict: # triggered_atをac
             end_time_str = detail.get('end_time')
             description = detail.get('description')
 
+            current_app.logger.debug(f"Calendar Add Action: title={title}, start_time_str={start_time_str}, end_time_str={end_time_str}, description={description}")
+
             if not title or not start_time_str or not end_time_str:
+                current_app.logger.error("Calendar Add Action: Missing required information.")
                 return {"status": "error", "message": "カレンダーイベントの追加に必要な情報が不足しています。"}
 
             start_time = datetime.fromisoformat(start_time_str)
             end_time = datetime.fromisoformat(end_time_str)
+            current_app.logger.debug(f"Calendar Add Action: Converted times: start_time={start_time}, end_time={end_time}")
 
             from services import local_calendar_service
             new_event = local_calendar_service.add_event(
@@ -558,14 +562,19 @@ def execute_action(user_id: str, action_data: dict) -> dict: # triggered_atをac
                 end_time=end_time,
                 description=description
             )
+            current_app.logger.debug(f"Calendar Add Action: local_calendar_service.add_event result: {new_event}")
             
             # WebSocketでカレンダーの更新を通知
             sid = connected_users.get(user_id)
             if sid:
                 socketio.emit('calendar_updated', {'message': 'A new event was added.'}, room=sid)
+                current_app.logger.debug(f"Calendar Add Action: Emitted 'calendar_updated' to user_id={user_id}, sid={sid}")
+            else:
+                current_app.logger.warning(f"Calendar Add Action: User {user_id} not connected via WebSocket. Cannot emit update.")
 
             return {"status": "success", "message": f"カレンダーに予定「{title}」を追加しました。"}
         except Exception as e:
+            current_app.logger.error(f"Calendar Add Action: Error adding event: {e}", exc_info=True)
             return {"status": "error", "message": f"カレンダーイベントの追加中にエラーが発生しました: {e}"}
     elif category == 'カレンダー' and sub == '読み上げ':
         return _execute_calendar_read_aloud(user_id, detail, triggered_at)
