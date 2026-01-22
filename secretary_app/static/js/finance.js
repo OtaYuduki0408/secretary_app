@@ -137,73 +137,169 @@ document.addEventListener("DOMContentLoaded", () => {
     drawExpenseChart(currentExpenseRecords);
   }
 
-  function drawIncomeChart(records) {
-    const ctx = document.getElementById('incomeChart').getContext('2d');
-    if (incomeChart) incomeChart.destroy();
+            function drawIncomeChart(records) {
 
-    const monthlyData = records.reduce((acc, r) => {
-      const m = (r.dateKey || "").substring(0, 7); // YYYY-MM
-      if (!m) return acc;
-      acc[m] = (acc[m] || 0) + Number(r.amount || 0);
-      return acc;
-    }, {});
-    const labels = Object.keys(monthlyData).sort();
-    const data = labels.map(l => monthlyData[l]);
+              const ctx = document.getElementById('incomeChart').getContext('2d');
 
-    incomeChart = new Chart(ctx, {
-      type: 'bar',
-      data: {
-        labels,
-        datasets: [{
-          label: '収入',
-          data,
-          backgroundColor: 'rgba(0, 188, 212, 0.8)',
-          borderColor: 'rgba(0, 188, 212, 1)',
-          borderWidth: 1
-        }]
-      },
-      options: {
-        responsive: true,
-        scales: { y: { beginAtZero: true } }
-      }
-    });
-  }
+              if (incomeChart) incomeChart.destroy();
 
-  function drawExpenseChart(records) {
-    const ctx = document.getElementById('expenseChart').getContext('2d');
-    if (expenseChart) expenseChart.destroy();
+          
 
-    const categories = [...new Set(records.map(r => r.category))];
-    const categoryColorMap = generateCategoryColors(categories);
+              const categoryTotals = records.reduce((acc, r) => {
 
-    const monthlyData = records.reduce((acc, r) => {
-      const m = (r.dateKey || "").substring(0, 7);
-      if (!m) return acc;
-      if (!acc[m]) acc[m] = {};
-      const cat = r.category || "未分類";
-      acc[m][cat] = (acc[m][cat] || 0) + Number(r.amount || 0);
-      return acc;
-    }, {});
-    const labels = Object.keys(monthlyData).sort();
+                const cat = r.category || "未分類";
 
-    const datasets = categories.map(category => ({
-      label: category,
-      data: labels.map(l => monthlyData[l][category] || 0),
-      backgroundColor: categoryColorMap[category]
-    }));
+                acc[cat] = (acc[cat] || 0) + Number(r.amount || 0);
 
-    expenseChart = new Chart(ctx, {
-      type: 'bar',
-      data: { labels, datasets },
-      options: {
-        responsive: true,
-        scales: {
-          x: { stacked: true },
-          y: { stacked: true, beginAtZero: true }
-        }
-      }
-    });
-  }
+                return acc;
+
+              }, {});
+
+          
+
+              const labels = Object.keys(categoryTotals);
+
+              const data = labels.map(l => categoryTotals[l]);
+
+          
+
+              incomeChart = new Chart(ctx, {
+
+                type: 'bar',
+
+                data: {
+
+                  labels,
+
+                  datasets: [{
+
+                    label: '収入',
+
+                    data,
+
+                    backgroundColor: 'rgba(0, 188, 212, 0.8)',
+
+                    borderColor: 'rgba(0, 188, 212, 1)',
+
+                    borderWidth: 1
+
+                  }]
+
+                },
+
+                options: {
+
+                  responsive: true,
+
+                  scales: {
+
+                    y: {
+
+                      beginAtZero: true
+
+                    }
+
+                  },
+
+                  plugins: {
+
+                    legend: {
+
+                      display: false
+
+                    },
+
+                    title: {
+
+                      display: true,
+
+                      text: 'カテゴリ別収入'
+
+                    }
+
+                  }
+
+                }
+
+              });
+
+            }
+
+          
+
+            function drawExpenseChart(records) {
+
+              const ctx = document.getElementById('expenseChart').getContext('2d');
+
+              if (expenseChart) expenseChart.destroy();
+
+          
+
+              const categoryTotals = records.reduce((acc, r) => {
+
+                const cat = r.category || "未分類";
+
+                acc[cat] = (acc[cat] || 0) + Number(r.amount || 0);
+
+                return acc;
+
+              }, {});
+
+          
+
+              const labels = Object.keys(categoryTotals);
+
+              const data = labels.map(l => categoryTotals[l]);
+
+              const backgroundColors = generateCategoryColors(labels);
+
+          
+
+              expenseChart = new Chart(ctx, {
+
+                type: 'pie',
+
+                data: {
+
+                  labels: labels,
+
+                  datasets: [{
+
+                    data: data,
+
+                    backgroundColor: Object.values(backgroundColors)
+
+                  }]
+
+                },
+
+                options: {
+
+                  responsive: true,
+
+                  plugins: {
+
+                    legend: {
+
+                      position: 'top',
+
+                    },
+
+                    title: {
+
+                      display: true,
+
+                      text: 'カテゴリ別支出'
+
+                    }
+
+                  }
+
+                }
+
+              });
+
+            }
 
   function generateCategoryColors(categories) {
     const colors = {};

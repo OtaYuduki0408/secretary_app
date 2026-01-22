@@ -756,6 +756,7 @@ atexit.register(lambda: scheduler.shutdown())
 if __name__ == '__main__':
     # Werkzeugのリローダーによる重複起動を防ぐため、メインプロセスでのみスケジューラを起動
     if os.environ.get('WERKZEUG_RUN_MAIN') != 'true':
+        app.debug = False # Debug modeを明示的にFalseに設定
         # APSchedulerジョブの登録
         scheduler.add_job(
             id='time_trigger_evaluator',
@@ -768,4 +769,4 @@ if __name__ == '__main__':
         )
         scheduler.start()
         
-    socketio.run(app, host='0.0.0.0', port=5000, debug=True, ssl_context='adhoc', use_reloader=False)
+    socketio.run(app, host='0.0.0.0', port=5000, debug=False, ssl_context='adhoc', use_reloader=False)
