@@ -61,13 +61,20 @@ export async function check_chat_Space(inputValue) {
   console.log("入力検知:", inputValue);
   // console.log(`DEBUG: ユーザー入力読み上げ: "${inputValue}でございますね。かしこまりました。"`); // デバッグログ削除
 
-  async function applyToneSetting(message) {
+  async function applyToneSetting(message, applyTarget) {
     try {
       const raw = localStorage.getItem('appSettings');
       if (!raw) return message;
       const settings = JSON.parse(raw);
-      const tone = settings?.main?.tone || '';
-      if (!tone.trim()) return message;
+      const toneByTarget = {
+        input: settings?.main?.toneInput || '',
+        response: settings?.main?.toneResponse || '',
+        error: settings?.main?.toneError || '',
+      };
+      const tone = applyTarget ? toneByTarget[applyTarget] : '';
+      if (!tone || !tone.trim()) {
+        return message;
+      }
       const response = await fetch('/web_api/transform_tone', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -84,7 +91,7 @@ export async function check_chat_Space(inputValue) {
     }
   }
 
-  const initialSpeakText = await applyToneSetting(`${inputValue}ですね。`);
+  const initialSpeakText = await applyToneSetting(`${inputValue}ですね。`, 'input');
   reader.speak(initialSpeakText);
 
   // 読み込み中の動的表示を追加
@@ -128,7 +135,7 @@ export async function check_chat_Space(inputValue) {
     fire('analysis:step', { index: 1, label: '処理完了' });
 
     if (result.message) {
-      const finalMessage = await applyToneSetting(result.message);
+      const finalMessage = await applyToneSetting(result.message, 'response');
       console.log(`DEBUG: API応答メッセージ読み上げ: "${finalMessage}"`);
       if (window.addResponseLogEntry) {
         window.addResponseLogEntry(finalMessage);
@@ -204,7 +211,7 @@ export async function check_chat_Space(inputValue) {
 
   } catch (error) {
     console.error("ChatSpace API呼び出しエラー:", error);
-    const errorMessage = await applyToneSetting("申し訳ございません。処理中にエラーが発生しました。");
+    const errorMessage = await applyToneSetting("申し訳ございません。処理中にエラーが発生しました。", 'error');
     reader.speak(errorMessage);
   } finally {
     if (loadingIndicator) {

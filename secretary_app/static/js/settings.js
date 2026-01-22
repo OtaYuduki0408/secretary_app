@@ -6,7 +6,9 @@
     main: {
       backgroundColor: '#0b1f38',
       voiceName: '',
-      tone: '',
+      toneInput: '',
+      toneResponse: '',
+      toneError: '',
       stripeColor: '#7aa8ff',
       buttonColor: '#7aa8ff',
       wakeWords: 'サイレントメイト,ぼいすめいと,voicemate,高速実行,クイックコマンド',
@@ -32,7 +34,9 @@
     wakeWord: document.getElementById('wake-word'),
     stripeColor: document.getElementById('stripe-color'),
     mainButtonColor: document.getElementById('main-button-color'),
-    toneSetting: document.getElementById('tone-setting'),
+    toneInput: document.getElementById('tone-input'),
+    toneResponse: document.getElementById('tone-response'),
+    toneError: document.getElementById('tone-error'),
     voiceSelect: document.getElementById('voice-select'),
     characterEnabled: document.getElementById('character-enabled'),
     characterSize: document.getElementById('character-size'),
@@ -121,7 +125,9 @@
   if (elements.wakeWord) elements.wakeWord.value = settings.main.wakeWords || '';
   if (elements.stripeColor) elements.stripeColor.value = settings.main.stripeColor || '#7aa8ff';
   if (elements.mainButtonColor) elements.mainButtonColor.value = settings.main.buttonColor || '#7aa8ff';
-  if (elements.toneSetting) elements.toneSetting.value = settings.main.tone || '';
+  if (elements.toneInput) elements.toneInput.value = settings.main.toneInput || '';
+  if (elements.toneResponse) elements.toneResponse.value = settings.main.toneResponse || '';
+  if (elements.toneError) elements.toneError.value = settings.main.toneError || '';
   if (elements.voiceSelect) elements.voiceSelect.value = settings.main.voiceName;
   if (elements.characterEnabled) elements.characterEnabled.checked = settings.character.enabled !== false;
   if (elements.characterSize) elements.characterSize.value = settings.character.size;
@@ -243,8 +249,18 @@
     document.dispatchEvent(new CustomEvent('app-settings:updated'));
   });
 
-  elements.toneSetting?.addEventListener('input', (event) => {
-    settings.main.tone = event.target.value;
+  elements.toneInput?.addEventListener('input', (event) => {
+    settings.main.toneInput = event.target.value;
+    saveSettings(settings);
+  });
+
+  elements.toneResponse?.addEventListener('input', (event) => {
+    settings.main.toneResponse = event.target.value;
+    saveSettings(settings);
+  });
+
+  elements.toneError?.addEventListener('input', (event) => {
+    settings.main.toneError = event.target.value;
     saveSettings(settings);
   });
 
