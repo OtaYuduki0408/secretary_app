@@ -13,6 +13,15 @@ console.log(`DEBUG: TextToSpeechReader初期化。利用可能な音声数: ${re
 const manager = window.manager || new ScheduleManager(); 
 
 let abortRequested = false;
+let abortUntil = 0;
+
+function setAbortCooldown(ms = 10000) {
+  abortUntil = Date.now() + ms;
+}
+
+function isAbortCooldownActive() {
+  return Date.now() < abortUntil;
+}
 
 function stopStandardTts() {
   abortRequested = true;
@@ -32,6 +41,7 @@ function stopStandardTts() {
 }
 
 async function requestAbortToServer(source = 'button') {
+  setAbortCooldown();
   stopStandardTts();
   try {
     const response = await fetch('/web_api/abort', {
@@ -40,8 +50,13 @@ async function requestAbortToServer(source = 'button') {
       body: JSON.stringify({ source })
     });
     const data = await response.json();
-    if (data?.message && window.addResponseLogEntry) {
-      window.addResponseLogEntry(data.message);
+    if (window.addResponseLogEntry) {
+      window.addResponseLogEntry("強制終了しました。");
+      if (data?.cancelled === true) {
+        window.addResponseLogEntry("処理を正常に終了させました。");
+      } else if (data?.cancelled === false) {
+        window.addResponseLogEntry("処理は実行されてしまいました。");
+      }
     }
   } catch (e) {
     console.warn("強制終了の通知に失敗しました。", e);
@@ -56,13 +71,21 @@ function setAbortButtonVisible(visible) {
   if (!btn) return;
   btn.disabled = !visible;
   btn.setAttribute('aria-hidden', visible ? 'false' : 'true');
+  btn.setAttribute('aria-disabled', visible ? 'false' : 'true');
   btn.style.opacity = visible ? '1' : '0.45';
+  btn.style.pointerEvents = visible ? 'auto' : 'none';
+  if (visible) {
+    btn.classList.add('is-active');
+  } else {
+    btn.classList.remove('is-active');
+  }
 }
 
 document.addEventListener('DOMContentLoaded', () => {
   const btn = document.getElementById('force-abort-btn');
   if (btn) {
     btn.addEventListener('click', () => requestAbortToServer('button'));
+    setAbortButtonVisible(false);
   }
 });
 
@@ -140,6 +163,12 @@ function stripWakeWords(text) {
  * @param {string} inputValue - ユーザーの入力テキスト
  */
 export async function check_chat_Space(inputValue) {
+  if (isAbortCooldownActive()) {
+    if (window.addResponseLogEntry) {
+      window.addResponseLogEntry("???????????????????");
+    }
+    return;
+  }
   fire('analysis:start', { steps: ['処理開始'] });
   console.time("チャット解析 総所要時間");
   console.log("入力検知:", inputValue);
@@ -236,9 +265,15 @@ export async function check_chat_Space(inputValue) {
     fire('analysis:step', { index: 1, label: '処理完了' });
 
     if (result.abort_command) {
+      setAbortCooldown();
       stopStandardTts();
-      if (result.message && window.addResponseLogEntry) {
-        window.addResponseLogEntry(result.message);
+      if (window.addResponseLogEntry) {
+        window.addResponseLogEntry("強制終了しました。");
+        if (result.cancelled === true) {
+          window.addResponseLogEntry("処理を正常に終了させました。");
+        } else if (result.cancelled === false) {
+          window.addResponseLogEntry("処理は実行されてしまいました。");
+        }
       }
       return;
     }

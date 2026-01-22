@@ -170,6 +170,7 @@ GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
 if not GEMINI_API_KEY:
     app.logger.warning('Warning: GEMINI_API_KEY not set. ChatSpaceModel may not work.')
 chat_space_model = ChatSpaceModel(gemini_api_key=GEMINI_API_KEY)
+chat_space_model.set_logger(app.logger)
 calendar_manager = ScheduleManager()
 app.calendar_manager = calendar_manager # ScheduleManagerインスタンスをアプリにアタッチ
 
@@ -916,18 +917,16 @@ def chat_api_web():
     user_id = session.get('user', {}).get('id') # セッションからuser_idを取得
     response_data = {"status": "success", "message": ""}
 
-    try:
-        if chat_space_model.is_abort_command(user_input):
-            response_data = {
-                "status": "success",
-                "message": "強制終了しました。進行中の処理はキャンセルできませんでした。",
-                "abort_command": True,
-                "suppress_tts": True
-            }
-            app.logger.debug("DEBUG: 強制終了コマンドを検知しました。")
-            return jsonify(response_data)
-    except Exception as e:
-        app.logger.error(f"強制終了判定に失敗しました: {e}")
+    if chat_space_model.is_cancelled(user_id):
+        app.logger.debug("DEBUG: force-cancel flag active. Rejecting input.")
+        response_data = {
+            "status": "success",
+            "message": "",
+            "abort_command": True,
+            "suppress_tts": True,
+            "cancelled": True
+        }
+        return jsonify(response_data)
 
     # 高速実行のチェック
     if user_input.startswith("クイックコマンド"):
@@ -1082,15 +1081,15 @@ def abort_api():
     if not user_id:
         return jsonify({
             'status': 'error',
-            'message': '強制終了に失敗しました（ユーザー未認証）。',
             'abort_command': True,
             'suppress_tts': True
         }), 401
+    chat_space_model.request_cancel(user_id, logger=app.logger)
     return jsonify({
         'status': 'success',
-        'message': '強制終了しました。進行中の処理はキャンセルできませんでした。',
         'abort_command': True,
-        'suppress_tts': True
+        'suppress_tts': True,
+        'cancelled': True
     })
 
 @app.route('/api/user_settings', methods=['GET', 'PUT'])

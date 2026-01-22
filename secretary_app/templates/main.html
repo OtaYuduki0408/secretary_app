@@ -174,32 +174,41 @@
     }
 
     .abort-row {
-      margin-top: 12px;
+      margin-bottom: 10px;
       display: flex;
       justify-content: flex-end;
+      gap: 10px;
     }
 
     .abort-btn {
-      border: 1px solid rgba(220, 70, 70, 0.6);
-      background: rgba(140, 20, 20, 0.15);
-      color: #ffd7d7;
-      padding: 8px 14px;
+      border: 1px solid rgba(255, 84, 84, 0.9);
+      background: rgba(255, 34, 34, 0.22);
+      color: #ffe6e6;
+      padding: 10px 16px;
       border-radius: 999px;
-      font-weight: 600;
-      letter-spacing: 0.02em;
+      font-weight: 700;
+      letter-spacing: 0.05em;
       cursor: pointer;
-      transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.12s ease;
+      transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.12s ease, opacity 0.12s ease;
+      text-transform: uppercase;
     }
 
     .abort-btn:hover {
       transform: translateY(-1px);
-      box-shadow: 0 6px 14px rgba(255, 80, 80, 0.25);
-      background: rgba(160, 25, 25, 0.25);
+      box-shadow: 0 10px 22px rgba(255, 60, 60, 0.35);
+      background: rgba(255, 40, 40, 0.35);
     }
 
     .abort-btn:disabled {
       cursor: not-allowed;
       box-shadow: none;
+    }
+
+    .abort-btn.is-active {
+      box-shadow: 0 12px 26px rgba(255, 60, 60, 0.5);
+      background: rgba(255, 24, 24, 0.7);
+      border-color: rgba(255, 140, 140, 0.95);
+      color: #fff;
     }
 
     body {
@@ -356,6 +365,9 @@
         <div id="voice-log-container" class="voice-log-panel">
             <!-- Voice logs will be dynamically inserted here -->
         </div>
+        <div class="abort-row">
+          <button id="force-abort-btn" class="abort-btn" type="button" aria-label="強制終了" disabled>強制終了</button>
+        </div>
         <form id="search-form" class="search" role="search" aria-label="検索フォーム">
           <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
             <path d="M4 12l2-2 3 3 3-3 2 2" stroke="#e7edf5" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
@@ -363,9 +375,6 @@
           </svg>
           <input id="searchbox" type="text" inputmode="search" name="search" placeholder="テキストでコマンドを入力..." aria-label="入力" />
         </form>
-        <div class="abort-row">
-          <button id="force-abort-btn" class="abort-btn" type="button" aria-label="強制終了" disabled>強制終了</button>
-        </div>
       </div>
     </section>
  

@@ -50,6 +50,7 @@ class ChatSpaceModel:
     T:時刻、年月日、曜日確認(行動はn)
     R:過去の命令の修正(行動はn)
     S:SwitchBot iot等。例:電気を消す、エアコンを付ける、鍵を掛ける)(行動はn)
+    Re:強制終了コマンド(処理を停止して等)
     -行動-
     a:追加
     d:削除
@@ -194,33 +195,56 @@ class ChatSpaceModel:
     User input: {input_value}
     Available devices: {available_devices_json}
     """
-    ABORT_PROMPT_TEMPLATE = """
-    目的: 入力が強制終了/停止/中断の命令かどうかを判定する。
-    出力は Y または N のみ。その他の文字は禁止。
-    例:
-    入力: 処理を中断して -> Y
-    入力: 停止して -> Y
-    入力: 予定を追加して -> N
-    入力: {input_value}
-    """
-
-
     def __init__(self, gemini_api_key: str, calendar_manager=None):
         genai.configure(api_key=gemini_api_key)
         self.model_name = "gemini-2.5-flash"
         self.model = genai.GenerativeModel(model_name=self.model_name)
         # メモはSupabaseに保存するため、ここでは初期化不要
         self.memo_manager = None
+        self._cancel_flags = {}
+        self._current_user_id = None
+        self._logger = None
 
-    def is_abort_command(self, text: str) -> bool:
-        if not text:
+    class CancelledError(Exception):
+        pass
+
+    def set_logger(self, logger):
+        self._logger = logger
+
+    def request_cancel(self, user_id: str | None, duration_seconds: int = 10, logger=None):
+        if not user_id:
+            return
+        until = datetime.now() + timedelta(seconds=duration_seconds)
+        self._cancel_flags[user_id] = until
+        message = f"--- [DEBUG] force-cancel flag set: user_id={user_id}, until={until.isoformat()} ---"
+        print(message)
+        log_target = logger or self._logger
+        if log_target:
+            log_target.debug(message)
+
+    def _consume_cancel(self, user_id: str | None) -> bool:
+        if not user_id:
             return False
-        prompt = self.ABORT_PROMPT_TEMPLATE.format(input_value=text)
-        raw = self._gemini_request(prompt)
-        answer = (raw or '').strip().lower()
-        return answer.startswith('y')
+        current = self._cancel_flags.pop(user_id, None)
+        return current is not None
+
+    def _is_cancelled(self, user_id: str | None) -> bool:
+        if not user_id:
+            return False
+        until = self._cancel_flags.get(user_id)
+        if not until:
+            return False
+        if isinstance(until, datetime) and until < datetime.now():
+            self._cancel_flags.pop(user_id, None)
+            return False
+        return True
+
+    def is_cancelled(self, user_id: str | None) -> bool:
+        return self._is_cancelled(user_id)
 
     def _gemini_request(self, prompt: str) -> str:
+        if self._is_cancelled(self._current_user_id):
+            raise ChatSpaceModel.CancelledError("cancelled")
         print(f"--- [DEBUG] geminiに解析リクエスト (ユーザー入力: {prompt}) ---")
         response_text = _cached_gemini_request_impl(self.model, prompt)
         return response_text
@@ -407,42 +431,73 @@ class ChatSpaceModel:
         # 起動コマンドを除外してGeminiへ渡す
         cleaned_input = (input_value or "").replace("サイレントメイト", "").strip()
         current_time = datetime.now(JST).strftime('%Y-%m-%d %H:%M:%S')
-        purpose_prompt = self.PURPOSE_PROMPT_TEMPLATE.format(current_time=current_time, input_value=cleaned_input)
-        purpose = self._gemini_request(purpose_prompt)
-        print(f"--- [DEBUG] check_chat_space: Received purpose: {purpose} ---")
-        result = {"status": "success", "purpose": purpose, "data": None, "message": ""}
-        
-        if purpose == "Ca":
-            data, msg = self._add_calendar(cleaned_input, user_id)
-            result["data"] = data
-            result["message"] = msg
-        elif purpose == "Cd":
-            result["data"], result["message"] = self._remove_calendar(cleaned_input, user_id)
-        elif purpose == "Cg":
-            result["data"], result["message"] = self._get_calender(cleaned_input, is_silent=False, user_id=user_id)
-        elif purpose == "Cc":
-            result["data"], result["message"] = self._change_calendar(cleaned_input, user_id)
-        # ... (other purpose handling remains the same) ...
-        elif purpose == "Ia":
-            result["data"], result["message"] = self._add_income_expense(cleaned_input, user_id)
-        elif purpose == "Ig":
-            result["data"], result["message"] = self._get_income_expense(cleaned_input, user_id)
-        elif purpose == "Ma":
-            result["data"], result["message"] = self._add_memo(cleaned_input, user_id)
-        elif purpose == "Mg":
-            result["data"], result["message"] = self._get_memo(cleaned_input, user_id)
-        elif purpose == "Md":
-            result["data"], result["message"] = self._delete_memo(cleaned_input, user_id)
-        elif purpose == "Tn":
-            time_prompt = self.TIME_GET_PROMPT_TEMPLATE.format(current_time=current_time, input_value=cleaned_input)
-            result["message"] = self._gemini_request(time_prompt)
-        elif purpose == "Sn":
-            result["data"], result["message"] = self._get_switchbot_devices(cleaned_input, user_id)
-        else:
-            result["message"] = "申し訳ございません。お客様の意図を特定できませんでした。"
-            print(f"DEBUG: 意図不明なpurpose: {purpose}")
-            
-        return result
+        if self._is_cancelled(user_id):
+            return {
+                "status": "success",
+                "message": "",
+                "abort_command": True,
+                "suppress_tts": True,
+                "cancelled": True
+            }
+        self._current_user_id = user_id
+        try:
+            purpose_prompt = self.PURPOSE_PROMPT_TEMPLATE.format(current_time=current_time, input_value=cleaned_input)
+            purpose = self._gemini_request(purpose_prompt)
+            print(f"--- [DEBUG] check_chat_space: Received purpose: {purpose} ---")
+            result = {"status": "success", "purpose": purpose, "data": None, "message": ""}
+
+            if purpose == "Re":
+                self.request_cancel(user_id)
+                return {
+                    "status": "success",
+                    "purpose": "Re",
+                    "message": "",
+                    "abort_command": True,
+                    "suppress_tts": True,
+                    "cancelled": True
+                }
+
+            if purpose == "Ca":
+                data, msg = self._add_calendar(cleaned_input, user_id)
+                result["data"] = data
+                result["message"] = msg
+            elif purpose == "Cd":
+                result["data"], result["message"] = self._remove_calendar(cleaned_input, user_id)
+            elif purpose == "Cg":
+                result["data"], result["message"] = self._get_calender(cleaned_input, is_silent=False, user_id=user_id)
+            elif purpose == "Cc":
+                result["data"], result["message"] = self._change_calendar(cleaned_input, user_id)
+            # ... (other purpose handling remains the same) ...
+            elif purpose == "Ia":
+                result["data"], result["message"] = self._add_income_expense(cleaned_input, user_id)
+            elif purpose == "Ig":
+                result["data"], result["message"] = self._get_income_expense(cleaned_input, user_id)
+            elif purpose == "Ma":
+                result["data"], result["message"] = self._add_memo(cleaned_input, user_id)
+            elif purpose == "Mg":
+                result["data"], result["message"] = self._get_memo(cleaned_input, user_id)
+            elif purpose == "Md":
+                result["data"], result["message"] = self._delete_memo(cleaned_input, user_id)
+            elif purpose == "Tn":
+                time_prompt = self.TIME_GET_PROMPT_TEMPLATE.format(current_time=current_time, input_value=cleaned_input)
+                result["message"] = self._gemini_request(time_prompt)
+            elif purpose == "Sn":
+                result["data"], result["message"] = self._get_switchbot_devices(cleaned_input, user_id)
+            else:
+                result["message"] = "申し訳ございません。お客様の意図を特定できませんでした。"
+                print(f"DEBUG: 意図不明なpurpose: {purpose}")
+
+            return result
+        except ChatSpaceModel.CancelledError:
+            return {
+                "status": "success",
+                "message": "",
+                "abort_command": True,
+                "suppress_tts": True,
+                "cancelled": True
+            }
+        finally:
+            self._current_user_id = None
 
     def _add_calendar(self, text: str, user_id: str | None):
         """カレンダーにローカルDBを使ってイベントを追加"""

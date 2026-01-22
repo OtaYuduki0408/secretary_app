@@ -260,6 +260,60 @@ def _evaluate_finance_threshold_trigger(trigger_value, now_jst, app_logger=None,
     return triggered
 
 
+def _evaluate_finance_threshold_edge(trigger_value, now_jst, app_logger=None, user_id=None, order_data=None):
+    item = (trigger_value or {}).get('item') or ''
+    compare = (trigger_value or {}).get('compare') or 'gte'
+    amount = _safe_float((trigger_value or {}).get('amount'))
+    percentage = _safe_float((trigger_value or {}).get('percentage'))
+
+    value = _get_finance_item_value(item, user_id, now_jst, app_logger)
+    if value is None:
+        app_logger.debug(f"[FIN_EDGE] value is None for item={item}")
+        return False, False
+
+    threshold = None
+    if amount is not None:
+        threshold = amount
+    elif percentage is not None:
+        goal = get_monthly_goal(user_id)
+        goal_amount = (goal or {}).get('goal_amount')
+        if goal_amount is None:
+            app_logger.debug("[FIN_EDGE] percentage provided but goal_amount is None")
+            return False, False
+        threshold = float(goal_amount) * (percentage / 100.0)
+
+    if threshold is None:
+        app_logger.debug("[FIN_EDGE] threshold is None")
+        return False, False
+
+    is_over = value >= threshold if compare != 'lte' else value <= threshold
+
+    trigger_states = {}
+    if isinstance(order_data, dict):
+        trigger_states = order_data.setdefault('trigger_states', {})
+    finance_state = trigger_states.setdefault('finance_threshold', {})
+
+    was_over = finance_state.get('last_over')
+    state_changed = False
+    should_fire = False
+
+    if was_over is None:
+        finance_state['last_over'] = is_over
+        state_changed = True
+    else:
+        if was_over is False and is_over is True:
+            should_fire = True
+        if was_over != is_over:
+            finance_state['last_over'] = is_over
+            state_changed = True
+
+    app_logger.debug(
+        f"[FIN_EDGE] item={item} compare={compare} value={value} threshold={threshold} is_over={is_over} was_over={was_over} fire={should_fire}"
+    )
+
+    return should_fire, state_changed
+
+
 def evaluate_triggers(app_logger):
     # 定期的にトリガーを評価
     app_logger.debug(f"[{datetime.now()}] Evaluating triggers...")
@@ -283,6 +337,7 @@ def evaluate_triggers(app_logger):
     for order in orders:
         user_id = order.get('user_id')
         order_data = order.get('order_data')
+        order_id = order.get('id')
         app_logger.debug(f"[ORDER] id={order.get('id')} user_id={order.get('user_id')}")
         app_logger.debug(f"[ORDER] order_data keys: {list(order_data.keys()) if isinstance(order_data, dict) else order_data}")
 
@@ -301,7 +356,15 @@ def evaluate_triggers(app_logger):
         elif trigger_category == 'カレンダー' and trigger_sub == '予定の時間になったら':
             should_fire = _evaluate_calendar_time_trigger(trigger_value, now_jst, current_time_str, app_logger, user_id)
         elif trigger_category == '収支管理' and trigger_sub == '特定金額になったら':
-            should_fire = _evaluate_finance_threshold_trigger(trigger_value, now_jst, app_logger, user_id)
+            should_fire, state_changed = _evaluate_finance_threshold_edge(
+                trigger_value, now_jst, app_logger, user_id, order_data
+            )
+            if state_changed and isinstance(order_data, dict) and order_id:
+                try:
+                    supabase.table('custom_orders').update({'order_data': order_data}).match({'id': order_id, 'user_id': user_id}).execute()
+                    app_logger.debug(f"[FIN_EDGE] state updated for order_id={order_id}")
+                except Exception as e:
+                    app_logger.error(f"[FIN_EDGE] failed to update state: {e}")
         else:
             app_logger.debug(f"[TRIGGER] skip category={trigger_category} sub={trigger_sub}")
             continue
