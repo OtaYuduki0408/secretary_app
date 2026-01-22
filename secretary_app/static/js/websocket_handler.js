@@ -155,6 +155,22 @@ function getPreferredVoiceName() {
         return '';
     }
 }
+
+function getVoiceSettings() {
+    try {
+        const raw = localStorage.getItem('appSettings');
+        if (!raw) return { rate: 1, pitch: 1, volume: 1 };
+        const settings = JSON.parse(raw);
+        return {
+            rate: settings?.main?.voiceRate ?? 1,
+            pitch: settings?.main?.voicePitch ?? 1,
+            volume: settings?.main?.voiceVolume ?? 1,
+        };
+    } catch (e) {
+        console.warn('音声設定の読み込みに失敗しました。', e);
+        return { rate: 1, pitch: 1, volume: 1 };
+    }
+}
 /**
  * 指定されたアクションを実行する
  * @param {object} action - 実行するアクション
@@ -328,6 +344,7 @@ function executeAction(action) {
                         resolveSpeech();
                     };
                     const preferredVoiceName = getPreferredVoiceName();
+                    const voiceSettings = getVoiceSettings();
                     if (preferredVoiceName) {
                         const voices = speechSynthesis.getVoices();
                         const selectedVoice = voices.find(voice => voice.name === preferredVoiceName);
@@ -335,6 +352,9 @@ function executeAction(action) {
                             utterance.voice = selectedVoice;
                         }
                     }
+                    utterance.rate = voiceSettings.rate;
+                    utterance.pitch = voiceSettings.pitch;
+                    utterance.volume = voiceSettings.volume;
                     speechSynthesis.speak(utterance);
                 });
                 console.log(`発声開始: "${textToSpeak.substring(0, 50)}..."`);

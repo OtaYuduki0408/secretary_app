@@ -43,11 +43,17 @@ export class TextToSpeechReader { // ★ここに 'export' を追加しました
 
         // 設定ページで選択された音声があれば優先する
         let preferredVoiceName = '';
+        let voiceRate = 1;
+        let voicePitch = 1;
+        let voiceVolume = 1;
         try {
             const raw = localStorage.getItem('appSettings');
             if (raw) {
                 const settings = JSON.parse(raw);
                 preferredVoiceName = settings?.main?.voiceName || '';
+                voiceRate = settings?.main?.voiceRate ?? 1;
+                voicePitch = settings?.main?.voicePitch ?? 1;
+                voiceVolume = settings?.main?.voiceVolume ?? 1;
             }
         } catch (e) {
             console.warn("音声設定の読み込みに失敗しました。", e);
@@ -72,6 +78,10 @@ export class TextToSpeechReader { // ★ここに 'export' を追加しました
             // 指定言語の音声が見つからない場合、デフォルトの音声を使用
             console.warn(`指定された言語 (${lang}) の音声が見つかりませんでした。デフォルト音声を使用します。`);
         }
+
+        utterance.rate = voiceRate;
+        utterance.pitch = voicePitch;
+        utterance.volume = voiceVolume;
 
         utterance.onstart = () => {
             document.dispatchEvent(new CustomEvent('voice:playstart'));

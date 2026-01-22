@@ -187,9 +187,23 @@
             <label for="main-button-color">ボタンの色</label>
             <input id="main-button-color" type="color" value="#7aa8ff">
           </div>
+        </div>
+      </details>
+
+      <details class="settings-group">
+        <summary>声の設定</summary>
+        <div class="details-body">
           <div class="field">
-            <label for="tone-input">口調の設定（入力確認）</label>
-            <input id="tone-input" type="text" placeholder="(例:関西弁、英語等)">
+            <label>入力確認の設定</label>
+            <div class="field-inline">
+              <input id="input-confirm-enabled" type="checkbox" checked>
+              <label for="input-confirm-enabled">入力確認を行う</label>
+            </div>
+          </div>
+          <div class="field">
+            <label for="input-confirm-template">入力確認テンプレート</label>
+            <input id="input-confirm-template" type="text" value="でございますね。かしこまりました。">
+            <div class="hint">入力文の後ろに追加されます。</div>
           </div>
           <div class="field">
             <label for="tone-response">口調の設定（返答）</label>
@@ -206,6 +220,34 @@
               <option value="">自動（既定）</option>
             </select>
             <div class="hint">利用可能な音声が無い場合は既定を使用します。</div>
+          </div>
+          <div class="field">
+            <label for="voice-rate">話速</label>
+            <div class="field-inline">
+              <input id="voice-rate" type="range" min="0.5" max="2" step="0.1">
+              <span id="voice-rate-value"></span>
+            </div>
+          </div>
+          <div class="field">
+            <label for="voice-pitch">ピッチ</label>
+            <div class="field-inline">
+              <input id="voice-pitch" type="range" min="0" max="2" step="0.1">
+              <span id="voice-pitch-value"></span>
+            </div>
+          </div>
+          <div class="field">
+            <label for="voice-volume">音量</label>
+            <div class="field-inline">
+              <input id="voice-volume" type="range" min="0" max="1" step="0.1">
+              <span id="voice-volume-value"></span>
+            </div>
+          </div>
+          <div class="field">
+            <label for="voice-test-text">テストテキスト</label>
+            <input id="voice-test-text" type="text" value="この声でよろしいでしょうか？">
+          </div>
+          <div class="field">
+            <button id="voice-test-button" type="button">テスト再生</button>
           </div>
         </div>
       </details>

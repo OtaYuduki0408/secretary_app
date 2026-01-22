@@ -67,7 +67,6 @@ export async function check_chat_Space(inputValue) {
       if (!raw) return message;
       const settings = JSON.parse(raw);
       const toneByTarget = {
-        input: settings?.main?.toneInput || '',
         response: settings?.main?.toneResponse || '',
         error: settings?.main?.toneError || '',
       };
@@ -91,8 +90,23 @@ export async function check_chat_Space(inputValue) {
     }
   }
 
-  const initialSpeakText = await applyToneSetting(`${inputValue}ですね。`, 'input');
-  reader.speak(initialSpeakText);
+  let inputConfirmText = null;
+  try {
+    const raw = localStorage.getItem('appSettings');
+    if (raw) {
+      const settings = JSON.parse(raw);
+      const enabled = settings?.main?.inputConfirmEnabled !== false;
+      const template = settings?.main?.inputConfirmTemplate || 'でございますね。かしこまりました。';
+      if (enabled) {
+        inputConfirmText = `${inputValue}${template}`;
+      }
+    }
+  } catch (e) {
+    console.warn("入力確認設定の読み込みに失敗しました。", e);
+  }
+  if (inputConfirmText) {
+    reader.speak(inputConfirmText);
+  }
 
   // 読み込み中の動的表示を追加
   const loadingIndicator = (() => {
