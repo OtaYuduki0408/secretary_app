@@ -247,7 +247,13 @@ export function loadCommandToForm(cmd){
     
     updateSubOptions(triggerCategorySelect.id, triggerSubSelect.id, TRIGGER_CATEGORIES_MAIN);
     
-    triggerSubSelect.value = trigger.sub || "";
+    if (trigger.sub) {
+      triggerSubSelect.value = trigger.sub;
+    } else if (TRIGGER_CATEGORIES_MAIN[trigger.category]?.length) {
+      triggerSubSelect.value = TRIGGER_CATEGORIES_MAIN[trigger.category][0];
+    } else {
+      triggerSubSelect.value = "";
+    }
 
     setTimeout(() => {
         createTriggerUI('', trigger.value);
@@ -317,7 +323,14 @@ export async function registerCommand(){
 
   // Trigger
   const triggerCategory = document.getElementById("trigger_category").value;
-  const triggerSub = document.getElementById("trigger_sub").value;
+  let triggerSub = document.getElementById("trigger_sub").value;
+  if (!triggerSub && TRIGGER_CATEGORIES_MAIN[triggerCategory]?.length) {
+    triggerSub = TRIGGER_CATEGORIES_MAIN[triggerCategory][0];
+    const triggerSubSelect = document.getElementById("trigger_sub");
+    if (triggerSubSelect) {
+      triggerSubSelect.value = triggerSub;
+    }
+  }
   let triggerValue = {};
   const triggerContainer = document.getElementById("trigger_value_container");
 

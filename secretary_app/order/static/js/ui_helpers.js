@@ -98,8 +98,14 @@ export function updateSubOptions(categoryId, subId, data) {
   if (categoryId.includes('trigger')) {
     if (cat === "場所" || cat === "メモ") {
       sub.style.display = 'none';
+      if (data[cat] && data[cat].length > 0) {
+        sub.value = data[cat][0];
+      }
     } else if (cat === "時間") {
       sub.style.display = 'none';
+      if (data[cat] && data[cat].length > 0) {
+        sub.value = data[cat][0];
+      }
     } else {
       sub.style.display = 'block';
     }
