@@ -102,7 +102,7 @@ async function getActionsToExecute(conditions) {
  * @returns {Promise<void>} アクションの完了を示すPromise
  */
 function executeAction(action) {
-    return new Promise(async resolve => {
+    return new Promise(resolve => {
         console.log("アクションを実行します:", action);
         let textToSpeak = "";
         let overlayTitle = "";
@@ -122,15 +122,14 @@ function executeAction(action) {
         
         let messageHtml = "";
 
-
-        if (action.category === '\u767a\u58f0') {
+        if (action.category === '発声') {
             textToSpeak = action.detail.text;
-            overlayTitle = "\u8aad\u307f\u4e0a\u3052";
+            overlayTitle = "読み上げ";
             overlayCategoryClass = "overlay-speech";
             messageHtml = `<h3>${overlayTitle}</h3><p>${textToSpeak}</p>`;
-
-        } else if (action.category === '\u30ab\u30ec\u30f3\u30c0\u30fc' && action.sub === '\u8aad\u307f\u4e0a\u3052') {
-            overlayTitle = "\u30ab\u30ec\u30f3\u30c0\u30fc";
+        
+        } else if (action.category === '?????' && action.sub === '????') {
+            overlayTitle = "?????";
             overlayCategoryClass = "overlay-calendar";
             const detail = action.detail || {};
             const events = Array.isArray(detail.events) ? detail.events : [];
@@ -141,14 +140,14 @@ function executeAction(action) {
             const end_day = detail.end_day;
             const event_link = detail.event_link;
 
-            if (events.length === 0 && (summary === '\u4eca\u65e5\u306e\u4e88\u5b9a\u306f\u3042\u308a\u307e\u305b\u3093' || summary === '\u30ab\u30ec\u30f3\u30c0\u30fc\u60c5\u5831\u306e\u53d6\u5f97\u306b\u5931\u6557\u3057\u307e\u3057\u305f\u3002')) {
+            if (events.length === 0 && (summary === '???????????' || summary === '??????????????????')) {
                 textToSpeak = summary;
                 messageHtml = `<h3>${overlayTitle}</h3><p>${textToSpeak}</p>`;
             } else if (events.length > 0) {
                 const cardsHtml = events.map((e, idx) => {
-                    const title = e.summary || e.title || '\u540d\u79f0\u672a\u8a2d\u5b9a\u30a4\u30d9\u30f3\u30c8';
+                    const title = e.summary || e.title || '?????????';
                     const day = e.start_day || '';
-                    const time = `${e.start_time || '\u672a\u5b9a'} - ${e.end_time || '\u672a\u5b9a'}`;
+                    const time = `${e.start_time || '??'} - ${e.end_time || '??'}`;
                     return `
                         <div class="calendar-card">
                             <div class="calendar-card-title">${idx + 1}. ${title}</div>
@@ -159,15 +158,15 @@ function executeAction(action) {
                         </div>`;
                 }).join('');
                 textToSpeak = `???????????????${events.length}??????????` +
-                    events.map((e, idx) => `${idx + 1}???${e.start_day || ''} ${e.summary || e.title || '\u540d\u79f0\u672a\u8a2d\u5b9a\u30a4\u30d9\u30f3\u30c8'}?${e.start_time || '\u672a\u5b9a'}??${e.end_time || '\u672a\u5b9a'}??`).join('?');
+                    events.map((e, idx) => `${idx + 1}???${e.start_day || ''} ${e.summary || e.title || '?????????'}?${e.start_time || '??'}??${e.end_time || '??'}??`).join('?');
                 messageHtml = `
                     <h3>${overlayTitle}</h3>
                     <div class="calendar-cards">${cardsHtml}</div>`;
             } else {
                 let datePart = "";
-                if (start_day && end_day && start_day !== "??") {
+                if (start_day && end_day && start_day !== "??????") {
                     datePart = (start_day === end_day) ? `${start_day}?` : `${start_day}??${end_day}??`;
-                } else if (start_day === "??") {
+                } else if (start_day === "??????") {
                     datePart = "???";
                 } else if (start_day) {
                     datePart = `${start_day}?`;
@@ -176,51 +175,70 @@ function executeAction(action) {
                 messageHtml = `
                     <h3>${overlayTitle}</h3>
                     <div class="details-section">
-                        <p><strong>\u30a4\u30d9\u30f3\u30c8</strong> ${summary}</p>
-                        <p><strong>\u65e5\u6642:</strong> ${datePart}${start_time || '\u672a\u5b9a'} - ${end_time || '\u672a\u5b9a'}</p>
-                        ${event_link ? `<p><a href="${event_link}" target="_blank">\u8a73\u7d30\u3092\u898b\u308b</a></p>` : ''}
+                        <p><strong>????:</strong> ${summary}</p>
+                        <p><strong>??:</strong> ${datePart}${start_time || '??'} - ${end_time || '??'}</p>
+                        ${event_link ? `<p><a href="${event_link}" target="_blank">?????</a></p>` : ''}
                     </div>`;
             }
 
-        } else if (action.category === '\u53ce\u652f\u7ba1\u7406' && action.sub === '\u8aad\u307f\u4e0a\u3052') {
-            overlayTitle = "\u53ce\u652f\u7ba1\u7406";
+} else if (action.category === '収支管理' && action.sub === '読み上げ') {
+            overlayTitle = "収支管理";
             overlayCategoryClass = "overlay-finance";
-            let { format, records, income_total, expense_total, balance, error } = action.detail || {};
-            records = Array.isArray(records) ? records : [];
+            const { format, records, income_total, expense_total, balance, error } = action.detail;
 
-            if (!error && (records.length === 0 || income_total == null || expense_total == null || balance == null)) {
-                try {
-                    const res = await fetch("/api/finance");
-                    if (res.ok) {
-                        const allRecords = await res.json();
-                        records = Array.isArray(allRecords) ? allRecords : [];
-                        const incomeSum = records
-                            .filter(r => r.type === 'income')
-                            .reduce((sum, r) => sum + (r.amount || 0), 0);
-                        const expenseSum = records
-                            .filter(r => r.type === 'expense')
-                            .reduce((sum, r) => sum + (r.amount || 0), 0);
-                        if (income_total == null) income_total = incomeSum;
-                        if (expense_total == null) expense_total = expenseSum;
-                        if (balance == null) balance = incomeSum - expenseSum;
-                    } else {
-                        console.warn("[finance] /api/finance fetch failed", res.status);
-                    }
-                } catch (e) {
-                    console.warn("[finance] /api/finance fetch error", e);
+            if (error) {
+                textToSpeak = error;
+                messageHtml = `<h3>${overlayTitle}</h3><p class="error">${error}</p>`;
+            } else {
+                switch (format) {
+                    case 'individual':
+                        if (records && records.length > 0) {
+                            let textParts = [];
+                            let htmlParts = '<ul>';
+                            records.forEach(r => {
+                                const typeText = r.type === 'income' ? '収入' : '支出';
+                                textParts.push(`${typeText}、${r.category}、${r.amount}円。${r.description || ''}`);
+                                htmlParts += `<li>${typeText} (${r.category}): ${r.amount}円 ${r.description || ''}</li>`;
+                            });
+                            textToSpeak = "個別の収支を読み上げます。" + textParts.join(' ');
+                            messageHtml = `<h3>${overlayTitle} - 個別</h3>${htmlParts}</ul>`;
+                        } else {
+                            textToSpeak = "読み上げる収支記録がありません。";
+                            messageHtml = `<h3>${overlayTitle}</h3><p>${textToSpeak}</p>`;
+                        }
+                        break;
+                    case 'income':
+                        textToSpeak = `期間内の収入合計は${income_total}円です。`;
+                        messageHtml = `<h3>${overlayTitle} - 収入合計</h3><p class="amount">${income_total}円</p>`;
+                        break;
+                    case 'expense':
+                        textToSpeak = `期間内の支出合計は${expense_total}円です。`;
+                        messageHtml = `<h3>${overlayTitle} - 支出合計</h3><p class="amount">${expense_total}円</p>`;
+                        break;
+                    case 'total_balance':
+                        textToSpeak = `期間内の収入合計は${income_total}円、支出合計は${expense_total}円、差し引き収支は${balance}円です。`;
+                        messageHtml = `
+                            <h3>${overlayTitle} - 収支合計</h3>
+                            <p>収入: <span class="amount">${income_total}円</span></p>
+                            <p>支出: <span class="amount">${expense_total}円</span></p>
+                            <hr>
+                            <p>収支: <span class="amount">${balance}円</span></p>`;
+                        break;
+                    default:
+                        textToSpeak = "収支の読み上げ形式が不明です。";
+                        messageHtml = `<h3>${overlayTitle}</h3><p>${textToSpeak}</p>`;
                 }
             }
 
-            // (??????????????????)
-
-        } else if (action.category === '\u30e1\u30e2' && action.sub === '\u8aad\u307f\u4e0a\u3052') {
-            overlayTitle = "\u30e1\u30e2";
+        } else if (action.category === 'メモ' && action.sub === '読み上げ') {
+            overlayTitle = "メモ";
             overlayCategoryClass = "overlay-memo";
-            const memoContent = action.detail && action.detail.content ? action.detail.content : "";
-            textToSpeak = `??????????????${memoContent}????`;
-            messageHtml = `<h3>${overlayTitle}</h3><p>${memoContent}</p>`;
+            const memoContent = action.detail.content || 'メモの内容がありません。';
+            textToSpeak = `メモの読み上げです。内容は「${memoContent}」です。`;
+            messageHtml = `<h3>${overlayTitle}</h3><div class="details-section"><p>${memoContent}</p></div>`;
         }
 
+        if (textToSpeak && overlay && messageElement) {
             overlay.classList.add(overlayCategoryClass);
             messageElement.innerHTML = messageHtml;
             overlay.classList.add('visible');
@@ -255,6 +273,7 @@ function executeAction(action) {
             resolve();
         }
     });
+});
 }
 
 function setupWebSocket() {
