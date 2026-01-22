@@ -11,6 +11,17 @@ let recognition; // SpeechRecognitionインスタンス
 let currentMode = 'waiting'; // 'waiting' or 'listening'
 let recognitionTimeoutId; // 音声入力タイムアウトのID
 
+// モバイル環境のみの制御
+const isMobileDevice = (() => {
+    const ua = navigator.userAgent || '';
+    return /Android|iPhone|iPad|iPod|Mobile/i.test(ua) || 'ontouchstart' in window;
+})();
+let lastFinalCommand = '';
+let lastFinalCommandAt = 0;
+let lastRestartAt = 0;
+const MOBILE_DUPLICATE_SUPPRESS_MS = 2500;
+const MOBILE_RESTART_COOLDOWN_MS = 3000;
+
 // TTS (Text-to-Speech) 設定
 const speechSynth = window.speechSynthesis;
 const speechUtterance = new SpeechSynthesisUtterance();
@@ -777,17 +788,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
         if (currentMode === 'listening' && isFinal && finalCommand) {
-
-
+            const now = Date.now();
+            if (isMobileDevice) {
+                const normalized = finalCommand.trim();
+                const isDuplicate = normalized === lastFinalCommand && (now - lastFinalCommandAt) < MOBILE_DUPLICATE_SUPPRESS_MS;
+                if (isDuplicate) {
+                    console.log('DEBUG: モバイルの重複認識を抑制');
+                    return;
+                }
+                lastFinalCommand = normalized;
+                lastFinalCommandAt = now;
+            }
 
             console.log(`DEBUG: 音声入力確定: "${transcript.trim()}"`);
-
-
-
             processInput(finalCommand, 'voice');
-
-
-
         }
 
 
@@ -838,25 +852,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
         setTimeout(() => {
-
-
-
             try {
-
-
-
-                if(recognition?.dontRestart) return; // for debugging
-
-
-
+                if (recognition?.dontRestart) return; // for debugging
+                if (isMobileDevice) {
+                    const now = Date.now();
+                    if (document.visibilityState !== 'visible') return;
+                    if (now - lastRestartAt < MOBILE_RESTART_COOLDOWN_MS) return;
+                    lastRestartAt = now;
+                }
                 recognition.start();
-
-
-
             } catch(e) {}
-
-
-
         }, 1000);
 
 
