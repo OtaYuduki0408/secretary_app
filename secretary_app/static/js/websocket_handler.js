@@ -128,7 +128,7 @@ function executeAction(action) {
             overlayCategoryClass = "overlay-speech";
             messageHtml = `<h3>${overlayTitle}</h3><p>${textToSpeak}</p>`;
         
-        } else if (action.category === '?????' && action.sub === '????') {
+} else if (action.category === '?????' && action.sub === '????') {
             overlayTitle = "?????";
             overlayCategoryClass = "overlay-calendar";
             const detail = action.detail || {};
@@ -181,7 +181,7 @@ function executeAction(action) {
                     </div>`;
             }
 
-} else if (action.category === '収支管理' && action.sub === '読み上げ') {
+        } else if (action.category === '収支管理' && action.sub === '読み上げ') {
             overlayTitle = "収支管理";
             overlayCategoryClass = "overlay-finance";
             const { format, records, income_total, expense_total, balance, error } = action.detail;
@@ -238,6 +238,9 @@ function executeAction(action) {
             messageHtml = `<h3>${overlayTitle}</h3><div class="details-section"><p>${memoContent}</p></div>`;
         }
 
+        if (!overlay) console.warn("[DEBUG] overlay element not found");
+        if (!messageElement) console.warn("[DEBUG] overlay message element not found");
+        console.log("[DEBUG] overlay textToSpeak length:", textToSpeak.length, "messageHtml length:", messageHtml.length);
         if (textToSpeak && overlay && messageElement) {
             overlay.classList.add(overlayCategoryClass);
             messageElement.innerHTML = messageHtml;
@@ -273,19 +276,10 @@ function executeAction(action) {
             resolve();
         }
     });
-});
 }
 
 function setupWebSocket() {
-    const SOCKET_URL =
-        location.hostname === "localhost"
-            ? "http://127.0.0.1:5000"
-            : location.origin;
-
-    const socket = io.connect(SOCKET_URL, {
-        path: "/socket.io",
-        transports: ["websocket"],
-    });
+    const socket = io.connect('https://127.0.0.1:5000');
 
     socket.on('connect', () => {
         console.log('WebSocketサーバーに接続しました (SID: ' + socket.id + ')');
