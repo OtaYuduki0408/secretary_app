@@ -571,7 +571,12 @@ class ChatSpaceModel:
 
         # expense_serviceからカテゴリ一覧を取得
         from services.expense_service import add_finance_record, get_unique_categories
-        available_categories = get_unique_categories(user_id)
+        from services.category_service import get_all_categories
+        registered_categories = get_all_categories()
+        registered_names = []
+        if isinstance(registered_categories, list):
+            registered_names = [item.get("name") for item in registered_categories if item.get("name")]
+        available_categories = list(dict.fromkeys(registered_names + get_unique_categories(user_id)))
         
         # デフォルトカテゴリ
         if not available_categories:
