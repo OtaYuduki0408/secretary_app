@@ -7,7 +7,7 @@ console.log("websocket_handler.js loaded.");
 // =====================================================================
 
 /**
- * 2点間の緯度経度から距離を計算する (Haversine公式)
+ * 2点間の緯度経度から距離を計算する (Haversine公式)完了
  * @param {number} lat1 - 地点1の緯度
  * @param {number} lon1 - 地点1の経度
  * @param {number} lat2 - 地点2の緯度
