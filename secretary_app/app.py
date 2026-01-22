@@ -41,6 +41,7 @@ from services import local_calendar_service
 from services.chat_space_model import ChatSpaceModel
 from services.memo_routes import memo_bp
 from services.ScheduleManager import ScheduleManager
+from services.user_settings_service import get_user_settings, upsert_user_settings
 from order.models import db
 from models.event import Event
 from order.custom_order_routes import custom_order_bp
@@ -736,6 +737,24 @@ def transform_tone_api():
     except Exception as e:
         app.logger.error(f"口調変換に失敗しました: {e}")
         return jsonify({'message': text})
+
+@app.route('/api/user_settings', methods=['GET', 'PUT'])
+@login_required
+def user_settings_api():
+    user_id = session.get('user', {}).get('id')
+    if not user_id:
+        return jsonify({'error': 'ユーザーが見つかりません'}), 401
+
+    if request.method == 'GET':
+        settings = get_user_settings(user_id) or {}
+        return jsonify({'settings': settings})
+
+    data = request.get_json() or {}
+    settings = data.get('settings')
+    if not isinstance(settings, dict):
+        return jsonify({'error': 'settingsが不正です'}), 400
+    upsert_user_settings(user_id, settings)
+    return jsonify({'settings': settings})
 app.register_blueprint(memo_bp, url_prefix='/api/memos')
 
 @app.route('/api/execute_action', methods=['POST'])

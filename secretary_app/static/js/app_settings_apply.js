@@ -89,12 +89,30 @@
     body.style.minHeight = '100%';
   };
 
+  const fetchSettingsFromServer = async () => {
+    try {
+      const alreadyFetched = sessionStorage.getItem('appSettingsFetched');
+      if (alreadyFetched) return;
+      const res = await fetch('/api/user_settings');
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data && data.settings) {
+        localStorage.setItem('appSettings', JSON.stringify(data.settings));
+        document.dispatchEvent(new CustomEvent('app-settings:updated'));
+      }
+      sessionStorage.setItem('appSettingsFetched', 'true');
+    } catch (e) {
+      // ログイン前などで失敗するため静かに無視する
+    }
+  };
+
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', applySettings);
   } else {
     applySettings();
   }
 
+  fetchSettingsFromServer();
   window.addEventListener('storage', applySettings);
   document.addEventListener('app-settings:updated', applySettings);
 })();

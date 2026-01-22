@@ -65,6 +65,14 @@
     localStorage.setItem('appSettings', JSON.stringify(settings));
   };
 
+  const debounce = (fn, wait = 600) => {
+    let timerId;
+    return (...args) => {
+      if (timerId) clearTimeout(timerId);
+      timerId = setTimeout(() => fn(...args), wait);
+    };
+  };
+
   const applyToPage = (settings) => {
     document.documentElement.style.setProperty('--app-font', settings.general.fontFamily || '');
     document.body.style.fontFamily = settings.general.fontFamily || '';
@@ -115,7 +123,23 @@
     synth.speak(utterance);
   };
 
-  const settings = loadSettings();
+  let settings = loadSettings();
+  let applyingRemote = false;
+
+  const saveToServer = async () => {
+    if (applyingRemote) return;
+    try {
+      await fetch('/api/user_settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ settings }),
+      });
+    } catch (e) {
+      console.warn('設定の保存に失敗しました。', e);
+    }
+  };
+
+  const scheduleSaveToServer = debounce(saveToServer, 800);
 
   if (elements.fontFamily) elements.fontFamily.value = settings.general.fontFamily;
   if (elements.colorTemplate) elements.colorTemplate.value = settings.theme.template || '';
@@ -198,12 +222,14 @@
   elements.colorTemplate?.addEventListener('change', (event) => {
     settings.theme.template = event.target.value;
     saveSettings(settings);
+    scheduleSaveToServer();
     applyThemeTemplate(event.target.value);
   });
 
   elements.fontFamily?.addEventListener('change', (event) => {
     settings.general.fontFamily = event.target.value;
     saveSettings(settings);
+    scheduleSaveToServer();
     applyToPage(settings);
     document.dispatchEvent(new CustomEvent('app-settings:updated'));
   });
@@ -211,6 +237,7 @@
   elements.mainBgColor?.addEventListener('change', (event) => {
     settings.main.backgroundColor = event.target.value;
     saveSettings(settings);
+    scheduleSaveToServer();
     applyToPage(settings);
     document.dispatchEvent(new CustomEvent('app-settings:updated'));
   });
@@ -218,12 +245,14 @@
   elements.wakeWord?.addEventListener('input', (event) => {
     settings.main.wakeWords = event.target.value;
     saveSettings(settings);
+    scheduleSaveToServer();
     document.dispatchEvent(new CustomEvent('app-settings:updated'));
   });
 
   elements.accentColor?.addEventListener('change', (event) => {
     settings.theme.accentColor = event.target.value;
     saveSettings(settings);
+    scheduleSaveToServer();
     applyToPage(settings);
     document.dispatchEvent(new CustomEvent('app-settings:updated'));
   });
@@ -231,6 +260,7 @@
   elements.mutedColor?.addEventListener('change', (event) => {
     settings.theme.mutedColor = event.target.value;
     saveSettings(settings);
+    scheduleSaveToServer();
     applyToPage(settings);
     document.dispatchEvent(new CustomEvent('app-settings:updated'));
   });
@@ -238,6 +268,7 @@
   elements.stripeColor?.addEventListener('change', (event) => {
     settings.main.stripeColor = event.target.value;
     saveSettings(settings);
+    scheduleSaveToServer();
     applyToPage(settings);
     document.dispatchEvent(new CustomEvent('app-settings:updated'));
   });
@@ -245,6 +276,7 @@
   elements.mainButtonColor?.addEventListener('change', (event) => {
     settings.main.buttonColor = event.target.value;
     saveSettings(settings);
+    scheduleSaveToServer();
     applyToPage(settings);
     document.dispatchEvent(new CustomEvent('app-settings:updated'));
   });
@@ -252,37 +284,88 @@
   elements.toneInput?.addEventListener('input', (event) => {
     settings.main.toneInput = event.target.value;
     saveSettings(settings);
+    scheduleSaveToServer();
   });
 
   elements.toneResponse?.addEventListener('input', (event) => {
     settings.main.toneResponse = event.target.value;
     saveSettings(settings);
+    scheduleSaveToServer();
   });
 
   elements.toneError?.addEventListener('input', (event) => {
     settings.main.toneError = event.target.value;
     saveSettings(settings);
+    scheduleSaveToServer();
   });
 
   elements.voiceSelect?.addEventListener('change', (event) => {
     settings.main.voiceName = event.target.value;
     saveSettings(settings);
+    scheduleSaveToServer();
     previewVoice(settings.main.voiceName);
   });
 
   elements.characterEnabled?.addEventListener('change', (event) => {
     settings.character.enabled = event.target.checked;
     saveSettings(settings);
+    scheduleSaveToServer();
   });
 
   elements.characterSize?.addEventListener('input', (event) => {
     settings.character.size = Number(event.target.value || 220);
     updateSizeLabel(settings.character.size);
     saveSettings(settings);
+    scheduleSaveToServer();
   });
 
   elements.characterColor?.addEventListener('change', (event) => {
     settings.character.color = event.target.value;
     saveSettings(settings);
+    scheduleSaveToServer();
   });
+
+  const applySettingsFromServer = (serverSettings) => {
+    if (!serverSettings || typeof serverSettings !== 'object') return;
+    applyingRemote = true;
+    settings = {
+      general: { ...defaultSettings.general, ...(serverSettings.general || {}) },
+      main: { ...defaultSettings.main, ...(serverSettings.main || {}) },
+      character: { ...defaultSettings.character, ...(serverSettings.character || {}) },
+      theme: { ...defaultSettings.theme, ...(serverSettings.theme || {}) },
+    };
+    if (elements.fontFamily) elements.fontFamily.value = settings.general.fontFamily;
+    if (elements.colorTemplate) elements.colorTemplate.value = settings.theme.template || '';
+    if (elements.accentColor) elements.accentColor.value = settings.theme.accentColor;
+    if (elements.mutedColor) elements.mutedColor.value = settings.theme.mutedColor;
+    if (elements.mainBgColor) elements.mainBgColor.value = settings.main.backgroundColor;
+    if (elements.wakeWord) elements.wakeWord.value = settings.main.wakeWords || '';
+    if (elements.stripeColor) elements.stripeColor.value = settings.main.stripeColor || '#7aa8ff';
+    if (elements.mainButtonColor) elements.mainButtonColor.value = settings.main.buttonColor || '#7aa8ff';
+    if (elements.toneInput) elements.toneInput.value = settings.main.toneInput || '';
+    if (elements.toneResponse) elements.toneResponse.value = settings.main.toneResponse || '';
+    if (elements.toneError) elements.toneError.value = settings.main.toneError || '';
+    if (elements.voiceSelect) elements.voiceSelect.value = settings.main.voiceName;
+    if (elements.characterEnabled) elements.characterEnabled.checked = settings.character.enabled !== false;
+    if (elements.characterSize) elements.characterSize.value = settings.character.size;
+    if (elements.characterColor) elements.characterColor.value = settings.character.color;
+    updateSizeLabel(settings.character.size);
+    saveSettings(settings);
+    applyToPage(settings);
+    document.dispatchEvent(new CustomEvent('app-settings:updated'));
+    applyingRemote = false;
+  };
+
+  const fetchSettingsFromServer = async () => {
+    try {
+      const res = await fetch('/api/user_settings');
+      if (!res.ok) return;
+      const data = await res.json();
+      applySettingsFromServer(data.settings);
+    } catch (e) {
+      console.warn('設定の取得に失敗しました。', e);
+    }
+  };
+
+  fetchSettingsFromServer();
 })();
