@@ -51,6 +51,33 @@ function log(message) {
   // 例: showToast(message);
 }
 
+// ??????????????????
+function stripWakeWords(text) {
+  if (!text) return text;
+  try {
+    const raw = localStorage.getItem('appSettings');
+    if (!raw) return text;
+    const settings = JSON.parse(raw);
+    const wakeWordsRaw = settings?.main?.wakeWords || '';
+    if (!wakeWordsRaw) return text;
+    const words = wakeWordsRaw
+      .split(',')
+      .map(word => word.trim())
+      .filter(Boolean);
+    if (words.length === 0) return text;
+    let cleaned = text;
+    words.forEach((word) => {
+      cleaned = cleaned.replaceAll(word, '');
+    });
+    cleaned = cleaned.replace(/\s+/g, ' ').trim();
+    return cleaned || text;
+  } catch (e) {
+    console.warn('?????????????????', e);
+    return text;
+  }
+}
+
+
 /**
  * ユーザー入力を受け付け、LLMで解析・処理を分岐するメインエントリポイント。
  * @param {string} inputValue - ユーザーの入力テキスト
@@ -59,6 +86,7 @@ export async function check_chat_Space(inputValue) {
   fire('analysis:start', { steps: ['処理開始'] });
   console.time("チャット解析 総所要時間");
   console.log("入力検知:", inputValue);
+  const cleanedInput = stripWakeWords(inputValue);
   // console.log(`DEBUG: ユーザー入力読み上げ: "${inputValue}でございますね。かしこまりました。"`); // デバッグログ削除
 
   async function applyToneSetting(message, applyTarget) {
@@ -137,7 +165,7 @@ export async function check_chat_Space(inputValue) {
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ inputValue: inputValue }),
+      body: JSON.stringify({ inputValue: cleanedInput }),
     });
 
     if (!response.ok) {
@@ -164,7 +192,7 @@ export async function check_chat_Space(inputValue) {
       await new Promise(resolve => setTimeout(resolve, 2000)); // 2秒待機
 
       // 元のinputValueから「高速実行て、再度check_chat_Spaceを呼び出す
-      const originalCommand = inputValue.replace(高速実行);
+      const originalCommand = cleanedInput.replace(高速実行);
       console.log(`DEBUG: フォールバック後の入力: "${originalCommand}"`);
       await check_chat_Space(originalCommand);
       return; // フォールバック処理が完了したら、以降の処理はスキップ
