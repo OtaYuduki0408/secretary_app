@@ -8,11 +8,44 @@ from services.finance_service import get_all_finance_records
 # タイムゾーン設定
 JST = pytz.timezone('Asia/Tokyo')
 
-def _evaluate_time_trigger(trigger, now_jst, current_time_str, current_day_of_week_jp):
+def _evaluate_time_trigger(trigger, now_jst, current_time_str, current_day_of_week_jp, app_logger=None):
     # 時間トリガーの評価
     trigger_value = trigger.get('value')
     if not trigger_value:
+        if app_logger:
+            app_logger.debug("[TIME_TRIGGER] trigger_value is empty")
         return False
+
+    trigger_year = trigger_value.get('year')
+    trigger_month = trigger_value.get('month')
+    trigger_day = trigger_value.get('day')
+    trigger_day_of_week = trigger_value.get('day_of_week')
+    trigger_time_start = trigger_value.get('time_start')
+
+    time_match = (trigger_time_start == current_time_str)
+
+    date_match = True
+    if trigger_year and trigger_month and trigger_day:
+        try:
+            trigger_date = datetime(int(trigger_year), int(trigger_month), int(trigger_day)).date()
+            date_match = (trigger_date == now_jst.date())
+        except (ValueError, TypeError):
+            date_match = False
+
+    day_of_week_match = True
+    if trigger_day_of_week:
+        day_of_week_match = (current_day_of_week_jp in trigger_day_of_week)
+
+    if app_logger:
+        app_logger.debug(
+            f"[TIME_TRIGGER] now={now_jst.isoformat()} current_time={current_time_str} "
+            f"trigger_time={trigger_time_start} time_match={time_match} "
+            f"trigger_date={{'year':{trigger_year},'month':{trigger_month},'day':{trigger_day}}} date_match={date_match} "
+            f"trigger_day_of_week={trigger_day_of_week} current_day_of_week={current_day_of_week_jp} day_match={day_of_week_match}"
+        )
+
+    return time_match and date_match and day_of_week_match
+
 
 def _collect_actions_from_condition(condition):
     actions = []
@@ -42,31 +75,8 @@ def _collect_actions_from_steps(steps):
     return actions
 
 
-    trigger_year = trigger_value.get('year')
-    trigger_month = trigger_value.get('month')
-    trigger_day = trigger_value.get('day')
-    trigger_day_of_week = trigger_value.get('day_of_week')
-    trigger_time_start = trigger_value.get('time_start')
-
-    time_match = (trigger_time_start == current_time_str)
-
-    date_match = True
-    if trigger_year and trigger_month and trigger_day:
-        try:
-            trigger_date = datetime(int(trigger_year), int(trigger_month), int(trigger_day)).date()
-            date_match = (trigger_date == now_jst.date())
-        except (ValueError, TypeError):
-            date_match = False
-
-    day_of_week_match = True
-    if trigger_day_of_week:
-        day_of_week_match = (current_day_of_week_jp in trigger_day_of_week)
-
-    return time_match and date_match and day_of_week_match
-
-
 def evaluate_triggers(app_logger):
-    # 毎分のトリガー評価
+    # 定期的にトリガーを評価
     app_logger.debug(f"[{datetime.now()}] Evaluating triggers...")
 
     dispatch_list = []
@@ -88,15 +98,18 @@ def evaluate_triggers(app_logger):
     for order in orders:
         user_id = order.get('user_id')
         order_data = order.get('order_data')
+        app_logger.debug(f"[ORDER] id={order.get('id')} user_id={order.get('user_id')}")
+        app_logger.debug(f"[ORDER] order_data keys: {list(order_data.keys()) if isinstance(order_data, dict) else order_data}")
 
         if not order_data or not order_data.get('triggers'):
             continue
 
         trigger = order_data['triggers'][0]
+        app_logger.debug(f"[TRIGGER] {trigger}")
         if trigger.get('category') != '時間':
             continue
 
-        if _evaluate_time_trigger(trigger, now_jst, current_time_str, current_day_of_week_jp):
+        if _evaluate_time_trigger(trigger, now_jst, current_time_str, current_day_of_week_jp, app_logger):
             app_logger.debug(f"Trigger activated for user {user_id}. Processing actions...")
             steps = order_data.get('steps')
             actions_to_process = []
@@ -114,7 +127,7 @@ def evaluate_triggers(app_logger):
             for action in actions_to_process:
                 if not isinstance(action, dict):
                     continue
-                if action.get('category') == '?????' and action.get('sub') == '????':
+                if action.get('category') == 'カレンダー' and action.get('sub') == '読み上げ':
                     try:
                         today_start = now_jst.replace(hour=0, minute=0, second=0, microsecond=0)
                         today_end = now_jst.replace(hour=23, minute=59, second=59, microsecond=999999)
@@ -129,11 +142,11 @@ def evaluate_triggers(app_logger):
                                     start_dt = datetime.fromisoformat(e['start_time']).astimezone(JST)
                                     end_dt = datetime.fromisoformat(e['end_time']).astimezone(JST)
                                     event_items.append({
-                                        'summary': e.get('title', '??'),
+                                        'summary': e.get('title', '予定'),
                                         'start_time': start_dt.strftime('%H:%M'),
                                         'end_time': end_dt.strftime('%H:%M'),
-                                        'start_day': f"{start_dt.year}?{start_dt.month}?{start_dt.day}?",
-                                        'end_day': f"{end_dt.year}?{end_dt.month}?{end_dt.day}?",
+                                        'start_day': f"{start_dt.year}年{start_dt.month}月{start_dt.day}日",
+                                        'end_day': f"{end_dt.year}年{end_dt.month}月{end_dt.day}日",
                                         'event_link': None
                                     })
                                 except Exception as err:
@@ -145,14 +158,14 @@ def evaluate_triggers(app_logger):
                                 action['detail']['summary'] = event_items[0]['summary']
                                 app_logger.debug(f"Injected calendar event details: count={len(event_items)}")
                             else:
-                                action.setdefault('detail', {})['summary'] = '???????????'
+                                action.setdefault('detail', {})['summary'] = '今日の予定はありません'
                         else:
-                            action.setdefault('detail', {})['summary'] = '???????????'
+                            action.setdefault('detail', {})['summary'] = '今日の予定はありません'
                     except Exception as e:
                         app_logger.error(f"Error processing calendar action for user {user_id}: {e}")
-                        action.setdefault('detail', {})['summary'] = '????????????????????'
+                        action.setdefault('detail', {})['summary'] = 'カレンダー読み上げの処理に失敗しました。'
 
-                elif action.get('category') == '????' and action.get('sub') == '????':
+                elif action.get('category') == '収支管理' and action.get('sub') == '読み上げ':
                     try:
                         format_type = action.get('detail', {}).get('format')
                         app_logger.debug(f"Processing finance action for format: {format_type}")
@@ -175,12 +188,13 @@ def evaluate_triggers(app_logger):
                             )
                     except Exception as e:
                         app_logger.error(f"Error processing finance action for user {user_id}: {e}", exc_info=True)
-                        action.setdefault('detail', {})['error'] = '?????????????????'
+                        action.setdefault('detail', {})['error'] = '収支読み上げの処理に失敗しました。'
 
                 modified_actions.append(action)
 
             if not (isinstance(steps, list) and steps):
                 order_data['actions'] = modified_actions
+            app_logger.debug(f"[DISPATCH] user_id={user_id} order_id={order.get('id')} actions={len(modified_actions)} steps_present={isinstance(steps, list) and bool(steps)}")
             dispatch_list.append((user_id, order_data))
 
     return dispatch_list

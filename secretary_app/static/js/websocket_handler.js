@@ -114,6 +114,7 @@ function extractActionFromStep(step) {
 }
 
 async function executeStepsInOrder(steps) {
+    console.log('[DEBUG] executeStepsInOrder steps:', steps);
     if (!Array.isArray(steps) || steps.length === 0) {
         return;
     }
@@ -121,10 +122,12 @@ async function executeStepsInOrder(steps) {
     let i = 0;
     while (i < steps.length) {
         const currentStep = steps[i];
+        console.log('[DEBUG] step index', i, 'step', currentStep);
         const condition = extractConditionFromStep(currentStep);
 
         if (condition) {
-            const conditionGroup = [];
+            const conditionGroup = []
+            console.log('[DEBUG] condition group start at', i);;
             while (i < steps.length) {
                 const nextCondition = extractConditionFromStep(steps[i]);
                 if (!nextCondition) break;
@@ -132,6 +135,7 @@ async function executeStepsInOrder(steps) {
                 i += 1;
             }
             const actionsToExecute = await getActionsToExecute(conditionGroup);
+            console.log('[DEBUG] actionsToExecute from conditions:', actionsToExecute);
             if (actionsToExecute && actionsToExecute.length > 0) {
                 for (const action of actionsToExecute) {
                     await executeAction(action);
@@ -141,6 +145,7 @@ async function executeStepsInOrder(steps) {
         }
 
         const action = extractActionFromStep(currentStep);
+        if (action) console.log('[DEBUG] execute single action:', action);
         if (action) {
             await executeAction(action);
         }
@@ -450,8 +455,10 @@ function setupWebSocket() {
     });
 
     socket.on('dispatch_command', async (order_data) => {
+        console.log('[DEBUG] dispatch_command order_data:', order_data);
         console.log('サーバーからコマンドディスパッチを受け取りました:', order_data);
         const steps = Array.isArray(order_data.steps) ? order_data.steps : [];
+        console.log('[DEBUG] dispatch_command steps length:', steps.length);
         if (steps.length > 0) {
             await executeStepsInOrder(steps);
             return;
@@ -468,12 +475,12 @@ function setupWebSocket() {
         }
 
         if (actionsToExecute && actionsToExecute.length > 0) {
-            console.log("??????????????????????");
+            console.log("条件を満たしました。アクションを実行します。");
             for (const action of actionsToExecute) {
                 await executeAction(action);
             }
         } else {
-            console.log("????????????????????");
+            console.log("条件を満たしました。アクションを実行します。");
         }
     });
 }

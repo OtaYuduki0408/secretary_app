@@ -6,16 +6,20 @@ import { TRIGGER_CATEGORIES, ACTION_CATEGORIES } from './constants.js';
 
 export function parseActionArray(actionRoot) {
   if (!actionRoot) return [];
-  const allActionItems = [...actionRoot.children].filter(child => child.classList.contains('item')); // root??????.item?????
+  const allActionItems = [...actionRoot.children].filter(child => child.classList.contains('item'));
   
-  return [...allActionItems].map(actionItem => parseActionItem(actionItem));
+  const actions = [...allActionItems].map(actionItem => parseActionItem(actionItem));
+  console.log("[DEBUG] parseActionArray:", actions);
+  return actions;
 }
 
 export function parseConditions(root){
   if (!root) return [];
-  return [...root.children]
+  const conditions = [...root.children]
     .filter(child => child.classList.contains('condition-block'))
     .map(block => parseConditionBlock(block));
+  console.log("[DEBUG] parseConditions:", conditions);
+  return conditions;
 }
 
 function parseActionItem(actionItem) {
@@ -31,15 +35,15 @@ function parseActionItem(actionItem) {
   const detailContainer = actionItem.querySelector(".action-detail-container");
 
   switch (category) {
-    case "?????":
-      if (sub === "??") {
+    case "カレンダー":
+      if (sub === "追加") {
         detail.title = detailContainer.querySelector(".action-detail-cal-title")?.value;
         detail.start_time = detailContainer.querySelector(".action-detail-cal-start-time")?.value;
         detail.end_time = detailContainer.querySelector(".action-detail-cal-end-time")?.value;
         detail.description = detailContainer.querySelector(".action-detail-cal-description")?.value;
-      } else if (sub === "??") {
+      } else if (sub === "削除") {
         detail.text = detailContainer.querySelector(".action-detail-cal-text")?.value;
-      } else if (sub === "????") {
+      } else if (sub === "読み上げ") {
         detail.start_year = detailContainer.querySelector(".action-detail-cal-read-start-year")?.value;
         detail.start_month = detailContainer.querySelector(".action-detail-cal-read-start-month")?.value;
         detail.start_day = detailContainer.querySelector(".action-detail-cal-read-start-day")?.value;
@@ -50,8 +54,8 @@ function parseActionItem(actionItem) {
         detail.end_time = detailContainer.querySelector(".action-detail-cal-read-end-time")?.value;
       }
       break;
-    case "????":
-      if (sub === "????") {
+    case "収支管理":
+      if (sub === "読み上げ") {
         detail.item = detailContainer.querySelector(".action-detail-fin-read-item")?.value;
         detail.format = detailContainer.querySelector(".action-detail-fin-read-format")?.value;
         detail.start_year = detailContainer.querySelector(".action-detail-fin-read-start-year")?.value;
@@ -64,8 +68,8 @@ function parseActionItem(actionItem) {
         detail.end_time = detailContainer.querySelector(".action-detail-fin-read-end-time")?.value;
       }
       break;
-    case "??":
-      if (sub === "????") {
+    case "メモ":
+      if (sub === "読み上げ") {
         detail.start_year = detailContainer.querySelector(".action-detail-memo-read-start-year")?.value;
         detail.start_month = detailContainer.querySelector(".action-detail-memo-read-start-month")?.value;
         detail.start_day = detailContainer.querySelector(".action-detail-memo-read-start-day")?.value;
@@ -76,25 +80,26 @@ function parseActionItem(actionItem) {
         detail.end_time = detailContainer.querySelector(".action-detail-memo-read-end-time")?.value;
       }
       break;
-    case "???":
-      if (sub === "??") {
+    case "メール":
+      if (sub === "送信") {
         detail.subject = detailContainer.querySelector(".action-detail-mail-subject")?.value;
         detail.body = detailContainer.querySelector(".action-detail-mail-body")?.value;
       }
       break;
-    case "??":
-      if (sub === "??") {
+    case "発声":
+      if (sub === "実行") {
         detail.text = detailContainer.querySelector(".action-detail-speak-text")?.value;
       }
       break;
-    case "????":
-      if (sub === "??") {
+    case "アラート":
+      if (sub === "実行") {
         detail.sound = detailContainer.querySelector(".action-detail-alert-sound")?.value;
       }
       break;
   }
 
   const actionData = { category, sub, timing, detail };
+  console.log("[DEBUG] parseActionItem:", actionData);
 
   return actionData;
 }
@@ -121,20 +126,20 @@ function parseConditionBlock(block) {
           const sub = subSelect.value;
 
           switch (category) {
-            case "??":
+            case "場所":
               value.address = valueContainer.querySelector(`[id$="trigger_value_address"]`)?.value;
               value.latitude = valueContainer.querySelector(`[id$="trigger_value_latitude"]`)?.value;
               value.longitude = valueContainer.querySelector(`[id$="trigger_value_longitude"]`)?.value;
               value.range = valueContainer.querySelector(`[id$="trigger_value_range"]`)?.value;
               break;
-            case "?????":
-              if (sub === "???????") {
+            case "カレンダー":
+              if (sub === "入力があったら") {
                 value.actions = [...valueContainer.querySelectorAll(`#${prefix}trigger_value_calendar_actions button.selected`)].map(btn => btn.dataset.value);
                 value.filters = [...valueContainer.querySelectorAll(".filter-item")].map(item => ({
                   text: item.querySelector(".calendar_filter_text")?.value,
                   logic: item.querySelector(".calendar_filter_logic")?.value
                 }));
-              } else if (sub === "??????????") {
+              } else if (sub === "予定の時間になったら") {
                 value.title = valueContainer.querySelector(`[id$="trigger_value_cal_title"]`)?.value;
                 value.start_year = valueContainer.querySelector(`[id$="trigger_value_cal_start_year"]`)?.value;
                 value.start_month = valueContainer.querySelector(`[id$="trigger_value_cal_start_month"]`)?.value;
@@ -145,7 +150,7 @@ function parseConditionBlock(block) {
                 value.end_month = valueContainer.querySelector(`[id$="trigger_value_cal_end_month"]`)?.value;
                 value.end_day = valueContainer.querySelector(`[id$="trigger_value_cal_end_day"]`)?.value;
                 value.end_time = valueContainer.querySelector(`[id$="trigger_value_cal_end_time"]`)?.value;
-              } else if (sub === "?????????") {
+              } else if (sub === "この予定があるなら") {
                 value.search_type = valueContainer.querySelector(`[id$="trigger_value_cal_search_type"]`)?.value;
                 value.title = valueContainer.querySelector(`[id$="trigger_value_cal_event_title"]`)?.value;
                 value.start_year = valueContainer.querySelector(`[id$="trigger_value_cal_event_start_year"]`)?.value;
@@ -158,26 +163,26 @@ function parseConditionBlock(block) {
                 value.end_time = valueContainer.querySelector(`[id$="trigger_value_cal_event_end_time"]`)?.value;
               }
               break;
-            case "????":
-              if (sub === "???????") {
+            case "収支管理":
+              if (sub === "入力があったら") {
                 value.actions = [...valueContainer.querySelectorAll(`#${prefix}trigger_value_finance_actions button.selected`)].map(btn => btn.dataset.value);
-                if (value.actions.includes('??')) {
+                if (value.actions.includes('追加')) {
                   value.genres = [...valueContainer.querySelectorAll(`#${prefix}trigger_value_finance_genres button.selected`)].map(btn => btn.dataset.value);
                 }
-              } else if (sub === "?????????") {
+              } else if (sub === "特定金額になったら") {
                 value.item = valueContainer.querySelector(`[id$="trigger_value_finance_item"]`)?.value;
                 value.amount = valueContainer.querySelector(`[id$="trigger_value_finance_amount"]`)?.value;
                 value.percentage = valueContainer.querySelector(`[id$="trigger_value_finance_percentage"]`)?.value;
               }
               break;
-            case "??":
+            case "メモ":
               value.actions = [...valueContainer.querySelectorAll(`#${prefix}trigger_value_memo_actions button.selected`)].map(btn => btn.dataset.value);
               value.filters = [...valueContainer.querySelectorAll(".filter-item")].map(item => ({
                 text: item.querySelector(".memo_filter_text")?.value,
                 logic: item.querySelector(".memo_filter_logic")?.value
               }));
               break;
-            case "??":
+            case "時間":
               value.start_year = valueContainer.querySelector(`[id$='_time_start_year']`)?.value;
               value.start_month = valueContainer.querySelector(`[id$='_time_start_month']`)?.value;
               value.start_day = valueContainer.querySelector(`[id$='_time_start_day']`)?.value;
@@ -202,18 +207,20 @@ function parseConditionBlock(block) {
     }
   }
 
-  return {
+  const conditionData = {
     logic: block.querySelector(".condition-logic").value,
     type: type,
     expr: expr,
     nested: parseConditions(block.querySelector(".nested-conditions")),
     actions: parseActionArray(block.querySelector(".nested-actions"))
   };
+  console.log("[DEBUG] parseConditionBlock:", conditionData);
+  return conditionData;
 }
 
 function parseSteps(root) {
   if (!root) return [];
-  return [...root.children]
+  const steps = [...root.children]
     .filter(child => child.classList.contains('condition-block') || child.classList.contains('item'))
     .map(child => {
       if (child.classList.contains('condition-block')) {
@@ -221,6 +228,8 @@ function parseSteps(root) {
       }
       return { kind: 'action', action: parseActionItem(child) };
     });
+  console.log("[DEBUG] parseSteps:", steps);
+  return steps;
 }
 export function loadCommandToForm(cmd){
   console.log("--- [DEBUG] loadCommandToForm called with cmd:", cmd);
