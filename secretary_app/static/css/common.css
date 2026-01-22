@@ -592,6 +592,21 @@ table tbody + tbody {
 
 }
 
+@media (max-width: 480px){
+  .main-wrapper{
+    padding:10px;
+  }
+  table{
+    display:block;
+    width:100%;
+    overflow-x:auto;
+  }
+  th,
+  td{
+    white-space:nowrap;
+  }
+}
+
 /* --- main.html specific styles from here --- */
 .shell {
   padding: 0 16px; /* Moved from templates/main.html */

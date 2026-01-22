@@ -47,6 +47,21 @@ body {
     }
 }
 
+@media (max-width: 480px){
+    body{
+        padding:16px 12px;
+    }
+    .card{
+        padding:18px;
+    }
+    .header h1{
+        font-size:2rem;
+    }
+    .dashboard{
+        gap:16px;
+    }
+}
+
 .card {
     background: white;
     border-radius: 15px;

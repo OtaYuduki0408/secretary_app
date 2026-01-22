@@ -229,9 +229,9 @@
 
         const openModal = ({ dateStr, event }) => {
             if (event) {
-                // 編集モード
+                // ??E????E
                 currentEventId = event.id;
-                $('#modal-title').textContent = 'イベントを編集';
+                $('#modal-title').textContent = '???????E;
                 $('#event-title').value = event.title;
                 $('#event-desc').value = event.extendedProps.description || '';
                 const start = new Date(event.start.getTime() - (new Date().getTimezoneOffset() * 60000)).toISOString().slice(0, 16);
@@ -240,9 +240,9 @@
                 $('#event-end').value = end;
                 $('#delete-event-button').style.display = 'inline-block';
             } else {
-                // 新規作成モード
+                // ????E???E
                 currentEventId = null;
-                $('#modal-title').textContent = 'イベントを追加';
+                $('#modal-title').textContent = '???????';
                 $('#event-title').value = '';
                 $('#event-desc').value = '';
                 const clickedDate = new Date(dateStr);
@@ -305,7 +305,7 @@
                 } catch (e) {
                     alert(`イベントの削除に失敗しました: ${e.message}`);
                 }
-            }
+            },
         };
 
         $('#save-event-button').addEventListener('click', async () => {
@@ -314,8 +314,8 @@
             const end = $('#event-end').value;
             const description = $('#event-desc').value.trim();
 
-            if (!title) { alert('タイトルを入力してください。'); return; }
-            if (!start || !end) { alert('開始日時と終了日時を入力してください。'); return; }
+            if (!title) { alert('??????????????'); return; }
+            if (!start || !end) { alert('???????????????????'); return; }
             
             const eventData = {
                 title,
@@ -338,6 +338,7 @@
         });
 
         $('#cancel-event-button').addEventListener('click', closeModal);
+
         modal.addEventListener('click', (e) => {
             if (e.target === modal) closeModal();
         });

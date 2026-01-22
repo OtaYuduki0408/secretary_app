@@ -139,3 +139,16 @@ body {
 .modal-overlay.is-visible .modal-content {
     transform: scale(1);
 }
+
+@media (max-width: 540px){
+  html{
+    font-size:16px;
+  }
+  #calendar{
+    padding:1rem;
+    margin:1rem auto;
+  }
+  .modal-content{
+    width:96%;
+  }
+}

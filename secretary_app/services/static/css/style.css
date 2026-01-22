@@ -10,8 +10,12 @@
 	 --shadow: 0 10px 30px rgba(0,0,0,.35);
 	 --inset: inset 0 1px 0 rgba(255,255,255,.05), inset 0 -1px 0 rgba(0,0,0,.4);
 	 --radius: 18px;
-	 --wallpaper:none;
-	 --wallpaper-darken: rgba(0,0,0,.62);
+	 --wallpaper:
+	   radial-gradient(circle at 18% 22%, rgba(56,189,248,.35), transparent 45%),
+	   radial-gradient(circle at 75% 6%, rgba(14,165,233,.30), transparent 52%),
+	   radial-gradient(circle at 52% 82%, rgba(59,130,246,.25), transparent 60%),
+	   linear-gradient(180deg,#081226 0%,#0b1f38 45%,#0c2f50 100%);
+	 --wallpaper-darken: rgba(6,12,32,.35);
 	 --mx: 0px;
 	 --my: 0px;
 }
@@ -286,6 +290,8 @@
 /* 讀懃ｴ｢繝舌・ */
  .search{
 	 width:min(960px, 88vw);
+   max-width:100%;
+   box-sizing:border-box;
 	 display:flex;
 	 align-items:center;
 	 gap:14px;
@@ -959,19 +965,40 @@
 @media (max-width: 680px){
   .shell{ padding: 0 14px; }
 
-  .mic-wrap{ transform: scale(.9); }
-  .search{ width: 100%; }
-  .search input{ width: 100%; }
+  .mic-wrap{ justify-content:center; }
+  .mic-btn{
+    width:min(220px, 60vw);
+    height:min(220px, 60vw);
+  }
+  .search{
+    width:100%;
+    max-width:100%;
+    padding:clamp(12px,4vw,18px);
+    grid-template-columns:minmax(0,1fr);
+  }
+  .search input{ width: 100%; font-size:1rem; }
 
   .fab-group{
-    position: fixed;
-    right: 12px;
-    bottom: max(12px, env(safe-area-inset-bottom));
-    gap: 10px;
+    position: static;
+    width:100%;
+    margin:20px auto 0;
+    display:flex;
+    flex-wrap:wrap;
+    justify-content:center;
+    gap:14px;
   }
-  .fab{ width: 52px; height: 52px; border-radius: 14px; }
+  .fab{
+    width:58px;
+    height:58px;
+    border-radius:16px;
+  }
   .fab svg{ width: 28px; height: 28px; }
-  .calendar-btn .badge{ transform: scale(.9); transform-origin: bottom right; }
+  .calendar-btn .badge{
+    transform:none;
+    position:absolute;
+    top:-8px;
+    right:-8px;
+  }
 }
 
 /* 讌ｵ蟆冗ｫｯ譛ｫ縺ｧ讀懃ｴ｢蝓溘ｒ遒ｺ菫・*/
@@ -1035,8 +1062,12 @@
 	 --shadow: 0 10px 30px rgba(0,0,0,.35);
 	 --inset: inset 0 1px 0 rgba(255,255,255,.05), inset 0 -1px 0 rgba(0,0,0,.4);
 	 --radius: 18px;
-	 --wallpaper:none;
-	 --wallpaper-darken: rgba(0,0,0,.62);
+	 --wallpaper:
+	   radial-gradient(circle at 18% 22%, rgba(56,189,248,.35), transparent 45%),
+	   radial-gradient(circle at 75% 6%, rgba(14,165,233,.30), transparent 52%),
+	   radial-gradient(circle at 52% 82%, rgba(59,130,246,.25), transparent 60%),
+	   linear-gradient(180deg,#081226 0%,#0b1f38 45%,#0c2f50 100%);
+	 --wallpaper-darken: rgba(6,12,32,.35);
 	 --mx: 0px;
 	 --my: 0px;
 }
@@ -1080,4 +1111,89 @@
 }
 .nav-btn--outline:hover{
   background:rgba(255,255,255,.12);
+}
+
+/* ========================
+   Smartphone レイアウト調整
+   ======================== */
+@media (max-width: 768px){
+  html,body{
+    height:auto;
+    min-height:100%;
+    overflow-x:hidden;
+  }
+  .shell{
+    grid-template-rows:auto;
+    align-items:flex-start;
+    justify-items:stretch;
+    padding:clamp(16px,4vw,28px);
+    row-gap:clamp(18px,4vw,32px);
+  }
+  .shell > div[aria-hidden="true"]{
+    display:none;
+  }
+  .ui-stack{
+    width:100%;
+    justify-items:stretch;
+    gap:clamp(14px,4vw,24px);
+  }
+  .ui-stack > *{
+    width:100%;
+  }
+  .mic-wrap{
+    width:100%;
+    justify-content:center;
+  }
+  .mic-btn{
+    width:min(220px,60vw);
+    height:min(220px,60vw);
+  }
+  .terminal-window{
+    width:100%;
+    max-width:none;
+    min-height:clamp(260px,60vh,380px);
+    height:auto;
+  }
+  .voice-log-panel{
+    padding:clamp(14px,4vw,20px);
+    font-size:.95rem;
+  }
+  .search{
+    width:100%;
+    padding:clamp(12px,4vw,18px);
+    grid-template-columns:minmax(0,1fr);
+    text-align:center;
+  }
+  .search .icon{
+    margin:0 auto;
+  }
+  .search input{
+    width:100%;
+    font-size:1rem;
+  }
+  .user-badge{
+    width:100%;
+    justify-content:center;
+    flex-wrap:wrap;
+    text-align:center;
+  }
+  .fab-group{
+    position:static;
+    width:100%;
+    padding:0;
+    margin:20px auto 0;
+    display:flex;
+    flex-wrap:wrap;
+    justify-content:center;
+    gap:14px;
+  }
+  .fab-group .fab{
+    width:58px;
+    height:58px;
+    border-radius:16px;
+  }
+  .fab-group .fab svg{
+    width:28px;
+    height:28px;
+  }
 }

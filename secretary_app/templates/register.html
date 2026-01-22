@@ -2,30 +2,33 @@
 {% block content %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/login.css') }}">
 
-<div class="auth-header">
-  <a href="{{ url_for('login') }}" class="link-btn">ログインへ戻る</a>
-</div>
+<div class="auth-shell">
+  <div class="auth-header">
+    <a href="{{ url_for('login') }}" class="link-btn">ログインへ戻る</a>
+  </div>
 
-<h2>ユーザー登録</h2>
+  <h2>ユーザー登録</h2>
 
-<form method="post" action="/register">
-  <label>名前</label>
-  <input type="text" name="name" required>
+  <form method="post" action="/register">
+    <label>名前</label>
+    <input type="text" name="name" required>
 
-  <label>メールアドレス</label>
-  <input type="email" name="email" required>
+    <label>メールアドレス</label>
+    <input type="email" name="email" required>
 
-  <label>パスワード</label>
-  <input type="password" name="password" required>
+    <label>パスワード</label>
+    <input type="password" name="password" required>
 
-  <button type="submit">登録</button>
-</form>
+    <button type="submit">登録</button>
+  </form>
 
-{% if error %}
-  <p class="error-msg">{{ error }}</p>
-{% endif %}
+  {% if error %}
+    <p class="error-msg">{{ error }}</p>
+  {% endif %}
 
-<div class="auth-links">
-  <a href="{{ url_for('login') }}" class="link-text">ログインはこちら</a>
+  <div class="cta-footer">
+    <a href="{{ url_for('login') }}" class="link-btn">ログインはこちら</a>
+    <a href="{{ url_for('main') }}" class="link-btn">メインへ戻る</a>
+  </div>
 </div>
 {% endblock %}
