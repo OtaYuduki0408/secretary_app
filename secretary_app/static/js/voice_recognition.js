@@ -1,7 +1,7 @@
 // ============================================================================
 // グローバル変数と定数
 // ============================================================================
-const WAKE_WORDS = ['ボイスメイト', 'ぼいすめいと', 'voicemate', '高速実行', 'クイックコマンド'];
+const WAKE_WORDS = ['サイレントメイト', 'ぼいすめいと', 'voicemate', '高速実行', 'クイックコマンド'];
 const VOICE_WATE_SOUND_PATH = '/static/voice/voice_wate.mp3';
 const RELODE_SOUND_PATH = '/static/voice/relode.mp3';
 const ERROR_SOUND_PATH = '/static/voice/error.mp3';
@@ -277,7 +277,7 @@ function setMode(newMode) {
         }, 10000);
     } else { // 'waiting'
         micButton.classList.remove('active');
-        searchBox.placeholder = "「ボイスメイト」または「クイックコマンド」と呼びかけてください";
+        searchBox.placeholder = "「サイレントメイト」または「クイックコマンド」と呼びかけてください";
     }
 }
 

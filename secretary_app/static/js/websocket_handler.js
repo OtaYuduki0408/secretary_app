@@ -141,6 +141,21 @@ function emitVoiceState(isSpeaking) {
 }
 
 /**
+ * 設定から優先音声名を取得する
+ * @returns {string}
+ */
+function getPreferredVoiceName() {
+    try {
+        const raw = localStorage.getItem('appSettings');
+        if (!raw) return '';
+        const settings = JSON.parse(raw);
+        return settings?.main?.voiceName || '';
+    } catch (e) {
+        console.warn('音声設定の読み込みに失敗しました。', e);
+        return '';
+    }
+}
+/**
  * 指定されたアクションを実行する
  * @param {object} action - 実行するアクション
  * @returns {Promise<void>} アクションの完了を示すPromise
@@ -312,6 +327,14 @@ function executeAction(action) {
                         emitVoiceState(false);
                         resolveSpeech();
                     };
+                    const preferredVoiceName = getPreferredVoiceName();
+                    if (preferredVoiceName) {
+                        const voices = speechSynthesis.getVoices();
+                        const selectedVoice = voices.find(voice => voice.name === preferredVoiceName);
+                        if (selectedVoice) {
+                            utterance.voice = selectedVoice;
+                        }
+                    }
                     speechSynthesis.speak(utterance);
                 });
                 console.log(`発声開始: "${textToSpeak.substring(0, 50)}..."`);

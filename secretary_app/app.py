@@ -276,6 +276,11 @@ def oauth_callback2():
 def memo():
     return render_template('memo.html')
 
+@app.route('/settings')
+@login_required
+def settings_page():
+    return render_template('settings.html')
+
 @app.route('/calender')
 @login_required
 def calender_page():

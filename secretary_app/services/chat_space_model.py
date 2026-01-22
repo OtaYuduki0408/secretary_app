@@ -317,7 +317,7 @@ class ChatSpaceModel:
     def check_chat_space(self, input_value: str, user_id: str | None = None) -> dict:
         print("--- [DEBUG] check_chat_space: Starting ---")
         # 起動コマンドを除外してGeminiへ渡す
-        cleaned_input = (input_value or "").replace("ボイスメイト", "").strip()
+        cleaned_input = (input_value or "").replace("サイレントメイト", "").strip()
         current_time = datetime.now(JST).strftime('%Y-%m-%d %H:%M:%S')
         purpose_prompt = self.PURPOSE_PROMPT_TEMPLATE.format(current_time=current_time, input_value=cleaned_input)
         purpose = self._gemini_request(purpose_prompt)
