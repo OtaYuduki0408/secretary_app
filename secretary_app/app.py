@@ -587,7 +587,12 @@ def chat_api_external():
     return jsonify(response_data)
 
 import re
+import copy
+import pytz
+
+JST = pytz.timezone('Asia/Tokyo')
 from services import local_calendar_service
+from services.memo_service import get_all_memos as get_all_memo_records
 
 
 def _normalize_keyword_list(raw):
@@ -670,6 +675,173 @@ def _map_purpose_to_action(purpose):
     return category, action
 
 
+def _parse_int_or_now(value, now_value):
+    if value is None:
+        return now_value
+    if isinstance(value, int):
+        return value
+    if isinstance(value, str):
+        raw = value.strip()
+        if not raw or "実行された" in raw:
+            return now_value
+        if raw.isdigit():
+            return int(raw)
+    return now_value
+
+
+def _parse_time_or_default(value, default_time):
+    if not value:
+        return default_time
+    if isinstance(value, str):
+        raw = value.strip()
+        if not raw or "実行された" in raw:
+            return default_time
+        if ":" in raw:
+            return raw
+    return default_time
+
+
+def _build_range_from_detail(detail, now_jst):
+    start_year = _parse_int_or_now(detail.get('start_year'), now_jst.year)
+    start_month = _parse_int_or_now(detail.get('start_month'), now_jst.month)
+    start_day = _parse_int_or_now(detail.get('start_day'), now_jst.day)
+    end_year = _parse_int_or_now(detail.get('end_year'), now_jst.year)
+    end_month = _parse_int_or_now(detail.get('end_month'), now_jst.month)
+    end_day = _parse_int_or_now(detail.get('end_day'), now_jst.day)
+
+    start_time = _parse_time_or_default(detail.get('start_time'), "00:00")
+    end_time = _parse_time_or_default(detail.get('end_time'), "23:59")
+
+    start_hour, start_minute = [int(x) for x in start_time.split(":")[:2]]
+    end_hour, end_minute = [int(x) for x in end_time.split(":")[:2]]
+
+    start_dt = JST.localize(datetime(start_year, start_month, start_day, start_hour, start_minute))
+    end_dt = JST.localize(datetime(end_year, end_month, end_day, end_hour, end_minute, 59))
+    return start_dt, end_dt
+
+
+def _date_range_to_utc_iso(start_dt, end_dt):
+    start_utc = start_dt.astimezone(pytz.UTC).isoformat()
+    end_utc = end_dt.astimezone(pytz.UTC).isoformat()
+    return start_utc, end_utc
+
+
+def _enrich_calendar_read(detail, user_id, now_jst, app_logger):
+    start_dt, end_dt = _build_range_from_detail(detail, now_jst)
+    events = local_calendar_service.get_events(user_id, start_dt.isoformat(), end_dt.isoformat())
+    app_logger.debug(f"[INPUT_TRIGGER] calendar events={len(events)}")
+    if not events:
+        detail['summary'] = '今日の予定はありません'
+        detail['events'] = []
+        return detail
+    event_items = []
+    for e in events:
+        try:
+            start_local = datetime.fromisoformat(e['start_time']).astimezone(JST)
+            end_local = datetime.fromisoformat(e['end_time']).astimezone(JST)
+            event_items.append({
+                'summary': e.get('title', '予定'),
+                'start_time': start_local.strftime('%H:%M'),
+                'end_time': end_local.strftime('%H:%M'),
+                'start_day': f"{start_local.year}年{start_local.month}月{start_local.day}日",
+                'end_day': f"{end_local.year}年{end_local.month}月{end_local.day}日",
+                'event_link': None
+            })
+        except Exception as err:
+            app_logger.debug(f"[INPUT_TRIGGER] calendar parse error: {err}")
+    if event_items:
+        detail['events'] = event_items
+        detail.update(event_items[0])
+        detail['summary'] = event_items[0]['summary']
+    else:
+        detail['summary'] = '今日の予定はありません'
+        detail['events'] = []
+    return detail
+
+
+def _enrich_finance_read(detail, user_id, now_jst, app_logger):
+    format_type = detail.get('format')
+    records = get_all_finance_records(user_id)
+    start_dt, end_dt = _build_range_from_detail(detail, now_jst)
+    filtered = []
+    for r in records:
+        date_str = r.get('date')
+        if not date_str:
+            continue
+        try:
+            record_dt = datetime.fromisoformat(date_str)
+        except ValueError:
+            continue
+        if record_dt.tzinfo is None:
+            record_dt = JST.localize(record_dt)
+        if start_dt <= record_dt <= end_dt:
+            filtered.append(r)
+
+    income_total = sum(r.get('amount', 0) for r in filtered if r.get('type') == 'income')
+    expense_total = sum(r.get('amount', 0) for r in filtered if r.get('type') == 'expense')
+    balance = income_total - expense_total
+
+    if format_type == 'individual':
+        detail['records'] = filtered
+    else:
+        detail['income_total'] = income_total
+        detail['expense_total'] = expense_total
+        detail['balance'] = balance
+    app_logger.debug(f"[INPUT_TRIGGER] finance format={format_type} income={income_total} expense={expense_total} balance={balance}")
+    return detail
+
+
+def _enrich_memo_read(detail, user_id, now_jst, app_logger):
+    start_dt, end_dt = _build_range_from_detail(detail, now_jst)
+    start_utc, end_utc = _date_range_to_utc_iso(start_dt, end_dt)
+    memos = get_all_memo_records(user_id=user_id, start_date=start_utc, end_date=end_utc)
+    if isinstance(memos, dict) and memos.get('error'):
+        detail['content'] = 'メモの取得に失敗しました。'
+        return detail
+    if not memos:
+        detail['content'] = '該当するメモは見つかりませんでした。'
+        return detail
+    parts = []
+    for memo in memos[:5]:
+        title = memo.get('title') or '無題'
+        content = memo.get('content') or '内容なし'
+        parts.append(f"タイトル: {title} / 内容: {content}")
+    detail['content'] = " / ".join(parts)
+    return detail
+
+
+def _enrich_actions_for_dispatch(order_payload, user_id, app_logger):
+    now_jst = datetime.now(JST)
+    steps = order_payload.get('steps') or []
+    actions = order_payload.get('actions') or []
+
+    def enrich_action(action):
+        if not isinstance(action, dict):
+            return action
+        category = action.get('category')
+        sub = action.get('sub')
+        detail = action.get('detail') or {}
+        if category == 'カレンダー' and sub == '読み上げ':
+            action['detail'] = _enrich_calendar_read(detail, user_id, now_jst, app_logger)
+        elif category == '収支管理' and sub == '読み上げ':
+            action['detail'] = _enrich_finance_read(detail, user_id, now_jst, app_logger)
+        elif category == 'メモ' and sub == '読み上げ':
+            action['detail'] = _enrich_memo_read(detail, user_id, now_jst, app_logger)
+        return action
+
+    if isinstance(steps, list) and steps:
+        for step in steps:
+            if not isinstance(step, dict):
+                continue
+            action = step.get('action')
+            if action:
+                step['action'] = enrich_action(action)
+        order_payload['steps'] = steps
+    else:
+        order_payload['actions'] = [enrich_action(a) for a in actions]
+    return order_payload
+
+
 def _dispatch_order_payload(user_id, order_payload):
     sid = connected_users.get(user_id)
     if not sid:
@@ -702,6 +874,7 @@ def _handle_input_triggers(user_input, response_data, user_id):
             keywords = _normalize_keyword_list(value.get('keywords') or value.get('keyword') or value.get('value'))
             if _match_keywords(user_input, keywords):
                 payload = {k: order.get(k) for k in ['triggers', 'actions', 'conditions', 'steps'] if k in order}
+                payload = _enrich_actions_for_dispatch(payload, user_id, app.logger)
                 app.logger.debug(f"[INPUT_TRIGGER] Voice matched keywords={keywords}")
                 _dispatch_order_payload(user_id, payload)
             continue
@@ -727,6 +900,7 @@ def _handle_input_triggers(user_input, response_data, user_id):
                     continue
 
         payload = {k: order.get(k) for k in ['triggers', 'actions', 'conditions', 'steps'] if k in order}
+        payload = _enrich_actions_for_dispatch(payload, user_id, app.logger)
         app.logger.debug(f"[INPUT_TRIGGER] Matched trigger category={category} action={purpose_action}")
         _dispatch_order_payload(user_id, payload)
 
