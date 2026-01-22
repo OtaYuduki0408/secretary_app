@@ -739,6 +739,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
 
+            addTextLogEntry('音声認識ボタン');
+            addTextLogEntry('音声認識ボタン');
             setMode('listening');
 
 
