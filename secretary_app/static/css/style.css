@@ -1,4 +1,4 @@
-:root{
+﻿:root{
 	 --bg-1:#0b1116;
 	 --bg-2:#0f141a;
 	 --panel:#1c232a;
@@ -7,6 +7,8 @@
 	 --muted:#cdd6df;
 	 --accent:#66a3ff;
 	 --ring:#7aa8ff;
+	 --stripe-color: rgba(255,255,255,.025);
+	 --main-btn-color: #7aa8ff;
 	 --shadow: 0 10px 30px rgba(0,0,0,.35);
 	 --inset: inset 0 1px 0 rgba(255,255,255,.05), inset 0 -1px 0 rgba(0,0,0,.4);
 	 --radius: 18px;
@@ -38,10 +40,12 @@
 }
  html,body{
 	 height:100%;
+	 min-height:100vh;
 	 margin:0;
 	 color:var(--text);
    box-sizing: border-box; /* ここを追加 */
 	 background: radial-gradient(1200px 800px at 70% 20%, rgba(102,163,255,.08), transparent 60%), radial-gradient(900px 700px at 20% 85%, rgba(102,163,255,.05), transparent 60%), linear-gradient(180deg, var(--bg-2), var(--bg-1));
+	 background-attachment: fixed;
 	 font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans JP", sans-serif;
 }
 /* 繝代Λ繝ｩ繝・け繧ｹ */
@@ -72,7 +76,7 @@
 }
  .plx-layer.front{
 	 transform: translate3d(calc(var(--mx)*0.90), calc(var(--my)*0.90), 0) scale(1.03);
-	 background: radial-gradient(120vmax 80vmax at 50% 50%, rgba(0,0,0,0) 65%, rgba(0,0,0,.40) 95%), repeating-linear-gradient(135deg, rgba(255,255,255,.025) 0px, rgba(255,255,255,.025) 1px, rgba(0,0,0,0) 2px, rgba(0,0,0,0) 8px);
+	 background: radial-gradient(120vmax 80vmax at 50% 50%, rgba(0,0,0,0) 65%, rgba(0,0,0,.40) 95%), repeating-linear-gradient(135deg, var(--stripe-color) 0px, var(--stripe-color) 1px, rgba(0,0,0,0) 2px, rgba(0,0,0,0) 8px);
 }
 /* Light・育區・・*/
  html.theme-light .plx-layer.back{
@@ -85,7 +89,7 @@
 }
  html.theme-light .plx-layer.front{
 	 transform: translate3d(calc(var(--mx)*0.65), calc(var(--my)*0.65), 0) scale(1.02);
-	 background: radial-gradient(120vmax 80vmax at 50% 50%, rgba(0,0,0,0) 60%, rgba(0,0,0,.12) 96%), repeating-linear-gradient(135deg, rgba(0,0,0,.08) 0px, rgba(0,0,0,.08) 1px, rgba(0,0,0,0) 2px, rgba(0,0,0,0) 9px);
+	 background: radial-gradient(120vmax 80vmax at 50% 50%, rgba(0,0,0,0) 60%, rgba(0,0,0,.12) 96%), repeating-linear-gradient(135deg, var(--stripe-color) 0px, var(--stripe-color) 1px, rgba(0,0,0,0) 2px, rgba(0,0,0,0) 9px);
 }
 /* Purple / Blue / Orange・磯ｮｮ繧・°・・*/
  html.theme-purple{
@@ -104,7 +108,7 @@
 }
  html.theme-purple .plx-layer.front{
 	 transform: translate3d(calc(var(--mx)*0.78), calc(var(--my)*0.78), 0) scale(1.02);
-	 background: radial-gradient(120vmax 80vmax at 50% 50%, rgba(0,0,0,0) 55%, rgba(0,0,0,.52) 96%), repeating-linear-gradient(135deg, rgba(192,132,252,.35) 0px, rgba(192,132,252,.35) 1px, rgba(0,0,0,0) 2px, rgba(0,0,0,0) 9px);
+	 background: radial-gradient(120vmax 80vmax at 50% 50%, rgba(0,0,0,0) 55%, rgba(0,0,0,.52) 96%), repeating-linear-gradient(135deg, var(--stripe-color) 0px, var(--stripe-color) 1px, rgba(0,0,0,0) 2px, rgba(0,0,0,0) 9px);
 }
  html.theme-blue{
 	 --bg-1:#071426;
@@ -122,7 +126,7 @@
 }
  html.theme-blue .plx-layer.front{
 	 transform: translate3d(calc(var(--mx)*0.78), calc(var(--my)*0.78), 0) scale(1.02);
-	 background: radial-gradient(120vmax 80vmax at 50% 50%, rgba(0,0,0,0) 55%, rgba(0,0,0,.50) 96%), repeating-linear-gradient(135deg, rgba(59,130,246,.35) 0px, rgba(59,130,246,.35) 1px, rgba(0,0,0,0) 2px, rgba(0,0,0,0) 9px);
+	 background: radial-gradient(120vmax 80vmax at 50% 50%, rgba(0,0,0,0) 55%, rgba(0,0,0,.50) 96%), repeating-linear-gradient(135deg, var(--stripe-color) 0px, var(--stripe-color) 1px, rgba(0,0,0,0) 2px, rgba(0,0,0,0) 9px);
 }
  html.theme-orange{
 	 --bg-1:#1d0e04;
@@ -140,7 +144,7 @@
 }
  html.theme-orange .plx-layer.front{
 	 transform: translate3d(calc(var(--mx)*0.78), calc(var(--my)*0.78), 0) scale(1.02);
-	 background: radial-gradient(120vmax 80vmax at 50% 50%, rgba(0,0,0,0) 55%, rgba(0,0,0,.52) 96%), repeating-linear-gradient(135deg, rgba(251,146,60,.38) 0px, rgba(251,146,60,.38) 1px, rgba(0,0,0,0) 2px, rgba(0,0,0,0) 9px);
+	 background: radial-gradient(120vmax 80vmax at 50% 50%, rgba(0,0,0,0) 55%, rgba(0,0,0,.52) 96%), repeating-linear-gradient(135deg, var(--stripe-color) 0px, var(--stripe-color) 1px, rgba(0,0,0,0) 2px, rgba(0,0,0,0) 9px);
 }
 /* UI 閭碁擇證怜ｹ・*/
  .ui-backdrop{
@@ -221,7 +225,7 @@
 	 width:100%;
 	 height:100%;
 	 border-radius:50%;
-	 background: radial-gradient(100% 100% at 50% 25%, #2a3440 0%, #141a20 70%, #11161b 100%);
+	 background: radial-gradient(100% 100% at 50% 25%, color-mix(in srgb, var(--main-btn-color) 45%, #11161b), #11161b 90%);
 	 display:grid;
 	 place-items:center;
 }
@@ -235,18 +239,18 @@
 	 background: radial-gradient(70% 70% at 50% 35%, rgba(59,130,246,.28), transparent 65%), radial-gradient(85% 85% at 50% 65%, rgba(59,130,246,.18), transparent 70%);
 }
  html.theme-light .mic-surface{
-	 background: radial-gradient(100% 100% at 50% 25%, #f4f6fb 0%, #e8eef5 70%, #e2e9f0 100%);
-	 box-shadow: inset 0 1px 0 rgba(255,255,255,.65), 0 12px 26px rgba(0,0,0,.18);
+	background: radial-gradient(100% 100% at 50% 25%, color-mix(in srgb, var(--main-btn-color) 35%, #ffffff) 0%, #e8eef5 70%, #e2e9f0 100%);
+	box-shadow: inset 0 1px 0 rgba(255,255,255,.65), 0 12px 26px rgba(0,0,0,.18);
 }
  html.theme-light .mic-surface svg{
 	 filter: invert(1) brightness(.1);
 }
  html.theme-purple .mic-surface{
-	 background: radial-gradient(100% 100% at 50% 25%, #4b2c6f 0%, #28163f 68%, #1a0f28 100%);
+	background: radial-gradient(100% 100% at 50% 25%, color-mix(in srgb, var(--main-btn-color) 45%, #1a0f28) 0%, #28163f 68%, #1a0f28 100%);
 }
  html.theme-purple .mic-btn::after{
-	 border-color: rgba(192,132,252,.35);
-	 box-shadow: inset 0 0 36px rgba(168,85,247,.50), 0 0 0 8px rgba(168,85,247,.12);
+	border-color: color-mix(in srgb, var(--main-btn-color) 70%, transparent);
+	box-shadow: inset 0 0 36px color-mix(in srgb, var(--main-btn-color) 45%, transparent), 0 0 0 8px color-mix(in srgb, var(--main-btn-color) 20%, transparent);
 }
  html.theme-purple .mic-btn{
 	 box-shadow: 0 22px 52px rgba(168,85,247,.16), 0 18px 40px rgba(0,0,0,.55);
@@ -255,11 +259,11 @@
 	 background: radial-gradient(70% 70% at 50% 35%, rgba(192,132,252,.35), transparent 65%), radial-gradient(85% 85% at 50% 65%, rgba(192,132,252,.22), transparent 70%);
 }
  html.theme-blue .mic-surface{
-	 background: radial-gradient(100% 100% at 50% 25%, #214a7a 0%, #133458 68%, #0c2038 100%);
+	background: radial-gradient(100% 100% at 50% 25%, color-mix(in srgb, var(--main-btn-color) 45%, #0c2038) 0%, #133458 68%, #0c2038 100%);
 }
  html.theme-blue .mic-btn::after{
-	 border-color: rgba(56,189,248,.35);
-	 box-shadow: inset 0 0 36px rgba(59,130,246,.48), 0 0 0 8px rgba(56,189,248,.12);
+	border-color: color-mix(in srgb, var(--main-btn-color) 70%, transparent);
+	box-shadow: inset 0 0 36px color-mix(in srgb, var(--main-btn-color) 45%, transparent), 0 0 0 8px color-mix(in srgb, var(--main-btn-color) 20%, transparent);
 }
  html.theme-blue .mic-btn{
 	 box-shadow: 0 22px 52px rgba(59,130,246,.16), 0 18px 40px rgba(0,0,0,.55);
@@ -268,11 +272,11 @@
 	 background: radial-gradient(70% 70% at 50% 35%, rgba(56,189,248,.35), transparent 65%), radial-gradient(85% 85% at 50% 65%, rgba(59,130,246,.28), transparent 70%);
 }
  html.theme-orange .mic-surface{
-	 background: radial-gradient(100% 100% at 50% 25%, #6a3a17 0%, #4a2510 68%, #2b160b 100%);
+	background: radial-gradient(100% 100% at 50% 25%, color-mix(in srgb, var(--main-btn-color) 45%, #2b160b) 0%, #4a2510 68%, #2b160b 100%);
 }
  html.theme-orange .mic-btn::after{
-	 border-color: rgba(251,146,60,.38);
-	 box-shadow: inset 0 0 36px rgba(251,146,60,.50), 0 0 0 8px rgba(251,146,60,.12);
+	border-color: color-mix(in srgb, var(--main-btn-color) 70%, transparent);
+	box-shadow: inset 0 0 36px color-mix(in srgb, var(--main-btn-color) 45%, transparent), 0 0 0 8px color-mix(in srgb, var(--main-btn-color) 20%, transparent);
 }
  html.theme-orange .mic-btn{
 	 box-shadow: 0 22px 52px rgba(251,146,60,.18), 0 18px 40px rgba(0,0,0,.55);
@@ -284,7 +288,7 @@
 /* 髻ｳ螢ｰ隱崎ｭ倅ｸｭ縺ｮ繝懊ち繝ｳ縺ｮ迥ｶ諷・*/
 .mic-btn.active .mic-surface {
     /* 隱崎ｭ倅ｸｭ縺ｯ濶ｲ繧貞､牙喧縺輔○繧九↑縺ｩ */
-    box-shadow: 0 0 15px rgba(122, 168, 255, 0.8), 0 0 30px rgba(122, 168, 255, 0.5);
+    box-shadow: 0 0 15px color-mix(in srgb, var(--main-btn-color) 75%, white), 0 0 30px color-mix(in srgb, var(--main-btn-color) 55%, white);
     transform: scale(1.05);
     transition: all 0.2s ease-in-out;
 }
@@ -374,7 +378,7 @@
 	 position:absolute;
 	 top:-8px;
 	 right:-8px;
-	 background: linear-gradient(180deg, #78a8ff, #4b86ff);
+	 background: linear-gradient(180deg, color-mix(in srgb, var(--main-btn-color) 70%, #4b86ff), #4b86ff);
 	 color:#fff;
 	 font-weight:600;
 	 font-size:12px;
@@ -403,6 +407,7 @@
 	 box-shadow: 0 10px 24px rgba(0,0,0,.55), var(--inset);
 	 border:1px solid rgba(255,255,255,.12);
 	 transition: transform .15s ease, box-shadow .2s ease, filter .2s ease;
+	 background: linear-gradient(180deg, color-mix(in srgb, var(--main-btn-color) 70%, #151b21), #151b21);
 }
  .fab:hover{
 	 transform: translateY(-2px);
@@ -412,11 +417,11 @@
 	 transform: translateY(0) scale(.98);
 }
  .finance-btn{
-	 background: linear-gradient(180deg, #22313c, #151b21);
+	 background: linear-gradient(180deg, color-mix(in srgb, var(--main-btn-color) 55%, #151b21), #151b21);
 	 color: var(--text);
 }
  .calendar-btn.fab{
-	 background: linear-gradient(180deg, #222a33, #151b21);
+	 background: linear-gradient(180deg, color-mix(in srgb, var(--main-btn-color) 80%, #151b21), #151b21);
 }
  .fab-group .calendar-btn{
 	 position: static;
@@ -672,7 +677,7 @@
 	 height:min(34vh, 260px);
 	 border-radius:16px;
 	 overflow:hidden;
-	 background: linear-gradient(180deg, #202a34, #141b22);
+	 background: linear-gradient(180deg, color-mix(in srgb, var(--main-btn-color) 45%, #141b22), #141b22);
 	 border:1px solid rgba(255,255,255,.14);
 	 box-shadow: inset 0 1px 0 rgba(255,255,255,.06);
 	 display:grid;
@@ -801,7 +806,7 @@
 	 display: grid;
 	 place-items: center;
 	 border-radius: 16px;
-	 background: rgba(8,12,18,.55);
+	 background: linear-gradient(180deg, color-mix(in srgb, var(--main-btn-color) 70%, #151b21), rgba(8,12,18,.55));
 	 border: 1px solid rgba(255,255,255,.16);
 	 box-shadow: 0 8px 28px rgba(0,0,0,.35);
 	 -webkit-backdrop-filter: blur(10px) saturate(130%);
@@ -1354,3 +1359,5 @@ main.shell > div[aria-hidden="true"] {
     color: #ffe08a;
     font-weight: 600;
 }
+
+

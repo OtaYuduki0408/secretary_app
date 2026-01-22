@@ -589,6 +589,20 @@
         root.style.removeProperty('--wallpaper-darken');
       }
 
+      if (main.stripeColor) {
+        const stripe = hexToRgb(main.stripeColor);
+        root.style.setProperty('--stripe-color', `rgba(${stripe.r}, ${stripe.g}, ${stripe.b}, 0.35)`);
+      } else {
+        root.style.removeProperty('--stripe-color');
+      }
+
+      if (main.buttonColor) {
+        const btn = hexToRgb(main.buttonColor);
+        root.style.setProperty('--main-btn-color', `rgb(${btn.r}, ${btn.g}, ${btn.b})`);
+      } else {
+        root.style.removeProperty('--main-btn-color');
+      }
+
       const sizeValue = characterSettings.size || 220;
       root.style.setProperty('--character-size', `${sizeValue}px`);
 

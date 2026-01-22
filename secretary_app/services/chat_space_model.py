@@ -181,7 +181,8 @@ class ChatSpaceModel:
         if not text or not tone:
             return text
         prompt = (
-            f"以下のテキストを{tone}にして。意味は変えず、自然な会話口調にして。\\n"
+            f"以下のテキストを{tone}にして。意味は変えず、自然な会話口調にして。"
+            f"変換した文章のみを出力してください。\\n"
             f"---\\n{text}"
         )
         return self._gemini_request(prompt)
