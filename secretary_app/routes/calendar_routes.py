@@ -28,25 +28,24 @@ def handle_add_event():
         return jsonify({"error": "Missing required fields"}), 400
 
     try:
-        # クライアントから送られてきた時刻文字列をJSTとしてパースし、UTCに変換
-        # datetime.fromisoformatはタイムゾーン情報がない場合はnaiveなdatetimeを生成する
-        # ここではクライアントからの時刻はJSTを意図していると仮定する
-        start_time_naive = datetime.fromisoformat(data['start_time'].replace('Z', ''))
-        end_time_naive = datetime.fromisoformat(data['end_time'].replace('Z', ''))
+        def _parse_client_datetime(value: str):
+            if not value:
+                return None
+            candidate = value.replace('Z', '+00:00')
+            dt = datetime.fromisoformat(candidate)
+            if dt.tzinfo is None:
+                # 受け取った日時はJSTとして扱う
+                return dt
+            # タイムゾーン付きはJSTに変換してnaiveにする
+            return dt.astimezone(JST).replace(tzinfo=None)
 
-        # naiveなdatetimeオブジェクトをJSTのawareなdatetimeオブジェクトに変換
-        start_time_jst = JST.localize(start_time_naive, is_dst=None)
-        end_time_jst = JST.localize(end_time_naive, is_dst=None)
-
-        # JSTからUTCに変換
-        start_time_utc = start_time_jst.astimezone(pytz.utc)
-        end_time_utc = end_time_jst.astimezone(pytz.utc)
-        
+        start_time_jst = _parse_client_datetime(data['start_time'])
+        end_time_jst = _parse_client_datetime(data['end_time'])
         new_event = local_calendar_service.add_event(
             user_id=user_id,
             title=data['title'],
-            start_time=start_time_utc,
-            end_time=end_time_utc,
+            start_time=start_time_jst,
+            end_time=end_time_jst,
             description=data.get('description')
         )
         return jsonify(new_event), 201
@@ -95,16 +94,18 @@ def handle_update_event(event_id):
         return jsonify({"error": "No update data provided"}), 400
 
     try:
-        # 更新データ内の時刻情報もJSTとしてパースしUTCに変換
+        # 更新データ内の日時文字列をJSTとしてパース
         if 'start_time' in data and isinstance(data['start_time'], str):
-            start_time_naive = datetime.fromisoformat(data['start_time'].replace('Z', ''))
-            start_time_jst = JST.localize(start_time_naive, is_dst=None)
-            data['start_time'] = start_time_jst.astimezone(pytz.utc)
+            start_dt = datetime.fromisoformat(data['start_time'].replace('Z', '+00:00'))
+            if start_dt.tzinfo is not None:
+                start_dt = start_dt.astimezone(JST).replace(tzinfo=None)
+            data['start_time'] = start_dt
         if 'end_time' in data and isinstance(data['end_time'], str):
-            end_time_naive = datetime.fromisoformat(data['end_time'].replace('Z', ''))
-            end_time_jst = JST.localize(end_time_naive, is_dst=None)
-            data['end_time'] = end_time_jst.astimezone(pytz.utc)
-        
+            end_dt = datetime.fromisoformat(data['end_time'].replace('Z', '+00:00'))
+            if end_dt.tzinfo is not None:
+                end_dt = end_dt.astimezone(JST).replace(tzinfo=None)
+            data['end_time'] = end_dt
+
         updated_event = local_calendar_service.update_event(event_id, user_id, **data)
         if not updated_event:
             return jsonify({"error": "Event not found or permission denied"}), 404

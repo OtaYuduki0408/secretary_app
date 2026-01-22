@@ -333,10 +333,16 @@
             if (!title) { alert('タイトルを入力してください。'); return; }
             if (!start || !end) { alert('開始日時と終了日時を入力してください。'); return; }
 
+            const toIsoUtc = (value) => {
+                const dt = new Date(value);
+                if (Number.isNaN(dt.getTime())) return value;
+                return dt.toISOString();
+            };
+
             if (currentEventId) {
-                await api.updateEvent(currentEventId, title, start, end, $('#event-desc').value || "");
+                await api.updateEvent(currentEventId, title, toIsoUtc(start), toIsoUtc(end), $('#event-desc').value || "");
             } else {
-                await api.addEvent(title, start, end, $('#event-desc').value || "");
+                await api.addEvent(title, toIsoUtc(start), toIsoUtc(end), $('#event-desc').value || "");
             }
         });
 
