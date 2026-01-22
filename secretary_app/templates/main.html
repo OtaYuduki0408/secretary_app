@@ -173,6 +173,30 @@
       border-radius: 4px;
     }
 
+    body {
+      font-family: var(--app-font, inherit);
+    }
+
+    .character-buddy {
+      position: fixed;
+      left: 24px;
+      bottom: 24px;
+      width: min(var(--character-size, 220px), 32vw);
+      z-index: 1200;
+      pointer-events: none;
+      filter: var(--character-filter, none);
+    }
+
+    .character-buddy img {
+      width: 100%;
+      height: auto;
+      display: none;
+    }
+
+    .character-buddy img.active {
+      display: block;
+    }
+
     @media (max-width: 768px) {
       body {
         font-size: 15px; /* Adjust base font size for smaller screens */
@@ -231,6 +255,12 @@
       width: 52px;
       height: 52px;
     }
+
+    .character-buddy {
+      left: 12px;
+      bottom: 12px;
+      width: min(var(--character-size, 160px), 38vw);
+    }
     }
 
     @media (max-width: 480px) {
@@ -251,6 +281,10 @@
       .fab, .fab svg {
         width: 48px;
         height: 48px;
+      }
+
+      .character-buddy {
+        width: min(140px, 44vw);
       }
     }
   </style>
@@ -367,9 +401,22 @@
           <path d="M7.8,7.8 l-1.4,-1.4" stroke="#a8b6c6" stroke-width="1.2" stroke-linecap="round"/>
         </svg>
       </a>
+      <a class="custom-order-btn fab" href="{{ url_for('settings_page') }}" aria-label="設定を開く" title="設定">
+        <svg width="34" height="34" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <rect x="4" y="4" width="16" height="16" rx="4" fill="#1f2a33" stroke="#a8b6c6" stroke-width="1.2"/>
+          <path d="M12 8v8M8 12h8" stroke="#7aa8ff" stroke-width="1.6" stroke-linecap="round"/>
+          <circle cx="12" cy="12" r="3.2" stroke="#a8b6c6" stroke-width="1.2"/>
+        </svg>
+      </a>
     </div>  </main>
 
   <a href="{{ url_for('register') }}">ユーザー登録</a>
+
+  <div id="character-buddy" class="character-buddy" aria-hidden="true">
+    <img id="character-frame-idle" class="active" src="{{ url_for('serve_img_file', filename='サイレントメイト君_差分0.png') }}" alt="">
+    <img id="character-frame-1" src="{{ url_for('serve_img_file', filename='サイレントメイト君_差分1.png') }}" alt="">
+    <img id="character-frame-2" src="{{ url_for('serve_img_file', filename='サイレントメイト君_差分2.png') }}" alt="">
+  </div>
  
   <div id="ai-indicator" aria-live="polite" style="position:fixed;right:14px;bottom:14px;z-index:14000;display:none;">
     <div style="min-width:240px;background:#0f172a;border:1px solid #334155;border-radius:12px;padding:12px 14px;box-shadow:0 12px 40px rgba(0,0,0,.45);color:#e5e7eb">
@@ -440,6 +487,138 @@
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.5/socket.io.min.js"></script>
+<script>
+  (() => {
+    const body = document.body;
+    const root = document.documentElement;
+    const character = document.getElementById('character-buddy');
+
+    const hexToRgb = (hex) => {
+      const raw = hex.replace('#', '');
+      const full = raw.length === 3 ? raw.split('').map((c) => c + c).join('') : raw;
+      const num = parseInt(full, 16);
+      if (Number.isNaN(num)) return { r: 177, g: 214, b: 86 };
+      return { r: (num >> 16) & 255, g: (num >> 8) & 255, b: num & 255 };
+    };
+
+    const rgbToHsl = (r, g, b) => {
+      r /= 255;
+      g /= 255;
+      b /= 255;
+      const max = Math.max(r, g, b);
+      const min = Math.min(r, g, b);
+      let h = 0;
+      let s = 0;
+      const l = (max + min) / 2;
+      if (max !== min) {
+        const d = max - min;
+        s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+        switch (max) {
+          case r:
+            h = (g - b) / d + (g < b ? 6 : 0);
+            break;
+          case g:
+            h = (b - r) / d + 2;
+            break;
+          default:
+            h = (r - g) / d + 4;
+        }
+        h /= 6;
+      }
+      return { h: h * 360, s, l };
+    };
+
+    const baseColor = { r: 177, g: 214, b: 86 };
+    const baseHsl = rgbToHsl(baseColor.r, baseColor.g, baseColor.b);
+
+    const buildColorFilter = (hex) => {
+      const target = hexToRgb(hex);
+      const targetHsl = rgbToHsl(target.r, target.g, target.b);
+      const hueRotate = targetHsl.h - baseHsl.h;
+      const saturate = baseHsl.s > 0 ? targetHsl.s / baseHsl.s : 1;
+      const brightness = baseHsl.l > 0 ? targetHsl.l / baseHsl.l : 1;
+      return `hue-rotate(${hueRotate.toFixed(1)}deg) saturate(${saturate.toFixed(2)}) brightness(${brightness.toFixed(2)})`;
+    };
+
+    const applySettings = () => {
+      let settings = null;
+      try {
+        const raw = localStorage.getItem('appSettings');
+        settings = raw ? JSON.parse(raw) : null;
+      } catch (e) {
+        console.warn('設定の読み込みに失敗しました。', e);
+      }
+
+      const general = settings?.general || {};
+      const main = settings?.main || {};
+      const characterSettings = settings?.character || {};
+
+      if (general.fontFamily) {
+        root.style.setProperty('--app-font', general.fontFamily);
+      } else {
+        root.style.removeProperty('--app-font');
+      }
+
+      if (main.backgroundColor) {
+        body.style.backgroundColor = main.backgroundColor;
+        body.style.backgroundImage = 'none';
+      }
+
+      const sizeValue = characterSettings.size || 220;
+      root.style.setProperty('--character-size', `${sizeValue}px`);
+
+      const colorValue = characterSettings.color || '#B1D656';
+      root.style.setProperty('--character-filter', buildColorFilter(colorValue));
+
+      if (character) {
+        const isEnabled = characterSettings.enabled !== false;
+        character.style.display = isEnabled ? 'block' : 'none';
+      }
+    };
+
+    applySettings();
+    window.addEventListener('storage', applySettings);
+  })();
+</script>
+<script>
+  (() => {
+    const idleFrame = document.getElementById('character-frame-idle');
+    const frameA = document.getElementById('character-frame-1');
+    const frameB = document.getElementById('character-frame-2');
+    if (!idleFrame || !frameA || !frameB) return;
+
+    const talkFrames = [frameA, frameB];
+    let talkIndex = 0;
+    let timerId = null;
+
+    const showFrame = (index) => {
+      idleFrame.classList.toggle('active', index === 'idle');
+      talkFrames.forEach((frame, i) => frame.classList.toggle('active', index === i));
+    };
+
+    const startTalking = () => {
+      if (timerId) return;
+      let idx = talkIndex;
+      timerId = setInterval(() => {
+        idx = idx === 0 ? 1 : 0;
+        showFrame(idx);
+        talkIndex = idx;
+      }, 220);
+    };
+
+    const stopTalking = () => {
+      if (timerId) {
+        clearInterval(timerId);
+        timerId = null;
+      }
+      showFrame('idle');
+    };
+
+    showFrame('idle');
+    document.addEventListener('voice:playstart', startTalking);
+    document.addEventListener('voice:playend', stopTalking);
+  })();
+</script>
 <script>
   (() => {
     const log = (...args) => console.log('[DEBUG:CSS]', ...args);

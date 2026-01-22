@@ -125,9 +125,19 @@ function ensureOverlayCloseButton(overlay) {
         if (typeof speechSynthesis !== 'undefined') {
             speechSynthesis.cancel();
         }
+        document.dispatchEvent(new CustomEvent('voice:playend'));
     });
 
     overlay.appendChild(btn);
+}
+
+/**
+ * 音声再生の開始/終了イベントを通知する
+ * @param {boolean} isSpeaking - 再生中かどうか
+ */
+function emitVoiceState(isSpeaking) {
+    const eventName = isSpeaking ? 'voice:playstart' : 'voice:playend';
+    document.dispatchEvent(new CustomEvent(eventName));
 }
 
 /**
@@ -289,12 +299,17 @@ function executeAction(action) {
             if (typeof SpeechSynthesisUtterance !== 'undefined' && typeof speechSynthesis !== 'undefined') {
                 const utterance = new SpeechSynthesisUtterance(textToSpeak);
                 speechPromise = new Promise(resolveSpeech => {
+                    utterance.onstart = () => {
+                        emitVoiceState(true);
+                    };
                     utterance.onend = () => {
                         console.log(`発声終了: "${textToSpeak.substring(0, 50)}..."`);
+                        emitVoiceState(false);
                         resolveSpeech();
                     };
                     utterance.onerror = (event) => {
                         console.error(`音声合成エラー: ${event.error}`);
+                        emitVoiceState(false);
                         resolveSpeech();
                     };
                     speechSynthesis.speak(utterance);

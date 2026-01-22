@@ -106,6 +106,12 @@ def edit_command_page(order_id=None):
 
 app.register_blueprint(custom_order_pages_bp, url_prefix='/custom_order')
 
+@app.route('/img/<path:filename>')
+def serve_img_file(filename):
+    # キャラクター画像を配信する
+    img_dir = os.path.join(app.root_path, 'img')
+    return send_from_directory(img_dir, filename)
+
 
 # ============== WebSocket 接続管理 ==============
 @socketio.on('connect')
