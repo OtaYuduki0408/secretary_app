@@ -452,8 +452,15 @@ class ChatSpaceModel:
         for event_data in events_to_delete:
             target_id = None
             for task in task_list:
-                 # A simple match by name and time for now. Could be improved.
-                if task.get("name") == event_data.get("name"):
+                # 名前と時間で照合（DB側はtitleキー）
+                task_name = task.get("title") or task.get("name")
+                task_start = (task.get("start_time") or "").replace("T", " ").split(".")[0]
+                task_end = (task.get("end_time") or "").replace("T", " ").split(".")[0]
+                target_name = (event_data.get("name") or "").strip()
+                target_start = (event_data.get("start_time") or "").replace("T", " ").split(".")[0]
+                target_end = (event_data.get("end_time") or "").replace("T", " ").split(".")[0]
+
+                if task_name == target_name and task_start == target_start and task_end == target_end:
                     target_id = task.get("id")
                     break
             
