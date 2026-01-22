@@ -160,6 +160,7 @@ function parseConditionBlock(block) {
                 }
               } else if (sub === "特定金額になったら") {
                 value.item = valueContainer.querySelector(`[id$="trigger_value_finance_item"]`)?.value;
+                value.compare = valueContainer.querySelector(`[id$="trigger_value_finance_compare"]`)?.value;
                 value.amount = valueContainer.querySelector(`[id$="trigger_value_finance_amount"]`)?.value;
                 value.percentage = valueContainer.querySelector(`[id$="trigger_value_finance_percentage"]`)?.value;
               }
@@ -376,6 +377,7 @@ export async function registerCommand(){
         }
       } else if (triggerSub === "特定金額になったら") {
         triggerValue.item = triggerContainer.querySelector("#trigger_value_finance_item")?.value;
+        triggerValue.compare = triggerContainer.querySelector("#trigger_value_finance_compare")?.value;
         triggerValue.amount = triggerContainer.querySelector("#trigger_value_finance_amount")?.value;
         triggerValue.percentage = triggerContainer.querySelector("#trigger_value_finance_percentage")?.value;
       }

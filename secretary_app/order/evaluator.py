@@ -229,6 +229,7 @@ def _get_finance_item_value(item, user_id, now_jst, app_logger=None):
 
 def _evaluate_finance_threshold_trigger(trigger_value, now_jst, app_logger=None, user_id=None):
     item = (trigger_value or {}).get('item') or ''
+    compare = (trigger_value or {}).get('compare') or 'gte'
     amount = _safe_float((trigger_value or {}).get('amount'))
     percentage = _safe_float((trigger_value or {}).get('percentage'))
 
@@ -246,21 +247,15 @@ def _evaluate_finance_threshold_trigger(trigger_value, now_jst, app_logger=None,
             return False
 
     triggered = False
-    if item == 'remaining_to_target':
-        if amount is not None:
-            triggered = value <= amount
-        elif percentage is not None and goal_amount is not None:
-            threshold = float(goal_amount) * (percentage / 100.0)
-            triggered = value <= threshold
-    else:
-        if amount is not None:
-            triggered = value >= amount
-        elif percentage is not None and goal_amount is not None:
-            threshold = float(goal_amount) * (percentage / 100.0)
-            triggered = value >= threshold
+    use_lte = compare == 'lte'
+    if amount is not None:
+        triggered = value <= amount if use_lte else value >= amount
+    elif percentage is not None and goal_amount is not None:
+        threshold = float(goal_amount) * (percentage / 100.0)
+        triggered = value <= threshold if use_lte else value >= threshold
 
     app_logger.debug(
-        f"[FIN_TRIGGER] item={item} value={value} amount={amount} percentage={percentage} triggered={triggered}"
+        f"[FIN_TRIGGER] item={item} compare={compare} value={value} amount={amount} percentage={percentage} triggered={triggered}"
     )
     return triggered
 

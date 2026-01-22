@@ -481,6 +481,11 @@ export function createTriggerUI(prefix = '', initialValue = {}) {
               <option value="daily_expense" ${initialValue.item === 'daily_expense' ? 'selected' : ''}>今日の支出</option>
               <option value="daily_expense_no_necessities" ${initialValue.item === 'daily_expense_no_necessities' ? 'selected' : ''}>今日の支出(必需品なし)</option>
             </select>
+            <label>判定</label>
+            <select id="${prefix}trigger_value_finance_compare" class="trigger-input" required>
+              <option value="gte" ${initialValue.compare === 'gte' ? 'selected' : ''}>上回ったら</option>
+              <option value="lte" ${initialValue.compare === 'lte' ? 'selected' : ''}>下回ったら</option>
+            </select>
             <label>金額</label>
             <input type="number" id="${prefix}trigger_value_finance_amount" class="trigger-input" placeholder="金額 (円)" value="${initialValue.amount || ''}">
             <label>または</label>
