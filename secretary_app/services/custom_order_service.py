@@ -1,6 +1,8 @@
 from supabase_client import supabase
 
 TABLE_NAME = "custom_orders"
+# Supabase障害時のフォールバック用キャッシュ
+_ORDERS_CACHE = {}
 
 def get_all_orders(user_id: str):
     """
@@ -15,10 +17,15 @@ def get_all_orders(user_id: str):
                     order_data_content = item.pop('order_data')
                     item.update(order_data_content)
 
-        return response.data or []
+        data = response.data or []
+        _ORDERS_CACHE[user_id] = data
+        return data
     except Exception as e:
         from flask import current_app
         current_app.logger.error(f"❗ get_all_orders エラー: {e}")
+        cached = _ORDERS_CACHE.get(user_id)
+        if cached is not None:
+            return cached
         return {"error": f"データベースからの命令読み込みに失敗しました: {str(e)}"}
 
 def create_order(user_id: str, data: dict):

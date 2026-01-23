@@ -15,6 +15,9 @@ from services.finance_service import (
 
 # タイムゾーン設定
 JST = pytz.timezone('Asia/Tokyo')
+# Supabase障害時のフォールバック用キャッシュ
+_CACHED_ORDERS = []
+_CACHED_AT = None
 
 def _evaluate_time_trigger(trigger, now_jst, current_time_str, current_day_of_week_jp, app_logger=None):
     # 時間トリガーの評価
@@ -460,9 +463,17 @@ def evaluate_triggers(app_logger):
     try:
         response = supabase.table('custom_orders').select('id, user_id, order_data').execute()
         orders = response.data
+        if orders is not None:
+            global _CACHED_ORDERS, _CACHED_AT
+            _CACHED_ORDERS = orders
+            _CACHED_AT = datetime.now()
     except Exception as e:
         app_logger.error(f"Error fetching custom orders from Supabase: {e}")
-        return dispatch_list
+        if _CACHED_ORDERS:
+            app_logger.debug(f"[CACHE] Using cached orders. cached_at={_CACHED_AT}")
+            orders = _CACHED_ORDERS
+        else:
+            return dispatch_list
 
     if not orders:
         return dispatch_list
