@@ -4,7 +4,8 @@ export const TRIGGER_CATEGORIES = {
   "収支管理": ["入力があったら", "特定金額になったら"],
   "メモ": ["入力があったら"],
   "時間": [],
-  "ボイス": ["キーワード"]
+  "ボイス": ["キーワード"],
+  "SwitchBot": ["人感センサーが反応したら"]
 };
 
 export const TRIGGER_CATEGORIES_MAIN = {
@@ -12,7 +13,8 @@ export const TRIGGER_CATEGORIES_MAIN = {
   "収支管理": ["入力があったら", "特定金額になったら"],
   "メモ": ["入力があったら"],
   "時間": [],
-  "ボイス": ["キーワード"]
+  "ボイス": ["キーワード"],
+  "SwitchBot": ["人感センサーが反応したら"]
 };
 
 export const TRIGGER_VALUE_PLACEHOLDERS = {
@@ -37,6 +39,9 @@ export const TRIGGER_VALUE_PLACEHOLDERS = {
   "時間": {
     "特定時刻": "例: 07:00",
     "一定時間ごと": "例: 60 (分)"
+  },
+  "SwitchBot": {
+    "人感センサーが反応したら": "例: B0E9FE6E4D35"
   }
 };
 

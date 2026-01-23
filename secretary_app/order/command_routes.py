@@ -1,4 +1,6 @@
 from flask import Blueprint, request, jsonify
+import os
+from services import switchbot_service
 from .command_manager import (
     get_all_commands,
     register_command,
@@ -77,3 +79,35 @@ def api_delete_command(command_id):
             return jsonify({"status": "error", "message": "削除対象が存在しません"}), 404
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@command_bp.route("/switchbot/devices", methods=["GET"])
+def api_switchbot_devices():
+    api_token = os.getenv("SWITCHBOT_TOKEN")
+    api_secret = os.getenv("SWITCHBOT_SECRET")
+    if not api_token or not api_secret:
+        return jsonify({"devices": [], "error": "SwitchBot API credentials are not set."}), 400
+
+    data = switchbot_service.get_switchbot_devices(api_token, api_secret)
+    if not data or data.get("statusCode") != 100:
+        return jsonify({"devices": [], "error": "Failed to fetch SwitchBot devices."}), 500
+
+    body = data.get("body") or {}
+    device_list = body.get("deviceList") or []
+    infrared_list = body.get("infraredRemoteList") or []
+
+    devices = []
+    for device in device_list:
+        devices.append({
+            "name": device.get("deviceName"),
+            "type": device.get("deviceType"),
+            "id": device.get("deviceId"),
+        })
+    for remote in infrared_list:
+        devices.append({
+            "name": remote.get("deviceName"),
+            "type": remote.get("remoteType"),
+            "id": remote.get("deviceId"),
+        })
+
+    return jsonify({"devices": devices})

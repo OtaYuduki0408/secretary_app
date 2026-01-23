@@ -727,7 +727,64 @@ export function createTriggerUI(prefix = '', initialValue = {}) {
           <small>入力された単語が含まれるとトリガーが発動します。</small>
         `;
         break;
-      default:
+      case "SwitchBot":
+        triggerValueContainer.innerHTML = `
+          <label for="${prefix}trigger_value_switchbot_device_select">デバイス</label>
+          <select id="${prefix}trigger_value_switchbot_device_select" class="trigger-input">
+            <option value="">デバイス一覧を取得中...</option>
+          </select>
+          <label for="${prefix}trigger_value_switchbot_brightness">明るさ条件</label>
+          <select id="${prefix}trigger_value_switchbot_brightness" class="trigger-input">
+            <option value="">指定なし</option>
+            <option value="bright" ${(initialValue.brightness_condition === "bright" ? "selected" : "")}>明るいとき</option>
+            <option value="dark" ${(initialValue.brightness_condition === "dark" ? "selected" : "")}>暗いとき</option>
+          </select>
+          <label for="${prefix}trigger_value_switchbot_motion">人の居る/居ない条件</label>
+          <select id="${prefix}trigger_value_switchbot_motion" class="trigger-input">
+            <option value="">指定なし</option>
+            <option value="present" ${(initialValue.motion_condition === "present" ? "selected" : "")}>人が居るとき</option>
+            <option value="absent" ${(initialValue.motion_condition === "absent" ? "selected" : "")}>人が居ないとき</option>
+          </select>
+          <small>人感センサーの人の居る/居ないと明るさを組み合わせてトリガーを発動します。</small>
+        `;
+        (async () => {
+          const select = document.getElementById(`${prefix}trigger_value_switchbot_device_select`);
+          if (!select) return;
+          try {
+            const response = await fetch('/api/switchbot/devices');
+            const data = await response.json();
+            const devices = data?.devices || [];
+            select.innerHTML = '';
+            if (!devices.length) {
+              const opt = document.createElement('option');
+              opt.value = '';
+              opt.textContent = 'デバイスが見つかりませんでした';
+              select.appendChild(opt);
+              return;
+            }
+            const defaultOpt = document.createElement('option');
+            defaultOpt.value = '';
+            defaultOpt.textContent = '選択してください';
+            select.appendChild(defaultOpt);
+            devices.forEach((device) => {
+              const opt = document.createElement('option');
+              opt.value = device.id;
+              opt.textContent = `${device.name} (${device.type})`;
+              if (initialValue.device_id && initialValue.device_id === device.id) {
+                opt.selected = true;
+              }
+              select.appendChild(opt);
+            });
+          } catch (e) {
+            select.innerHTML = '';
+            const opt = document.createElement('option');
+            opt.value = '';
+            opt.textContent = 'デバイス一覧の取得に失敗しました';
+            select.appendChild(opt);
+          }
+        })();
+        break;
+default:
         triggerValueContainer.innerHTML = `<input type="text" id="${prefix}trigger_value" placeholder="${defaultPlaceholder}" value="${initialValue.value || ''}">`;
         break;
     }

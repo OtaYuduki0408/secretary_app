@@ -1,8 +1,10 @@
 # order/evaluator.py
+import os
 from supabase_client import supabase
 from datetime import datetime
 import pytz
 from services import local_calendar_service
+from services import switchbot_service
 from services.finance_service import (
     get_all_finance_records,
     get_current_balance,
@@ -314,6 +316,142 @@ def _evaluate_finance_threshold_edge(trigger_value, now_jst, app_logger=None, us
     return should_fire, state_changed
 
 
+def _extract_motion_detected(status_body):
+    """SwitchBot人感センサーの状態を判定する。"""
+    if not isinstance(status_body, dict):
+        return None
+    for key in [
+        'motionDetected',
+        'moveDetected',
+        'detected',
+        'isMotionDetected',
+        'isDetected',
+        'motion',
+        'moving',
+        'presence',
+        'pir'
+    ]:
+        if key in status_body:
+            value = status_body.get(key)
+            if isinstance(value, bool):
+                return value
+            if isinstance(value, (int, float)):
+                return value != 0
+            if isinstance(value, str):
+                normalized = value.strip().lower()
+                if normalized in ('true', '1', 'yes', 'on', 'detected', 'motion'):
+                    return True
+                if normalized in ('false', '0', 'no', 'off', 'none', 'clear'):
+                    return False
+
+    status_text = status_body.get('status')
+    if isinstance(status_text, str):
+        normalized = status_text.strip().lower()
+        if 'detect' in normalized or 'motion' in normalized:
+            return True
+        if normalized in ('normal', 'clear', 'no motion', 'inactive'):
+            return False
+    return None
+
+
+def _extract_brightness(status_body):
+    """SwitchBot人感センサーの明るさ状態を取得する。"""
+    if not isinstance(status_body, dict):
+        return None
+    value = status_body.get('brightness')
+    if not value:
+        return None
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        if normalized == 'dim':
+            return 'dark'
+        if normalized in ('bright', 'dark'):
+            return normalized
+    return None
+
+
+def _evaluate_switchbot_motion_edge(trigger_value, app_logger=None, order_data=None):
+    """SwitchBot人感センサーの立ち上がり検知。"""
+    device_id = (trigger_value or {}).get('device_id') or (trigger_value or {}).get('deviceId')
+    if not device_id:
+        if app_logger:
+            app_logger.debug("[SWITCHBOT_TRIGGER] device_id is missing")
+        return False, False
+
+    brightness_condition = (trigger_value or {}).get('brightness_condition') or ''
+    motion_condition = (trigger_value or {}).get('motion_condition') or ''
+
+    api_token = os.getenv("SWITCHBOT_TOKEN")
+    api_secret = os.getenv("SWITCHBOT_SECRET")
+    if not api_token or not api_secret:
+        if app_logger:
+            app_logger.debug("[SWITCHBOT_TRIGGER] token or secret is missing")
+        return False, False
+
+    status = switchbot_service.get_device_status(api_token, api_secret, device_id)
+    if not status or status.get('statusCode') != 100:
+        if app_logger:
+            app_logger.debug(f"[SWITCHBOT_TRIGGER] status fetch failed: {status}")
+        return False, False
+
+    body = status.get('body') or {}
+    detected = _extract_motion_detected(body)
+    brightness = _extract_brightness(body)
+
+    state_message = f"[SWITCHBOT_TRIGGER] status device_id={device_id} detected={detected} brightness={brightness} raw={body}"
+    print(state_message)
+    if app_logger:
+        app_logger.debug(state_message)
+    if detected is None:
+        if app_logger:
+            app_logger.debug(f"[SWITCHBOT_TRIGGER] motion detect field not found: {body}")
+        return False, False
+
+    trigger_states = {}
+    if isinstance(order_data, dict):
+        trigger_states = order_data.setdefault('trigger_states', {})
+    switchbot_state = trigger_states.setdefault('switchbot_motion', {})
+    state_key = f"{device_id}|{brightness_condition}|{motion_condition}"
+    device_state = switchbot_state.setdefault(state_key, {})
+
+    # 条件判定 (brightness/motion が指定されている場合のみ評価)
+    motion_match = True
+    if motion_condition == 'present':
+        motion_match = detected is True
+    elif motion_condition == 'absent':
+        motion_match = detected is False
+
+    brightness_match = True
+    if brightness_condition == 'bright':
+        brightness_match = brightness == 'bright'
+    elif brightness_condition == 'dark':
+        brightness_match = brightness == 'dark'
+
+    current_match = motion_match and brightness_match
+    was_match = device_state.get('last_match')
+    should_fire = False
+    state_changed = False
+
+    if was_match is None:
+        device_state['last_match'] = current_match
+        state_changed = True
+    else:
+        if was_match is False and current_match is True:
+            should_fire = True
+        if was_match != current_match:
+            device_state['last_match'] = current_match
+            state_changed = True
+
+    if app_logger:
+        app_logger.debug(
+            f"[SWITCHBOT_TRIGGER] device_id={device_id} brightness={brightness} detected={detected} "
+            f"cond_brightness={brightness_condition} cond_motion={motion_condition} match={current_match} "
+            f"was_match={was_match} fire={should_fire}"
+        )
+
+    return should_fire, state_changed
+
+
 def evaluate_triggers(app_logger):
     # 定期的にトリガーを評価
     app_logger.debug(f"[{datetime.now()}] Evaluating triggers...")
@@ -365,6 +503,16 @@ def evaluate_triggers(app_logger):
                     app_logger.debug(f"[FIN_EDGE] state updated for order_id={order_id}")
                 except Exception as e:
                     app_logger.error(f"[FIN_EDGE] failed to update state: {e}")
+        elif trigger_category == 'SwitchBot' and trigger_sub == '人感センサーが反応したら':
+            should_fire, state_changed = _evaluate_switchbot_motion_edge(
+                trigger_value, app_logger, order_data
+            )
+            if state_changed and isinstance(order_data, dict) and order_id:
+                try:
+                    supabase.table('custom_orders').update({'order_data': order_data}).match({'id': order_id, 'user_id': user_id}).execute()
+                    app_logger.debug(f"[SWITCHBOT_TRIGGER] state updated for order_id={order_id}")
+                except Exception as e:
+                    app_logger.error(f"[SWITCHBOT_TRIGGER] failed to update state: {e}")
         else:
             app_logger.debug(f"[TRIGGER] skip category={trigger_category} sub={trigger_sub}")
             continue
@@ -456,5 +604,70 @@ def evaluate_triggers(app_logger):
                 order_data['actions'] = modified_actions
             app_logger.debug(f"[DISPATCH] user_id={user_id} order_id={order.get('id')} actions={len(modified_actions)} steps_present={isinstance(steps, list) and bool(steps)}")
             dispatch_list.append((user_id, order_data))
+
+    return dispatch_list
+
+
+def evaluate_switchbot_triggers(app_logger):
+    """SwitchBot人感センサーのみを毎秒評価する。"""
+    app_logger.debug(f"[{datetime.now()}] Evaluating SwitchBot triggers...")
+
+    dispatch_list = []
+    try:
+        response = supabase.table('custom_orders').select('id, user_id, order_data').execute()
+        orders = response.data
+    except Exception as e:
+        app_logger.error(f"Error fetching custom orders from Supabase: {e}")
+        return dispatch_list
+
+    if not orders:
+        return dispatch_list
+
+    for order in orders:
+        user_id = order.get('user_id')
+        order_data = order.get('order_data')
+        order_id = order.get('id')
+
+        if not order_data or not order_data.get('triggers'):
+            continue
+
+        trigger = order_data['triggers'][0]
+        trigger_category = trigger.get('category')
+        trigger_sub = trigger.get('sub')
+        trigger_value = trigger.get('value') or {}
+
+        if trigger_category != 'SwitchBot' or trigger_sub != '人感センサーが反応したら':
+            continue
+
+        scan_message = f"[SWITCHBOT_TRIGGER] scan start user_id={user_id} order_id={order_id} trigger={trigger}"
+        should_fire, state_changed = _evaluate_switchbot_motion_edge(
+            trigger_value, app_logger, order_data
+        )
+        if state_changed and isinstance(order_data, dict) and order_id:
+            try:
+                supabase.table('custom_orders').update({'order_data': order_data}).match({'id': order_id, 'user_id': user_id}).execute()
+                app_logger.debug(f"[SWITCHBOT_TRIGGER] state updated for order_id={order_id}")
+            except Exception as e:
+                app_logger.error(f"[SWITCHBOT_TRIGGER] failed to update state: {e}")
+
+        if not should_fire:
+            continue
+
+        app_logger.debug(f"[SWITCHBOT_TRIGGER] Trigger activated for user {user_id}. Processing actions...")
+        steps = order_data.get('steps')
+        actions_to_process = []
+        if isinstance(steps, list) and steps:
+            actions_to_process = _collect_actions_from_steps(steps)
+            app_logger.debug(f"[SWITCHBOT_TRIGGER] Actions in order_data steps: {actions_to_process}")
+        else:
+            actions_to_process.extend(order_data.get('actions', []) or [])
+            for condition in order_data.get('conditions', []) or []:
+                actions_to_process.extend(_collect_actions_from_condition(condition))
+            app_logger.debug(f"[SWITCHBOT_TRIGGER] Actions in order_data: {actions_to_process}")
+
+        if not (isinstance(steps, list) and steps):
+            order_data['actions'] = actions_to_process
+
+        dispatch_list.append((user_id, order_data))
 
     return dispatch_list

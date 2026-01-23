@@ -65,3 +65,17 @@ def send_device_command(api_token: str, api_secret: str, device_id: str, command
     except requests.exceptions.RequestException as e:
         print(f"SwitchBotコマンド送信エラー: {e}")
         return {"statusCode": 500, "message": str(e)}
+
+def get_device_status(api_token: str, api_secret: str, device_id: str) -> dict:
+    """
+    SwitchBotデバイスのステータスを取得する。
+    """
+    headers = generate_sign(api_token, api_secret)
+    url = f"{SWITCHBOT_API_BASE_URL}/v1.1/devices/{device_id}/status"
+    try:
+        response = requests.get(url, headers=headers)
+        response.raise_for_status()
+        return response.json()
+    except requests.exceptions.RequestException as e:
+        print(f"SwitchBotデバイス状態取得エラー: {e}")
+        return {"statusCode": 500, "message": str(e)}

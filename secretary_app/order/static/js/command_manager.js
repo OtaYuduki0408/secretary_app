@@ -186,6 +186,11 @@ function parseConditionBlock(block) {
             case "ボイス":
               value.keywords = valueContainer.querySelector(`[id$="trigger_value_voice_keywords"]`)?.value;
               break;
+    case "SwitchBot":
+      triggerValue.device_id = triggerContainer.querySelector(`#${prefix}trigger_value_switchbot_device_select`)?.value;
+      triggerValue.brightness_condition = triggerContainer.querySelector(`#${prefix}trigger_value_switchbot_brightness`)?.value;
+      triggerValue.motion_condition = triggerContainer.querySelector(`#${prefix}trigger_value_switchbot_motion`)?.value;
+      break;
             default:
               value.value = valueContainer.querySelector(`[id$="trigger_value"]`)?.value;
               break;
@@ -402,6 +407,11 @@ export async function registerCommand(){
       break;
     case "ボイス":
       triggerValue.keywords = triggerContainer.querySelector("#trigger_value_voice_keywords")?.value;
+      break;
+    case "SwitchBot":
+      triggerValue.device_id = triggerContainer.querySelector("#trigger_value_switchbot_device_select")?.value;
+      triggerValue.brightness_condition = triggerContainer.querySelector("#trigger_value_switchbot_brightness")?.value;
+      triggerValue.motion_condition = triggerContainer.querySelector("#trigger_value_switchbot_motion")?.value;
       break;
     default:
       triggerValue.value = triggerContainer.querySelector("#trigger_value")?.value;

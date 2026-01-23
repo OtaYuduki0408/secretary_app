@@ -49,7 +49,7 @@ from order.custom_order_routes import custom_order_bp
 from order.command_routes import command_bp
 from routes.order_routes import order_bp
 from routes.calendar_routes import calendar_bp
-from order.evaluator import evaluate_triggers # 関数名を修正
+from order.evaluator import evaluate_triggers, evaluate_switchbot_triggers # 関数名を修正
 
 
 
@@ -1168,6 +1168,8 @@ if __name__ == '__main__':
             replace_existing=True,
             args=[evaluate_triggers] # 引数はevaluate_triggers関数オブジェクトのみ
         )
+        app.logger.debug("DEBUG: APScheduler job registered: time_trigger_evaluator")
+        # SwitchBotの毎秒ジョブは一旦停止（調査のため）
         scheduler.start()
         
     socketio.run(app, host='0.0.0.0', port=5000, debug=True, ssl_context='adhoc', use_reloader=False)
