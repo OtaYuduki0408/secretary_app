@@ -828,6 +828,25 @@ def _enrich_actions_for_dispatch(order_payload, user_id, app_logger):
             action['detail'] = _enrich_finance_read(detail, user_id, now_jst, app_logger)
         elif category == 'メモ' and sub == '読み上げ':
             action['detail'] = _enrich_memo_read(detail, user_id, now_jst, app_logger)
+        elif (category in ('メール', '繝｡繝ｼ繝ｫ')) and (sub in ('送信', '騾∽ｿ｡') or not sub):
+            try:
+                from services.action_executor_service import execute_action
+                action_data = {
+                    "category": "メール",
+                    "sub": "送信",
+                    "detail": detail,
+                    "triggered_at": now_jst.isoformat()
+                }
+                print(f"[EMAIL_EXEC] user_id={user_id} to={detail.get('to')}")
+                result = execute_action(user_id=user_id, action_data=action_data)
+                detail['server_result'] = result
+                action['detail'] = detail
+                action['sub'] = '送信'
+            except Exception as e:
+                print(f"[EMAIL_EXEC] error: {e}")
+                detail['server_result'] = {"status": "error", "message": f"メール送信に失敗しました: {e}"}
+                action['detail'] = detail
+                action['sub'] = '送信'
         return action
 
     if isinstance(steps, list) and steps:
@@ -848,6 +867,17 @@ def _dispatch_order_payload(user_id, order_payload):
     if not sid:
         app.logger.debug(f"[INPUT_TRIGGER] User {user_id} is not connected. Command not dispatched.")
         return
+    try:
+        # サーバー側でもディスパッチ内容を確認できるようにprintログを追加
+        steps = order_payload.get("steps") or []
+        actions = order_payload.get("actions") or []
+        step_summary = [s.get("kind", "action") if isinstance(s, dict) else "unknown" for s in steps]
+        action_summary = [
+            f"{a.get('category')}:{a.get('sub')}" for a in actions if isinstance(a, dict)
+        ]
+        print(f"[DISPATCH] user_id={user_id} steps={len(steps)} actions={len(actions)} step_kinds={step_summary} action_list={action_summary}")
+    except Exception as e:
+        print(f"[DISPATCH] summary log failed: {e}")
     socketio.emit('dispatch_command', order_payload, room=sid)
     app.logger.debug(f"[INPUT_TRIGGER] Dispatched command to user {user_id}.")
 

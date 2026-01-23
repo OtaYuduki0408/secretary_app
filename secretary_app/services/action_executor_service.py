@@ -511,10 +511,13 @@ def _execute_email_send(user_id: str, detail_data: dict) -> dict:
     to_email = detail_data.get('to')
     subject = detail_data.get('subject', '無題')
     body = detail_data.get('body', '')
+    print(f"[EMAIL] start user_id={user_id} to={to_email} subject={subject}")
 
     if not to_email:
+        print("[EMAIL] missing to_email")
         return {"status": "error", "message": "送信先メールアドレスが指定されていません。"}
     if not subject and not body:
+        print("[EMAIL] missing subject/body")
         return {"status": "error", "message": "メールの件名または本文が空です。"}
 
     # SMTP優先（Blastengineなど）
@@ -526,6 +529,7 @@ def _execute_email_send(user_id: str, detail_data: dict) -> dict:
     if smtp_host and smtp_user and smtp_pass and smtp_from:
         try:
             port = int(smtp_port) if smtp_port else 587
+            print(f"[EMAIL][SMTP] host={smtp_host} port={port} from={smtp_from} user={smtp_user}")
             message = MIMEText(body)
             message['to'] = to_email
             message['from'] = smtp_from
@@ -539,67 +543,15 @@ def _execute_email_send(user_id: str, detail_data: dict) -> dict:
                     server.ehlo()
                 server.login(smtp_user, smtp_pass)
                 server.sendmail(smtp_from, [to_email], message.as_string())
+            print("[EMAIL][SMTP] send success")
             return {"status": "success", "message": f"メールを{to_email}に送信しました。件名: {subject}"}
         except Exception as e:
+            print(f"[EMAIL][SMTP] send error: {e}")
             current_app.logger.error(f"SMTP送信エラー: {e}")
             return {"status": "error", "message": f"メール送信に失敗しました: {str(e)}"}
 
-    # SendGrid（APIキーが設定されている場合）
-    sendgrid_api_key = os.getenv('SENDGRID_API_KEY', '').strip()
-    sendgrid_from_email = os.getenv('SENDGRID_FROM_EMAIL', '').strip()
-    if sendgrid_api_key and sendgrid_from_email:
-        try:
-            payload = {
-                "personalizations": [
-                    {
-                        "to": [{"email": to_email}],
-                        "subject": subject
-                    }
-                ],
-                "from": {"email": sendgrid_from_email},
-                "content": [
-                    {"type": "text/plain", "value": body}
-                ]
-            }
-            headers = {
-                "Authorization": f"Bearer {sendgrid_api_key}",
-                "Content-Type": "application/json"
-            }
-            resp = requests.post("https://api.sendgrid.com/v3/mail/send", headers=headers, json=payload, timeout=15)
-            if resp.status_code in (200, 202):
-                return {"status": "success", "message": f"メールを{to_email}に送信しました。件名: {subject}"}
-            current_app.logger.error(f"SendGrid送信エラー: status={resp.status_code} body={resp.text}")
-            return {"status": "error", "message": f"メール送信に失敗しました: SendGrid {resp.status_code}"}
-        except Exception as e:
-            current_app.logger.error(f"SendGrid送信エラー: {e}")
-            return {"status": "error", "message": f"メール送信に失敗しました: {str(e)}"}
-
-    try:
-        creds_info = get_credentials(user_id)
-        if not creds_info:
-            return {"status": "error", "message": "Googleアカウントがリンクされていません。", "needs_link": True}
-        
-        creds = Credentials.from_authorized_user_info(creds_info)
-        # 期限切れなら更新
-        if creds and creds.expired and creds.refresh_token:
-            creds.refresh(Request())
-            # 更新されたクレデンシャルを保存（必要であれば）
-            current_app.calendar_manager._save_creds_for_user(user_id, creds)
-
-        service = build('gmail', 'v1', credentials=creds, cache_discovery=False)
-        
-        message = MIMEText(body)
-        message['to'] = to_email
-        message['subject'] = subject
-        raw_message = base64.urlsafe_b64encode(message.as_bytes()).decode()
-
-        # Gmail APIでメールを送信
-        send_message = service.users().messages().send(userId='me', body={'raw': raw_message}).execute()
-        
-        return {"status": "success", "message": f"メールを{to_email}に送信しました。件名: {subject}"}
-    except Exception as e:
-        current_app.logger.error(f"メール送信エラー: {e}")
-        return {"status": "error", "message": f"メール送信に失敗しました: {str(e)}"}
+    # SMTP以外の送信経路は使わない
+    return {"status": "error", "message": "SMTP設定が不足しているため送信できません。"}
 
 
 def _execute_speak(detail_data: dict) -> dict:

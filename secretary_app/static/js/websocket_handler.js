@@ -307,10 +307,16 @@ function executeAction(action) {
             const body = action.detail?.body || '';
             const toLine = toEmail ? `宛先: ${toEmail}` : '宛先が指定されていません';
             const subjectLine = subject ? `件名: ${subject}` : '件名なし';
-            textToSpeak = `${toLine}。${subjectLine}。メールを送信しました。`;
+            const serverResult = action.detail?.server_result || null;
+            const status = serverResult?.status || '';
+            const statusLabel = status === 'success' ? '送信成功' : status === 'error' ? '送信失敗' : '送信結果';
+            const serverMessage = serverResult?.message || '';
+            textToSpeak = serverMessage || `${toLine}。${subjectLine}。メールを送信しました。`;
             messageHtml = `
                 <h3>${overlayTitle}</h3>
                 <div class="details-section">
+                    <p><strong>${statusLabel}</strong></p>
+                    ${serverMessage ? `<p>${serverMessage}</p>` : ''}
                     <p>${toLine}</p>
                     <p>${subjectLine}</p>
                     ${body ? `<p>本文: ${body}</p>` : '<p>本文なし</p>'}

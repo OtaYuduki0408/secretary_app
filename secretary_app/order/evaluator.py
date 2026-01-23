@@ -519,6 +519,27 @@ def evaluate_triggers(app_logger):
 
         if should_fire:
             app_logger.debug(f"Trigger activated for user {user_id}. Processing actions...")
+            try:
+                steps = order_data.get("steps") or []
+                actions = order_data.get("actions") or []
+                step_summ = []
+                for s in steps:
+                    if not isinstance(s, dict):
+                        continue
+                    kind = s.get("kind", "action")
+                    if kind == "action":
+                        act = s.get("action", {}) or {}
+                        step_summ.append(f"action:{act.get('category')}:{act.get('sub')}")
+                    elif kind == "condition":
+                        step_summ.append("condition")
+                    else:
+                        step_summ.append(kind)
+                action_summ = [
+                    f"{a.get('category')}:{a.get('sub')}" for a in actions if isinstance(a, dict)
+                ]
+                print(f"[TRIGGER_FIRE] user_id={user_id} steps={len(steps)} actions={len(actions)} step_list={step_summ} action_list={action_summ}")
+            except Exception as e:
+                print(f"[TRIGGER_FIRE] summary log failed: {e}")
             steps = order_data.get('steps')
             actions_to_process = []
             if isinstance(steps, list) and steps:
