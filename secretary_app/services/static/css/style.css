@@ -1182,18 +1182,18 @@
     width:100%;
     padding:0;
     margin:20px auto 0;
-    display:flex;
-    flex-wrap:wrap;
-    justify-content:center;
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(70px,1fr));
     gap:14px;
+    justify-items:center;
   }
   .fab-group .fab{
-    width:58px;
-    height:58px;
-    border-radius:16px;
+    width:64px;
+    height:64px;
+    border-radius:18px;
   }
   .fab-group .fab svg{
-    width:28px;
-    height:28px;
+    width:30px;
+    height:30px;
   }
 }

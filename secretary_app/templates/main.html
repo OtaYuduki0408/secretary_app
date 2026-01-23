@@ -220,14 +220,16 @@
     .fab-group {
       position: static;
       width: 100%;
-      justify-content: center;
       margin-top: 18px;
-      gap: 18px;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(70px, 1fr));
+      gap: 16px;
+      justify-items: center;
     }
 
     .fab, .fab svg {
-      width: 52px;
-      height: 52px;
+      width: 62px;
+      height: 62px;
     }
     }
 
