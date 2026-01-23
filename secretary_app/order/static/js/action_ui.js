@@ -354,20 +354,16 @@ export function createActionUI(prefix = '', initialValue = {}) {
         });
       }
       break;
-    case "メール":
-      if (sub === "送信") {
+    case "??????":
+      if (sub === "????") {
         detailContainer.innerHTML = `
-          <label>件名</label>
-          <input type="text" class="action-detail-mail-subject" placeholder="メールの件名" value="${initialValue.subject || ''}">
-          <label>本文</label>
-          <textarea class="action-detail-mail-body" placeholder="メールの本文">${initialValue.body || ''}</textarea>
-          <label>付与情報</label>
-          <div class="action-detail-mail-attachment">
-            <!-- ここにさらにUIが追加される -->
-            <button type="button" class="add-attachment-btn">付与情報を追加</button>
-          </div>
+          <label>\u30e1\u30fc\u30eb\u30a2\u30c9\u30ec\u30b9</label>
+          <input type="email" class="action-detail-mail-to" placeholder="recipient@example.com" value="${initialValue.to || ''}">
+          <label>\u4ef6\u540d</label>
+          <input type="text" class="action-detail-mail-subject" placeholder="\u30e1\u30fc\u30eb\u306e\u4ef6\u540d" value="${initialValue.subject || ''}">
+          <label>\u672c\u6587</label>
+          <textarea class="action-detail-mail-body" placeholder="\u30e1\u30fc\u30eb\u306e\u672c\u6587">${initialValue.body || ''}</textarea>
         `;
-        // TODO: 付与情報追加ボタンのロジック
       }
       break;
     case "発声":

@@ -82,6 +82,7 @@ function parseActionItem(actionItem) {
       break;
     case "メール":
       if (sub === "送信") {
+        detail.to = detailContainer.querySelector(".action-detail-mail-to")?.value;
         detail.subject = detailContainer.querySelector(".action-detail-mail-subject")?.value;
         detail.body = detailContainer.querySelector(".action-detail-mail-body")?.value;
       }
