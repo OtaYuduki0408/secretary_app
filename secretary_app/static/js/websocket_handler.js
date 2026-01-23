@@ -299,6 +299,23 @@ function executeAction(action) {
             textToSpeak = `アラート音を再生します。`;
             messageHtml = `<h3>${overlayTitle}</h3><p>アラート音: ${soundType}</p>`;
 
+        } else if ((action.category === 'メール' || action.category === '繝｡繝ｼ繝ｫ') && (action.sub === '送信' || action.sub === '騾∽ｿ｡' || !action.sub)) {
+            overlayTitle = "メール送信";
+            overlayCategoryClass = "overlay-speech";
+            const toEmail = action.detail?.to || action.detail?.email || '';
+            const subject = action.detail?.subject || '';
+            const body = action.detail?.body || '';
+            const toLine = toEmail ? `宛先: ${toEmail}` : '宛先が指定されていません';
+            const subjectLine = subject ? `件名: ${subject}` : '件名なし';
+            textToSpeak = `${toLine}。${subjectLine}。メールを送信しました。`;
+            messageHtml = `
+                <h3>${overlayTitle}</h3>
+                <div class="details-section">
+                    <p>${toLine}</p>
+                    <p>${subjectLine}</p>
+                    ${body ? `<p>本文: ${body}</p>` : '<p>本文なし</p>'}
+                </div>`;
+
         } else if (action.category === 'カレンダー' && action.sub === '読み上げ') {
             overlayTitle = "カレンダー";
             overlayCategoryClass = "overlay-calendar";

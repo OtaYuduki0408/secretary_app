@@ -8,6 +8,19 @@ export function createActionUI(prefix = '', initialValue = {}) {
   const detailContainer = document.getElementById(`${prefix}action_detail_container`);
   detailContainer.innerHTML = '';
 
+  // ????????????????????????
+  if (category === "\u30e1\u30fc\u30eb" || category === "??????") {
+    detailContainer.innerHTML = `
+      <label>\u30e1\u30fc\u30eb\u30a2\u30c9\u30ec\u30b9</label>
+      <input type="email" class="action-detail-mail-to" placeholder="recipient@example.com" value="${initialValue.to || ''}">
+      <label>\u4ef6\u540d</label>
+      <input type="text" class="action-detail-mail-subject" placeholder="\u30e1\u30fc\u30eb\u306e\u4ef6\u540d" value="${initialValue.subject || ''}">
+      <label>\u672c\u6587</label>
+      <textarea class="action-detail-mail-body" placeholder="\u30e1\u30fc\u30eb\u306e\u672c\u6587">${initialValue.body || ''}</textarea>
+    `;
+    return;
+  }
+
   switch (category) {
     case "カレンダー":
       if (sub === "追加") {
@@ -355,17 +368,16 @@ export function createActionUI(prefix = '', initialValue = {}) {
       }
       break;
     case "??????":
-      if (sub === "????") {
+      case "\u30e1\u30fc\u30eb":
         detailContainer.innerHTML = `
-          <label>\u30e1\u30fc\u30eb\u30a2\u30c9\u30ec\u30b9</label>
-          <input type="email" class="action-detail-mail-to" placeholder="recipient@example.com" value="${initialValue.to || ''}">
-          <label>\u4ef6\u540d</label>
-          <input type="text" class="action-detail-mail-subject" placeholder="\u30e1\u30fc\u30eb\u306e\u4ef6\u540d" value="${initialValue.subject || ''}">
-          <label>\u672c\u6587</label>
-          <textarea class="action-detail-mail-body" placeholder="\u30e1\u30fc\u30eb\u306e\u672c\u6587">${initialValue.body || ''}</textarea>
-        `;
-      }
-      break;
+            <label>\u30e1\u30fc\u30eb\u30a2\u30c9\u30ec\u30b9</label>
+            <input type="email" class="action-detail-mail-to" placeholder="recipient@example.com" value="${initialValue.to || ''}">
+            <label>\u4ef6\u540d</label>
+            <input type="text" class="action-detail-mail-subject" placeholder="\u30e1\u30fc\u30eb\u306e\u4ef6\u540d" value="${initialValue.subject || ''}">
+            <label>\u672c\u6587</label>
+            <textarea class="action-detail-mail-body" placeholder="\u30e1\u30fc\u30eb\u306e\u672c\u6587">${initialValue.body || ''}</textarea>
+          `;
+        break;
     case "発声":
       if (sub === "実行") {
         detailContainer.innerHTML = `

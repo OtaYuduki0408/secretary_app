@@ -24,7 +24,11 @@ export function parseConditions(root){
 
 function parseActionItem(actionItem) {
   const category = actionItem.querySelector(".action-category").value;
-  const sub = actionItem.querySelector(".action-sub").value;
+  const subSelect = actionItem.querySelector(".action-sub");
+  let sub = subSelect?.value || "";
+  if (!sub && subSelect?.options?.length) {
+    sub = subSelect.options[0].value;
+  }
   const timing = {
     date_abs: actionItem.querySelector(".action-timing-date-abs")?.value || '',
     date_rel: actionItem.querySelector(".action-timing-date-rel")?.value || '',

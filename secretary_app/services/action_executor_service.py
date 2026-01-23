@@ -2,6 +2,9 @@ from supabase_client import supabase
 from datetime import datetime, timedelta
 from flask import current_app
 import json
+import os
+import requests
+import smtplib
 import base64
 from email.mime.text import MIMEText
 import google.auth
@@ -514,6 +517,63 @@ def _execute_email_send(user_id: str, detail_data: dict) -> dict:
     if not subject and not body:
         return {"status": "error", "message": "メールの件名または本文が空です。"}
 
+    # SMTP優先（Blastengineなど）
+    smtp_host = os.getenv('SMTP_HOST', '').strip()
+    smtp_port = os.getenv('SMTP_PORT', '').strip()
+    smtp_user = os.getenv('SMTP_USER', '').strip()
+    smtp_pass = os.getenv('SMTP_PASS', '').strip()
+    smtp_from = os.getenv('SMTP_FROM_EMAIL', '').strip()
+    if smtp_host and smtp_user and smtp_pass and smtp_from:
+        try:
+            port = int(smtp_port) if smtp_port else 587
+            message = MIMEText(body)
+            message['to'] = to_email
+            message['from'] = smtp_from
+            message['subject'] = subject
+
+            with smtplib.SMTP(smtp_host, port, timeout=15) as server:
+                server.ehlo()
+                # 587/2525はStartTLS推奨
+                if port in (587, 2525):
+                    server.starttls()
+                    server.ehlo()
+                server.login(smtp_user, smtp_pass)
+                server.sendmail(smtp_from, [to_email], message.as_string())
+            return {"status": "success", "message": f"メールを{to_email}に送信しました。件名: {subject}"}
+        except Exception as e:
+            current_app.logger.error(f"SMTP送信エラー: {e}")
+            return {"status": "error", "message": f"メール送信に失敗しました: {str(e)}"}
+
+    # SendGrid（APIキーが設定されている場合）
+    sendgrid_api_key = os.getenv('SENDGRID_API_KEY', '').strip()
+    sendgrid_from_email = os.getenv('SENDGRID_FROM_EMAIL', '').strip()
+    if sendgrid_api_key and sendgrid_from_email:
+        try:
+            payload = {
+                "personalizations": [
+                    {
+                        "to": [{"email": to_email}],
+                        "subject": subject
+                    }
+                ],
+                "from": {"email": sendgrid_from_email},
+                "content": [
+                    {"type": "text/plain", "value": body}
+                ]
+            }
+            headers = {
+                "Authorization": f"Bearer {sendgrid_api_key}",
+                "Content-Type": "application/json"
+            }
+            resp = requests.post("https://api.sendgrid.com/v3/mail/send", headers=headers, json=payload, timeout=15)
+            if resp.status_code in (200, 202):
+                return {"status": "success", "message": f"メールを{to_email}に送信しました。件名: {subject}"}
+            current_app.logger.error(f"SendGrid送信エラー: status={resp.status_code} body={resp.text}")
+            return {"status": "error", "message": f"メール送信に失敗しました: SendGrid {resp.status_code}"}
+        except Exception as e:
+            current_app.logger.error(f"SendGrid送信エラー: {e}")
+            return {"status": "error", "message": f"メール送信に失敗しました: {str(e)}"}
+
     try:
         creds_info = get_credentials(user_id)
         if not creds_info:
@@ -636,7 +696,7 @@ def execute_action(user_id: str, action_data: dict) -> dict: # triggered_atをac
         return _execute_finance_read_aloud(user_id, detail, triggered_at)
     elif category == 'メモ' and sub == '読み上げ':
         return _execute_memo_read_aloud(user_id, detail, triggered_at)
-    elif category == 'メール' and sub == '送信':
+    elif (category == 'メール' or category == '繝｡繝ｼ繝ｫ') and (sub == '送信' or sub == '騾∽ｿ｡'):
         return _execute_email_send(user_id, detail)
     elif category == '発声' and sub == '実行':
         return _execute_speak(detail)
