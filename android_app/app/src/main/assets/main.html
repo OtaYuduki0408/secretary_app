@@ -7,6 +7,21 @@
   <script src="https://apis.google.com/js/api.js"></script>
   <link rel="stylesheet" href="static/css/style.css">
   <style>
+    .bg-sentinel{position:fixed;inset:0;z-index:0;background:var(--wallpaper);background-color:var(--bg-1);}
+    /* background fix */
+    html, body {
+      min-height: 100svh;
+      background: var(--wallpaper);
+      background-color: var(--bg-1);
+      background-attachment: fixed;
+    }
+    body {
+      min-height: 100svh;
+    }
+    .shell {
+      min-height: 100svh;
+    }
+
     .modal-overlay {
       position: fixed;
       top: 0;
@@ -338,6 +353,7 @@
   </style>
 </head>
 <body data-user-id="">
+  <div class="bg-sentinel" aria-hidden="true"></div>
  
   <div class="parallax" aria-hidden="true">
     <div id="plx-back"  class="plx-layer back"></div>
@@ -391,11 +407,11 @@
     <div aria-hidden="true"></div>
  
     <div class="fab-group">
-      <a id="logout-link" class="stats-btn fab" href="login.html" aria-label="ログアウト" title="ログアウト">
+      <a id="logout-link" class="finance-btn fab" href="login.html" aria-label="ログアウト" title="ログアウト">
         <svg width="34" height="34" viewBox="0 0 24 24" fill="none" aria-hidden="true">
           <rect x="4" y="4" width="16" height="16" rx="4" fill="#1f2a33" stroke="#a8b6c6" stroke-width="1.2"/>
-          <path d="M10 8h4v8h-4z" fill="#7aa8ff" opacity="0.85"/>
-          <path d="M7 12h7" stroke="#dbe6ff" stroke-width="1.4" stroke-linecap="round"/>
+          <path d="M10 8h4v8h-4z" fill="#7aa8ff"/>
+          <path d="M7 12h7" stroke="#a8b6c6" stroke-width="1.4" stroke-linecap="round"/>
           <path d="M12 9l4 3-4 3" stroke="#a8b6c6" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
       </a>
