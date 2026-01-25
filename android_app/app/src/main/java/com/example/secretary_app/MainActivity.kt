@@ -15,8 +15,21 @@ import androidx.core.view.WindowInsetsControllerCompat
 import com.google.accompanist.web.WebView
 import com.google.accompanist.web.rememberWebViewState
 import com.example.secretary_app.web.SyncBridge
+import com.example.secretary_app.data.auth.UserSessionStorage
+import com.example.secretary_app.data.auth.AuthRepository
+import com.example.secretary_app.data.sync.SyncManager
+import com.example.secretary_app.data.sync.SyncSettingsRepository
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import android.webkit.WebView as AndroidWebView
 
 class MainActivity : ComponentActivity() {
+    private var webViewRef: AndroidWebView? = null
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         // Match system bars to app background.
@@ -28,13 +41,21 @@ class MainActivity : ComponentActivity() {
             window.isNavigationBarContrastEnforced = false
         }
 
+        val sessionStorage = UserSessionStorage(this)
+        val initialUrl = if (!sessionStorage.getUserId().isNullOrBlank()) {
+            "file:///android_asset/main.html"
+        } else {
+            "file:///android_asset/login.html"
+        }
+
         setContent {
-            val webViewState = rememberWebViewState(url = "file:///android_asset/main.html")
+            val webViewState = rememberWebViewState(url = initialUrl)
             Box(modifier = Modifier.fillMaxSize().background(ComposeColor(0xFF0B1116))) {
                 WebView(
                     state = webViewState,
                     modifier = Modifier.fillMaxSize(),
                     onCreated = {
+                        webViewRef = it
                         it.settings.javaScriptEnabled = true
                         it.settings.domStorageEnabled = true
                         it.settings.allowFileAccess = true
@@ -46,6 +67,23 @@ class MainActivity : ComponentActivity() {
                         it.addJavascriptInterface(SyncBridge(this@MainActivity), "AndroidSync")
                     }
                 )
+            }
+        }
+
+        val scope = CoroutineScope(Dispatchers.IO)
+        val settingsRepo = SyncSettingsRepository(this)
+        val authRepository = AuthRepository(this)
+
+        scope.launch {
+            val session = authRepository.ensureSession()
+            if (session != null) {
+                val policy = settingsRepo.settingsFlow.first().conflictPolicy
+                SyncManager(this@MainActivity).syncAll(policy)
+                withContext(Dispatchers.Main) {
+                    if (initialUrl.endsWith("login.html")) {
+                        webViewRef?.loadUrl("file:///android_asset/main.html")
+                    }
+                }
             }
         }
     }

@@ -19,6 +19,9 @@ class SyncManager(private val context: Context) {
     private val json = HttpClientProvider.json
 
     suspend fun syncAll(policy: SyncConflictPolicy): SyncResult {
+        if (!NetworkUtils.isOnline(context)) {
+            return SyncResult(false, "offline")
+        }
         val session = authRepository.ensureSession() ?: return SyncResult(false, "missing_session")
         val userId = session.userId
         val accessToken = session.accessToken

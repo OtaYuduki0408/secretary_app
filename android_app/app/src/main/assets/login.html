@@ -7,27 +7,27 @@
   <link rel="stylesheet" href="static/css/style.css">
 </head>
 <body>
-  <script src=\"static/js/android_bridge.js\"></script>
+  <script src="static/js/android_bridge.js"></script>
   <div class="container">
-    
+
 <link rel="stylesheet" href="static/css/login.css">
 
 <div class="auth-shell">
   <h2>ログイン</h2>
 
-  <form method="post" action="/login">
-    <label>メールアドレス</label>
-    <input type="email" name="email" required>
-
-    <label>パスワード</label>
-    <input type="password" name="password" required>
-
-    <button type="submit">ログイン</button>
+  <form id="login-form" action="/login">
+    <div>
+      <label>メールアドレス</label>
+      <input type="email" id="login-email" required>
+    </div>
+    <div>
+      <label>パスワード</label>
+      <input type="password" id="login-password" required>
+    </div>
+    <button type="submit" class="cta-btn">ログイン</button>
   </form>
 
-  
-    <p class="error-msg"></p>
-  
+  <p class="error-msg" id="login-error"></p>
 
   <div class="cta-footer">
     <a href="register.html" class="cta-btn">新規登録はこちら</a>
@@ -36,5 +36,41 @@
 
   </div>
     <script src="static/js/app_settings_apply.js"></script>
+    <script>
+      const form = document.getElementById('login-form');
+      const errorEl = document.getElementById('login-error');
+      const emailEl = document.getElementById('login-email');
+      const passwordEl = document.getElementById('login-password');
+
+      form?.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        errorEl.textContent = '';
+
+        const email = (emailEl?.value || '').trim();
+        const password = passwordEl?.value || '';
+        if (!email || !password) {
+          errorEl.textContent = 'メールアドレスとパスワードを入力してください。';
+          return;
+        }
+
+        if (!window.AndroidSync || !window.AndroidSync.signIn) {
+          errorEl.textContent = 'Androidブリッジが見つかりません。';
+          return;
+        }
+
+        try {
+          const raw = window.AndroidSync.signIn(email, password);
+          const res = JSON.parse(raw || '{}');
+          if (res.success) {
+            localStorage.setItem('user_id', res.userId || '');
+            location.href = 'main.html';
+          } else {
+            errorEl.textContent = res.error || 'ログインに失敗しました。';
+          }
+        } catch (e) {
+          errorEl.textContent = 'ログインに失敗しました。';
+        }
+      });
+    </script>
 </body>
 </html>

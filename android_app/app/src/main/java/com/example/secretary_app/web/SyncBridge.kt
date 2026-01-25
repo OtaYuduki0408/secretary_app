@@ -6,6 +6,7 @@ import com.example.secretary_app.data.sync.SyncConflictPolicy
 import com.example.secretary_app.data.sync.SyncManager
 import com.example.secretary_app.data.sync.SyncScheduler
 import com.example.secretary_app.data.sync.SyncSettingsRepository
+import com.example.secretary_app.data.sync.NetworkUtils
 import com.example.secretary_app.data.local.AppDatabase
 import com.example.secretary_app.data.local.LocalApiRouter
 import com.example.secretary_app.data.local.LocalStore
@@ -15,6 +16,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
+import org.json.JSONObject
 
 class SyncBridge(private val context: Context) {
     private val scope = CoroutineScope(Dispatchers.IO)
@@ -54,6 +56,22 @@ class SyncBridge(private val context: Context) {
     }
 
     @JavascriptInterface
+    fun signIn(email: String, password: String): String {
+        return runBlocking {
+            runCatching { authRepository.signIn(email, password) }
+                .fold(
+                    onSuccess = {
+                        "{\"success\":true,\"userId\":\"${it.userId}\"}"
+                    },
+                    onFailure = {
+                        val msg = it.message ?: "login_failed"
+                        "{\"success\":false,\"error\":${JSONObject.quote(msg)}}"
+                    }
+                )
+        }
+    }
+
+    @JavascriptInterface
     fun request(method: String, url: String, body: String?): String {
         return runBlocking {
             val dao = AppDatabase.get(context).syncRecordDao()
@@ -61,6 +79,13 @@ class SyncBridge(private val context: Context) {
             val userId = authRepository.getCachedUserId() ?: "local"
             val router = LocalApiRouter(store)
             val response = router.handle(method, url, body, userId)
+            val isWrite = method.uppercase() != "GET"
+            if (isWrite && NetworkUtils.isOnline(context)) {
+                val policy = settingsRepo.settingsFlow.first().conflictPolicy
+                scope.launch {
+                    SyncManager(context).syncAll(policy)
+                }
+            }
             "{\"status\":${response.status},\"body\":${response.body}}"
         }
     }

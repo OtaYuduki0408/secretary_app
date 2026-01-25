@@ -31,6 +31,7 @@ class LocalApiRouter(private val store: LocalStore) {
             path.startsWith("/api/finance/bulk-delete") -> handleFinanceBulkDelete(body, userId)
             path.startsWith("/api/finance") -> handleFinance(normalizedMethod, segments, body, userId)
             path.startsWith("/api/memos") -> handleMemos(normalizedMethod, segments, uri, body, userId)
+            path.startsWith("/api/tasks") -> handleTasks(normalizedMethod, segments, body, userId)
             path.startsWith("/api/user_settings") -> handleUserSettings(normalizedMethod, body, userId)
             path.startsWith("/api/custom_orders") -> handleCustomOrders(normalizedMethod, segments, body, userId)
             path.startsWith("/order/api/past_addresses") -> handlePastAddresses(normalizedMethod, body, userId)
@@ -184,6 +185,35 @@ class LocalApiRouter(private val store: LocalStore) {
                 val obj = json.parseToJsonElement(body ?: "{}").jsonObject
                 val ids = obj["ids"]?.jsonArray?.mapNotNull { it.asStringOrNull() } ?: emptyList()
                 ids.forEach { store.delete("memos", it) }
+                ApiResponse(200, json.parseToJsonElement("{\"ok\":true}"))
+            }
+            else -> ApiResponse(405, json.parseToJsonElement("{\"error\":\"method_not_allowed\"}"))
+        }
+    }
+
+    private suspend fun handleTasks(method: String, segments: List<String>, body: String?, userId: String?): ApiResponse {
+        return when {
+            method == "GET" -> {
+                val list = store.list("tasks", userId)
+                ApiResponse(200, json.parseToJsonElement(json.encodeToString(ListSerializer, list)))
+            }
+            method == "POST" -> {
+                val obj = json.parseToJsonElement(body ?: "{}").jsonObject
+                val id = obj["id"].asStringOrNull() ?: store.newId()
+                val data = store.ensureUserId(obj, userId)
+                store.upsert("tasks", id, userId, data)
+                ApiResponse(200, data)
+            }
+            method == "PUT" && segments.size >= 3 -> {
+                val id = segments.last()
+                val obj = json.parseToJsonElement(body ?: "{}").jsonObject
+                val data = store.ensureUserId(obj, userId)
+                store.upsert("tasks", id, userId, data)
+                ApiResponse(200, data)
+            }
+            method == "DELETE" && segments.size >= 3 -> {
+                val id = segments.last()
+                store.delete("tasks", id)
                 ApiResponse(200, json.parseToJsonElement("{\"ok\":true}"))
             }
             else -> ApiResponse(405, json.parseToJsonElement("{\"error\":\"method_not_allowed\"}"))

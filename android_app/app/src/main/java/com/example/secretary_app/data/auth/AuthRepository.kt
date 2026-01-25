@@ -13,6 +13,14 @@ class AuthRepository(private val context: Context) {
 
     fun getCachedUserId(): String? = sessionStorage.getUserId()
 
+    suspend fun signIn(email: String, password: String): UserSession {
+        val res = authApi.signInWithPassword(email, password)
+        credentialStorage.saveCredentials(email, password)
+        val expiresAtEpoch = Instant.now().epochSecond + res.expiresIn
+        sessionStorage.saveSession(res.user.id, res.accessToken, res.refreshToken, expiresAtEpoch)
+        return UserSession(res.user.id, res.accessToken, res.refreshToken)
+    }
+
     suspend fun ensureSession(): UserSession? {
         val userId = sessionStorage.getUserId()
         val accessToken = sessionStorage.getAccessToken()

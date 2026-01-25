@@ -158,6 +158,168 @@ function stripWakeWords(text) {
 }
 
 
+const VOICE_TRIGGER_CATEGORY = "?????";
+const VOICE_TRIGGER_SUB = "??????????";
+const ACTION_SPEAK_CATEGORY = "????";
+const ACTION_ALERT_CATEGORY = "????????";
+const ACTION_EXECUTE_SUB = "????";
+const ACTION_MEMO_CATEGORY = "????";
+const ACTION_FINANCE_CATEGORY = "???????";
+const ACTION_CALENDAR_CATEGORY = "??????????";
+const ACTION_READ_SUB = "???????";
+
+function normalizeCommandText(text) {
+  return (text || '').toLowerCase().trim();
+}
+
+function splitKeywords(raw) {
+  if (!raw) return [];
+  return String(raw)
+    .split(/[
+,]/)
+    .map((w) => w.trim())
+    .filter(Boolean);
+}
+
+async function loadLocalCustomOrders() {
+  try {
+    const res = await fetch('/api/custom_orders');
+    if (!res.ok) return [];
+    const list = await res.json();
+    return Array.isArray(list) ? list : [];
+  } catch (e) {
+    console.warn('local custom_orders fetch failed', e);
+    return [];
+  }
+}
+
+function collectOrderActions(order) {
+  if (!order) return [];
+  const actions = [];
+  const steps = Array.isArray(order.steps) ? order.steps : [];
+  steps.forEach((step) => {
+    if (!step) return;
+    if (step.kind === 'action' && step.action) {
+      actions.push(step.action);
+      return;
+    }
+    if (step.action) {
+      actions.push(step.action);
+      return;
+    }
+    if (step.category) {
+      actions.push(step);
+    }
+  });
+  if (actions.length === 0 && Array.isArray(order.actions)) {
+    return order.actions;
+  }
+  return actions;
+}
+
+async function executeLocalAction(action) {
+  if (!action) return;
+  const category = action.category || '';
+  const sub = action.sub || '';
+  const detail = action.detail || {};
+
+  if (category === ACTION_SPEAK_CATEGORY && sub === ACTION_EXECUTE_SUB) {
+    const text = detail.text || 'OK';
+    if (window.addResponseLogEntry) window.addResponseLogEntry(text);
+    reader.speak(text);
+    return;
+  }
+
+  if (category === ACTION_ALERT_CATEGORY && sub === ACTION_EXECUTE_SUB) {
+    const alertSound = detail.sound || 'default';
+    const soundMap = { sound1: 'bet.mp3', sound2: 'error.mp3', sound3: 'gako.mp3', default: 'bet.mp3' };
+    const filename = soundMap[alertSound] || alertSound;
+    const audio = new Audio(`/static/voice/${filename}`);
+    audio.play().catch(() => {});
+    if (window.addResponseLogEntry) window.addResponseLogEntry('alert: ' + alertSound);
+    return;
+  }
+
+  if (category === ACTION_MEMO_CATEGORY && sub === ACTION_READ_SUB) {
+    try {
+      const res = await fetch('/api/memos');
+      if (!res.ok) throw new Error('memo fetch failed');
+      const memos = await res.json();
+      const list = Array.isArray(memos) ? memos : [];
+      const titles = list.slice(0, 3).map((m) => m.title || '??');
+      const message = list.length
+        ? `???${list.length}????${titles.join('?')}`
+        : '?????????';
+      if (window.addResponseLogEntry) window.addResponseLogEntry(message);
+      reader.speak(message);
+    } catch (e) {
+      if (window.addResponseLogEntry) window.addResponseLogEntry('???????????????');
+      reader.speak('???????????????');
+    }
+    return;
+  }
+
+  if (category === ACTION_FINANCE_CATEGORY && sub === ACTION_READ_SUB) {
+    try {
+      const res = await fetch('/api/finance/summary');
+      if (!res.ok) throw new Error('finance summary failed');
+      const data = await res.json();
+      const balance = data.balance ?? 0;
+      const monthly = data.monthly_expense ?? 0;
+      const daily = data.daily_expense ?? 0;
+      const message = `??${balance}???????${monthly}???????${daily}??`;
+      if (window.addResponseLogEntry) window.addResponseLogEntry(message);
+      reader.speak(message);
+    } catch (e) {
+      if (window.addResponseLogEntry) window.addResponseLogEntry('???????????????');
+      reader.speak('???????????????');
+    }
+    return;
+  }
+
+  if (category === ACTION_CALENDAR_CATEGORY && sub === ACTION_READ_SUB) {
+    const message = '??????????????????????';
+    if (window.addResponseLogEntry) window.addResponseLogEntry(message);
+    reader.speak(message);
+    return;
+  }
+
+  const fallback = '???????????????????';
+  if (window.addResponseLogEntry) window.addResponseLogEntry(fallback);
+  reader.speak(fallback);
+}
+
+async function tryHandleLocalVoiceTrigger(inputValue) {
+  const command = normalizeCommandText(inputValue);
+  if (!command) return false;
+  const orders = await loadLocalCustomOrders();
+  for (const order of orders) {
+    const triggers = Array.isArray(order.triggers) ? order.triggers : [];
+    for (const trigger of triggers) {
+      if (!trigger) continue;
+      if (trigger.category !== VOICE_TRIGGER_CATEGORY) continue;
+      if (trigger.sub && trigger.sub !== VOICE_TRIGGER_SUB) continue;
+      const keywords = splitKeywords(trigger.value?.keywords || trigger.keywords || '');
+      if (!keywords.length) continue;
+      const matched = keywords.some((kw) => command.includes(normalizeCommandText(kw)));
+      if (!matched) continue;
+      const actions = collectOrderActions(order);
+      if (!actions.length) {
+        const msg = '?????????????????????';
+        if (window.addResponseLogEntry) window.addResponseLogEntry(msg);
+        reader.speak(msg);
+        return true;
+      }
+      for (const action of actions) {
+        await executeLocalAction(action);
+      }
+      return true;
+    }
+  }
+  return false;
+}
+
+
 /**
  * ユーザー入力を受け付け、LLMで解析・処理を分岐するメインエントリポイント。
  * @param {string} inputValue - ユーザーの入力テキスト
@@ -223,6 +385,17 @@ export async function check_chat_Space(inputValue) {
   }
 
   // 読み込み中の動的表示を追加
+
+  try {
+    const handled = await tryHandleLocalVoiceTrigger(cleanedInput);
+    if (handled) {
+      fire('analysis:end');
+      return;
+    }
+  } catch (e) {
+    console.warn('local voice trigger failed', e);
+  }
+
   const loadingIndicator = (() => {
     const container = document.getElementById('voice-log-container');
     if (!container) return null;

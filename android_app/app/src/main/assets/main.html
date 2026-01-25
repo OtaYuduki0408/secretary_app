@@ -359,7 +359,7 @@
   </style>
 </head>
 <body data-user-id="">
-  <script src=\"static/js/android_bridge.js\"></script>
+  <script src="static/js/android_bridge.js"></script>
   <div class="bg-sentinel" aria-hidden="true"></div>
  
   <div class="parallax" aria-hidden="true">
@@ -812,5 +812,22 @@
 <script src="static/js/voice_recognition.js"></script>
 <script src="static/js/Parallax_and_Theme_rotation.js" type="module"></script>
 <!-- <script src="" defer></script> -->
+<script>
+  (async () => {
+    const userNameEl = document.querySelector('.user-name');
+    const userId = localStorage.getItem('user_id');
+    if (userNameEl && userId) {
+        if (window.AndroidSync?.get) {
+            const raw = await window.AndroidSync.get("/api/user_settings");
+            const settings = JSON.parse(raw || '{}');
+            const userName = settings.user_name || userId.split('@')[0];
+            userNameEl.textContent = userName;
+        } else {
+            const userName = userId.split('@')[0];
+            userNameEl.textContent = userName;
+        }
+    }
+  })();
+</script>
   </body>
 </html>

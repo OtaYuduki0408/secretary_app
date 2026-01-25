@@ -154,37 +154,38 @@
       </div>
 
       <details class="settings-group" open>
-        <summary>????</summary>
-        <div class="details-body">
-          <div class="field">
-            <label for="sync-conflict-policy">???????</label>
-            <select id="sync-conflict-policy">
-              <option value="LOCAL_WINS">?????</option>
-              <option value="SERVER_WINS">?????</option>
-            </select>
-          </div>
-          <div class="field">
-            <label for="sync-interval">???????</label>
-            <select id="sync-interval">
-              <option value="0">????</option>
-              <option value="6">6????</option>
-              <option value="12">12????</option>
-              <option value="24">1?1?</option>
-            </select>
-            <div class="hint">??: 1?1? / ??: ???</div>
-          </div>
-          <div class="field">
-            <label for="sync-manual-policy">???????????</label>
-            <div class="field-inline">
-              <select id="sync-manual-policy">
-                <option value="LOCAL_WINS">?????</option>
-                <option value="SERVER_WINS">?????</option>
-              </select>
-              <button id="sync-now-btn" type="button" class="btn ghost">?????</button>
-            </div>
-          </div>
-        </div>
-      </details>
+  <summary>同期設定</summary>
+  <div class="details-body">
+    <div class="field">
+      <label for="sync-conflict-policy">自動同期の優先</label>
+      <select id="sync-conflict-policy">
+        <option value="LOCAL_WINS">スマホ優先</option>
+        <option value="SERVER_WINS">サーバー優先</option>
+      </select>
+    </div>
+    <div class="field">
+      <label for="sync-interval">自動同期の間隔</label>
+      <select id="sync-interval">
+        <option value="0">オフ</option>
+        <option value="6">6時間ごと</option>
+        <option value="12">12時間ごと</option>
+        <option value="24">1日1回</option>
+      </select>
+      <div class="hint">例: 1日1回 / 推奨: 毎日</div>
+    </div>
+    <div class="field">
+      <label for="sync-manual-policy">手動同期の優先</label>
+      <div class="field-inline">
+        <select id="sync-manual-policy">
+          <option value="LOCAL_WINS">スマホ優先</option>
+          <option value="SERVER_WINS">サーバー優先</option>
+        </select>
+        <button id="sync-now-btn" type="button" class="btn ghost">今すぐ同期</button>
+      </div>
+    </div>
+    <div class="hint" id="sync-status">未同期</div>
+  </div>
+</details>
 
       <div class="settings-title">設定</div>
 
@@ -346,6 +347,7 @@
       const intervalEl = document.getElementById('sync-interval');
       const manualEl = document.getElementById('sync-manual-policy');
       const syncBtn = document.getElementById('sync-now-btn');
+      const statusEl = document.getElementById('sync-status');
 
       try {
         const raw = bridge.getSettingsJson?.();
@@ -365,6 +367,7 @@
       syncBtn?.addEventListener('click', () => {
         const policy = manualEl?.value || 'LOCAL_WINS';
         bridge.runSync?.(policy);
+        if (statusEl) statusEl.textContent = "同期が完了しました";
       });
     })();
   </script>
