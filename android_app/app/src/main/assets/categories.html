@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Flask Supabase App</title>
+  <link rel="stylesheet" href="static/css/style.css">
+
+  <link rel="stylesheet" href="static/css/expense.css">
+
+</head>
+<body>
+  <div class="container">
+    
+<div class="main-wrapper">
+  <header class="header">
+    <h1>種類の情報変更</h1>
+    <div class="header-actions">
+      <a href="expense.html" class="btn ghost">収支管理へ戻る</a>
+    </div>
+  </header>
+
+  <section class="card">
+    <h2>種類の追加</h2>
+    <div class="form-group actions">
+      <input id="cat-input" class="input" placeholder="例：食費 / 日用品 / 収入 など" />
+      <select id="cat-type" class="input" style="width: 120px;">
+        <option value="expense">支出</option>
+        <option value="income">収入</option>
+      </select>
+      <button id="cat-add" class="btn btn-primary" type="button">追加</button>
+      <button id="cat-clear" class="btn btn-danger" type="button">全削除</button>
+    </div>
+    <p class="empty" style="margin-top:6px;color:#cbd5f5;">
+      ※ 同名・同タイプは追加されません。削除はバッジの「×」から行ってください。
+    </p>
+  </section>
+
+  <section class="card">
+    <h2>現在の種類</h2>
+    <div id="cat-list" class="chips"></div>
+    <div id="cat-empty" class="empty" style="display:none">種類がまだありません。上の入力から追加してください。</div>
+  </section>
+</div>
+
+  <script src="static/js/Parallax_and_Theme_rotation.js"></script>
+  <script src="static/js/categories.js"></script>
+
+  </div>
+  <script src="static/js/app_settings_apply.js"></script>
+</body>
+</html>

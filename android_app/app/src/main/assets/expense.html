@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>収支管理</title>
+  <link rel="stylesheet" href="static/css/expense.css">
+</head>
+<body>
+  <div class="container">
+    <div id="toast-container"></div>
+    <div class="header">
+      <h1>収支管理</h1>
+      <div class="header-actions">
+        <a href="categories.html" class="link-btn">種類設定・変更へ</a>
+        <a href="#" class="link-btn">メインに戻る</a>
+      </div>
+    </div>
+
+    <section class="card status-card">
+      <h2>現在の状況</h2>
+      <div class="status-grid">
+        <p>現在の残高：<b id="balance">{{ '{:,.0f}'.format(balance or 0) }}</b> 円</p>
+        <p>今月の使用額：<b id="monthly">{{ '{:,.0f}'.format(monthly_expense or 0) }}</b> 円</p>
+        <p>今日の使用額：<b id="daily">{{ '{:,.0f}'.format(daily_expense or 0) }}</b> 円</p>
+      </div>
+    </section>
+
+    <!-- 入力フォーム -->
+    <section class="card">
+      <h2>収支の記録</h2>
+      <div class="form-group">
+        <label>種別</label>
+        <div id="type-selector" class="type-selector">
+          <button data-value="expense" class="btn-type active">支出</button>
+          <button data-value="income" class="btn-type">収入</button>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>金額</label>
+        <input id="amount" type="number" class="input" min="0" placeholder="金額を入力">
+      </div>
+      <div class="form-group">
+        <label>種類</label>
+        <div id="category-buttons" class="category-buttons"></div>
+        <p id="no-cat" class="empty" style="display:none;">
+          種類が登録されていません。
+          <a href="categories.html">追加する</a>
+        </p>
+      </div>
+      <div class="form-group">
+        <label>メモ</label>
+        <input id="memo" class="input" placeholder="例：昼食、電車代">
+      </div>
+      <button id="save" class="btn">データを送信</button>
+    </section>
+
+    <section class="card">
+      <div class="records-header">
+        <h2>直近の記録</h2>
+        <button id="delete-mode-btn" class="btn btn-secondary">削除モード</button>
+      </div>
+      <table id="records">
+        <thead>
+          <tr>
+            <th class="checkbox-col" style="display: none;"><input type="checkbox" id="select-all-checkbox"></th>
+            <th>日付</th>
+            <th>種別</th>
+            <th>種類</th>
+            <th>金額</th>
+            <th>メモ</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+      <div class="records-footer">
+        <button id="execute-delete-btn" class="btn btn-danger" style="display: none;">選択した項目を削除</button>
+      </div>
+    </section>
+  </div>
+  <script src="static/js/expense.js"></script>
+  <script src="static/js/app_settings_apply.js"></script>
+</body>
+</html>

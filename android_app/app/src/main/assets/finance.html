@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>収支管理統計</title>
+  <link rel="stylesheet" href="static/css/finance.css">
+</head>
+<body>
+
+  <div class="fd-wrap">
+    <div class="fd-button-container">
+      <a href="main.html" class="link-btn">メインに戻る</a>
+    </div>
+        <section class="fd-section">
+      <h2 class="fd-title">サマリー</h2>
+            <div class="fd-summary">
+            <div class="fd-kpi">
+              <h3>現在の所持金</h3>
+              <p id="current-balance" class="fd-num">-- 円</p>
+            </div>
+            <div class="fd-kpi">
+              <h3>今月の使用額</h3>
+              <p id="monthly-expense" class="fd-num">-- 円</p>
+            </div>
+            <div class="fd-kpi">
+              <h3>今月の目標額</h3>
+              <p id="goal-amount" class="fd-num">
+                
+                  {{ '{:,.0f}'.format(goal_amount) }} 円
+                
+                  -- 円
+                
+              </p>
+            </div>
+            <div class="fd-kpi">
+              <h3>今月の収入</h3>
+              <p id="monthly-income" class="fd-num">-- 円</p>
+            </div>
+            <div class="fd-kpi">
+              <h3>今日の使用額</h3>
+              <p id="daily-expense" class="fd-num">-- 円</p>
+            </div>
+            <div class="fd-kpi">
+              <h3>今日の使用額(必需品抜き)</h3>
+              <p id="daily-expense-no-necessities" class="fd-num">-- 円</p>
+            </div>
+          </div>     </section>
+
+    <section class="fd-section">
+      <h2 class="fd-title">一覧</h2>
+      <div class="fd-controls">
+        <div id="filterType" class="fd-radio-group">
+            <input type="radio" id="typeAll" name="typeFilter" value="all" checked>
+            <label for="typeAll">すべて</label>
+            <input type="radio" id="typeExpense" name="typeFilter" value="expense">
+            <label for="typeExpense">支出</label>
+            <input type="radio" id="typeIncome" name="typeFilter" value="income">
+            <label for="typeIncome">収入</label>
+        </div>
+        
+        <input id="searchInput" class="fd-input" placeholder="検索…" />
+        
+        <select id="sortSelect" class="fd-select">
+          <option value="date">日付順</option>
+          <option value="amount">金額順</option>
+        </select>
+        
+        <select id="filterCategory" class="fd-select" multiple size="3">
+            <option value="all" selected>すべてのカテゴリ</option>
+        </select>
+
+        <div class="fd-date-range">
+            <div class="fd-date-input-group">
+                <input type="date" id="startDate" class="fd-input" placeholder="開始日">
+                <button type="button" class="fd-wheel-btn" data-target="startDate" aria-label="ホイールで開始日を選ぶ">🗓</button>
+            </div>
+            <div class="fd-date-input-group">
+                <input type="date" id="endDate" class="fd-input" placeholder="終了日">
+                <button type="button" class="fd-wheel-btn" data-target="endDate" aria-label="ホイールで終了日を選ぶ">🗓</button>
+            </div>
+        </div>
+        </div>
+      
+      <details open>
+        <summary class="fd-collapsible-summary fd-list-summary">一覧</summary>
+        <table id="financeTable">
+          <thead>
+            <tr>
+                  <th>日付</th>
+                  <th>タイプ</th>
+                  <th>カテゴリ</th>
+                  <th>内容</th>
+                  <th>金額</th>
+              </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </details>
+      </section>
+
+    <section class="fd-section">
+      <details open>
+        <summary class="fd-collapsible-summary fd-chart-summary">グラフ</summary>
+        <div class="fd-charts">
+          <canvas id="incomeChart" class="fd-chart"></canvas>
+          <canvas id="expenseChart" class="fd-chart"></canvas>
+        </div>
+        <div 
+          id="finance-data"
+          data-income=''
+          data-expense=''
+          data-all-records=''
+          style="display: none;">
+        </div>
+      </details>
+    </section>
+    
+
+    <section class="fd-section">
+      <h2 class="fd-title">設定</h2>
+      <form id="settingsForm" class="fd-form">
+        <label>目標金額
+          <input
+            id="inputGoal"
+            type="number"
+            placeholder="例: 100000"
+            value=""
+          />
+        </label>
+        <label>通知設定
+          <select id="notifySetting">
+            <option value="on">ON</option>
+            <option value="off">OFF</option>
+          </select>
+        </label>
+        <button type="submit">保存</button>
+      </form>
+    </section>
+  </div>
+
+
+<div id="fdWheel" class="fd-wheel-backdrop" hidden>
+  <div class="fd-wheel-dialog" role="dialog" aria-modal="true" aria-labelledby="fdWheelTitle">
+    <div class="fd-wheel-header">
+      <span id="fdWheelTitle">Pick a date</span>
+    </div>
+
+    <div class="fd-wheel-body">
+      <div class="fd-wheel-column">
+        <label for="fdWheelYear" class="fd-wheel-label">年</label>
+        <select id="fdWheelYear" class="fd-wheel-select"></select>
+      </div>
+      <div class="fd-wheel-column">
+        <label for="fdWheelMonth" class="fd-wheel-label">月</label>
+        <select id="fdWheelMonth" class="fd-wheel-select"></select>
+      </div>
+      <div class="fd-wheel-column">
+        <label for="fdWheelDay" class="fd-wheel-label">日</label>
+        <select id="fdWheelDay" class="fd-wheel-select"></select>
+      </div>
+
+      <div class="fd-wheel-highlight"></div>
+    </div>
+
+    <div class="fd-wheel-actions">
+      <button type="button" class="fd-wheel-cancel">キャンセル</button>
+      <button type="button" class="fd-wheel-ok">決定</button>
+    </div>
+  </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="static/js/finance.js" defer></script>
+  <script src="static/js/app_settings_apply.js"></script>
+</body></html>

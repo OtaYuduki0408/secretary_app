@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Flask Supabase App</title>
+  <link rel="stylesheet" href="static/css/style.css">
+</head>
+<body>
+  <div class="container">
+    
+<link rel="stylesheet" href="static/css/login.css">
+
+<div class="auth-shell">
+  <h2>ログイン</h2>
+
+  <form method="post" action="/login">
+    <label>メールアドレス</label>
+    <input type="email" name="email" required>
+
+    <label>パスワード</label>
+    <input type="password" name="password" required>
+
+    <button type="submit">ログイン</button>
+  </form>
+
+  
+    <p class="error-msg"></p>
+  
+
+  <div class="cta-footer">
+    <a href="register.html" class="cta-btn">新規登録はこちら</a>
+  </div>
+</div>
+
+  </div>
+  <script src="static/js/app_settings_apply.js"></script>
+</body>
+</html>
