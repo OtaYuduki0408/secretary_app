@@ -1,0 +1,6 @@
+package com.example.secretary_app.data.supabase
+
+object SupabaseConfig {
+    const val URL = "https://ifytzbbjtlwjanjbnpzj.supabase.co"
+    const val ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlmeXR6YmJqdGx3amFuamJucHpqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkxOTE4MjYsImV4cCI6MjA3NDc2NzgyNn0.oL9XBqqWSCSUrJ79kYKugzfGacHmz70R4BIsv24pdpA"
+}

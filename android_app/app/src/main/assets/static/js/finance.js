@@ -19,7 +19,7 @@ function normalizeDateToKey(s) {
   return `${y}-${mo}-${d}`;
 }
 
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
   const container = document.getElementById("finance-data");
 
   // ---------- データ取得 ----------

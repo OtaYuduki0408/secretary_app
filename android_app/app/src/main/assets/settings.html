@@ -6,6 +6,29 @@
   <title>Voice Secretary — 設定</title>
   <link rel="stylesheet" href="static/css/style.css">
   <style>
+    /* width fix */
+    html, body {
+      max-width: 100%;
+      overflow-x: hidden;
+    }
+    .settings-shell {
+      width: 100%;
+      box-sizing: border-box;
+    }
+    .settings-card {
+      max-width: 100%;
+      width: min(760px, 92vw);
+      box-sizing: border-box;
+    }
+    .field input,
+    .field select {
+      max-width: 100%;
+      box-sizing: border-box;
+    }
+    .field-inline {
+      flex-wrap: wrap;
+    }
+
     body {
       font-family: var(--app-font, inherit);
     }
@@ -123,11 +146,46 @@
   </style>
 </head>
 <body>
+  <script src=\"static/js/android_bridge.js\"></script>
   <main class="settings-shell">
     <section class="settings-card">
       <div class="settings-actions">
         <a href="main.html">メインへ戻る</a>
       </div>
+
+      <details class="settings-group" open>
+        <summary>????</summary>
+        <div class="details-body">
+          <div class="field">
+            <label for="sync-conflict-policy">???????</label>
+            <select id="sync-conflict-policy">
+              <option value="LOCAL_WINS">?????</option>
+              <option value="SERVER_WINS">?????</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="sync-interval">???????</label>
+            <select id="sync-interval">
+              <option value="0">????</option>
+              <option value="6">6????</option>
+              <option value="12">12????</option>
+              <option value="24">1?1?</option>
+            </select>
+            <div class="hint">??: 1?1? / ??: ???</div>
+          </div>
+          <div class="field">
+            <label for="sync-manual-policy">???????????</label>
+            <div class="field-inline">
+              <select id="sync-manual-policy">
+                <option value="LOCAL_WINS">?????</option>
+                <option value="SERVER_WINS">?????</option>
+              </select>
+              <button id="sync-now-btn" type="button" class="btn ghost">?????</button>
+            </div>
+          </div>
+        </div>
+      </details>
+
       <div class="settings-title">設定</div>
 
       <details class="settings-group" open>
@@ -276,7 +334,40 @@
     </section>
   </main>
 
-  <script src="static/js/app_settings_apply.js"></script>
+    <script src="static/js/app_settings_apply.js"></script>
   <script src="static/js/settings.js"></script>
+
+  <script>
+    (() => {
+      const bridge = window.AndroidSync;
+      if (!bridge) return;
+
+      const conflictEl = document.getElementById('sync-conflict-policy');
+      const intervalEl = document.getElementById('sync-interval');
+      const manualEl = document.getElementById('sync-manual-policy');
+      const syncBtn = document.getElementById('sync-now-btn');
+
+      try {
+        const raw = bridge.getSettingsJson?.();
+        const settings = raw ? JSON.parse(raw) : null;
+        if (settings?.conflictPolicy && conflictEl) conflictEl.value = settings.conflictPolicy;
+        if (typeof settings?.intervalHours === 'number' && intervalEl) intervalEl.value = String(settings.intervalHours);
+      } catch (e) {
+        console.log('[sync-ui] failed to read settings', e);
+      }
+
+      conflictEl?.addEventListener('change', (e) => {
+        bridge.setConflictPolicy?.(e.target.value);
+      });
+      intervalEl?.addEventListener('change', (e) => {
+        bridge.setIntervalHours?.(parseInt(e.target.value || '0', 10));
+      });
+      syncBtn?.addEventListener('click', () => {
+        const policy = manualEl?.value || 'LOCAL_WINS';
+        bridge.runSync?.(policy);
+      });
+    })();
+  </script>
+
 </body>
 </html>

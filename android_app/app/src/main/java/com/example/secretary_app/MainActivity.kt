@@ -14,6 +14,7 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import com.google.accompanist.web.WebView
 import com.google.accompanist.web.rememberWebViewState
+import com.example.secretary_app.web.SyncBridge
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -42,6 +43,7 @@ class MainActivity : ComponentActivity() {
                         it.settings.allowUniversalAccessFromFileURLs = true
                         it.setBackgroundColor(Color.parseColor("#0b1116"))
                         it.overScrollMode = android.view.View.OVER_SCROLL_NEVER
+                        it.addJavascriptInterface(SyncBridge(this@MainActivity), "AndroidSync")
                     }
                 )
             }

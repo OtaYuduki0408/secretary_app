@@ -1,6 +1,7 @@
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
+    id("org.jetbrains.kotlin.kapt")
     id("org.jetbrains.kotlin.plugin.serialization") version "1.9.23"
 }
 
@@ -53,6 +54,9 @@ android {
 dependencies {
     val composeVersion = "1.7.7"
     val supabaseVersion = "2.6.1"
+    val roomVersion = "2.6.1"
+    val workVersion = "2.9.0"
+    val dataStoreVersion = "1.1.1"
     val material3Version = "1.3.0" // 1.2.1は旧版、1.3.0が安定
 
     implementation("androidx.activity:activity-compose:1.9.3")
@@ -83,4 +87,18 @@ dependencies {
     implementation(platform("io.github.jan-tennert.supabase:bom:$supabaseVersion"))
     implementation("io.github.jan-tennert.supabase:supabase-kt")
     implementation("io.github.jan-tennert.supabase:realtime-kt")
+
+    // --- Room (offline storage) ---
+    implementation("androidx.room:room-runtime:$roomVersion")
+    implementation("androidx.room:room-ktx:$roomVersion")
+    kapt("androidx.room:room-compiler:$roomVersion")
+
+    // --- WorkManager (sync) ---
+    implementation("androidx.work:work-runtime-ktx:$workVersion")
+
+    // --- DataStore (sync settings) ---
+    implementation("androidx.datastore:datastore-preferences:$dataStoreVersion")
+
+    // --- Supabase (Auth/PostgREST) ---
+
 }

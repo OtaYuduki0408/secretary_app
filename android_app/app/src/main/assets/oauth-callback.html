@@ -88,6 +88,7 @@
     </script>
 </head>
 <body>
+  <script src=\"static/js/android_bridge.js\"></script>
     <!-- server から来る token/error を data 属性で受け渡す（JS 側で JSON.parse する） -->
     <div id="server-data" data-token='' data-error='' style="display:none"></div>
  
@@ -98,6 +99,6 @@
       <p class="error" id="error"></p>
       <p><button onclick="closeOrRedirect()">Close window</button></p>
     </div>
-    <script src="static/js/app_settings_apply.js"></script>
+      <script src="static/js/app_settings_apply.js"></script>
 </body>
 </html>
