@@ -30,6 +30,7 @@ class MainActivity : ComponentActivity() {
                     it.settings.allowFileAccessFromFileURLs = true
                     it.settings.allowUniversalAccessFromFileURLs = true
                     it.setBackgroundColor(Color.parseColor("#0b1116"))
+                    it.overScrollMode = android.view.View.OVER_SCROLL_NEVER
                 }
             )
         }
