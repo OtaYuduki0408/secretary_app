@@ -9,3 +9,15 @@ secretary_app/services/client_secret.json
 secretary_app/token.json
 secretary_app/instance/orders.db
 secretary_app/order/commands.db
+
+# Android app (android_app)
+android_app/.gradle/
+android_app/.idea/
+android_app/build/
+android_app/**/build/
+android_app/local.properties
+android_app/**/.cxx/
+android_app/**/captures/
+android_app/**/*.iml
+android_app/**/release/
+android_app/**/debug/
