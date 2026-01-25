@@ -52,6 +52,7 @@ android {
 
 dependencies {
     val composeVersion = "1.7.7"
+    val supabaseVersion = "2.6.1"
     val material3Version = "1.3.0" // 1.2.1は旧版、1.3.0が安定
 
     implementation("androidx.activity:activity-compose:1.9.3")
@@ -77,4 +78,9 @@ dependencies {
 
     // --- Kotlin Serialization ---
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
+
+    // --- Supabase (Realtime) ---
+    implementation(platform("io.github.jan-tennert.supabase:bom:$supabaseVersion"))
+    implementation("io.github.jan-tennert.supabase:supabase-kt")
+    implementation("io.github.jan-tennert.supabase:realtime-kt")
 }

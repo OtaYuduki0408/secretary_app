@@ -7,6 +7,7 @@ import io.github.jan.supabase.realtime.PostgresAction
 import io.github.jan.supabase.realtime.Realtime
 import io.github.jan.supabase.realtime.channel
 import io.github.jan.supabase.realtime.postgresChangeFlow
+import io.github.jan.supabase.realtime.realtime
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.launchIn
@@ -34,16 +35,16 @@ object SupabaseRealtimeService {
         return client!!
     }
 
-    fun subscribeToActionChanges(scope: CoroutineScope, onNewAction: (Map<String, Any>) -> Unit) {
+    fun subscribeToActionChanges(scope: CoroutineScope, onNewAction: (Map<String, Any?>) -> Unit) {
         val client = getInstance()
         val channel = client.channel("public:actions")
         
         scope.launch(Dispatchers.IO) {
             client.realtime.connect()
             channel.postgresChangeFlow<PostgresAction.Insert>("public")
-                .onEach { 
-                    Log.d(TAG, "New action received: ${it.record}")
-                    onNewAction(it.record)
+                .onEach { event: PostgresAction.Insert ->
+                    Log.d(TAG, "New action received: ${event.record}")
+                    onNewAction(event.record)
                 }
                 .launchIn(this)
             
