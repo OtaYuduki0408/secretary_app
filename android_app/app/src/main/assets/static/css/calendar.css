@@ -1,0 +1,240 @@
+:root{
+  --bg:#0f172a;
+  --panel:#1e293b;
+  --panel-soft:#243045;
+  --text:#f8fafc;
+  --muted:#cbd5f5;
+  --accent:#38bdf8;
+  --accent-strong:#0ea5e9;
+  --success:#34d399;
+  --danger:#f87171;
+  --shadow:0 20px 45px rgba(15,23,42,.35);
+  --radius-lg:22px;
+}
+
+*{box-sizing:border-box;}
+
+html,body{
+  margin:0;
+  min-height:100%;
+  font-family:"Noto Sans JP","Hiragino Kaku Gothic ProN",YuGothic,Meiryo,sans-serif;
+  color:var(--text);
+  background:radial-gradient(circle at 20% 20%, rgba(56,189,248,.15), transparent 40%),
+             radial-gradient(circle at 80% 20%, rgba(14,165,233,.25), transparent 45%),
+             linear-gradient(180deg,#0b1220,#0f172a);
+}
+
+.page-bg{position:fixed; inset:0; pointer-events:none;}
+
+.header{
+  position:sticky;
+  top:0;
+  z-index:20;
+  display:flex;
+  flex-wrap:wrap;
+  justify-content:space-between;
+  align-items:center;
+  gap:14px;
+  padding:18px clamp(16px,4vw,36px);
+  background:rgba(15,23,42,.8);
+  border-bottom:1px solid rgba(148,163,184,.25);
+  backdrop-filter:blur(12px) saturate(140%);
+}
+
+.title{
+  margin:0;
+  font-size:1.9rem;
+  letter-spacing:.04em;
+}
+
+.actions{
+  display:flex;
+  flex-wrap:wrap;
+  gap:12px;
+}
+
+.container{
+  width:min(1100px,94%);
+  margin:40px auto 90px;
+  display:grid;
+  gap:20px;
+}
+
+.card{
+  background:var(--panel);
+  border-radius:var(--radius-lg);
+  padding:26px;
+  border:1px solid rgba(148,163,184,.2);
+  box-shadow:var(--shadow);
+}
+
+.card-title{
+  margin:0 0 18px;
+  font-size:1.35rem;
+  letter-spacing:.05em;
+}
+
+.grid{
+  display:grid;
+  gap:14px;
+}
+.g-2{
+  grid-template-columns:repeat(2,minmax(0,1fr));
+}
+
+.field{
+  display:flex;
+  flex-direction:column;
+  gap:6px;
+}
+
+.field.full{
+  grid-column:1/-1;
+}
+
+.label{
+  color:var(--muted);
+  font-size:.95rem;
+}
+
+.input{
+  width:100%;
+  min-height:44px;
+  border-radius:14px;
+  border:1px solid rgba(148,163,184,.35);
+  background:var(--panel-soft);
+  color:var(--text);
+  padding:12px 14px;
+  font-size:1rem;
+  outline:none;
+  transition:border-color .2s, box-shadow .2s;
+}
+
+.input:focus{
+  border-color:var(--accent);
+  box-shadow:0 0 0 2px rgba(56,189,248,.3);
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator,
+input[type="datetime-local"]::-webkit-calendar-picker-indicator{
+  filter:invert(1) opacity(.85);
+}
+
+.card-actions{
+  margin-top:18px;
+  display:flex;
+  flex-wrap:wrap;
+  gap:12px;
+}
+
+.btn{
+  appearance:none;
+  min-height:44px;
+  padding:12px 22px;
+  border-radius:18px;
+  border:1px solid rgba(148,163,184,.35);
+  background:rgba(56,189,248,.12);
+  color:var(--text);
+  font-weight:600;
+  letter-spacing:.02em;
+  cursor:pointer;
+  transition:.2s;
+}
+.btn:hover{background:rgba(56,189,248,.2);}
+.btn:disabled{opacity:.55; cursor:not-allowed;}
+
+.btn.primary{
+  background:linear-gradient(135deg,var(--accent),var(--accent-strong));
+  color:#0f172a;
+  border:none;
+  box-shadow:0 12px 24px rgba(14,165,233,.35);
+}
+
+.btn.success{
+  background:linear-gradient(135deg,#34d399,#059669);
+  border:none;
+  color:#042f2e;
+  box-shadow:0 12px 24px rgba(5,150,105,.35);
+}
+
+.btn.danger{
+  background:linear-gradient(135deg,#f87171,#ef4444);
+  border:none;
+  color:#fff;
+  box-shadow:0 12px 24px rgba(248,113,113,.35);
+}
+
+.btn.ghost{
+  background:rgba(148,163,184,.18);
+  color:var(--text);
+}
+
+.log{
+  min-height:180px;
+  max-height:340px;
+  overflow:auto;
+  background:var(--panel-soft);
+  border-radius:16px;
+  border:1px solid rgba(148,163,184,.25);
+  padding:16px;
+  font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  line-height:1.5;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.05);
+}
+
+.log div + div{
+  margin-top:6px;
+  color:var(--muted);
+}
+
+@media (max-width:900px){
+  .container{
+    width:94%;
+  }
+  .g-2{
+    grid-template-columns:1fr;
+  }
+}
+
+@media (max-width:640px){
+  .header{
+    flex-direction:column;
+    align-items:flex-start;
+  }
+  .actions{
+    width:100%;
+    justify-content:flex-start;
+  }
+  .actions .btn{
+    flex:1 1 160px;
+  }
+  .card{
+    padding:20px;
+  }
+  .card-actions{
+    flex-direction:column;
+  }
+  .card-actions .btn{
+    width:100%;
+  }
+}
+
+@media (max-width:520px){
+  .container{
+    width:calc(100% - 24px);
+    margin:24px auto 70px;
+  }
+  .card{
+    padding:18px;
+  }
+  .card-actions{
+    gap:10px;
+  }
+  .card-actions .btn,
+  .actions .btn{
+    width:100%;
+  }
+  .title{
+    font-size:1.5rem;
+  }
+}

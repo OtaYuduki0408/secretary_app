@@ -1,0 +1,786 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Voice Secretary — Main</title>
+  <script src="https://apis.google.com/js/api.js"></script>
+  <link rel="stylesheet" href="static/css/style.css">
+  <style>
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.7);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 10000;
+    }
+
+    .modal-content {
+      background: #1f2a33;
+      padding: 20px;
+      border-radius: 10px;
+      position: relative;
+      text-align: center;
+      border: 1px solid #a8b6c6;
+    }
+
+    .modal-close-btn {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background: none;
+      border: none;
+      font-size: 1.5rem;
+      color: #a8b6c6;
+      cursor: pointer;
+    }
+
+    .switchbot-controls {
+      margin-top: 20px;
+    }
+
+    .switchbot-controls .btn {
+      margin: 0 10px;
+      /* Assuming .btn class exists and has base styling */
+      padding: 10px 20px;
+      border-radius: 5px;
+      cursor: pointer;
+      background-color: #7aa8ff;
+      color: #1f2a33;
+      border: 1px solid #a8b6c6;
+    }
+
+    .user-badge {
+      margin: 12px auto 0;
+      padding: 8px 16px;
+      border-radius: 999px;
+      background: #f1f5f9; /* Light gray background */
+      border: 1px solid #e2e8f0; /* Slightly darker border */
+      color: #1f2937; /* Dark text color */
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.9rem;
+    }
+
+    .user-name {
+      font-weight: 600;
+      color: #2563eb; /* A darker, more readable blue */
+    }
+
+    /* New Terminal UI Styles */
+    .ui-stack {
+      gap: 24px;
+    }
+
+    .terminal-window {
+      width: min(700px, 100%);
+      max-width: 100%;
+      min-height: 320px;
+      height: min(420px, 65vh);
+      margin: 0 auto clamp(18px, 3vh, 26px);
+      border-radius: 16px;
+      background: #ffffff; /* White background */
+      border: 1px solid #d1d5db; /* Gray border */
+      box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .voice-log-panel {
+      flex-grow: 1;
+      padding: clamp(16px, 3vw, 24px);
+      overflow-y: auto;
+      color: #000000; /* Final log color: Black */
+      font-family: 'Consolas', 'Monaco', monospace;
+      font-size: 1rem;
+      line-height: 1.7;
+    }
+
+    .log-interim {
+        color: #6b7280; /* Interim log color: Gray */
+    }
+
+    .voice-log-panel::-webkit-scrollbar {
+      width: 8px;
+    }
+    .voice-log-panel::-webkit-scrollbar-track {
+      background: #f1f5f9;
+    }
+    .voice-log-panel::-webkit-scrollbar-thumb {
+      background-color: #cbd5e1;
+      border-radius: 4px;
+    }
+
+    .voice-log-entry {
+      opacity: 1;
+    }
+    .voice-log-entry + .voice-log-entry {
+        margin-top: 12px;
+    }
+
+    .search {
+      flex-shrink: 0;
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr);
+      align-items: center;
+      gap: 16px;
+      width: min(960px, 92vw);
+      padding: 16px clamp(22px, 4vw, 30px);
+      margin: 0 auto;
+      box-sizing: border-box;
+      background: rgba(8,12,18,0.55);
+      border: 1px solid rgba(255,255,255,0.14);
+      border-radius: 999px;
+      box-shadow: 0 12px 34px rgba(0,0,0,0.45);
+    }
+    
+    .search .icon {
+      stroke: #64748b; /* Icon color */
+      margin-right: 0;
+      width: 32px;
+      height: 32px;
+      flex-shrink: 0;
+      align-self: center;
+    }
+
+    .search input {
+      flex-grow: 1;
+      width: 100%;
+      background: transparent;
+      border: none;
+      outline: none;
+      color: #000000;
+      font-size: 1.05rem;
+      font-family: 'Consolas', 'Monaco', monospace;
+    }
+
+    .search input::placeholder {
+      color: #9ca3af;
+    }
+
+    .highlight-wake-word {
+      color: #D97706; /* Darker, rich yellow/orange */
+      font-weight: 600;
+      background-color: #FEF3C7; /* Light yellow background */
+      padding: 2px 4px;
+      border-radius: 4px;
+    }
+
+    .abort-row {
+      margin-bottom: 10px;
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+    }
+
+    .abort-btn {
+      border: 1px solid rgba(255, 84, 84, 0.9);
+      background: rgba(255, 34, 34, 0.22);
+      color: #ffe6e6;
+      padding: 10px 16px;
+      border-radius: 999px;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      cursor: pointer;
+      transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.12s ease, opacity 0.12s ease;
+      text-transform: uppercase;
+    }
+
+    .abort-btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 10px 22px rgba(255, 60, 60, 0.35);
+      background: rgba(255, 40, 40, 0.35);
+    }
+
+    .abort-btn:disabled {
+      cursor: not-allowed;
+      box-shadow: none;
+    }
+
+    .abort-btn.is-active {
+      box-shadow: 0 12px 26px rgba(255, 60, 60, 0.5);
+      background: rgba(255, 24, 24, 0.7);
+      border-color: rgba(255, 140, 140, 0.95);
+      color: #fff;
+    }
+
+    body {
+      font-family: var(--app-font, inherit);
+    }
+
+    .character-buddy {
+      position: fixed;
+      left: 24px;
+      bottom: 24px;
+      width: min(var(--character-size, 220px), 32vw);
+      z-index: 1200;
+      pointer-events: none;
+      filter: var(--character-filter, none);
+    }
+
+    .character-buddy img {
+      width: 100%;
+      height: auto;
+      display: none;
+    }
+
+    .character-buddy img.active {
+      display: block;
+    }
+
+    @media (max-width: 768px) {
+      body {
+        font-size: 15px; /* Adjust base font size for smaller screens */
+      }
+
+      main.shell {
+        padding: clamp(16px, 4vw, 24px); /* Reduce overall padding */
+      }
+
+      .user-badge {
+        font-size: 0.85rem;
+        padding: 6px 12px;
+        width: 100%;
+        justify-content: center;
+      }
+
+      .terminal-window {
+        min-height: clamp(260px, 60vh, 360px);
+        height: auto;
+      }
+
+      .voice-log-panel {
+        font-size: 0.9rem;
+        padding: 14px;
+        line-height: 1.6;
+      }
+
+    .search {
+      grid-template-columns: 1fr;
+      width: 100%;
+      margin: 0;
+      padding: 12px;
+      border-radius: 20px;
+    }
+
+      .search input {
+        font-size: 1rem;
+      }
+
+      .mic-wrap .mic-btn {
+        width: min(220px, 60vw);
+        height: min(220px, 60vw);
+      }
+
+    .fab-group {
+      position: static;
+      display: flex;
+      flex-wrap: wrap;
+      width: 100%;
+      justify-content: center;
+      margin-top: 18px;
+      gap: 18px;
+    }
+
+    .fab, .fab svg {
+      width: 52px;
+      height: 52px;
+    }
+
+    .character-buddy {
+      left: 12px;
+      bottom: 12px;
+      width: min(var(--character-size, 160px), 38vw);
+    }
+    }
+
+    @media (max-width: 480px) {
+      .terminal-window {
+        min-height: clamp(240px, 55vh, 320px);
+      }
+
+      .voice-log-panel {
+        font-size: 0.85rem;
+        padding: 12px;
+      }
+
+      .search {
+        grid-template-columns: 1fr;
+        text-align: center;
+      }
+
+      .fab, .fab svg {
+        width: 48px;
+        height: 48px;
+      }
+
+      .character-buddy {
+        width: min(140px, 44vw);
+      }
+    }
+  </style>
+</head>
+<body data-user-id="">
+ 
+  <div class="parallax" aria-hidden="true">
+    <div id="plx-back"  class="plx-layer back"></div>
+    <div id="plx-mid"   class="plx-layer mid"></div>
+    <div id="plx-front" class="plx-layer front"></div>
+  </div>
+ 
+  <div class="ui-backdrop" aria-hidden="true"></div>
+ 
+  <main class="shell">
+    <div aria-hidden="true"></div>
+ 
+    <div class="user-badge" aria-live="polite">
+      <span>ログイン中:</span>
+      <span class="user-name">offline</span>
+    </div>
+
+    <section aria-label="メイン操作" class="ui-stack">
+      <div class="mic-wrap">
+        <button class="mic-btn glass" aria-label="音声入力を開始">
+          <div class="mic-surface" aria-hidden="true">
+            <svg width="64" height="64" viewBox="0 0 24 24" fill="none" role="img" aria-hidden="true">
+              <defs><linearGradient id="g1" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#ffffff"/><stop offset="100%" stop-color="#e6eef8"/>
+              </linearGradient></defs>
+              <path d="M8 9a4 4 0 0 1 8 0v3a4 4 0 1 1-8 0V9Z" fill="url(#g1)"/>
+              <path d="M5 11.5a7 7 0 0 0 14 0" stroke="#a9c4ff" stroke-width="1.6" stroke-linecap="round"/>
+              <path d="M12 18v3" stroke="#d7e6ff" stroke-width="1.6" stroke-linecap="round"/>
+            </svg>
+          </div>
+        </button>
+      </div>
+
+      <div class="terminal-window glass">
+        <div id="voice-log-container" class="voice-log-panel">
+            <!-- Voice logs will be dynamically inserted here -->
+        </div>
+        <div class="abort-row">
+          <button id="force-abort-btn" class="abort-btn" type="button" aria-label="強制終了" disabled>強制終了</button>
+        </div>
+        <form id="search-form" class="search" role="search" aria-label="検索フォーム">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M4 12l2-2 3 3 3-3 2 2" stroke="#e7edf5" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M10 17l-3-3" stroke="#e7edf5" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <input id="searchbox" type="text" inputmode="search" name="search" placeholder="テキストでコマンドを入力..." aria-label="入力" />
+        </form>
+      </div>
+    </section>
+ 
+    <div aria-hidden="true"></div>
+ 
+    <div class="fab-group">
+      <a id="logout-link" class="stats-btn fab" href="#" aria-label="ログアウト" title="ログアウト">
+        <svg width="34" height="34" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <rect x="4" y="4" width="16" height="16" rx="4" fill="#1f2a33" stroke="#a8b6c6" stroke-width="1.2"/>
+          <path d="M10 8h4v8h-4z" fill="#7aa8ff" opacity="0.85"/>
+          <path d="M7 12h7" stroke="#dbe6ff" stroke-width="1.4" stroke-linecap="round"/>
+          <path d="M12 9l4 3-4 3" stroke="#a8b6c6" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </a>
+      <a class="finance-btn fab" href="/expense" aria-label="収支管理を開く" title="収支管理">
+        <svg width="34" height="34" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <rect x="3" y="3.5" width="18" height="17" rx="4" fill="#1f2a33" stroke="#a8b6c6" stroke-width="1.2"/>
+          <path d="M8 6l4 5 4-5" stroke="#a8b6c6" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M9 13h6M9 15h6M12 11v6" stroke="#7aa8ff" stroke-width="1.4" stroke-linecap="round"/>
+        </svg>
+      </a>
+      
+      <a class="stats-btn fab" href="#" aria-label="統計ダッシュボードを開く" title="統計">
+        <svg width="34" height="34" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <rect x="3.5" y="4" width="17" height="16" rx="4" fill="#1f2a33" stroke="#a8b6c6" stroke-width="1.2"/>
+          <path d="M8 16V11" stroke="#7aa8ff" stroke-width="1.6" stroke-linecap="round"/>
+          <path d="M12 16V8" stroke="#7aa8ff" stroke-width="1.6" stroke-linecap="round"/>
+          <path d="M16 16v-5" stroke="#7aa8ff" stroke-width="1.6" stroke-linecap="round"/>
+          <path d="M7 17.5h10" stroke="#a8b6c6" stroke-width="1.2" stroke-linecap="round"/>
+        </svg>
+      </a>
+ 
+      <!-- ✅ 変更後 -->
+<a class="calendar-btn fab" href="#" title="カレンダー" aria-label="カレンダーを開く">
+  <svg width="34" height="34" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <rect x="3" y="5.5" width="18" height="15" rx="3" fill="#24303a" stroke="#a8b6c6" stroke-width="1.2"/>
+    <path d="M8 3v4M16 3v4" stroke="#a8b6c6" stroke-width="1.4" stroke-linecap="round"/>
+    <path d="M3 9.5h18" stroke="#a8b6c6" stroke-width="1.2"/>
+    <rect x="7" y="12" width="3" height="3" rx="0.8" fill="#7aa8ff"/>
+    <rect x="12" y="12" width="3" height="3" rx="0.8" fill="#7aa8ff" opacity=".85"/>
+    <rect x="7" y="16" width="3" height="3" rx="0.8" fill="#7aa8ff" opacity=".7"/>
+  </svg>
+  <span class="badge" aria-hidden="true">Today</span>
+</a>
+
+
+      <a class="memo-btn fab" href="#" aria-label="メモを開く" title="メモ">
+        <svg width="34" height="34" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <rect x="4" y="4" width="16" height="16" rx="4" fill="#1f2a33" stroke="#a8b6c6" stroke-width="1.2"/>
+          <path d="M8 8h8M8 11.5h8M8 15h5" stroke="#7aa8ff" stroke-width="1.3" stroke-linecap="round"/>
+          <path d="M14.5 15l2.5 2.5" stroke="#a8b6c6" stroke-width="1.2" stroke-linecap="round"/>
+        </svg>
+      </a>
+      <a class="custom-order-btn fab" href="#" aria-label="カスタム命令を開く" title="カスタム命令">
+        <svg width="34" height="34" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <rect x="4" y="4" width="16" height="16" rx="4" fill="#1f2a33" stroke="#a8b6c6" stroke-width="1.2"/>
+          <circle cx="12" cy="12" r="3" stroke="#7aa8ff" stroke-width="1.5"/>
+          <path d="M12 4.5V6.5" stroke="#a8b6c6" stroke-width="1.2" stroke-linecap="round"/>
+          <path d="M12 17.5V19.5" stroke="#a8b6c6" stroke-width="1.2" stroke-linecap="round"/>
+          <path d="M17.6,6.4 l-1.4,1.4" stroke="#a8b6c6" stroke-width="1.2" stroke-linecap="round"/>
+          <path d="M7.8,16.2 l-1.4,1.4" stroke="#a8b6c6" stroke-width="1.2" stroke-linecap="round"/>
+          <path d="M19.5,12H17.5" stroke="#a8b6c6" stroke-width="1.2" stroke-linecap="round"/>
+          <path d="M6.5,12H4.5" stroke="#a8b6c6" stroke-width="1.2" stroke-linecap="round"/>
+          <path d="M17.6,17.6 l-1.4,-1.4" stroke="#a8b6c6" stroke-width="1.2" stroke-linecap="round"/>
+          <path d="M7.8,7.8 l-1.4,-1.4" stroke="#a8b6c6" stroke-width="1.2" stroke-linecap="round"/>
+        </svg>
+      </a>
+      <a class="custom-order-btn fab" href="#" aria-label="設定を開く" title="設定">
+        <svg width="34" height="34" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <rect x="4" y="4" width="16" height="16" rx="4" fill="#1f2a33" stroke="#a8b6c6" stroke-width="1.2"/>
+          <path d="M12 8v8M8 12h8" stroke="#7aa8ff" stroke-width="1.6" stroke-linecap="round"/>
+          <circle cx="12" cy="12" r="3.2" stroke="#a8b6c6" stroke-width="1.2"/>
+        </svg>
+      </a>
+    </div>  </main>
+
+  <a href="#">ユーザー登録</a>
+
+  <div id="character-buddy" class="character-buddy" aria-hidden="true">
+    <img id="character-frame-idle" class="active" src="" alt="">
+    <img id="character-frame-1" src="" alt="">
+    <img id="character-frame-2" src="" alt="">
+  </div>
+ 
+  <div id="ai-indicator" aria-live="polite" style="position:fixed;right:14px;bottom:14px;z-index:14000;display:none;">
+    <div style="min-width:240px;background:#0f172a;border:1px solid #334155;border-radius:12px;padding:12px 14px;box-shadow:0 12px 40px rgba(0,0,0,.45);color:#e5e7eb">
+      <div id="aii-title" style="font-weight:700;margin-bottom:8px">解析中…</div>
+      <div id="aii-steps" style="display:flex;gap:6px;margin-bottom:8px">
+        <span style="flex:1;height:6px;background:#475569;border-radius:999px;opacity:.45"></span>
+        <span style="flex:1;height:6px;background:#475569;border-radius:999px;opacity:.45"></span>
+        <span style="flex:1;height:6px;background:#475569;border-radius:999px;opacity:.45"></span>
+      </div>
+      <div id="aii-label" style="font-size:.92rem;opacity:.85">準備中</div>
+    </div>
+  </div>
+ 
+<script type="module">
+  // ScheduleManager を明示的にインポートする
+  import { ScheduleManager } from './static/js/ScheduleManager.js';
+ 
+  // 创建全局インスタンス，让其他脚本可以访问
+  window.manager = new ScheduleManager();
+ 
+  const log = (msg) => {
+    console.log(msg);
+  };
+ 
+// AIインジケータ制御スクリプト (両方に存在)
+(() => {
+  const box   = document.getElementById('ai-indicator');
+  const title = document.getElementById('aii-title');
+  const label = document.getElementById('aii-label');
+  const bars  = Array.from(document.querySelectorAll('#aii-steps span'));
+  let steps = ['目的判定','詳細抽出','結果反映'];
+ 
+  function setActive(n){
+    bars.forEach((b,i)=> b.style.background = i < n ? '#93c5fd' : '#475569');
+    bars.forEach((b,i)=> b.style.opacity = i < n ? '1' : '.45');
+    label.textContent = steps[Math.max(0, Math.min(n-1, steps.length-1))] || '処理中';
+  }
+ 
+  document.addEventListener('analysis:start', (e)=>{
+    steps = e.detail?.steps || steps;
+    title.textContent = '解析中…';
+    label.textContent = '準備中';
+    setActive(0);
+    box.style.display = 'block';
+  });
+ 
+  document.addEventListener('analysis:step', (e)=>{
+    const idx = (e.detail?.index|0);
+    if (e.detail?.label) steps[idx-1] = e.detail.label;
+    setActive(idx);
+  });
+ 
+  document.addEventListener('analysis:end', ()=>{
+    setActive(steps.length);
+    title.textContent = '完了';
+    setTimeout(()=> box.style.display = 'none', 700);
+  });
+})();
+</script>
+
+<div id="toast-stack" aria-live="polite" aria-atomic="true"></div>
+ 
+<div id="read-aloud-overlay" class="read-aloud-overlay">
+    <div class="overlay-content">
+        <div id="overlay-time" class="overlay-time"></div>
+        <div id="overlay-message" class="overlay-message"></div>
+    </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.5/socket.io.min.js"></script>
+<script>
+  (() => {
+    const logoutLink = document.getElementById('logout-link');
+    if (!logoutLink) return;
+    logoutLink.addEventListener('click', (event) => {
+      if (!confirm('ログアウトしますか？')) {
+        event.preventDefault();
+      }
+    });
+  })();
+</script>
+<script>
+  (() => {
+    const body = document.body;
+    const root = document.documentElement;
+    const character = document.getElementById('character-buddy');
+
+    const hexToRgb = (hex) => {
+      const raw = hex.replace('#', '');
+      const full = raw.length === 3 ? raw.split('').map((c) => c + c).join('') : raw;
+      const num = parseInt(full, 16);
+      if (Number.isNaN(num)) return { r: 177, g: 214, b: 86 };
+      return { r: (num >> 16) & 255, g: (num >> 8) & 255, b: num & 255 };
+    };
+
+    const rgbToHsl = (r, g, b) => {
+      r /= 255;
+      g /= 255;
+      b /= 255;
+      const max = Math.max(r, g, b);
+      const min = Math.min(r, g, b);
+      let h = 0;
+      let s = 0;
+      const l = (max + min) / 2;
+      if (max !== min) {
+        const d = max - min;
+        s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+        switch (max) {
+          case r:
+            h = (g - b) / d + (g < b ? 6 : 0);
+            break;
+          case g:
+            h = (b - r) / d + 2;
+            break;
+          default:
+            h = (r - g) / d + 4;
+        }
+        h /= 6;
+      }
+      return { h: h * 360, s, l };
+    };
+
+    const baseColor = { r: 177, g: 214, b: 86 };
+    const baseHsl = rgbToHsl(baseColor.r, baseColor.g, baseColor.b);
+
+    const buildColorFilter = (hex) => {
+      const target = hexToRgb(hex);
+      const targetHsl = rgbToHsl(target.r, target.g, target.b);
+      const hueRotate = targetHsl.h - baseHsl.h;
+      const saturate = baseHsl.s > 0 ? targetHsl.s / baseHsl.s : 1;
+      const brightness = baseHsl.l > 0 ? targetHsl.l / baseHsl.l : 1;
+      return `hue-rotate(${hueRotate.toFixed(1)}deg) saturate(${saturate.toFixed(2)}) brightness(${brightness.toFixed(2)})`;
+    };
+
+    const applySettings = () => {
+      let settings = null;
+      try {
+        const raw = localStorage.getItem('appSettings');
+        settings = raw ? JSON.parse(raw) : null;
+      } catch (e) {
+        console.warn('設定の読み込みに失敗しました。', e);
+      }
+
+      const general = settings?.general || {};
+      const main = settings?.main || {};
+      const characterSettings = settings?.character || {};
+
+      if (general.fontFamily) {
+        root.style.setProperty('--app-font', general.fontFamily);
+      } else {
+        root.style.removeProperty('--app-font');
+      }
+
+      const clamp = (value) => Math.min(255, Math.max(0, Math.round(value)));
+      const scale = (value, factor) => clamp(value * factor);
+      if (main.backgroundColor) {
+        const color = hexToRgb(main.backgroundColor);
+        const dark = `rgb(${scale(color.r, 0.55)}, ${scale(color.g, 0.55)}, ${scale(color.b, 0.55)})`;
+        const mid = `rgb(${scale(color.r, 0.78)}, ${scale(color.g, 0.78)}, ${scale(color.b, 0.78)})`;
+        const glow1 = `rgba(${color.r}, ${color.g}, ${color.b}, 0.18)`;
+        const glow2 = `rgba(${color.r}, ${color.g}, ${color.b}, 0.12)`;
+        root.style.setProperty('--bg-1', dark);
+        root.style.setProperty('--bg-2', mid);
+        root.style.setProperty('--wallpaper', `radial-gradient(circle at 18% 22%, ${glow1}, transparent 45%), radial-gradient(circle at 70% 10%, ${glow2}, transparent 55%), linear-gradient(180deg, ${mid} 0%, ${dark} 100%)`);
+        root.style.setProperty('--wallpaper-darken', 'rgba(6,12,32,.18)');
+      } else {
+        root.style.removeProperty('--bg-1');
+        root.style.removeProperty('--bg-2');
+        root.style.removeProperty('--wallpaper');
+        root.style.removeProperty('--wallpaper-darken');
+      }
+
+      if (main.stripeColor) {
+        const stripe = hexToRgb(main.stripeColor);
+        root.style.setProperty('--stripe-color', `rgba(${stripe.r}, ${stripe.g}, ${stripe.b}, 0.35)`);
+      } else {
+        root.style.removeProperty('--stripe-color');
+      }
+
+      if (main.buttonColor) {
+        const btn = hexToRgb(main.buttonColor);
+        root.style.setProperty('--main-btn-color', `rgb(${btn.r}, ${btn.g}, ${btn.b})`);
+      } else {
+        root.style.removeProperty('--main-btn-color');
+      }
+
+      const sizeValue = characterSettings.size || 220;
+      root.style.setProperty('--character-size', `${sizeValue}px`);
+
+      const colorValue = characterSettings.color || '#B1D656';
+      root.style.setProperty('--character-filter', buildColorFilter(colorValue));
+
+      if (character) {
+        const isEnabled = characterSettings.enabled !== false;
+        character.style.display = isEnabled ? 'block' : 'none';
+      }
+    };
+
+    applySettings();
+    window.addEventListener('storage', applySettings);
+  })();
+</script>
+<script>
+  (() => {
+    const idleFrame = document.getElementById('character-frame-idle');
+    const frameA = document.getElementById('character-frame-1');
+    const frameB = document.getElementById('character-frame-2');
+    if (!idleFrame || !frameA || !frameB) return;
+
+    const talkFrames = [frameA, frameB];
+    let talkIndex = 0;
+    let timerId = null;
+
+    const showFrame = (index) => {
+      idleFrame.classList.toggle('active', index === 'idle');
+      talkFrames.forEach((frame, i) => frame.classList.toggle('active', index === i));
+    };
+
+    const startTalking = () => {
+      if (timerId) return;
+      let idx = talkIndex;
+      timerId = setInterval(() => {
+        idx = idx === 0 ? 1 : 0;
+        showFrame(idx);
+        talkIndex = idx;
+      }, 220);
+    };
+
+    const stopTalking = () => {
+      if (timerId) {
+        clearInterval(timerId);
+        timerId = null;
+      }
+      showFrame('idle');
+    };
+
+    showFrame('idle');
+    document.addEventListener('voice:playstart', startTalking);
+    document.addEventListener('voice:playend', stopTalking);
+  })();
+</script>
+<script>
+  (() => {
+    const log = (...args) => console.log('[DEBUG:CSS]', ...args);
+    const warn = (...args) => console.warn('[DEBUG:CSS]', ...args);
+
+    // CSS/JS???????????????????????
+    function findResourceEntry(keyword) {
+      const entries = performance.getEntriesByType('resource');
+      return entries.find((entry) => entry.name.includes(keyword));
+    }
+
+    function dumpResourceEntry(keyword) {
+      const entry = findResourceEntry(keyword);
+      if (!entry) {
+        warn(`resource not found: ${keyword}`);
+        return;
+      }
+      log(`resource: ${keyword}`, {
+        name: entry.name,
+        initiatorType: entry.initiatorType,
+        transferSize: entry.transferSize,
+        encodedBodySize: entry.encodedBodySize,
+        decodedBodySize: entry.decodedBodySize,
+      });
+    }
+
+    function dumpStyleSnapshot() {
+      const rootStyle = getComputedStyle(document.documentElement);
+      const bodyStyle = getComputedStyle(document.body);
+      log('env', {
+        time: new Date().toISOString(),
+        location: location.href,
+        origin: location.origin,
+        userAgent: navigator.userAgent,
+        language: navigator.language,
+        timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        devicePixelRatio: window.devicePixelRatio,
+        styleSheetCount: document.styleSheets.length,
+      });
+      log('theme', {
+        vsThemeIdx: localStorage.getItem('vs_theme_idx'),
+        htmlClass: document.documentElement.className,
+      });
+      log('css-vars', {
+        bg1: rootStyle.getPropertyValue('--bg-1').trim(),
+        bg2: rootStyle.getPropertyValue('--bg-2').trim(),
+        accent: rootStyle.getPropertyValue('--accent').trim(),
+        wallpaper: rootStyle.getPropertyValue('--wallpaper').trim(),
+      });
+      log('body-background', {
+        backgroundImage: bodyStyle.backgroundImage,
+        backgroundColor: bodyStyle.backgroundColor,
+      });
+
+      const styleLink = document.querySelector('link[rel="stylesheet"][href*="style.css"]');
+      if (styleLink) {
+        log('style.css link', styleLink.href);
+      } else {
+        warn('style.css link not found');
+      }
+
+      const sheets = Array.from(document.styleSheets).map((sheet) => sheet.href || 'inline');
+      log('stylesheets', sheets);
+
+      dumpResourceEntry('style.css');
+      dumpResourceEntry('websocket_handler.js');
+      dumpResourceEntry('Parallax_and_Theme_rotation.js');
+    }
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', dumpStyleSnapshot);
+    } else {
+      dumpStyleSnapshot();
+    }
+  })();
+</script>
+<script src="static/js/websocket_handler.js" type="module" defer></script>
+<script src="static/js/voice_recognition.js"></script>
+<script src="static/js/Parallax_and_Theme_rotation.js" type="module"></script>
+<!-- <script src="" defer></script> -->
+
+<!-- OFFLINE banner -->
+<div style="position:fixed;left:12px;bottom:12px;z-index:16000;background:#2b2b2b;color:#fff;padding:6px 10px;border-radius:8px;font-size:12px;opacity:0.85;">OFFLINE MODE</div>
+</body>
+</html>

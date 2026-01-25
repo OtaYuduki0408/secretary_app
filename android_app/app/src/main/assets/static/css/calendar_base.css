@@ -1,0 +1,154 @@
+/* static/css/calendar_base.css */
+
+/* --- 基本設定とデザイン統一 --- */
+:root {
+  /* style.cssのtheme-blueを参考に再定義 */
+  --theme-bg-1: #071426;
+  --theme-bg-2: #0b1e35;
+  --theme-accent-1: #3b82f6; /* 明るい青 */
+  --theme-accent-2: #1d4ed8; /* 濃い青 */
+  --theme-text-1: #f4f7fb;   /* 白に近いテキスト */
+  --theme-text-2: #cdd6df;   /* グレーのテキスト */
+  --theme-panel-1: #1c232a;  /* パネル背景 */
+  --theme-border: rgba(122, 168, 255, 0.2); /* ボーダー色 */
+
+  /* カレンダーのボーダー色をさらに目立たなくする */
+  --fc-border-color: rgba(122, 168, 255, 0.1); /* より暗い青系で透過度を上げる */
+}
+html {
+  /* UI全体を拡大するため、基本フォントサイズを大きくする */
+  font-size: 18px;
+}
+body {
+    font-family: 'Roboto', 'Noto Sans JP', sans-serif;
+    background: linear-gradient(180deg, var(--theme-bg-2), var(--theme-bg-1));
+    color: var(--theme-text-1);
+}
+.header {
+    background-color: transparent;
+}
+.container {
+    padding-top: 0;
+    padding-bottom: 2rem; /* 下部に余白を追加 */
+}
+#calendar {
+  max-width: 95vw;
+  margin: 1.5rem auto 0;
+  background-color: var(--theme-panel-1);
+  border: 1px solid var(--theme-border);
+  padding: 1.5rem;
+  border-radius: 18px;
+  box-shadow: 0 10px 30px rgba(0,0,0,.35);
+  color: var(--theme-text-1);
+}
+
+/* --- FullCalendarのスタイル調整 --- */
+.fc {
+    /* height: 100%; を削除。コンテンツに応じた高さにする */
+}
+.fc .fc-toolbar-title {
+    font-size: 1.5em;
+    color: var(--theme-text-1);
+}
+.fc .fc-button-primary {
+  background-color: var(--theme-accent-1);
+  border-color: var(--theme-accent-1);
+  font-size: 0.9rem;
+}
+.fc .fc-button-primary:hover, .fc .fc-button-primary:active {
+  background-color: var(--theme-accent-2);
+  border-color: var(--theme-accent-2);
+}
+.fc .fc-day-today {
+    background-color: rgba(59, 130, 246, 0.15);
+}
+.fc .fc-daygrid-day-number, .fc .fc-col-header-cell-cushion {
+    color: var(--theme-text-2);
+    font-size: 0.9rem;
+}
+.fc .fc-day-sun .fc-daygrid-day-number, .fc .fc-day-sun .fc-col-header-cell-cushion { color: #f87171; } /* 日曜は赤 */
+.fc .fc-day-sat .fc-daygrid-day-number, .fc .fc-day-sat .fc-col-header-cell-cushion { color: #60a5fa; } /* 土曜は青 */
+
+/* 曜日の背景色を修正 */
+.fc-theme-standard .fc-scrollgrid {
+    border: none; /* 全体のボーダーはカレンダーコンテナで制御するため、FCのボーダーは除去 */
+}
+.fc-theme-standard .fc-scrollgrid-sync-table,
+.fc-theme-standard th {
+    background-color: var(--theme-panel-1); /* カレンダーの背景色に合わせる */
+    border-color: var(--fc-border-color); /* グリッド線と統一 */
+}
+
+
+/* イベントの視認性向上 */
+.fc-event {
+    cursor: pointer;
+    padding: 4px 6px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    border-radius: 4px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+.fc-event-local {
+    background-color: var(--theme-accent-1) !important;
+    border-color: var(--theme-accent-1) !important;
+    color: #fff !important;
+}
+.fc-event-holiday {
+    border: none !important;
+    font-weight: bold;
+    background-color: transparent !important;
+    color: #fca5a5 !important; /* 祝日は薄い赤文字 */
+}
+.fc-daygrid-day.fc-day-today .fc-event-holiday .fc-event-title {
+    color: #fca5a5 !important;
+}
+.fc-daygrid-dot-event.fc-event-holiday {
+    background-color: #fca5a5;
+}
+
+/* --- モーダルのバグ修正とデザイン調整 --- */
+.modal-overlay {
+    position: fixed;
+    top: 0; left: 0; width: 100%; height: 100%;
+    background-color: rgba(0, 0, 0, 0.7);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1001;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s, visibility 0s 0.3s;
+    backdrop-filter: blur(5px);
+}
+.modal-overlay.is-visible {
+    opacity: 1;
+    visibility: visible;
+    transition: opacity 0.3s;
+}
+.modal-content {
+    background: var(--theme-panel-1);
+    border: 1px solid var(--theme-border);
+    box-shadow: 0 10px 30px rgba(0,0,0,.35);
+    border-radius: 18px;
+    width: 90%;
+    max-width: 550px;
+    transform: scale(0.95);
+    transition: transform 0.3s;
+}
+.modal-overlay.is-visible .modal-content {
+    transform: scale(1);
+}
+
+@media (max-width: 540px){
+  html{
+    font-size:16px;
+  }
+  #calendar{
+    padding:1rem;
+    margin:1rem auto;
+  }
+  .modal-content{
+    width:96%;
+  }
+}
