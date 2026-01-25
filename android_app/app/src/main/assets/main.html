@@ -391,7 +391,7 @@
           <path d="M12 9l4 3-4 3" stroke="#a8b6c6" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
       </a>
-      <a class="finance-btn fab" href="expense.html" aria-label="収支管理を開く" title="収支管理">
+      <a class="finance-btn fab" href="/expense" aria-label="収支管理を開く" title="収支管理">
         <svg width="34" height="34" viewBox="0 0 24 24" fill="none" aria-hidden="true">
           <rect x="3" y="3.5" width="18" height="17" rx="4" fill="#1f2a33" stroke="#a8b6c6" stroke-width="1.2"/>
           <path d="M8 6l4 5 4-5" stroke="#a8b6c6" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
@@ -419,7 +419,7 @@
     <rect x="12" y="12" width="3" height="3" rx="0.8" fill="#7aa8ff" opacity=".85"/>
     <rect x="7" y="16" width="3" height="3" rx="0.8" fill="#7aa8ff" opacity=".7"/>
   </svg>
-  <span class="badge" aria-hidden="true">Today</span>
+  
 </a>
 
 
@@ -430,7 +430,7 @@
           <path d="M14.5 15l2.5 2.5" stroke="#a8b6c6" stroke-width="1.2" stroke-linecap="round"/>
         </svg>
       </a>
-      <a class="custom-order-btn fab" href="#" aria-label="カスタム命令を開く" title="カスタム命令">
+      <a class="custom-order-btn fab" href="custom_order.html" aria-label="カスタム命令を開く" title="カスタム命令">
         <svg width="34" height="34" viewBox="0 0 24 24" fill="none" aria-hidden="true">
           <rect x="4" y="4" width="16" height="16" rx="4" fill="#1f2a33" stroke="#a8b6c6" stroke-width="1.2"/>
           <circle cx="12" cy="12" r="3" stroke="#7aa8ff" stroke-width="1.5"/>
@@ -456,9 +456,9 @@
   <a href="register.html">ユーザー登録</a>
 
   <div id="character-buddy" class="character-buddy" aria-hidden="true">
-    <img id="character-frame-idle" class="active" src="img/サイレントメイト君_差分0.png" alt="">
-    <img id="character-frame-1" src="img/サイレントメイト君_差分1.png" alt="">
-    <img id="character-frame-2" src="img/サイレントメイト君_差分2.png" alt="">
+    <img id="character-frame-idle" class="active" src="" alt="">
+    <img id="character-frame-1" src="" alt="">
+    <img id="character-frame-2" src="" alt="">
   </div>
  
   <div id="ai-indicator" aria-live="polite" style="position:fixed;right:14px;bottom:14px;z-index:14000;display:none;">
@@ -605,7 +605,7 @@
 
       const general = settings?.general || {};
       const main = settings?.main || {};
-      const characterSettings = settings?.character || {};
+      const characterSettings = settings?.character || { enabled: false };
 
       if (general.fontFamily) {
         root.style.setProperty('--app-font', general.fontFamily);
@@ -653,7 +653,7 @@
       root.style.setProperty('--character-filter', buildColorFilter(colorValue));
 
       if (character) {
-        const isEnabled = characterSettings.enabled !== false;
+        const isEnabled = characterSettings.enabled === true;
         character.style.display = isEnabled ? 'block' : 'none';
       }
     };
@@ -780,6 +780,6 @@
 <script src="static/js/websocket_handler.js" type="module" defer></script>
 <script src="static/js/voice_recognition.js"></script>
 <script src="static/js/Parallax_and_Theme_rotation.js" type="module"></script>
-<!-- <script src="static/js/calendar_toast.js" defer></script> -->
+<!-- <script src="" defer></script> -->
 </body>
 </html>

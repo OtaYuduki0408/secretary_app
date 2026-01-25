@@ -19,7 +19,7 @@
       inputConfirmTemplate: 'だね、ちょっと待ってね！',
     },
     character: {
-      enabled: true,
+      enabled: false,
       size: 220,
       color: '#B1D656',
     },
