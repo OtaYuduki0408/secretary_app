@@ -437,6 +437,7 @@ function executeAction(action) {
             overlay.classList.add(overlayCategoryClass);
             messageElement.innerHTML = messageHtml;
             overlay.classList.add('visible');
+            overlay.style.position = 'fixed'; // オーバーレイが正しく表示されるようにpositionを強制的に設定
 
             // ===== DEBUG START =====
             const styles = window.getComputedStyle(overlay);
@@ -444,7 +445,7 @@ function executeAction(action) {
                 opacity: styles.opacity,
                 visibility: styles.visibility,
                 display: styles.display,
-                position: styles.position, // positionプロパティを追加
+                position: styles.position,
                 zIndex: styles.zIndex
             });
             // ===== DEBUG END =====

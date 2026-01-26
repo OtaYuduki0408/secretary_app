@@ -91,23 +91,24 @@ class MainActivity : ComponentActivity() {
             }
         }
         startService(Intent(this, WakeWordDetectionService::class.java))
+        handleIntent(intent)
     }
 
-    override fun onNewIntent(intent: Intent?) {
+    override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        if (intent?.getBooleanExtra("start_voice_interaction", false) == true) {
-            startLocalVoiceInteraction()
-        }
+        handleIntent(intent)
     }
 
-    fun startLocalVoiceInteraction() {
-        try {
-            runOnUiThread {
-                Log.d(TAG, "Starting local voice interaction.")
-                startLocalVoiceInteraction(null)
+    private fun handleIntent(intent: Intent?) {
+        if (intent?.getBooleanExtra("start_voice_interaction", false) == true) {
+            try {
+                runOnUiThread {
+                    Log.d(TAG, "Starting local voice interaction.")
+                    startLocalVoiceInteraction(null)
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error starting local voice interaction", e)
             }
-        } catch (e: Exception) {
-            Log.e(TAG, "Error starting local voice interaction", e)
         }
     }
 
