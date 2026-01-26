@@ -438,6 +438,17 @@ function executeAction(action) {
             messageElement.innerHTML = messageHtml;
             overlay.classList.add('visible');
 
+            // ===== DEBUG START =====
+            const styles = window.getComputedStyle(overlay);
+            console.log('Overlay STYLE DEBUG:', {
+                opacity: styles.opacity,
+                visibility: styles.visibility,
+                display: styles.display,
+                position: styles.position, // positionプロパティを追加
+                zIndex: styles.zIndex
+            });
+            // ===== DEBUG END =====
+
             let speechPromise;
             if (typeof SpeechSynthesisUtterance !== 'undefined' && typeof speechSynthesis !== 'undefined') {
                 const utterance = new SpeechSynthesisUtterance(textToSpeak);

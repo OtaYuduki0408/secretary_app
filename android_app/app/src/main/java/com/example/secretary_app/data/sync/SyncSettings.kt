@@ -7,5 +7,6 @@ enum class SyncConflictPolicy {
 
 data class SyncSettings(
     val conflictPolicy: SyncConflictPolicy = SyncConflictPolicy.LOCAL_WINS,
-    val intervalHours: Int = 24
+    val intervalHours: Int = 24,
+    val wakeWords: String = "サイレントメイト"
 )

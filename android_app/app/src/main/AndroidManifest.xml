@@ -33,29 +33,6 @@
 
         </activity>
 
-        <activity
-            android:name=".VoiceCommandActivity"
-            android:theme="@android:style/Theme.NoDisplay"
-            android:exported="true"
-            android:launchMode="singleInstance"
-            android:excludeFromRecents="true">
-            <!-- For headset button, etc. -->
-            <intent-filter>
-                <action android:name="android.intent.action.VOICE_COMMAND" />
-                <category android:name="android.intent.category.DEFAULT" />
-            </intent-filter>
-            <!-- For Google Assistant App Actions -->
-            <intent-filter>
-                <action android:name="android.intent.action.VIEW" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
-            </intent-filter>
-        </activity>
-
-        <activity
-            android:name=".ResultActivity"
-            android:exported="false" />
-
         <service
             android:name=".AssistantInteractionService"
             android:exported="true"
@@ -72,6 +49,11 @@
             android:name=".AssistantInteractionSessionService"
             android:exported="true"
             android:permission="android.permission.BIND_VOICE_INTERACTION" />
+            
+        <service 
+            android:name=".service.WakeWordDetectionService"
+            android:enabled="true"
+            android:exported="false" />
 
     </application>
 

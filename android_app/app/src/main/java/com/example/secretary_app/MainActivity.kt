@@ -1,8 +1,10 @@
 ﻿package com.example.secretary_app
 
+import android.content.Intent
 import android.os.Bundle
 import android.graphics.Color
 import android.os.Build
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
@@ -19,6 +21,7 @@ import com.example.secretary_app.data.auth.UserSessionStorage
 import com.example.secretary_app.data.auth.AuthRepository
 import com.example.secretary_app.data.sync.SyncManager
 import com.example.secretary_app.data.sync.SyncSettingsRepository
+import com.example.secretary_app.service.WakeWordDetectionService
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
@@ -29,6 +32,7 @@ import android.webkit.WebView as AndroidWebView
 
 class MainActivity : ComponentActivity() {
     private var webViewRef: AndroidWebView? = null
+    private val TAG = "MainActivity"
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -85,6 +89,25 @@ class MainActivity : ComponentActivity() {
                     }
                 }
             }
+        }
+        startService(Intent(this, WakeWordDetectionService::class.java))
+    }
+
+    override fun onNewIntent(intent: Intent?) {
+        super.onNewIntent(intent)
+        if (intent?.getBooleanExtra("start_voice_interaction", false) == true) {
+            startLocalVoiceInteraction()
+        }
+    }
+
+    fun startLocalVoiceInteraction() {
+        try {
+            runOnUiThread {
+                Log.d(TAG, "Starting local voice interaction.")
+                startLocalVoiceInteraction(null)
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error starting local voice interaction", e)
         }
     }
 

@@ -146,11 +146,9 @@
   const saveToServer = async () => {
     if (applyingRemote) return;
     try {
-      await fetch('/api/user_settings', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ settings }),
-      });
+      if (window.AndroidSync?.request) {
+          await window.AndroidSync.request('PUT', '/api/user_settings', { settings });
+      }
     } catch (e) {
       console.warn('設定の保存に失敗しました。', e);
     }
@@ -274,6 +272,7 @@
   elements.wakeWord?.addEventListener('input', (event) => {
     settings.main.wakeWords = event.target.value;
     saveSettings(settings);
+    window.AndroidSync?.setWakeWords(event.target.value);
     scheduleSaveToServer();
     document.dispatchEvent(new CustomEvent('app-settings:updated'));
   });
@@ -433,10 +432,10 @@
 
   const fetchSettingsFromServer = async () => {
     try {
-      const res = await fetch('/api/user_settings');
-      if (!res.ok) return;
-      const data = await res.json();
-      applySettingsFromServer(data.settings);
+        if (window.AndroidSync?.request) {
+            const data = await window.AndroidSync.request('GET', '/api/user_settings');
+            applySettingsFromServer(data.settings);
+        }
     } catch (e) {
       console.warn('設定の取得に失敗しました。', e);
     }
