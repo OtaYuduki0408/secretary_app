@@ -380,7 +380,7 @@
 
     <section aria-label="メイン操作" class="ui-stack">
       <div class="mic-wrap">
-        <button class="mic-btn glass" aria-label="音声入力を開始">
+        <button id="start-recognition-btn" class="mic-btn glass" aria-label="音声入力を開始">
           <div class="mic-surface" aria-hidden="true">
             <svg width="64" height="64" viewBox="0 0 24 24" fill="none" role="img" aria-hidden="true">
               <defs><linearGradient id="g1" x1="0" y1="0" x2="0" y2="1">
@@ -828,6 +828,11 @@
         }
     }
   })();
+</script>
+<script>
+  document.getElementById('start-recognition-btn')?.addEventListener('click', () => {
+    window.AndroidSync?.startVoiceRecognition?.();
+  });
 </script>
   </body>
 </html>

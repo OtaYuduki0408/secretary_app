@@ -1,8 +1,10 @@
 package com.example.secretary_app.web
 
 import android.content.Context
+import android.content.Intent
 import android.webkit.JavascriptInterface
 import com.example.secretary_app.MainActivity
+import com.example.secretary_app.VoiceCommandActivity
 import com.example.secretary_app.data.sync.SyncConflictPolicy
 import com.example.secretary_app.data.sync.SyncManager
 import com.example.secretary_app.data.sync.SyncScheduler
@@ -91,6 +93,13 @@ class SyncBridge(private val context: Context, private val mainActivity: MainAct
             }
             "{\"status\":${response.status},\"body\":${response.body}}"
         }
+    }
+
+    @JavascriptInterface
+    fun startVoiceRecognition() {
+        val intent = Intent(context, VoiceCommandActivity::class.java)
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        context.startActivity(intent)
     }
 
     @JavascriptInterface

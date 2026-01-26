@@ -184,6 +184,21 @@
   <script src='https://cdn.jsdelivr.net/npm/@fullcalendar/google-calendar@6.1.13/index.global.min.js'></script>
 
   <script>
+    async function localApiRequest(method, url, body = null) {
+        console.log(`[localApiRequest] ${method} ${url}`, body);
+        if (!window.AndroidSync?.request) {
+            console.error("AndroidSync.request is not available");
+            throw new Error("AndroidSync bridge not found");
+        }
+        const rawResponse = await window.AndroidSync.request(method, url, body ? JSON.stringify(body) : null);
+        console.log(`[localApiRequest] Raw response for ${url}:`, rawResponse);
+        const response = JSON.parse(rawResponse);
+        if (response.status >= 400) {
+            throw new Error(`API Error: ${response.status} ${response.body?.error}`);
+        }
+        return response.body;
+    }
+
     document.addEventListener('DOMContentLoaded', () => {
         const gcpApiKey = '';
         if (!gcpApiKey) console.warn('GCP_API_KEYが設定されていません。祝日カレンダーは表示されません。');
@@ -195,15 +210,20 @@
         const calendar = new FullCalendar.Calendar(calendarEl, {
             initialView: 'dayGridMonth',
             headerToolbar: { left: 'prev,next today', center: 'title', right: 'dayGridMonth,timeGridWeek,timeGridDay' },
-            eventSources: [
-                {
-                    url: '/api/local_calendar/events',
-                    failure: () => alert('自分のイベント取得に失敗しました。'),
-                    eventDataTransform: data => ({
+            events: async function(fetchInfo, successCallback, failureCallback) {
+                try {
+                    const events = await localApiRequest('GET', '/api/tasks');
+                    const transformedEvents = events.map(data => ({
                         id: data.id, title: data.title, start: data.start_time, end: data.end_time,
                         description: data.description, classNames: ['fc-event-local']
-                    })
-                },
+                    }));
+                    successCallback(transformedEvents);
+                } catch (err) {
+                    console.error("Failed to fetch local calendar events:", err);
+                    failureCallback(err);
+                }
+            },
+            eventSources: [
                 gcpApiKey ? {
                     googleCalendarId: 'ja.japanese#holiday@group.v.calendar.google.com',
                     className: 'fc-event-holiday',
@@ -216,7 +236,7 @@
             allDayText: '終日',
             height: 'auto', // 高さをコンテンツに合わせる
             dateClick: (info) => {
-                openModal(info.dateStr);
+                openModal(null, info.dateStr);
             },
             eventClick: (info) => {
                 if (info.event.source.publicId === 'ja.japanese#holiday@group.v.calendar.google.com') return;
@@ -275,13 +295,7 @@
         const api = {
             async addEvent(title, startTime, endTime, description) {
                 try {
-                    const res = await fetch('/api/local_calendar/events', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ title, start_time: startTime, end_time: endTime, description }),
-                    });
-                    const data = await res.json();
-                    if (!res.ok) throw new Error(data.error || 'サーバーエラー');
+                    const data = await localApiRequest('POST', '/api/tasks', { title, start_time: startTime, end_time: endTime, description });
                     alert(`イベントを追加しました: 「${data.title}」`);
                     calendar.refetchEvents();
                     closeModal();
@@ -291,8 +305,7 @@
             },
             async deleteEvent(eventId) {
                 try {
-                    const res = await fetch(`/api/local_calendar/events/${eventId}`, { method: 'DELETE' });
-                    if (!res.ok) throw new Error((await res.json()).error || 'サーバーエラー');
+                    await localApiRequest('DELETE', `/api/tasks/${eventId}`);
                     alert(`イベント(ID: ${eventId})を削除しました。`);
                     calendar.refetchEvents();
                     closeModal(); // 削除後もモーダルを閉じる
@@ -302,13 +315,7 @@
             },
             async updateEvent(eventId, title, startTime, endTime, description) {
                 try {
-                    const res = await fetch(`/api/local_calendar/events/${eventId}`, {
-                        method: 'PUT',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ title, start_time: startTime, end_time: endTime, description }),
-                    });
-                    const data = await res.json();
-                    if (!res.ok) throw new Error(data.error || 'サーバーエラー');
+                    const data = await localApiRequest('PUT', `/api/tasks/${eventId}`, { title, start_time: startTime, end_time: endTime, description });
                     alert(`イベントを更新しました: 「${data.title}」`);
                     calendar.refetchEvents();
                     closeModal();

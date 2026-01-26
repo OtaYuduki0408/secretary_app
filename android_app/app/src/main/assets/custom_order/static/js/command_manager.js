@@ -4,6 +4,21 @@ import { createTriggerUI, saveAddressToDB } from './trigger_ui.js';
 import { createActionUI } from './action_ui.js'; // createActionUI も必要
 import { TRIGGER_CATEGORIES, TRIGGER_CATEGORIES_MAIN, ACTION_CATEGORIES } from './constants.js';
 
+async function localApiRequest(method, url, body = null) {
+    console.log(`[localApiRequest] ${method} ${url}`, body);
+    if (!window.AndroidSync?.request) {
+        console.error("AndroidSync.request is not available");
+        throw new Error("AndroidSync bridge not found");
+    }
+    const rawResponse = await window.AndroidSync.request(method, url, body ? JSON.stringify(body) : null);
+    console.log(`[localApiRequest] Raw response for ${url}:`, rawResponse);
+    const response = JSON.parse(rawResponse);
+    if (response.status >= 400) {
+        throw new Error(`API Error: ${response.status} ${response.body?.error}`);
+    }
+    return response.body;
+}
+
 export function parseActionArray(actionRoot) {
   if (!actionRoot) return [];
   const allActionItems = [...actionRoot.children].filter(child => child.classList.contains('item'));
@@ -293,7 +308,6 @@ export function loadCommandToForm(cmd){
       }
       if (step.action) {
         addAction(conditionBlocksContainer, step.action);
-        return;
       }
       if (step.type === 'if' || step.type === 'else' || step.expr) {
         addConditionBlockFromData(step, conditionBlocksContainer);
@@ -439,14 +453,8 @@ export async function registerCommand(){
   console.log("--- [DEBUG] Payload to be sent:", JSON.stringify(payload, null, 2));
 
   try {
-    const res = await fetch(id ? `/api/custom_orders/${id}` : "/api/custom_orders", {
-      method: id ? "PUT" : "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
-    });
+    const data = await localApiRequest(id ? "PUT" : "POST", id ? `/api/custom_orders/${id}` : "/api/custom_orders", payload);
 
-    console.log("--- [DEBUG] Fetch response status:", res.status);
-    const data = await res.json();
     console.log("--- [DEBUG] Fetch response data:", data);
 
     document.getElementById("message").innerText = data.message || "保存しました";
@@ -461,12 +469,7 @@ export async function registerCommand(){
 
 export async function fetchGenres() {
   try {
-    const response = await fetch('/api/categories');
-    if (!response.ok) {
-      console.error('Failed to fetch genres:', response.statusText);
-      return [];
-    }
-    const genres = await response.json();
+    const genres = await localApiRequest('GET', '/api/categories');
     return genres;
   } catch (error) {
     console.error('Error fetching genres:', error);
@@ -477,16 +480,7 @@ export async function fetchGenres() {
 export async function loadCommands() {
   console.log("--- [DEBUG] loadCommands called ---");
   try {
-    const res = await fetch("/api/custom_orders");
-    console.log("--- [DEBUG] loadCommands fetch response status:", res.status);
-    if (!res.ok) {
-      console.error("--- [ERROR] Fetch failed with status:", res.status);
-      const errorText = await res.text();
-      console.error("--- [ERROR] Fetch error response text:", errorText);
-      document.getElementById("command-list").innerHTML = `<p style="color:red;">一覧の読み込みに失敗しました。</p>`;
-      return;
-    }
-    const list = await res.json();
+    const list = await localApiRequest("GET", "/api/custom_orders");
     console.log("--- [DEBUG] loadCommands received list:", list);
 
     const container = document.getElementById("command-list");
@@ -509,9 +503,7 @@ export async function loadCommands() {
       delBtn.innerText = "削除";
       delBtn.onclick = async () => {
         if (confirm("削除しますか？")) {
-          await fetch(`/api/custom_orders/${cmd.id}`, {
-            method: "DELETE"
-          });
+          await localApiRequest("DELETE", `/api/custom_orders/${cmd.id}`);
           loadCommands();
         }
       };
@@ -539,13 +531,7 @@ export async function pollPendingActions() {
   }
 
   try {
-    const response = await fetch("/order/api/pending_actions/" + userId);
-    console.log("--- DEBUG: pollPendingActions fetch response status:", response.status); // 追加
-    if (!response.ok) {
-      console.error("Failed to poll pending actions: " + response.status + " " + response.statusText);
-      return;
-    }
-    const actions = await response.json();
+    const actions = await localApiRequest("GET", "/order/api/pending_actions/" + userId);
     console.log("--- DEBUG: pollPendingActions received actions:", actions); // 追加
     if (actions && actions.length > 0) {
       console.log("RECEIVED PENDING ACTIONS:", actions);

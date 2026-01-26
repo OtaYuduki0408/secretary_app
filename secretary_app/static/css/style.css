@@ -243,11 +243,11 @@ html.theme-light .search .icon{ filter: invert(1) brightness(.15); }
 .calendar-btn .badge{ position:absolute; top:-8px; right:-8px; background: linear-gradient(180deg, #78a8ff, #4b86ff); color:#fff; font-weight:600; font-size:12px; padding:4px 8px; border-radius:999px; box-shadow: 0 6px 16px rgba(75,134,255,.35); }
 
 .fab-group{ position: fixed; right: clamp(20px, 3vw, 40px); bottom: clamp(20px, 3vw, 40px); display: grid; gap: 14px; z-index: 6; }
-.fab{ width:72px; height:72px; border-radius:20px; display:grid; place-items:center; appearance:none; border:0; outline:none; cursor:pointer; box-shadow: 0 10px 24px rgba(0,0,0,.55), var(--inset); border:1px solid rgba(255,255,255,.12); transition: transform .15s ease, box-shadow .2s ease, filter .2s ease; }
+.fab{ width:72px; height:72px; border-radius:20px; display:grid; place-items:center; appearance:none; border:0; outline:none; cursor:pointer; box-shadow: 0 10px 24px rgba(0,0,0,.55), var(--inset); border:1px solid rgba(255,255,255,.12); transition: transform .15s ease, box-shadow .2s ease, filter .2s ease; background: linear-gradient(180deg, #222a33, #151b21); color: var(--text); }
 .fab:hover{ transform: translateY(-2px); box-shadow: 0 18px 34px rgba(0,0,0,.65), var(--inset); }
 .fab:active{ transform: translateY(0) scale(.98); }
-.finance-btn{ background: linear-gradient(180deg, #22313c, #151b21); color: var(--text); }
-.calendar-btn.fab{ background: linear-gradient(180deg, #222a33, #151b21); }
+.finance-btn{ /* background: linear-gradient(180deg, #22313c, #151b21); color: var(--text); */ }
+.calendar-btn.fab{ /* background: linear-gradient(180deg, #222a33, #151b21); */ }
 .fab-group .calendar-btn{ position: static; right:auto; bottom:auto; z-index:auto; }
 
 html.theme-light .fab{
