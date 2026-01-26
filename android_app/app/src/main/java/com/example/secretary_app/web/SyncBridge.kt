@@ -2,6 +2,7 @@ package com.example.secretary_app.web
 
 import android.content.Context
 import android.webkit.JavascriptInterface
+import com.example.secretary_app.MainActivity
 import com.example.secretary_app.data.sync.SyncConflictPolicy
 import com.example.secretary_app.data.sync.SyncManager
 import com.example.secretary_app.data.sync.SyncScheduler
@@ -18,7 +19,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.json.JSONObject
 
-class SyncBridge(private val context: Context) {
+class SyncBridge(private val context: Context, private val mainActivity: MainActivity) {
     private val scope = CoroutineScope(Dispatchers.IO)
     private val settingsRepo = SyncSettingsRepository(context)
     private val authRepository = AuthRepository(context)
@@ -77,7 +78,8 @@ class SyncBridge(private val context: Context) {
         return runBlocking {
             val dao = AppDatabase.get(context).syncRecordDao()
             val store = LocalStore(dao)
-            val userId = authRepository.getCachedUserId() ?: "local"
+            val session = authRepository.ensureSession()
+            val userId = session?.userId ?: "local"
             val router = LocalApiRouter(store)
             val response = router.handle(method, url, body, userId)
             val isWrite = method.uppercase() != "GET"
@@ -89,5 +91,10 @@ class SyncBridge(private val context: Context) {
             }
             "{\"status\":${response.status},\"body\":${response.body}}"
         }
+    }
+
+    @JavascriptInterface
+    fun clearCacheAndReload() {
+        mainActivity.clearCacheAndReload()
     }
 }

@@ -64,7 +64,7 @@ class MainActivity : ComponentActivity() {
                         it.settings.allowUniversalAccessFromFileURLs = true
                         it.setBackgroundColor(Color.parseColor("#0b1116"))
                         it.overScrollMode = android.view.View.OVER_SCROLL_NEVER
-                        it.addJavascriptInterface(SyncBridge(this@MainActivity), "AndroidSync")
+                        it.addJavascriptInterface(SyncBridge(this@MainActivity, this@MainActivity), "AndroidSync")
                     }
                 )
             }
@@ -85,6 +85,13 @@ class MainActivity : ComponentActivity() {
                     }
                 }
             }
+        }
+    }
+
+    fun clearCacheAndReload() {
+        runOnUiThread {
+            webViewRef?.clearCache(true)
+            webViewRef?.reload()
         }
     }
 }

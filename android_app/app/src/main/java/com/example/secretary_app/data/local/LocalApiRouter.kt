@@ -1,6 +1,7 @@
 package com.example.secretary_app.data.local
 
 import android.net.Uri
+import android.util.Log
 import com.example.secretary_app.data.supabase.HttpClientProvider
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -18,7 +19,12 @@ data class ApiResponse(val status: Int, val body: JsonElement)
 class LocalApiRouter(private val store: LocalStore) {
     private val json = HttpClientProvider.json
 
+    companion object {
+        private const val TAG = "LocalApiRouter"
+    }
+
     suspend fun handle(method: String, url: String, body: String?, userId: String?): ApiResponse {
+        Log.d(TAG, "handle: method=$method, url=$url, userId=$userId")
         val uri = Uri.parse("http://local$url")
         val path = uri.path ?: "/"
         val segments = uri.pathSegments
@@ -40,14 +46,19 @@ class LocalApiRouter(private val store: LocalStore) {
             path.startsWith("/web_api/chat") -> ApiResponse(200, json.parseToJsonElement("{\"reply\":\"オフラインのため応答できません\",\"fallback_to_voicemate\":false}"))
             path.startsWith("/web_api/abort") -> ApiResponse(200, json.parseToJsonElement("{\"ok\":true}"))
             path.startsWith("/web_api/transform_tone") -> ApiResponse(200, json.parseToJsonElement("{\"text\":\"\"}"))
-            else -> ApiResponse(404, json.parseToJsonElement("{\"error\":\"not_supported\"}"))
+            else -> {
+                Log.w(TAG, "No handler for path: $path")
+                ApiResponse(404, json.parseToJsonElement("{\"error\":\"not_supported\"}"))
+            }
         }
     }
 
     private suspend fun handleCategories(method: String, segments: List<String>, body: String?, userId: String?): ApiResponse {
+        Log.d(TAG, "handleCategories: method=$method, userId=$userId")
         return when {
             method == "GET" -> {
                 val list = store.list("categories", userId)
+                Log.d(TAG, "handleCategories GET: found ${list.size} records")
                 ApiResponse(200, json.parseToJsonElement(json.encodeToString(ListSerializer, list)))
             }
             method == "POST" -> {
@@ -71,9 +82,11 @@ class LocalApiRouter(private val store: LocalStore) {
     }
 
     private suspend fun handleFinance(method: String, segments: List<String>, body: String?, userId: String?): ApiResponse {
+        Log.d(TAG, "handleFinance: method=$method, userId=$userId")
         return when {
             method == "GET" -> {
                 val list = store.list("finance", userId)
+                Log.d(TAG, "handleFinance GET: found ${list.size} records")
                 ApiResponse(200, json.parseToJsonElement(json.encodeToString(ListSerializer, list)))
             }
             method == "POST" -> {
@@ -90,12 +103,14 @@ class LocalApiRouter(private val store: LocalStore) {
     private suspend fun handleFinanceBulkDelete(body: String?, userId: String?): ApiResponse {
         val obj = json.parseToJsonElement(body ?: "{}").jsonObject
         val ids = obj["ids"]?.jsonArray?.mapNotNull { it.asStringOrNull() } ?: emptyList()
+        Log.d(TAG, "handleFinanceBulkDelete: deleting ${ids.size} items")
         ids.forEach { store.delete("finance", it) }
         return ApiResponse(200, json.parseToJsonElement("{\"ok\":true}"))
     }
 
     private suspend fun handleFinanceSummary(userId: String?): ApiResponse {
         val records = store.list("finance", userId)
+        Log.d(TAG, "handleFinanceSummary: calculating for ${records.size} records")
         var balance = 0.0
         var monthly = 0.0
         var daily = 0.0
@@ -122,6 +137,7 @@ class LocalApiRouter(private val store: LocalStore) {
     }
 
     private suspend fun handleFinanceGoal(method: String, body: String?, userId: String?): ApiResponse {
+        Log.d(TAG, "handleFinanceGoal: method=$method, userId=$userId")
         return when (method) {
             "GET" -> {
                 val list = store.list("finance_goals", userId)
@@ -140,6 +156,7 @@ class LocalApiRouter(private val store: LocalStore) {
     }
 
     private suspend fun handleMemos(method: String, segments: List<String>, uri: Uri, body: String?, userId: String?): ApiResponse {
+        Log.d(TAG, "handleMemos: method=$method, userId=$userId")
         return when {
             method == "GET" -> {
                 val q = uri.getQueryParameter("q")?.lowercase() ?: ""
@@ -160,6 +177,7 @@ class LocalApiRouter(private val store: LocalStore) {
                     val okEnd = end.isBlank() || createdAt <= end
                     okText && okStart && okEnd
                 }
+                Log.d(TAG, "handleMemos GET: found ${list.size} records")
                 ApiResponse(200, json.parseToJsonElement(json.encodeToString(ListSerializer, list)))
             }
             method == "POST" -> {
@@ -192,9 +210,11 @@ class LocalApiRouter(private val store: LocalStore) {
     }
 
     private suspend fun handleTasks(method: String, segments: List<String>, body: String?, userId: String?): ApiResponse {
+        Log.d(TAG, "handleTasks: method=$method, userId=$userId")
         return when {
             method == "GET" -> {
                 val list = store.list("tasks", userId)
+                Log.d(TAG, "handleTasks GET: found ${list.size} records")
                 ApiResponse(200, json.parseToJsonElement(json.encodeToString(ListSerializer, list)))
             }
             method == "POST" -> {
@@ -221,6 +241,7 @@ class LocalApiRouter(private val store: LocalStore) {
     }
 
     private suspend fun handleUserSettings(method: String, body: String?, userId: String?): ApiResponse {
+        Log.d(TAG, "handleUserSettings: method=$method, userId=$userId")
         return when (method) {
             "GET" -> {
                 val settingsList = store.list("user_settings", userId)
@@ -245,6 +266,7 @@ class LocalApiRouter(private val store: LocalStore) {
     }
 
     private suspend fun handleCustomOrders(method: String, segments: List<String>, body: String?, userId: String?): ApiResponse {
+        Log.d(TAG, "handleCustomOrders: method=$method, userId=$userId")
         return when {
             method == "GET" -> {
                 val list = store.list("custom_orders", userId)
@@ -274,6 +296,7 @@ class LocalApiRouter(private val store: LocalStore) {
     }
 
     private suspend fun handlePastAddresses(method: String, body: String?, userId: String?): ApiResponse {
+        Log.d(TAG, "handlePastAddresses: method=$method, userId=$userId")
         return when (method) {
             "GET" -> {
                 val list = store.list("past_addresses", userId)
@@ -291,6 +314,7 @@ class LocalApiRouter(private val store: LocalStore) {
     }
 
     private suspend fun handlePendingActions(segments: List<String>, userId: String?): ApiResponse {
+        Log.d(TAG, "handlePendingActions: userId=$userId")
         val list = store.list("pending_user_actions", userId)
         return ApiResponse(200, json.parseToJsonElement(json.encodeToString(ListSerializer, list)))
     }

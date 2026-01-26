@@ -42,35 +42,60 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   // --- API Functions ---
+  async function localApiRequest(method, url, body = null) {
+    console.log(`[localApiRequest] ${method} ${url}`, body);
+    if (!window.AndroidSync?.request) {
+      console.error("AndroidSync.request is not available");
+      throw new Error("AndroidSync bridge not found");
+    }
+    const rawResponse = await window.AndroidSync.request(method, url, body ? JSON.stringify(body) : null);
+    console.log(`[localApiRequest] Raw response for ${url}:`, rawResponse);
+    const response = JSON.parse(rawResponse);
+    if (response.status >= 400) {
+      throw new Error(`API Error: ${response.status} ${response.body?.error}`);
+    }
+    return response.body;
+  }
+
+
   async function fetchCategories() {
     try {
-      const res = await fetch("/api/categories");
-      return await res.json();
+      console.log("Fetching categories from /api/categories");
+      const data = await localApiRequest("GET", "/api/categories");
+      console.log("Categories fetched:", data);
+      return data;
     } catch (err) {
       showToast("カテゴリの読み込みに失敗しました。", true);
+      console.error("Failed to fetch categories:", err);
       return [];
     }
   }
 
   async function fetchSummary() {
     try {
-      const res = await fetch("/api/finance/summary");
-      if (!res.ok) throw new Error("failed to fetch summary");
-      const data = await res.json();
+      console.log("Fetching summary from /api/finance/summary");
+      const data = await localApiRequest("GET", "/api/finance/summary");
+      console.log("Summary fetched:", data);
       balanceEl.textContent = formatYen(data.balance);
       monthlyEl.textContent = formatYen(data.monthly_expense);
       dailyEl.textContent = formatYen(data.daily_expense);
     } catch (err) {
       console.warn("[expense] summary fetch failed", err);
+      balanceEl.textContent = "エラー";
+      monthlyEl.textContent = "エラー";
+      dailyEl.textContent = "エラー";
     }
   }
 
   async function fetchRecords() {
     try {
-      const res = await fetch("/api/finance");
-      return await res.json();
+      console.log("Fetching records from /api/finance");
+      const data = await localApiRequest("GET", "/api/finance");
+      console.log("Records fetched:", data);
+      return data;
     } catch (err) {
       showToast("記録の読み込みに失敗しました。", true);
+      console.error("Failed to fetch records:", err);
       return [];
     }
   }
@@ -158,22 +183,16 @@ document.addEventListener("DOMContentLoaded", () => {
       memo,
     };
 
-    const res = await fetch("/api/finance", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-
-    const data = await res.json();
-    if (data.error) {
-      showToast(data.error, true);
-    } else {
+    try {
+      const data = await localApiRequest("POST", "/api/finance", payload);
       showToast("登録しました！");
       amountEl.value = "";
       memoEl.value = "";
       state.category = null;
       renderCategoryButtons();
       loadData();
+    } catch(err) {
+        showToast(err.message, true);
     }
   }
 
@@ -198,19 +217,13 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
-    const res = await fetch("/api/finance/bulk-delete", {
-      method: "DELETE",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ids: selectedIds }),
-    });
-
-    const data = await res.json();
-    if (data.error) {
-      showToast(data.error, true);
-    } else {
+    try {
+      await localApiRequest("DELETE", "/api/finance/bulk-delete", { ids: selectedIds });
       showToast(`${selectedIds.length}件の記録を削除しました。`);
       toggleDeleteMode(); // Exit delete mode
       loadData();
+    } catch(err) {
+        showToast(err.message, true);
     }
   }
 
@@ -222,6 +235,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // --- Initial Load ---
   async function loadData() {
+    balanceEl.textContent = "読み込み中...";
+    monthlyEl.textContent = "読み込み中...";
+    dailyEl.textContent = "読み込み中...";
+    recordsTbody.innerHTML = '<tr><td colspan="6" style="text-align:center;">読み込み中...</td></tr>';
+
     const [categories, records] = await Promise.all([fetchCategories(), fetchRecords()]);
     state.allCategories = categories;
     renderCategoryButtons();
@@ -238,4 +256,3 @@ document.addEventListener("DOMContentLoaded", () => {
 
   loadData();
 });
-
