@@ -41,11 +41,12 @@ class SyncBridge(private val context: Context) {
     }
 
     @JavascriptInterface
-    fun runSync(policy: String?) {
+    fun runSync(policy: String?): String {
         val parsed = runCatching { SyncConflictPolicy.valueOf(policy ?: "") }
             .getOrDefault(SyncConflictPolicy.LOCAL_WINS)
-        scope.launch {
-            SyncManager(context).syncAll(parsed)
+        return runBlocking {
+            val result = SyncManager(context).syncAll(parsed)
+            "{\"success\":${result.success},\"message\":\"${result.message}\"}"
         }
     }
 

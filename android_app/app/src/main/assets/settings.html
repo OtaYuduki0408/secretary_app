@@ -143,10 +143,31 @@
       font-size: 0.85rem;
       color: #94a3b8;
     }
+    .btn-primary {
+        border: none;
+        border-radius: 18px;
+        padding: 8px 16px;
+        font-size: 1rem;
+        font-weight: 700;
+        color: #0f172a;
+        background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+        cursor: pointer;
+        transition: .2s;
+    }
+    .btn-primary:hover {
+        filter: brightness(1.05);
+        box-shadow: 0 10px 25px rgba(14, 165, 233, .35);
+    }
+    .btn-primary:disabled {
+        background: #555;
+        cursor: not-allowed;
+        filter: none;
+        box-shadow: none;
+    }
   </style>
 </head>
 <body>
-  <script src=\"static/js/android_bridge.js\"></script>
+  <script src="static/js/android_bridge.js"></script>
   <main class="settings-shell">
     <section class="settings-card">
       <div class="settings-actions">
@@ -180,7 +201,7 @@
           <option value="LOCAL_WINS">スマホ優先</option>
           <option value="SERVER_WINS">サーバー優先</option>
         </select>
-        <button id="sync-now-btn" type="button" class="btn ghost">今すぐ同期</button>
+        <button id="sync-now-btn" type="button" class="btn-primary">今すぐ同期</button>
       </div>
     </div>
     <div class="hint" id="sync-status">未同期</div>
@@ -365,9 +386,38 @@
         bridge.setIntervalHours?.(parseInt(e.target.value || '0', 10));
       });
       syncBtn?.addEventListener('click', () => {
+        if (syncBtn.disabled) return;
+
         const policy = manualEl?.value || 'LOCAL_WINS';
-        bridge.runSync?.(policy);
-        if (statusEl) statusEl.textContent = "同期が完了しました";
+        
+        syncBtn.disabled = true;
+        statusEl.textContent = '同期中';
+        let dotCount = 0;
+        const intervalId = setInterval(() => {
+            dotCount = (dotCount + 1) % 4;
+            statusEl.textContent = '同期中' + '.'.repeat(dotCount);
+        }, 500);
+
+        setTimeout(() => {
+            try {
+                const result = bridge.runSync?.(policy);
+                const res = JSON.parse(result || '{}');
+                
+                clearInterval(intervalId);
+                syncBtn.disabled = false;
+
+                if (res.success) {
+                    statusEl.textContent = "同期が完了しました。ページを再読み込みします。";
+                    setTimeout(() => location.reload(), 1000);
+                } else {
+                    statusEl.textContent = "同期に失敗しました: " + (res.message || "不明なエラー");
+                }
+            } catch (e) {
+                clearInterval(intervalId);
+                syncBtn.disabled = false;
+                statusEl.textContent = "同期処理の呼び出しに失敗しました: " + e.message;
+            }
+        }, 10); // Allow UI to update before blocking
       });
     })();
   </script>

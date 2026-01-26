@@ -223,9 +223,15 @@ class LocalApiRouter(private val store: LocalStore) {
     private suspend fun handleUserSettings(method: String, body: String?, userId: String?): ApiResponse {
         return when (method) {
             "GET" -> {
-                val list = store.list("user_settings", userId)
-                val current = list.firstOrNull()
-                ApiResponse(200, current ?: json.parseToJsonElement("{}"))
+                val settingsList = store.list("user_settings", userId)
+                val userList = store.list("users", userId)
+                val currentSettings = settingsList.firstOrNull()?.let { json.parseToJsonElement(it["dataJson"].asStringOrNull() ?: "{}") } ?: buildJsonObject {}
+                val currentUser = userList.firstOrNull()?.let { json.parseToJsonElement(it["dataJson"].asStringOrNull() ?: "{}") } ?: buildJsonObject {}
+                val merged = buildJsonObject {
+                    currentSettings.jsonObject.forEach { (k, v) -> put(k, v) }
+                    currentUser.jsonObject.forEach { (k, v) -> put(k, v) }
+                }
+                ApiResponse(200, merged)
             }
             "POST" -> {
                 val obj = json.parseToJsonElement(body ?: "{}").jsonObject

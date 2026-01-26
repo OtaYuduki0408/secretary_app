@@ -820,7 +820,7 @@
         if (window.AndroidSync?.get) {
             const raw = await window.AndroidSync.get("/api/user_settings");
             const settings = JSON.parse(raw || '{}');
-            const userName = settings.user_name || userId.split('@')[0];
+            const userName = settings.name || userId.split('@')[0];
             userNameEl.textContent = userName;
         } else {
             const userName = userId.split('@')[0];
