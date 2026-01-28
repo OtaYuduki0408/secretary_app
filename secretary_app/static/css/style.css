@@ -587,3 +587,34 @@ html.theme-light{ --crack-color: rgba(0,0,0,.55); }
 #read-aloud-overlay.overlay-speech .overlay-content {
     border-left-color: #8b5cf6;
 }
+
+/* FAB Tooltip */
+.fab[title] {
+    position: relative;
+}
+
+.fab[title]::after {
+    content: attr(title);
+    position: absolute;
+    bottom: 120%; /* ボタンの上に表示 */
+    left: 50%;
+    transform: translateX(-50%);
+    white-space: nowrap;
+    background-color: #0f172a; /* ダークな背景 */
+    color: #e2e8f0; /* 明るいテキスト */
+    padding: 6px 12px;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    z-index: 10;
+    opacity: 0;
+    pointer-events: none; /* ツールチップ自体がホバーイベントを妨げないように */
+    transition: opacity 0.2s 0.1s ease-out, transform 0.2s 0.1s ease-out;
+}
+
+.fab[title]:hover::after {
+    opacity: 1;
+    transform: translateX(-50%) translateY(-4px); /* 少し上に動かす */
+}
