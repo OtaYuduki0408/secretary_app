@@ -1,3 +1,4 @@
+#最新の情報を読み込めているかテスト 番号は22132
 # -*- coding: utf-8 -*-
 import os
 import sys
@@ -1198,8 +1199,17 @@ if __name__ == '__main__':
             replace_existing=True,
             args=[evaluate_triggers] # 引数はevaluate_triggers関数オブジェクトのみ
         )
+
         app.logger.debug("DEBUG: APScheduler job registered: time_trigger_evaluator")
         # SwitchBotの毎秒ジョブは一旦停止（調査のため）
+        scheduler.add_job(
+            id='switchbot_trigger_evaluator',
+            func=_run_job_with_app_context,
+            trigger='interval',
+            seconds=1,
+            replace_existing=True,
+            args=[evaluate_switchbot_triggers]
+        )
         scheduler.start()
         
     socketio.run(app, host='0.0.0.0', port=5000, debug=True, ssl_context='adhoc', use_reloader=False)

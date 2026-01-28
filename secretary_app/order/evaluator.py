@@ -402,9 +402,7 @@ def _evaluate_switchbot_motion_edge(trigger_value, app_logger=None, order_data=N
     brightness = _extract_brightness(body)
 
     state_message = f"[SWITCHBOT_TRIGGER] status device_id={device_id} detected={detected} brightness={brightness} raw={body}"
-    print(state_message)
-    if app_logger:
-        app_logger.debug(state_message)
+    # 以前のログ出力: print(state_message) と app_logger.debug(state_message) は削除されました。
     if detected is None:
         if app_logger:
             app_logger.debug(f"[SWITCHBOT_TRIGGER] motion detect field not found: {body}")
