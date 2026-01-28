@@ -54,6 +54,11 @@ from order.evaluator import evaluate_triggers, evaluate_switchbot_triggers # 関
 
 
 
+import logging
+
+# APSchedulerの警告ログを抑制
+logging.getLogger('apscheduler').setLevel(logging.ERROR)
+
 # ============== 基本設定 ==============
 app = Flask(__name__, template_folder='templates', static_folder='static')
 socketio = SocketIO(app, async_mode='threading', cors_allowed_origins="*")
