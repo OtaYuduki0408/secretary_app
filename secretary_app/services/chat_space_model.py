@@ -4,6 +4,7 @@ import json
 from datetime import datetime, timedelta
 import pytz
 import functools
+from decimal import Decimal, ROUND_HALF_UP, InvalidOperation
 JST = pytz.timezone('Asia/Tokyo')
 import google.generativeai as genai
 
@@ -316,7 +317,25 @@ class ChatSpaceModel:
             value = eval(expr, {"__builtins__": {}}, {})
         except Exception:
             return None
-        return f"答えは{value}です。計算式は{expr}です。"
+        formatted = self._format_calc_value(value)
+        return f"答えは{formatted}です。計算式は{expr}です。"
+
+    def _format_calc_value(self, value) -> str:
+        try:
+            dec = Decimal(str(value))
+        except (InvalidOperation, ValueError):
+            return str(value)
+        sign = "-" if dec < 0 else ""
+        abs_dec = abs(dec)
+        int_part = int(abs_dec)
+        int_digits = len(str(int_part))
+        if int_digits >= 5:
+            frac_digits = 2
+        else:
+            frac_digits = max(2, 5 - int_digits)
+        quant = Decimal(1).scaleb(-frac_digits)
+        rounded = abs_dec.quantize(quant, rounding=ROUND_HALF_UP)
+        return f"{sign}{rounded:,.{frac_digits}f}"
 
     def _calculate_expression(self, text: str) -> str:
         prompt = self.CALC_PROMPT_TEMPLATE.format(input_value=text)
@@ -330,7 +349,8 @@ class ChatSpaceModel:
             value = eval(expr, {"__builtins__": {}}, {})
         except Exception:
             return "計算に失敗しました。"
-        return f"答えは{value}です。計算式は{expr}です。"
+        formatted = self._format_calc_value(value)
+        return f"答えは{formatted}です。計算式は{expr}です。"
 
     def _format_event_time(self, iso_time: str) -> str:
         if not iso_time: return ""
