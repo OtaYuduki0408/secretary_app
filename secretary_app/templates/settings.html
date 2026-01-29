@@ -1,9 +1,9 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="ja">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Voice Secretary — 設定</title>
+  <title>Voice Secretary - 設定</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
   <style>
     body {
@@ -126,7 +126,7 @@
   <main class="settings-shell">
     <section class="settings-card">
       <div class="settings-actions">
-        <a href="{{ url_for('main') }}">メインへ戻る</a>
+        <a href="{{ url_for('main') }}">メインに戻る</a>
       </div>
       <div class="settings-title">設定</div>
 
@@ -135,33 +135,26 @@
         <div class="details-body">
           <div class="field">
             <label for="font-family">字体</label>
-            <select id="font-family">
-              <option value="">システム標準</option>
-              <option value="\"Yu Gothic\", \"Meiryo\", sans-serif">游ゴシック</option>
-              <option value="\"Noto Sans JP\", sans-serif">Noto Sans JP</option>
-              <option value="\"M PLUS 1\", sans-serif">M PLUS 1</option>
-              <option value="\"Sawarabi Gothic\", sans-serif">Sawarabi Gothic</option>
-              <option value="serif">Serif</option>
-              <option value="monospace">Monospace</option>
-            </select>
+            <input id="font-family" type="text" placeholder="(例: 'Noto Sans JP', 'Yu Gothic')">
           </div>
           <div class="field">
             <label for="color-template">カラーテンプレート</label>
             <select id="color-template">
-              <option value="">テンプレートを選択</option>
-              <option value="midnight">Midnight Blue</option>
-              <option value="sunset">Sunset Orange</option>
-              <option value="forest">Forest Green</option>
-              <option value="mono">Mono Slate</option>
-              <option value="neon">Neon Cyan</option>
+              <option value="">選択しない</option>
+              <option value="midnight">ミッドナイトテーマ</option>
+              <option value="sunset">夕焼けオレンジテーマ</option>
+              <option value="forest">深い緑テーマ</option>
+              <option value="mono">モノクロテーマ</option>
+              <option value="neon">ネオンブルーテーマ</option>
             </select>
+            <div class="hint">テンプレートを選ぶと各色が一括で反映されます。</div>
           </div>
           <div class="field">
-            <label for="accent-color">標準アクセント色</label>
+            <label for="accent-color">アクセント色</label>
             <input id="accent-color" type="color" value="#7aa8ff">
           </div>
           <div class="field">
-            <label for="muted-color">標準のグレー色</label>
+            <label for="muted-color">標準グレー色</label>
             <input id="muted-color" type="color" value="#cdd6df">
           </div>
         </div>
@@ -171,13 +164,13 @@
         <summary>メイン画面の設定</summary>
         <div class="details-body">
           <div class="field">
-            <label for="main-bg-color">背景色</label>
-            <input id="main-bg-color" type="color" value="#0b1f38">
+            <label for="wake-word">呼びかけワード</label>
+            <input id="wake-word" type="text" placeholder="(例: サイレントメイト君)" />
+            <div class="hint">複数入力する場合はカンマ区切りで入力してください。</div>
           </div>
           <div class="field">
-            <label for="wake-word">呼びかけワード</label>
-            <input id="wake-word" type="text" placeholder="(例:サイレントメイト)">
-            <div class="hint">複数指定する場合は「,」区切りで入力してください。</div>
+            <label for="main-bg-color">背景色(ストライプの裏)</label>
+            <input id="main-bg-color" type="color" value="#0b1f38">
           </div>
           <div class="field">
             <label for="stripe-color">ストライプの色</label>
@@ -186,26 +179,26 @@
           <div class="field">
             <label for="main-button-color">ボタンの色</label>
             <input id="main-button-color" type="color" value="#7aa8ff">
+          </div>
           <div class="field">
-            <label for="mic-color">?????????</label>
+            <label for="mic-color">音声認識ボタンの色</label>
             <input id="mic-color" type="color" value="#2a3440">
           </div>
           <div class="field">
-            <label for="user-badge-bg-color">??????????</label>
+            <label for="user-badge-bg-color">ログイン表示の背景色</label>
             <input id="user-badge-bg-color" type="color" value="#f1f5f9">
           </div>
           <div class="field">
-            <label for="log-bg-color">????????</label>
+            <label for="log-bg-color">ログ表示の背景色</label>
             <input id="log-bg-color" type="color" value="#ffffff">
           </div>
           <div class="field">
-            <label for="fab-color">???????????</label>
+            <label for="fab-color">各機能ボタンのテーマ色</label>
             <input id="fab-color" type="color" value="#7aa8ff">
           </div>
           <div class="field">
-            <label for="main-text-color">???</label>
+            <label for="main-text-color">文字色</label>
             <input id="main-text-color" type="color" value="#0f1720">
-          </div>
           </div>
         </div>
       </details>
@@ -222,22 +215,22 @@
           </div>
           <div class="field">
             <label for="input-confirm-template">入力確認テンプレート</label>
-            <input id="input-confirm-template" type="text" value="でございますね。かしこまりました。">
-            <div class="hint">入力文の後ろに追加されます。</div>
+            <input id="input-confirm-template" type="text" value="だね、ちょっと待ってね！">
+            <div class="hint">入力確認時の読み上げに使用されます。</div>
           </div>
           <div class="field">
-            <label for="tone-response">口調の設定（返答）</label>
-            <input id="tone-response" type="text" placeholder="(例:関西弁、英語等)">
+            <label for="tone-response">口調の設定(返答)</label>
+            <input id="tone-response" type="text" placeholder="(例: 関西弁、英語等)">
           </div>
           <div class="field">
-            <label for="tone-error">口調の設定（エラーメッセージ）</label>
-            <input id="tone-error" type="text" placeholder="(例:関西弁、英語等)">
+            <label for="tone-error">口調の設定(エラーメッセージ)</label>
+            <input id="tone-error" type="text" placeholder="(例: 関西弁、英語等)">
             <div class="hint">空欄の場合は標準の口調で返答します。</div>
           </div>
           <div class="field">
             <label for="voice-select">喋っている声</label>
             <select id="voice-select">
-              <option value="">自動（既定）</option>
+              <option value="">既定を使用</option>
             </select>
             <div class="hint">利用可能な音声が無い場合は既定を使用します。</div>
           </div>
@@ -264,7 +257,7 @@
           </div>
           <div class="field">
             <label for="voice-test-text">テストテキスト</label>
-            <input id="voice-test-text" type="text" value="この声でよろしいでしょうか？">
+            <input id="voice-test-text" type="text" value="僕はサイレントメイト君だよ">
           </div>
           <div class="field">
             <button id="voice-test-button" type="button">テスト再生</button>
@@ -289,7 +282,7 @@
           <div class="field">
             <label for="character-color">色</label>
             <input id="character-color" type="color" value="#B1D656">
-            <div class="hint">初期色: RGB(177, 214, 86)</div>
+            <div class="hint">既定色: RGB(177, 214, 86)</div>
           </div>
         </div>
       </details>

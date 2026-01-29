@@ -192,8 +192,10 @@
     }
     if (main.textColor) {
       root.style.setProperty('--main-text-color', main.textColor);
+      root.style.setProperty('--text', main.textColor);
     } else {
       root.style.removeProperty('--main-text-color');
+      root.style.removeProperty('--text');
     }
 
     // キャラクター設定

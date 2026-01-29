@@ -1,15 +1,15 @@
-(() => {
+﻿(() => {
   const defaultSettings = {
     general: {
       fontFamily: '',
     },
     main: {
       backgroundColor: '#0b1f38',
-      voiceName: '',
+      voiceName: 'Google 日本語 (ja-JP)',
       toneResponse: '友達ロボット風',
       toneError: '',
-      voiceRate: 1.4,
-      voicePitch: 1.2,
+      voiceRate: 1.2,
+      voicePitch: 1.1,
       voiceVolume: 1,
       voiceTestText: '僕はサイレントメイト君だよ',
       stripeColor: '#7aa8ff',
@@ -118,7 +118,7 @@
     if (!synth) return;
 
     const voices = synth.getVoices();
-    elements.voiceSelect.innerHTML = '<option value="">自動（既定）</option>';
+    elements.voiceSelect.innerHTML = '<option value="">既定を使用</option>';
     voices.forEach((voice) => {
       const option = document.createElement('option');
       option.value = voice.name;
@@ -130,13 +130,15 @@
     }
   };
 
-  const previewVoice = (voiceName, textOverride) => {
+  const previewVoice = (settings, voiceName, textOverride) => {
     const synth = window.speechSynthesis;
     if (!synth) return;
     if (synth.speaking) {
       synth.cancel();
     }
-    const utterance = new SpeechSynthesisUtterance(textOverride || 'この声でよろしいですか？');
+    const utterance = new SpeechSynthesisUtterance(
+      textOverride || 'この声でよろしいでしょうか？'
+    );
     if (voiceName) {
       const voices = synth.getVoices();
       const selectedVoice = voices.find((voice) => voice.name === voiceName);
@@ -173,7 +175,7 @@
   if (elements.accentColor) elements.accentColor.value = settings.theme.accentColor;
   if (elements.mutedColor) elements.mutedColor.value = settings.theme.mutedColor;
   if (elements.mainBgColor) elements.mainBgColor.value = settings.main.backgroundColor;
-  if (elements.wakeWord) elements.wakeWord.value = settings.main.wakeWords || 'サイレントメイト,サイレントメイト君,さいれんとめいと,silentmate,ボイスメイト';
+  if (elements.wakeWord) elements.wakeWord.value = settings.main.wakeWords || '';
   if (elements.stripeColor) elements.stripeColor.value = settings.main.stripeColor || '#7aa8ff';
   if (elements.mainButtonColor) elements.mainButtonColor.value = settings.main.buttonColor || '#7aa8ff';
   if (elements.micColor) elements.micColor.value = settings.main.micColor || '#2a3440';
@@ -182,18 +184,23 @@
   if (elements.fabColor) elements.fabColor.value = settings.main.fabColor || '#7aa8ff';
   if (elements.mainTextColor) elements.mainTextColor.value = settings.main.textColor || '#0f1720';
   if (elements.inputConfirmEnabled) elements.inputConfirmEnabled.checked = settings.main.inputConfirmEnabled !== false;
-  if (elements.inputConfirmTemplate) elements.inputConfirmTemplate.value = settings.main.inputConfirmTemplate || 'だね、ちょっと待ってね！';
-  if (elements.toneResponse) elements.toneResponse.value = settings.main.toneResponse || '友達ロボット風';
+  if (elements.inputConfirmTemplate) {
+    elements.inputConfirmTemplate.value = settings.main.inputConfirmTemplate || 'だね、ちょっと待ってね！';
+  }
+  if (elements.toneResponse) elements.toneResponse.value = settings.main.toneResponse || '';
   if (elements.toneError) elements.toneError.value = settings.main.toneError || '';
-  if (elements.voiceSelect) elements.voiceSelect.value = settings.main.voiceName || 'Google 日本語 (ja-JP)';
+  if (elements.voiceSelect) elements.voiceSelect.value = settings.main.voiceName || '';
   if (elements.voiceRate) elements.voiceRate.value = settings.main.voiceRate ?? 1.2;
   if (elements.voicePitch) elements.voicePitch.value = settings.main.voicePitch ?? 1.1;
   if (elements.voiceVolume) elements.voiceVolume.value = settings.main.voiceVolume ?? 1;
-  if (elements.voiceTestText) elements.voiceTestText.value = settings.main.voiceTestText || '僕はサイレントメイト君だよ';
+  if (elements.voiceTestText) {
+    elements.voiceTestText.value = settings.main.voiceTestText || '僕はサイレントメイト君だよ';
+  }
   if (elements.characterEnabled) elements.characterEnabled.checked = settings.character.enabled !== false;
   if (elements.characterSize) elements.characterSize.value = settings.character.size;
   if (elements.characterColor) elements.characterColor.value = settings.character.color;
   updateSizeLabel(settings.character.size);
+
   const updateVoiceValue = (valueElement, value, unit = '') => {
     if (!valueElement) return;
     valueElement.textContent = `${value}${unit}`;
@@ -216,6 +223,11 @@
         backgroundColor: '#0b1f38',
         stripeColor: '#5b8cff',
         buttonColor: '#7aa8ff',
+        micColor: '#2a3440',
+        userBadgeBgColor: '#0f172a',
+        logBgColor: '#0f172a',
+        fabColor: '#7aa8ff',
+        textColor: '#e2e8f0',
       },
       sunset: {
         accentColor: '#fb923c',
@@ -223,6 +235,11 @@
         backgroundColor: '#2a1409',
         stripeColor: '#f59e0b',
         buttonColor: '#fb923c',
+        micColor: '#6a3a17',
+        userBadgeBgColor: '#1b120c',
+        logBgColor: '#1b120c',
+        fabColor: '#fb923c',
+        textColor: '#fdf2e9',
       },
       forest: {
         accentColor: '#34d399',
@@ -230,6 +247,11 @@
         backgroundColor: '#0e1f17',
         stripeColor: '#10b981',
         buttonColor: '#34d399',
+        micColor: '#0e1f17',
+        userBadgeBgColor: '#0c1612',
+        logBgColor: '#0c1612',
+        fabColor: '#34d399',
+        textColor: '#e6f6ef',
       },
       mono: {
         accentColor: '#94a3b8',
@@ -237,6 +259,11 @@
         backgroundColor: '#111827',
         stripeColor: '#64748b',
         buttonColor: '#94a3b8',
+        micColor: '#2f3645',
+        userBadgeBgColor: '#111827',
+        logBgColor: '#111827',
+        fabColor: '#94a3b8',
+        textColor: '#e2e8f0',
       },
       neon: {
         accentColor: '#38bdf8',
@@ -244,6 +271,11 @@
         backgroundColor: '#05101a',
         stripeColor: '#22d3ee',
         buttonColor: '#38bdf8',
+        micColor: '#0b2030',
+        userBadgeBgColor: '#06131b',
+        logBgColor: '#06131b',
+        fabColor: '#38bdf8',
+        textColor: '#e0f7ff',
       },
     };
     const selected = templates[templateKey];
@@ -403,7 +435,7 @@
     settings.main.voiceName = event.target.value;
     saveSettings(settings);
     scheduleSaveToServer();
-    previewVoice(settings.main.voiceName);
+    previewVoice(settings, settings.main.voiceName);
   });
 
   elements.voiceRate?.addEventListener('input', (event) => {
@@ -435,7 +467,7 @@
 
   elements.voiceTestButton?.addEventListener('click', () => {
     const text = settings.main.voiceTestText || 'この声でよろしいでしょうか？';
-    previewVoice(settings.main.voiceName, text);
+    previewVoice(settings, settings.main.voiceName, text);
   });
 
   elements.characterEnabled?.addEventListener('change', (event) => {
@@ -480,14 +512,18 @@
     if (elements.fabColor) elements.fabColor.value = settings.main.fabColor || '#7aa8ff';
     if (elements.mainTextColor) elements.mainTextColor.value = settings.main.textColor || '#0f1720';
     if (elements.inputConfirmEnabled) elements.inputConfirmEnabled.checked = settings.main.inputConfirmEnabled !== false;
-    if (elements.inputConfirmTemplate) elements.inputConfirmTemplate.value = settings.main.inputConfirmTemplate || 'だね、ちょっと待ってね！';
-    if (elements.toneResponse) elements.toneResponse.value = settings.main.toneResponse || '友達ロボット風';
+    if (elements.inputConfirmTemplate) {
+      elements.inputConfirmTemplate.value = settings.main.inputConfirmTemplate || 'だね、ちょっと待ってね！';
+    }
+    if (elements.toneResponse) elements.toneResponse.value = settings.main.toneResponse || '';
     if (elements.toneError) elements.toneError.value = settings.main.toneError || '';
-    if (elements.voiceSelect) elements.voiceSelect.value = settings.main.voiceName || 'Google 日本語 (ja-JP)';
+    if (elements.voiceSelect) elements.voiceSelect.value = settings.main.voiceName || '';
     if (elements.voiceRate) elements.voiceRate.value = settings.main.voiceRate ?? 1.2;
     if (elements.voicePitch) elements.voicePitch.value = settings.main.voicePitch ?? 1.1;
     if (elements.voiceVolume) elements.voiceVolume.value = settings.main.voiceVolume ?? 1;
-    if (elements.voiceTestText) elements.voiceTestText.value = settings.main.voiceTestText || '僕はサイレントメイト君だよ';
+    if (elements.voiceTestText) {
+      elements.voiceTestText.value = settings.main.voiceTestText || '僕はサイレントメイト君だよ';
+    }
     if (elements.characterEnabled) elements.characterEnabled.checked = settings.character.enabled !== false;
     if (elements.characterSize) elements.characterSize.value = settings.character.size;
     if (elements.characterColor) elements.characterColor.value = settings.character.color;
