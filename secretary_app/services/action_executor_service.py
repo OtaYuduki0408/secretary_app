@@ -20,6 +20,7 @@ from services.finance_service import ( # finance_serviceから必要な関数を
     get_daily_expense,
     get_monthly_goal,
     get_all_finance_records,
+    get_last_finance_error,
     upsert_monthly_goal
 )
 from services.memo_service import get_all_memos # memo_serviceから必要な関数をインポート
@@ -69,6 +70,7 @@ from services.finance_service import ( # finance_serviceから必要な関数を
     get_daily_expense,
     get_monthly_goal,
     get_all_finance_records,
+    get_last_finance_error,
     upsert_monthly_goal
 )
 from services.memo_service import get_all_memos # memo_serviceから必要な関数をインポート
@@ -339,6 +341,10 @@ def _execute_finance_read_aloud(user_id: str, detail_data: dict, triggered_at: d
         finance_display_data["date_range"] = date_range_str
 
         all_records = get_all_finance_records(user_id)
+        finance_error = get_last_finance_error()
+        if finance_error:
+            current_app.logger.error(f"Finance read error: {finance_error}")
+            return {"status": "error", "message": finance_error, "category": "収支管理", "display_data": {"type": "error", "message": finance_error}}
         filtered_records = [
             r for r in all_records 
             if r.get('date') and start_datetime <= datetime.fromisoformat(r['date'].replace('Z', '+00:00')).astimezone(JST) <= end_datetime
@@ -357,6 +363,10 @@ def _execute_finance_read_aloud(user_id: str, detail_data: dict, triggered_at: d
         finance_display_data["date_range"] = date_range_str
 
         all_records = get_all_finance_records(user_id)
+        finance_error = get_last_finance_error()
+        if finance_error:
+            current_app.logger.error(f"Finance read error: {finance_error}")
+            return {"status": "error", "message": finance_error, "category": "収支管理", "display_data": {"type": "error", "message": finance_error}}
         current_month_str = current_dt_jst.strftime('%Y-%m')
         
         monthly_records = [

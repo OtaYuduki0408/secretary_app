@@ -5,6 +5,22 @@ from postgrest.exceptions import APIError
 
 TABLE_FINANCE = "finance"
 TABLE_FINANCE_GOALS = "finance_goals"
+_LAST_FINANCE_ERROR = None
+
+
+def _is_dns_error(error: Exception) -> bool:
+    message = str(error)
+    return "getaddrinfo failed" in message or "Errno 11001" in message
+
+
+def _format_finance_error(error: Exception) -> str:
+    if _is_dns_error(error):
+        return "DNSエラーのため収支データに接続できませんでした。ネットワーク/DNS設定を確認してください。"
+    return f"収支データの取得に失敗しました: {str(error)}"
+
+
+def get_last_finance_error() -> str | None:
+    return _LAST_FINANCE_ERROR
 
 def get_all_finance_records(user_id: str | None = None):
     """
@@ -17,10 +33,14 @@ def get_all_finance_records(user_id: str | None = None):
         if user_id:
             q = q.eq("user_id", user_id)
         all_records = q.execute().data
+        global _LAST_FINANCE_ERROR
+        _LAST_FINANCE_ERROR = None
         return all_records
     except (APIError, Exception) as e:
         # 接続エラーやその他のエラーを捕捉
         print(f"ERROR: Failed to fetch all finance records from DB: {e}")
+        global _LAST_FINANCE_ERROR
+        _LAST_FINANCE_ERROR = _format_finance_error(e)
         # 安全策として空のリストを返す
         return []
 

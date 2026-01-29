@@ -7,6 +7,7 @@ from services import local_calendar_service
 from services import switchbot_service
 from services.finance_service import (
     get_all_finance_records,
+    get_last_finance_error,
     get_current_balance,
     get_monthly_expense,
     get_daily_expense,
@@ -609,6 +610,12 @@ def evaluate_triggers(app_logger):
                         app_logger.debug(f"Processing finance action for format: {format_type}")
 
                         all_records = get_all_finance_records(user_id)
+                        finance_error = get_last_finance_error()
+                        if finance_error:
+                            action.setdefault('detail', {})['error'] = finance_error
+                            app_logger.error(f"Finance data error for user {user_id}: {finance_error}")
+                            modified_actions.append(action)
+                            continue
                         income_total = sum(r.get('amount', 0) for r in all_records if r.get('type') == 'income')
                         expense_total = sum(r.get('amount', 0) for r in all_records if r.get('type') == 'expense')
                         balance = income_total - expense_total
