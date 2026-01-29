@@ -276,6 +276,7 @@ export async function check_chat_Space(inputValue) {
         }
       }
       return;
+    }
 
     if (Array.isArray(result.order_payloads) && result.order_payloads.length > 0) {
       console.log("DEBUG: Voice trigger payloads received:", result.order_payloads);
@@ -286,12 +287,28 @@ export async function check_chat_Space(inputValue) {
       } else {
         console.warn("executeOrderPayload is not available on window. Queueing payloads.");
         window.__pendingOrderPayloads = (window.__pendingOrderPayloads || []).concat(result.order_payloads);
+        let attempts = 0;
+        const maxAttempts = 40; // 2s (50ms * 40)
+        const intervalId = setInterval(async () => {
+          attempts += 1;
+          if (typeof window.executeOrderPayload === "function") {
+            clearInterval(intervalId);
+            const queued = window.__pendingOrderPayloads || [];
+            window.__pendingOrderPayloads = [];
+            console.log("DEBUG: executeOrderPayload is now available. Flushing queued payloads.", queued.length);
+            for (const payload of queued) {
+              await window.executeOrderPayload(payload);
+            }
+          } else if (attempts >= maxAttempts) {
+            clearInterval(intervalId);
+            console.warn("executeOrderPayload is still unavailable after waiting.");
+          }
+        }, 50);
       }
       return;
     }
     if (result.triggered_by_voice) {
       console.warn("Voice trigger matched but no order_payloads were returned.", result);
-    }
     }
 
     if (result.message && !result.suppress_tts) {

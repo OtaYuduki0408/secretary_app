@@ -573,8 +573,11 @@
     </div>
 </div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.5/socket.io.min.js"></script>
-<script src="{{ url_for('static', filename='js/app_settings_apply.js') }}"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.5/socket.io.min.js"></script>
+  <script>
+    window.APP_VERSION = "{{ config['VERSION_TIMESTAMP'] }}";
+  </script>
+  <script src="{{ url_for('static', filename='js/app_settings_apply.js', _t=config['VERSION_TIMESTAMP']) }}"></script>
 <script>
   (() => {
     const logoutLink = document.getElementById('logout-link');
@@ -700,9 +703,9 @@
     }
   })();
 </script>
-<script src="{{ url_for('static', filename='js/websocket_handler.js') }}" type="module" defer></script>
-<script src="{{ url_for('static', filename='js/voice_recognition.js') }}"></script>
-<script src="{{ url_for('static', filename='js/Parallax_and_Theme_rotation.js') }}" type="module"></script>
+  <script src="{{ url_for('static', filename='js/websocket_handler.js', _t=config['VERSION_TIMESTAMP']) }}" type="module" defer></script>
+  <script src="{{ url_for('static', filename='js/voice_recognition.js', _t=config['VERSION_TIMESTAMP']) }}"></script>
+  <script src="{{ url_for('static', filename='js/Parallax_and_Theme_rotation.js', _t=config['VERSION_TIMESTAMP']) }}" type="module"></script>
 <!-- <script src="{{ url_for('static', filename='js/calendar_toast.js') }}" defer></script> -->
 </body>
 </html>

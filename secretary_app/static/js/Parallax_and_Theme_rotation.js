@@ -1,4 +1,16 @@
-import { check_chat_Space } from '/static/js/ChatSpace.js';
+let check_chat_Space = () => {};
+const chatSpaceVersion = window.APP_VERSION ? `?_t=${window.APP_VERSION}` : '';
+const loadChatSpace = async () => {
+  try {
+    const mod = await import(`/static/js/ChatSpace.js${chatSpaceVersion}`);
+    if (mod && typeof mod.check_chat_Space === 'function') {
+      check_chat_Space = mod.check_chat_Space;
+    }
+  } catch (e) {
+    console.warn('ChatSpace module load failed:', e);
+  }
+};
+loadChatSpace();
 
 /* =======================
    Parallax + Theme rotation + ORA jackpot
