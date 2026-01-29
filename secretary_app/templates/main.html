@@ -59,9 +59,9 @@
       margin: 12px auto 0;
       padding: 8px 16px;
       border-radius: 999px;
-      background: #f1f5f9; /* Light gray background */
+      background: var(--main-user-badge-bg, #f1f5f9);
       border: 1px solid #e2e8f0; /* Slightly darker border */
-      color: #1f2937; /* Dark text color */
+      color: var(--main-text-color, #1f2937);
       display: inline-flex;
       align-items: center;
       gap: 8px;
@@ -70,7 +70,7 @@
 
     .user-name {
       font-weight: 600;
-      color: #2563eb; /* A darker, more readable blue */
+      color: var(--main-text-color, #1f2937);
     }
 
     /* New Terminal UI Styles */
@@ -85,7 +85,7 @@
       height: min(420px, 65vh);
       margin: 0 auto clamp(18px, 3vh, 26px);
       border-radius: 16px;
-      background: #ffffff; /* White background */
+      background: var(--main-log-bg, #ffffff);
       border: 1px solid #d1d5db; /* Gray border */
       box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
       display: flex;
@@ -97,7 +97,7 @@
       flex-grow: 1;
       padding: clamp(16px, 3vw, 24px);
       overflow-y: auto;
-      color: #000000; /* Final log color: Black */
+      color: var(--main-text-color, #000000);
       font-family: 'Consolas', 'Monaco', monospace;
       font-size: 1rem;
       line-height: 1.7;
@@ -156,7 +156,7 @@
       background: transparent;
       border: none;
       outline: none;
-      color: #000000;
+      color: var(--main-text-color, #000000);
       font-size: 1.05rem;
       font-family: 'Consolas', 'Monaco', monospace;
     }
@@ -541,128 +541,6 @@
 </script>
 <script>
   (() => {
-    const body = document.body;
-    const root = document.documentElement;
-    const character = document.getElementById('character-buddy');
-
-    const hexToRgb = (hex) => {
-      const raw = hex.replace('#', '');
-      const full = raw.length === 3 ? raw.split('').map((c) => c + c).join('') : raw;
-      const num = parseInt(full, 16);
-      if (Number.isNaN(num)) return { r: 177, g: 214, b: 86 };
-      return { r: (num >> 16) & 255, g: (num >> 8) & 255, b: num & 255 };
-    };
-
-    const rgbToHsl = (r, g, b) => {
-      r /= 255;
-      g /= 255;
-      b /= 255;
-      const max = Math.max(r, g, b);
-      const min = Math.min(r, g, b);
-      let h = 0;
-      let s = 0;
-      const l = (max + min) / 2;
-      if (max !== min) {
-        const d = max - min;
-        s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
-        switch (max) {
-          case r:
-            h = (g - b) / d + (g < b ? 6 : 0);
-            break;
-          case g:
-            h = (b - r) / d + 2;
-            break;
-          default:
-            h = (r - g) / d + 4;
-        }
-        h /= 6;
-      }
-      return { h: h * 360, s, l };
-    };
-
-    const baseColor = { r: 177, g: 214, b: 86 };
-    const baseHsl = rgbToHsl(baseColor.r, baseColor.g, baseColor.b);
-
-    const buildColorFilter = (hex) => {
-      const target = hexToRgb(hex);
-      const targetHsl = rgbToHsl(target.r, target.g, target.b);
-      const hueRotate = targetHsl.h - baseHsl.h;
-      const saturate = baseHsl.s > 0 ? targetHsl.s / baseHsl.s : 1;
-      const brightness = baseHsl.l > 0 ? targetHsl.l / baseHsl.l : 1;
-      return `hue-rotate(${hueRotate.toFixed(1)}deg) saturate(${saturate.toFixed(2)}) brightness(${brightness.toFixed(2)})`;
-    };
-
-    const applySettings = () => {
-      let settings = null;
-      try {
-        const raw = localStorage.getItem('appSettings');
-        settings = raw ? JSON.parse(raw) : null;
-      } catch (e) {
-        console.warn('設定の読み込みに失敗しました。', e);
-      }
-
-      const general = settings?.general || {};
-      const main = settings?.main || {};
-      const characterSettings = settings?.character || {};
-
-      if (general.fontFamily) {
-        root.style.setProperty('--app-font', general.fontFamily);
-      } else {
-        root.style.removeProperty('--app-font');
-      }
-
-      const clamp = (value) => Math.min(255, Math.max(0, Math.round(value)));
-      const scale = (value, factor) => clamp(value * factor);
-      if (main.backgroundColor) {
-        const color = hexToRgb(main.backgroundColor);
-        const dark = `rgb(${scale(color.r, 0.55)}, ${scale(color.g, 0.55)}, ${scale(color.b, 0.55)})`;
-        const mid = `rgb(${scale(color.r, 0.78)}, ${scale(color.g, 0.78)}, ${scale(color.b, 0.78)})`;
-        const glow1 = `rgba(${color.r}, ${color.g}, ${color.b}, 0.18)`;
-        const glow2 = `rgba(${color.r}, ${color.g}, ${color.b}, 0.12)`;
-        root.style.setProperty('--bg-1', dark);
-        root.style.setProperty('--bg-2', mid);
-        root.style.setProperty('--wallpaper', `radial-gradient(circle at 18% 22%, ${glow1}, transparent 45%), radial-gradient(circle at 70% 10%, ${glow2}, transparent 55%), linear-gradient(180deg, ${mid} 0%, ${dark} 100%)`);
-        root.style.setProperty('--wallpaper-darken', 'rgba(6,12,32,.18)');
-      } else {
-        root.style.removeProperty('--bg-1');
-        root.style.removeProperty('--bg-2');
-        root.style.removeProperty('--wallpaper');
-        root.style.removeProperty('--wallpaper-darken');
-      }
-
-      if (main.stripeColor) {
-        const stripe = hexToRgb(main.stripeColor);
-        root.style.setProperty('--stripe-color', `rgba(${stripe.r}, ${stripe.g}, ${stripe.b}, 0.35)`);
-      } else {
-        root.style.removeProperty('--stripe-color');
-      }
-
-      if (main.buttonColor) {
-        const btn = hexToRgb(main.buttonColor);
-        root.style.setProperty('--main-btn-color', `rgb(${btn.r}, ${btn.g}, ${btn.b})`);
-      } else {
-        root.style.removeProperty('--main-btn-color');
-      }
-
-      const sizeValue = characterSettings.size || 220;
-      root.style.setProperty('--character-size', `${sizeValue}px`);
-
-      const colorValue = characterSettings.color || '#B1D656';
-      root.style.setProperty('--character-filter', buildColorFilter(colorValue));
-
-      if (character) {
-        const isEnabled = characterSettings.enabled !== false;
-        character.style.display = isEnabled ? 'block' : 'none';
-      }
-    };
-
-    applySettings();
-    window.addEventListener('storage', applySettings);
-    document.addEventListener('app-settings:updated', applySettings);
-  })();
-</script>
-<script>
-  (() => {
     const idleFrame = document.getElementById('character-frame-idle');
     const frameA = document.getElementById('character-frame-1');
     const frameB = document.getElementById('character-frame-2');
@@ -705,7 +583,6 @@
     const log = (...args) => console.log('[DEBUG:CSS]', ...args);
     const warn = (...args) => console.warn('[DEBUG:CSS]', ...args);
 
-    // CSS/JS???????????????????????
     function findResourceEntry(keyword) {
       const entries = performance.getEntriesByType('resource');
       return entries.find((entry) => entry.name.includes(keyword));

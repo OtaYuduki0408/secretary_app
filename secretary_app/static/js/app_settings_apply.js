@@ -8,6 +8,45 @@
     return { r: (num >> 16) & 255, g: (num >> 8) & 255, b: num & 255 };
   };
 
+  const rgbToHsl = (r, g, b) => {
+    r /= 255;
+    g /= 255;
+    b /= 255;
+    const max = Math.max(r, g, b);
+    const min = Math.min(r, g, b);
+    let h = 0;
+    let s = 0;
+    const l = (max + min) / 2;
+    if (max !== min) {
+      const d = max - min;
+      s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+      switch (max) {
+        case r:
+          h = (g - b) / d + (g < b ? 6 : 0);
+          break;
+        case g:
+          h = (b - r) / d + 2;
+          break;
+        default:
+          h = (r - g) / d + 4;
+      }
+      h /= 6;
+    }
+    return { h: h * 360, s, l };
+  };
+
+  const buildColorFilter = (hex) => {
+    const baseColor = { r: 177, g: 214, b: 86 };
+    const baseHsl = rgbToHsl(baseColor.r, baseColor.g, baseColor.b);
+    const target = hexToRgb(hex);
+    if (!target) return 'none';
+    const targetHsl = rgbToHsl(target.r, target.g, target.b);
+    const hueRotate = targetHsl.h - baseHsl.h;
+    const saturate = baseHsl.s > 0 ? targetHsl.s / baseHsl.s : 1;
+    const brightness = baseHsl.l > 0 ? targetHsl.l / baseHsl.l : 1;
+    return `hue-rotate(${hueRotate.toFixed(1)}deg) saturate(${saturate.toFixed(2)}) brightness(${brightness.toFixed(2)})`;
+  };
+
   const applySettings = () => {
     const root = document.documentElement;
     const body = document.body;
@@ -25,6 +64,7 @@
     const general = settings?.general || {};
     const main = settings?.main || {};
     const theme = settings?.theme || {};
+    const character = settings?.character || {};
 
     if (general.fontFamily) {
       root.style.setProperty('--app-font', general.fontFamily);
@@ -56,26 +96,16 @@
       root.style.removeProperty('--co-muted');
     }
 
-    if (main.stripeColor) {
-      root.style.setProperty('--stripe-color', main.stripeColor);
-    }
-    if (main.buttonColor) {
-      root.style.setProperty('--main-btn-color', main.buttonColor);
-    }
-
     if (main.backgroundColor) {
       const color = hexToRgb(main.backgroundColor);
       if (color) {
-        const clamp = (value) => Math.min(255, Math.max(0, Math.round(value)));
-        const scale = (value, factor) => clamp(value * factor);
-        const dark = `rgb(${scale(color.r, 0.55)}, ${scale(color.g, 0.55)}, ${scale(color.b, 0.55)})`;
-        const mid = `rgb(${scale(color.r, 0.78)}, ${scale(color.g, 0.78)}, ${scale(color.b, 0.78)})`;
+        const base = `rgb(${color.r}, ${color.g}, ${color.b})`;
         const glow1 = `rgba(${color.r}, ${color.g}, ${color.b}, 0.18)`;
         const glow2 = `rgba(${color.r}, ${color.g}, ${color.b}, 0.12)`;
-        root.style.setProperty('--bg-1', dark);
-        root.style.setProperty('--bg-2', mid);
-        root.style.setProperty('--wallpaper', `radial-gradient(circle at 18% 22%, ${glow1}, transparent 45%), radial-gradient(circle at 70% 10%, ${glow2}, transparent 55%), linear-gradient(180deg, ${mid} 0%, ${dark} 100%)`);
-        root.style.setProperty('--wallpaper-darken', 'rgba(6,12,32,.18)');
+        root.style.setProperty('--bg-1', base);
+        root.style.setProperty('--bg-2', base);
+        root.style.setProperty('--wallpaper', `radial-gradient(circle at 18% 22%, ${glow1}, transparent 45%), radial-gradient(circle at 70% 10%, ${glow2}, transparent 55%), linear-gradient(180deg, ${base} 0%, ${base} 100%)`);
+        root.style.setProperty('--wallpaper-darken', 'rgba(0,0,0,0)');
       }
 
       if (!isMainSpecial) {
@@ -124,6 +154,63 @@
       root.style.removeProperty('--co-bg');
       root.style.removeProperty('--co-gradient');
       root.style.removeProperty('--co-card-bg');
+    }
+
+    if (main.stripeColor) {
+      root.style.setProperty('--stripe-color', main.stripeColor);
+    } else {
+      root.style.removeProperty('--stripe-color');
+    }
+    if (main.buttonColor) {
+      root.style.setProperty('--main-btn-color', main.buttonColor);
+      root.style.setProperty('--main-fab-bg', main.buttonColor);
+    } else {
+      root.style.removeProperty('--main-btn-color');
+      root.style.removeProperty('--main-fab-bg');
+    }
+    if (main.micColor) {
+      root.style.setProperty('--main-mic-surface', main.micColor);
+      root.style.setProperty('--main-mic-glow', main.micColor);
+    } else {
+      root.style.removeProperty('--main-mic-surface');
+      root.style.removeProperty('--main-mic-glow');
+    }
+    if (main.userBadgeBgColor) {
+      root.style.setProperty('--main-user-badge-bg', main.userBadgeBgColor);
+    } else {
+      root.style.removeProperty('--main-user-badge-bg');
+    }
+    if (main.logBgColor) {
+      root.style.setProperty('--main-log-bg', main.logBgColor);
+    } else {
+      root.style.removeProperty('--main-log-bg');
+    }
+    if (main.fabColor) {
+      root.style.setProperty('--main-fab-bg', main.fabColor);
+    } else if (!main.buttonColor) {
+      root.style.removeProperty('--main-fab-bg');
+    }
+    if (main.textColor) {
+      root.style.setProperty('--main-text-color', main.textColor);
+    } else {
+      root.style.removeProperty('--main-text-color');
+    }
+
+    // キャラクター設定
+    if (character.size) {
+      root.style.setProperty('--character-size', `${character.size}px`);
+    } else {
+      root.style.removeProperty('--character-size');
+    }
+    if (character.color) {
+      root.style.setProperty('--character-filter', buildColorFilter(character.color));
+    } else {
+      root.style.removeProperty('--character-filter');
+    }
+    const characterEl = document.getElementById('character-buddy');
+    if (characterEl) {
+      const enabled = character.enabled !== false;
+      characterEl.style.display = enabled ? 'block' : 'none';
     }
 
     root.style.minHeight = '100%';

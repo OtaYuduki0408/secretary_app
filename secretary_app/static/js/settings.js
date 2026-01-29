@@ -14,6 +14,11 @@
       voiceTestText: '僕はサイレントメイト君だよ',
       stripeColor: '#7aa8ff',
       buttonColor: '#7aa8ff',
+      micColor: '#2a3440',
+      userBadgeBgColor: '#f1f5f9',
+      logBgColor: '#ffffff',
+      fabColor: '#7aa8ff',
+      textColor: '#0f1720',
       wakeWords: 'サイレントメイト,サイレントメイト君,さいれんとめいと,silentmate,ボイスメイト',
       inputConfirmEnabled: true,
       inputConfirmTemplate: 'だね、ちょっと待ってね！',
@@ -39,6 +44,11 @@
     wakeWord: document.getElementById('wake-word'),
     stripeColor: document.getElementById('stripe-color'),
     mainButtonColor: document.getElementById('main-button-color'),
+    micColor: document.getElementById('mic-color'),
+    userBadgeBgColor: document.getElementById('user-badge-bg-color'),
+    logBgColor: document.getElementById('log-bg-color'),
+    fabColor: document.getElementById('fab-color'),
+    mainTextColor: document.getElementById('main-text-color'),
     inputConfirmEnabled: document.getElementById('input-confirm-enabled'),
     inputConfirmTemplate: document.getElementById('input-confirm-template'),
     toneResponse: document.getElementById('tone-response'),
@@ -166,6 +176,11 @@
   if (elements.wakeWord) elements.wakeWord.value = settings.main.wakeWords || 'サイレントメイト,サイレントメイト君,さいれんとめいと,silentmate,ボイスメイト';
   if (elements.stripeColor) elements.stripeColor.value = settings.main.stripeColor || '#7aa8ff';
   if (elements.mainButtonColor) elements.mainButtonColor.value = settings.main.buttonColor || '#7aa8ff';
+  if (elements.micColor) elements.micColor.value = settings.main.micColor || '#2a3440';
+  if (elements.userBadgeBgColor) elements.userBadgeBgColor.value = settings.main.userBadgeBgColor || '#f1f5f9';
+  if (elements.logBgColor) elements.logBgColor.value = settings.main.logBgColor || '#ffffff';
+  if (elements.fabColor) elements.fabColor.value = settings.main.fabColor || '#7aa8ff';
+  if (elements.mainTextColor) elements.mainTextColor.value = settings.main.textColor || '#0f1720';
   if (elements.inputConfirmEnabled) elements.inputConfirmEnabled.checked = settings.main.inputConfirmEnabled !== false;
   if (elements.inputConfirmTemplate) elements.inputConfirmTemplate.value = settings.main.inputConfirmTemplate || 'だね、ちょっと待ってね！';
   if (elements.toneResponse) elements.toneResponse.value = settings.main.toneResponse || '友達ロボット風';
@@ -238,11 +253,21 @@
     settings.main.backgroundColor = selected.backgroundColor;
     settings.main.stripeColor = selected.stripeColor;
     settings.main.buttonColor = selected.buttonColor;
+    settings.main.micColor = selected.micColor || selected.accentColor;
+    settings.main.userBadgeBgColor = selected.userBadgeBgColor || '#f1f5f9';
+    settings.main.logBgColor = selected.logBgColor || '#ffffff';
+    settings.main.fabColor = selected.fabColor || selected.accentColor;
+    settings.main.textColor = selected.textColor || '#0f1720';
     if (elements.accentColor) elements.accentColor.value = selected.accentColor;
     if (elements.mutedColor) elements.mutedColor.value = selected.mutedColor;
     if (elements.mainBgColor) elements.mainBgColor.value = selected.backgroundColor;
     if (elements.stripeColor) elements.stripeColor.value = selected.stripeColor;
     if (elements.mainButtonColor) elements.mainButtonColor.value = selected.buttonColor;
+    if (elements.micColor) elements.micColor.value = selected.micColor || selected.accentColor;
+    if (elements.userBadgeBgColor) elements.userBadgeBgColor.value = selected.userBadgeBgColor || '#f1f5f9';
+    if (elements.logBgColor) elements.logBgColor.value = selected.logBgColor || '#ffffff';
+    if (elements.fabColor) elements.fabColor.value = selected.fabColor || selected.accentColor;
+    if (elements.mainTextColor) elements.mainTextColor.value = selected.textColor || '#0f1720';
     saveSettings(settings);
     applyToPage(settings);
     document.dispatchEvent(new CustomEvent('app-settings:updated'));
@@ -304,6 +329,46 @@
 
   elements.mainButtonColor?.addEventListener('change', (event) => {
     settings.main.buttonColor = event.target.value;
+    saveSettings(settings);
+    scheduleSaveToServer();
+    applyToPage(settings);
+    document.dispatchEvent(new CustomEvent('app-settings:updated'));
+  });
+
+  elements.micColor?.addEventListener('change', (event) => {
+    settings.main.micColor = event.target.value;
+    saveSettings(settings);
+    scheduleSaveToServer();
+    applyToPage(settings);
+    document.dispatchEvent(new CustomEvent('app-settings:updated'));
+  });
+
+  elements.userBadgeBgColor?.addEventListener('change', (event) => {
+    settings.main.userBadgeBgColor = event.target.value;
+    saveSettings(settings);
+    scheduleSaveToServer();
+    applyToPage(settings);
+    document.dispatchEvent(new CustomEvent('app-settings:updated'));
+  });
+
+  elements.logBgColor?.addEventListener('change', (event) => {
+    settings.main.logBgColor = event.target.value;
+    saveSettings(settings);
+    scheduleSaveToServer();
+    applyToPage(settings);
+    document.dispatchEvent(new CustomEvent('app-settings:updated'));
+  });
+
+  elements.fabColor?.addEventListener('change', (event) => {
+    settings.main.fabColor = event.target.value;
+    saveSettings(settings);
+    scheduleSaveToServer();
+    applyToPage(settings);
+    document.dispatchEvent(new CustomEvent('app-settings:updated'));
+  });
+
+  elements.mainTextColor?.addEventListener('change', (event) => {
+    settings.main.textColor = event.target.value;
     saveSettings(settings);
     scheduleSaveToServer();
     applyToPage(settings);
@@ -409,6 +474,11 @@
     if (elements.wakeWord) elements.wakeWord.value = settings.main.wakeWords || '';
     if (elements.stripeColor) elements.stripeColor.value = settings.main.stripeColor || '#7aa8ff';
     if (elements.mainButtonColor) elements.mainButtonColor.value = settings.main.buttonColor || '#7aa8ff';
+    if (elements.micColor) elements.micColor.value = settings.main.micColor || '#2a3440';
+    if (elements.userBadgeBgColor) elements.userBadgeBgColor.value = settings.main.userBadgeBgColor || '#f1f5f9';
+    if (elements.logBgColor) elements.logBgColor.value = settings.main.logBgColor || '#ffffff';
+    if (elements.fabColor) elements.fabColor.value = settings.main.fabColor || '#7aa8ff';
+    if (elements.mainTextColor) elements.mainTextColor.value = settings.main.textColor || '#0f1720';
     if (elements.inputConfirmEnabled) elements.inputConfirmEnabled.checked = settings.main.inputConfirmEnabled !== false;
     if (elements.inputConfirmTemplate) elements.inputConfirmTemplate.value = settings.main.inputConfirmTemplate || 'だね、ちょっと待ってね！';
     if (elements.toneResponse) elements.toneResponse.value = settings.main.toneResponse || '友達ロボット風';
