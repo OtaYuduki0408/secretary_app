@@ -312,7 +312,9 @@ export async function check_chat_Space(inputValue) {
     }
 
     if (result.message && !result.suppress_tts) {
-      const finalMessage = await applyToneSetting(result.message, 'response');
+      const finalMessage = result.skip_tone
+        ? result.message
+        : await applyToneSetting(result.message, 'response');
       console.log(`DEBUG: API応答メッセージ読み上げ: "${finalMessage}"`);
       if (window.addResponseLogEntry) {
         window.addResponseLogEntry(finalMessage);

@@ -548,7 +548,13 @@ def chat_api_external():
     data = request.get_json() or {}
     user_input = data.get('inputValue', '')
     user_id = g.user_id
-    response_data = chat_space_model.check_chat_space(user_input, user_id=user_id)
+    settings = get_user_settings(user_id) or {}
+    tone_response = (settings.get('main') or {}).get('toneResponse', '')
+    response_data = chat_space_model.check_chat_space(
+        user_input,
+        user_id=user_id,
+        tone_response=tone_response
+    )
 
     action = response_data.get('action')
 
@@ -1056,7 +1062,13 @@ def chat_api_web():
         app.logger.debug(f"DEBUG: 高速実行パターン不一致: {user_input}")
     
     # 高速実行に一致しない場合、通常のchat_space_model処理
-    response_data = chat_space_model.check_chat_space(user_input, user_id=user_id)
+    settings = get_user_settings(user_id) or {}
+    tone_response = (settings.get('main') or {}).get('toneResponse', '')
+    response_data = chat_space_model.check_chat_space(
+        user_input,
+        user_id=user_id,
+        tone_response=tone_response
+    )
     # (The rest of the function remains the same)
 
     action = response_data.get('action')

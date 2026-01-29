@@ -51,6 +51,7 @@ class ChatSpaceModel:
     R:過去の命令の修正(行動はn)
     S:SwitchBot iot等。例:電気を消す、エアコンを付ける、鍵を掛ける)(行動はn)
     Re:強制終了コマンド(処理を停止して等)
+    K:計算(行動はn)
     -行動-
     a:追加
     d:削除
@@ -60,6 +61,15 @@ class ChatSpaceModel:
     例：カレンダーへの追加がユーザーの目的から、Caを返す。
     -入力-
     ユーザーの入力: {input_value}
+    """
+    CALC_PROMPT_TEMPLATE = """
+    以下の質問は計算に関する質問です。pythonのeval関数で計算できるように計算式を作成してください。
+    出力は計算式のみ。余計な説明は禁止。
+    質問: {input_value}
+    """
+    FN_FALLBACK_PROMPT_TEMPLATE = """
+    100文字以内で{tone}風に次の質問に回答してください:
+    {input_value}
     """
     ADD_CALENDAR_PROMPT_TEMPLATE = """
     目的: ユーザーが追加したい予定の抽出
@@ -259,6 +269,69 @@ class ChatSpaceModel:
         )
         return self._gemini_request(prompt)
 
+    def _fallback_with_gemini(self, text: str, tone_response: str) -> str:
+        tone = (tone_response or "").strip() or "標準"
+        prompt = self.FN_FALLBACK_PROMPT_TEMPLATE.format(tone=tone, input_value=text)
+        return self._gemini_request(prompt)
+
+    def _extract_calc_expression(self, raw: str) -> str:
+        if not raw:
+            return ""
+        text = raw.strip()
+        text = re.sub(r"^```[a-zA-Z]*\\n|```$", "", text, flags=re.MULTILINE).strip()
+        if text.startswith("{") or text.startswith("["):
+            try:
+                obj = json.loads(text)
+                if isinstance(obj, dict):
+                    for key in ("expr", "expression", "calc", "formula"):
+                        if isinstance(obj.get(key), str):
+                            return obj[key].strip()
+                if isinstance(obj, list) and obj:
+                    first = obj[0]
+                    if isinstance(first, str):
+                        return first.strip()
+                    if isinstance(first, dict):
+                        for key in ("expr", "expression", "calc", "formula"):
+                            if isinstance(first.get(key), str):
+                                return first[key].strip()
+            except Exception:
+                pass
+        return text.splitlines()[0].strip()
+
+    def _try_eval_expression(self, text: str) -> str | None:
+        if not text:
+            return None
+        normalized = text.strip()
+        normalized = normalized.replace("×", "*").replace("÷", "/")
+        normalized = normalized.replace("＋", "+").replace("－", "-").replace("−", "-")
+        normalized = normalized.replace("＝", "=")
+        if not re.fullmatch(r"[0-9eE+*/().%\\s=-]+", normalized):
+            return None
+        expr = normalized.replace("=", "").strip()
+        if not expr or not re.search(r"[0-9]", expr):
+            return None
+        if not re.search(r"[+*/%()\\-]", expr):
+            return None
+        try:
+            value = eval(expr, {"__builtins__": {}}, {})
+        except Exception:
+            return None
+        return f"答えは{value}です。計算式は{expr}です。"
+
+    def _calculate_expression(self, text: str) -> str:
+        prompt = self.CALC_PROMPT_TEMPLATE.format(input_value=text)
+        raw = self._gemini_request(prompt)
+        expr = self._extract_calc_expression(raw)
+        if not expr:
+            return "計算式を取得できませんでした。"
+        if not re.fullmatch(r"[0-9eE+*/().%\\s-]+", expr):
+            return "計算式に許可されていない文字が含まれていました。"
+        try:
+            value = eval(expr, {"__builtins__": {}}, {})
+        except Exception:
+            return "計算に失敗しました。"
+        return f"答えは{value}です。計算式は{expr}です。"
+
     def _format_event_time(self, iso_time: str) -> str:
         if not iso_time: return ""
         try:
@@ -426,7 +499,7 @@ class ChatSpaceModel:
         return parsed_list
 
 
-    def check_chat_space(self, input_value: str, user_id: str | None = None) -> dict:
+    def check_chat_space(self, input_value: str, user_id: str | None = None, tone_response: str = "") -> dict:
         print("--- [DEBUG] check_chat_space: Starting ---")
         # 起動コマンドを除外してGeminiへ渡す
         cleaned_input = (input_value or "").replace("サイレントメイト", "").strip()
@@ -438,6 +511,13 @@ class ChatSpaceModel:
                 "abort_command": True,
                 "suppress_tts": True,
                 "cancelled": True
+            }
+        calc_message = self._try_eval_expression(cleaned_input)
+        if calc_message:
+            return {
+                "status": "success",
+                "message": calc_message,
+                "skip_tone": True
             }
         self._current_user_id = user_id
         try:
@@ -456,6 +536,10 @@ class ChatSpaceModel:
                     "suppress_tts": True,
                     "cancelled": True
                 }
+            if purpose == "Fn":
+                result["message"] = self._fallback_with_gemini(cleaned_input, tone_response)
+                result["skip_tone"] = True
+                return result
 
             if purpose == "Ca":
                 data, msg = self._add_calendar(cleaned_input, user_id)
@@ -483,6 +567,8 @@ class ChatSpaceModel:
                 result["message"] = self._gemini_request(time_prompt)
             elif purpose == "Sn":
                 result["data"], result["message"] = self._get_switchbot_devices(cleaned_input, user_id)
+            elif purpose in ("Kn", "K"):
+                result["message"] = self._calculate_expression(cleaned_input)
             else:
                 result["message"] = "申し訳ございません。お客様の意図を特定できませんでした。"
                 print(f"DEBUG: 意図不明なpurpose: {purpose}")
