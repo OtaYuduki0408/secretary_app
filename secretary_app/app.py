@@ -945,6 +945,35 @@ def _handle_input_triggers(user_input, response_data, user_id):
         triggered = True
     return triggered
 
+
+def _handle_voice_triggers(user_input, user_id):
+    if not user_id or not user_input:
+        return False
+    orders = get_all_orders(user_id)
+    if isinstance(orders, dict) and orders.get('error'):
+        app.logger.debug(f"[INPUT_TRIGGER] get_all_orders error: {orders.get('error')}")
+        return False
+    triggered = False
+    for order in orders:
+        triggers = order.get('triggers') or []
+        if not triggers:
+            continue
+        trigger = triggers[0]
+        category = trigger.get('category')
+        if category != 'ボイス':
+            continue
+        value = trigger.get('value') or {}
+        keywords = _normalize_keyword_list(value.get('keywords') or value.get('keyword') or value.get('value'))
+        if not keywords:
+            continue
+        if _match_keywords(user_input, keywords):
+            payload = {k: order.get(k) for k in ['triggers', 'actions', 'conditions', 'steps'] if k in order}
+            payload = _enrich_actions_for_dispatch(payload, user_id, app.logger)
+            app.logger.debug(f"[INPUT_TRIGGER] Voice matched keywords={keywords} (fast path)")
+            _dispatch_order_payload(user_id, payload)
+            triggered = True
+    return triggered
+
 @app.route('/web_api/chat', methods=['POST'])
 @login_required # セッションベース認証
 def chat_api_web():
@@ -962,6 +991,13 @@ def chat_api_web():
             "suppress_tts": True,
             "cancelled": True
         }
+        return jsonify(response_data)
+
+    # ボイストリガーは最速で判定し、Gemini処理をスキップする
+    if _handle_voice_triggers(user_input, user_id):
+        response_data['suppress_tts'] = True
+        response_data['message'] = ""
+        response_data['triggered_by_voice'] = True
         return jsonify(response_data)
 
     # 高速実行のチェック
