@@ -23,6 +23,25 @@
       inputConfirmEnabled: true,
       inputConfirmTemplate: 'だね、ちょっと待ってね！',
     },
+    ui: {
+      backgroundColor: '#0f172a',
+      panelColor: '#1e293b',
+      panelSoftColor: '#243045',
+      textColor: '#f8fafc',
+      mutedColor: '#cbd5f5',
+      accentColor: '#38bdf8',
+      accentStrongColor: '#0ea5e9',
+      borderColor: '#94a3b8',
+      successColor: '#34d399',
+      dangerColor: '#f87171',
+      inputBgColor: '#0f172a',
+      inputTextColor: '#f8fafc',
+      inputBorderColor: '#94a3b8',
+      buttonBgColor: '#38bdf8',
+      buttonTextColor: '#0f172a',
+      linkColor: '#38bdf8',
+      shadowColor: '#0f172a',
+    },
     character: {
       enabled: true,
       size: 220,
@@ -32,14 +51,35 @@
       accentColor: '#7aa8ff',
       mutedColor: '#cdd6df',
       template: '',
+      userThemes: [],
     },
   };
 
   const elements = {
     fontFamily: document.getElementById('font-family'),
     colorTemplate: document.getElementById('color-template'),
+    themeSaveName: document.getElementById('theme-save-name'),
+    themeSaveButton: document.getElementById('theme-save-button'),
+    themeDeleteButton: document.getElementById('theme-delete-button'),
     accentColor: document.getElementById('accent-color'),
     mutedColor: document.getElementById('muted-color'),
+    uiBgColor: document.getElementById('ui-bg-color'),
+    uiPanelColor: document.getElementById('ui-panel-color'),
+    uiPanelSoftColor: document.getElementById('ui-panel-soft-color'),
+    uiTextColor: document.getElementById('ui-text-color'),
+    uiMutedColor: document.getElementById('ui-muted-color'),
+    uiAccentColor: document.getElementById('ui-accent-color'),
+    uiAccentStrongColor: document.getElementById('ui-accent-strong-color'),
+    uiBorderColor: document.getElementById('ui-border-color'),
+    uiSuccessColor: document.getElementById('ui-success-color'),
+    uiDangerColor: document.getElementById('ui-danger-color'),
+    uiInputBgColor: document.getElementById('ui-input-bg-color'),
+    uiInputTextColor: document.getElementById('ui-input-text-color'),
+    uiInputBorderColor: document.getElementById('ui-input-border-color'),
+    uiButtonBgColor: document.getElementById('ui-button-bg-color'),
+    uiButtonTextColor: document.getElementById('ui-button-text-color'),
+    uiLinkColor: document.getElementById('ui-link-color'),
+    uiShadowColor: document.getElementById('ui-shadow-color'),
     mainBgColor: document.getElementById('main-bg-color'),
     wakeWord: document.getElementById('wake-word'),
     stripeColor: document.getElementById('stripe-color'),
@@ -73,11 +113,16 @@
       const raw = localStorage.getItem('appSettings');
       if (!raw) return { ...defaultSettings };
       const stored = JSON.parse(raw);
+      const mergedTheme = { ...defaultSettings.theme, ...(stored.theme || {}) };
+      if (!Array.isArray(mergedTheme.userThemes)) {
+        mergedTheme.userThemes = [];
+      }
       return {
         general: { ...defaultSettings.general, ...(stored.general || {}) },
         main: { ...defaultSettings.main, ...(stored.main || {}) },
+        ui: { ...defaultSettings.ui, ...(stored.ui || {}) },
         character: { ...defaultSettings.character, ...(stored.character || {}) },
-        theme: { ...defaultSettings.theme, ...(stored.theme || {}) },
+        theme: mergedTheme,
       };
     } catch (e) {
       console.warn('設定の読み込みに失敗しました。', e);
@@ -98,12 +143,31 @@
   };
 
   const applyToPage = (settings) => {
+    const root = document.documentElement;
     document.documentElement.style.setProperty('--app-font', settings.general.fontFamily || '');
     document.body.style.fontFamily = settings.general.fontFamily || '';
-    if (settings.main.backgroundColor) {
-      document.body.style.backgroundColor = settings.main.backgroundColor;
+    const ui = settings.ui || {};
+    if (ui.backgroundColor) {
+      document.body.style.backgroundColor = ui.backgroundColor;
       document.body.style.backgroundImage = 'none';
     }
+    if (ui.backgroundColor) root.style.setProperty('--app-bg', ui.backgroundColor);
+    if (ui.panelColor) root.style.setProperty('--app-panel', ui.panelColor);
+    if (ui.panelSoftColor) root.style.setProperty('--app-panel-soft', ui.panelSoftColor);
+    if (ui.textColor) root.style.setProperty('--app-text', ui.textColor);
+    if (ui.mutedColor) root.style.setProperty('--app-muted', ui.mutedColor);
+    if (ui.accentColor) root.style.setProperty('--app-accent', ui.accentColor);
+    if (ui.accentStrongColor) root.style.setProperty('--app-accent-strong', ui.accentStrongColor);
+    if (ui.borderColor) root.style.setProperty('--app-border', ui.borderColor);
+    if (ui.successColor) root.style.setProperty('--app-success', ui.successColor);
+    if (ui.dangerColor) root.style.setProperty('--app-danger', ui.dangerColor);
+    if (ui.inputBgColor) root.style.setProperty('--app-input-bg', ui.inputBgColor);
+    if (ui.inputTextColor) root.style.setProperty('--app-input-text', ui.inputTextColor);
+    if (ui.inputBorderColor) root.style.setProperty('--app-input-border', ui.inputBorderColor);
+    if (ui.buttonBgColor) root.style.setProperty('--app-button-bg', ui.buttonBgColor);
+    if (ui.buttonTextColor) root.style.setProperty('--app-button-text', ui.buttonTextColor);
+    if (ui.linkColor) root.style.setProperty('--app-link', ui.linkColor);
+    if (ui.shadowColor) root.style.setProperty('--app-shadow-color', ui.shadowColor);
   };
 
   const updateSizeLabel = (value) => {
@@ -127,6 +191,70 @@
     });
     if (settings.main.voiceName) {
       elements.voiceSelect.value = settings.main.voiceName;
+    }
+  };
+
+  const standardTemplateOptions = [
+    { key: 'theme01', label: '01: 霧夜ブルー' },
+    { key: 'theme02', label: '02: 深海ネイビー' },
+    { key: 'theme03', label: '03: 墨ブラック' },
+    { key: 'theme04', label: '04: スチールグレー' },
+    { key: 'theme05', label: '05: 夕焼けアンバー' },
+    { key: 'theme06', label: '06: 焦がしオレンジ' },
+    { key: 'theme07', label: '07: 苺ミルク' },
+    { key: 'theme08', label: '08: 梅紫' },
+    { key: 'theme09', label: '09: 夜桜パープル' },
+    { key: 'theme10', label: '10: ライムグリーン' },
+    { key: 'theme11', label: '11: 深緑フォレスト' },
+    { key: 'theme12', label: '12: 抹茶' },
+    { key: 'theme13', label: '13: 砂漠サンド' },
+    { key: 'theme14', label: '14: コーヒーブラウン' },
+    { key: 'theme15', label: '15: ミントソーダ' },
+    { key: 'theme16', label: '16: アイスブルー' },
+    { key: 'theme17', label: '17: サイバーシアン' },
+    { key: 'theme18', label: '18: レモンイエロー' },
+    { key: 'theme19', label: '19: ローズピンク' },
+    { key: 'theme20', label: '20: ロイヤルブルー' },
+    { key: 'theme21', label: '21: ベージュクリーム' },
+    { key: 'theme22', label: '22: モノクロ（高コントラスト）' },
+    { key: 'theme23', label: '23: ダークレッド' },
+    { key: 'theme24', label: '24: ダークティール' },
+  ];
+
+  const rebuildTemplateOptions = () => {
+    if (!elements.colorTemplate) return;
+    const select = elements.colorTemplate;
+    select.innerHTML = '';
+    const noneOption = document.createElement('option');
+    noneOption.value = '';
+    noneOption.textContent = '選択しない';
+    select.appendChild(noneOption);
+
+    const userThemes = settings.theme.userThemes || [];
+    if (userThemes.length > 0) {
+      const userGroup = document.createElement('optgroup');
+      userGroup.label = 'ユーザーテーマ';
+      userThemes.forEach((theme) => {
+        const option = document.createElement('option');
+        option.value = `user:${theme.id}`;
+        option.textContent = theme.name;
+        userGroup.appendChild(option);
+      });
+      select.appendChild(userGroup);
+    }
+
+    const standardGroup = document.createElement('optgroup');
+    standardGroup.label = '標準テーマ';
+    standardTemplateOptions.forEach((item) => {
+      const option = document.createElement('option');
+      option.value = item.key;
+      option.textContent = item.label;
+      standardGroup.appendChild(option);
+    });
+    select.appendChild(standardGroup);
+
+    if (settings.theme.template) {
+      select.value = settings.theme.template;
     }
   };
 
@@ -171,9 +299,26 @@
   const scheduleSaveToServer = debounce(saveToServer, 800);
 
   if (elements.fontFamily) elements.fontFamily.value = settings.general.fontFamily;
-  if (elements.colorTemplate) elements.colorTemplate.value = settings.theme.template || '';
+  rebuildTemplateOptions();
   if (elements.accentColor) elements.accentColor.value = settings.theme.accentColor;
   if (elements.mutedColor) elements.mutedColor.value = settings.theme.mutedColor;
+  if (elements.uiBgColor) elements.uiBgColor.value = settings.ui.backgroundColor;
+  if (elements.uiPanelColor) elements.uiPanelColor.value = settings.ui.panelColor;
+  if (elements.uiPanelSoftColor) elements.uiPanelSoftColor.value = settings.ui.panelSoftColor;
+  if (elements.uiTextColor) elements.uiTextColor.value = settings.ui.textColor;
+  if (elements.uiMutedColor) elements.uiMutedColor.value = settings.ui.mutedColor;
+  if (elements.uiAccentColor) elements.uiAccentColor.value = settings.ui.accentColor;
+  if (elements.uiAccentStrongColor) elements.uiAccentStrongColor.value = settings.ui.accentStrongColor;
+  if (elements.uiBorderColor) elements.uiBorderColor.value = settings.ui.borderColor;
+  if (elements.uiSuccessColor) elements.uiSuccessColor.value = settings.ui.successColor;
+  if (elements.uiDangerColor) elements.uiDangerColor.value = settings.ui.dangerColor;
+  if (elements.uiInputBgColor) elements.uiInputBgColor.value = settings.ui.inputBgColor;
+  if (elements.uiInputTextColor) elements.uiInputTextColor.value = settings.ui.inputTextColor;
+  if (elements.uiInputBorderColor) elements.uiInputBorderColor.value = settings.ui.inputBorderColor;
+  if (elements.uiButtonBgColor) elements.uiButtonBgColor.value = settings.ui.buttonBgColor;
+  if (elements.uiButtonTextColor) elements.uiButtonTextColor.value = settings.ui.buttonTextColor;
+  if (elements.uiLinkColor) elements.uiLinkColor.value = settings.ui.linkColor;
+  if (elements.uiShadowColor) elements.uiShadowColor.value = settings.ui.shadowColor;
   if (elements.mainBgColor) elements.mainBgColor.value = settings.main.backgroundColor;
   if (elements.wakeWord) elements.wakeWord.value = settings.main.wakeWords || '';
   if (elements.stripeColor) elements.stripeColor.value = settings.main.stripeColor || '#7aa8ff';
@@ -215,7 +360,95 @@
     window.speechSynthesis.onvoiceschanged = () => populateVoices(loadSettings());
   }
 
+  const applyPalette = (palette) => {
+    if (!palette) return;
+    if (palette.theme) {
+      settings.theme.accentColor = palette.theme.accentColor ?? settings.theme.accentColor;
+      settings.theme.mutedColor = palette.theme.mutedColor ?? settings.theme.mutedColor;
+    }
+    if (palette.main) {
+      settings.main = { ...settings.main, ...palette.main };
+    }
+    if (palette.ui) {
+      settings.ui = { ...settings.ui, ...palette.ui };
+    }
+    if (elements.accentColor) elements.accentColor.value = settings.theme.accentColor;
+    if (elements.mutedColor) elements.mutedColor.value = settings.theme.mutedColor;
+    if (elements.mainBgColor) elements.mainBgColor.value = settings.main.backgroundColor;
+    if (elements.stripeColor) elements.stripeColor.value = settings.main.stripeColor;
+    if (elements.mainButtonColor) elements.mainButtonColor.value = settings.main.buttonColor;
+    if (elements.micColor) elements.micColor.value = settings.main.micColor;
+    if (elements.userBadgeBgColor) elements.userBadgeBgColor.value = settings.main.userBadgeBgColor;
+    if (elements.logBgColor) elements.logBgColor.value = settings.main.logBgColor;
+    if (elements.fabColor) elements.fabColor.value = settings.main.fabColor;
+    if (elements.mainTextColor) elements.mainTextColor.value = settings.main.textColor;
+    if (elements.uiBgColor) elements.uiBgColor.value = settings.ui.backgroundColor;
+    if (elements.uiPanelColor) elements.uiPanelColor.value = settings.ui.panelColor;
+    if (elements.uiPanelSoftColor) elements.uiPanelSoftColor.value = settings.ui.panelSoftColor;
+    if (elements.uiTextColor) elements.uiTextColor.value = settings.ui.textColor;
+    if (elements.uiMutedColor) elements.uiMutedColor.value = settings.ui.mutedColor;
+    if (elements.uiAccentColor) elements.uiAccentColor.value = settings.ui.accentColor;
+    if (elements.uiAccentStrongColor) elements.uiAccentStrongColor.value = settings.ui.accentStrongColor;
+    if (elements.uiBorderColor) elements.uiBorderColor.value = settings.ui.borderColor;
+    if (elements.uiSuccessColor) elements.uiSuccessColor.value = settings.ui.successColor;
+    if (elements.uiDangerColor) elements.uiDangerColor.value = settings.ui.dangerColor;
+    if (elements.uiInputBgColor) elements.uiInputBgColor.value = settings.ui.inputBgColor;
+    if (elements.uiInputTextColor) elements.uiInputTextColor.value = settings.ui.inputTextColor;
+    if (elements.uiInputBorderColor) elements.uiInputBorderColor.value = settings.ui.inputBorderColor;
+    if (elements.uiButtonBgColor) elements.uiButtonBgColor.value = settings.ui.buttonBgColor;
+    if (elements.uiButtonTextColor) elements.uiButtonTextColor.value = settings.ui.buttonTextColor;
+    if (elements.uiLinkColor) elements.uiLinkColor.value = settings.ui.linkColor;
+    if (elements.uiShadowColor) elements.uiShadowColor.value = settings.ui.shadowColor;
+    saveSettings(settings);
+    applyToPage(settings);
+    document.dispatchEvent(new CustomEvent('app-settings:updated'));
+  };
+
+  const buildCurrentPalette = () => ({
+    theme: {
+      accentColor: settings.theme.accentColor,
+      mutedColor: settings.theme.mutedColor,
+    },
+    main: {
+      backgroundColor: settings.main.backgroundColor,
+      stripeColor: settings.main.stripeColor,
+      buttonColor: settings.main.buttonColor,
+      micColor: settings.main.micColor,
+      userBadgeBgColor: settings.main.userBadgeBgColor,
+      logBgColor: settings.main.logBgColor,
+      fabColor: settings.main.fabColor,
+      textColor: settings.main.textColor,
+    },
+    ui: {
+      backgroundColor: settings.ui.backgroundColor,
+      panelColor: settings.ui.panelColor,
+      panelSoftColor: settings.ui.panelSoftColor,
+      textColor: settings.ui.textColor,
+      mutedColor: settings.ui.mutedColor,
+      accentColor: settings.ui.accentColor,
+      accentStrongColor: settings.ui.accentStrongColor,
+      borderColor: settings.ui.borderColor,
+      successColor: settings.ui.successColor,
+      dangerColor: settings.ui.dangerColor,
+      inputBgColor: settings.ui.inputBgColor,
+      inputTextColor: settings.ui.inputTextColor,
+      inputBorderColor: settings.ui.inputBorderColor,
+      buttonBgColor: settings.ui.buttonBgColor,
+      buttonTextColor: settings.ui.buttonTextColor,
+      linkColor: settings.ui.linkColor,
+      shadowColor: settings.ui.shadowColor,
+    },
+  });
+
   const applyThemeTemplate = (templateKey) => {
+    if (templateKey && templateKey.startsWith('user:')) {
+      const themeId = templateKey.replace('user:', '');
+      const userTheme = (settings.theme.userThemes || []).find((item) => item.id === themeId);
+      if (userTheme) {
+        applyPalette(userTheme.palette);
+      }
+      return;
+    }
     const templates = {
       theme01: {
         accentColor: '#6ea8ff',
@@ -508,29 +741,42 @@
     };
     const selected = templates[templateKey];
     if (!selected) return;
-    settings.theme.accentColor = selected.accentColor;
-    settings.theme.mutedColor = selected.mutedColor;
-    settings.main.backgroundColor = selected.backgroundColor;
-    settings.main.stripeColor = selected.stripeColor;
-    settings.main.buttonColor = selected.buttonColor;
-    settings.main.micColor = selected.micColor || selected.accentColor;
-    settings.main.userBadgeBgColor = selected.userBadgeBgColor || '#f1f5f9';
-    settings.main.logBgColor = selected.logBgColor || '#ffffff';
-    settings.main.fabColor = selected.fabColor || selected.accentColor;
-    settings.main.textColor = selected.textColor || '#0f1720';
-    if (elements.accentColor) elements.accentColor.value = selected.accentColor;
-    if (elements.mutedColor) elements.mutedColor.value = selected.mutedColor;
-    if (elements.mainBgColor) elements.mainBgColor.value = selected.backgroundColor;
-    if (elements.stripeColor) elements.stripeColor.value = selected.stripeColor;
-    if (elements.mainButtonColor) elements.mainButtonColor.value = selected.buttonColor;
-    if (elements.micColor) elements.micColor.value = selected.micColor || selected.accentColor;
-    if (elements.userBadgeBgColor) elements.userBadgeBgColor.value = selected.userBadgeBgColor || '#f1f5f9';
-    if (elements.logBgColor) elements.logBgColor.value = selected.logBgColor || '#ffffff';
-    if (elements.fabColor) elements.fabColor.value = selected.fabColor || selected.accentColor;
-    if (elements.mainTextColor) elements.mainTextColor.value = selected.textColor || '#0f1720';
-    saveSettings(settings);
-    applyToPage(settings);
-    document.dispatchEvent(new CustomEvent('app-settings:updated'));
+    const palette = {
+      theme: {
+        accentColor: selected.accentColor,
+        mutedColor: selected.mutedColor,
+      },
+      main: {
+        backgroundColor: selected.backgroundColor,
+        stripeColor: selected.stripeColor,
+        buttonColor: selected.buttonColor,
+        micColor: selected.micColor,
+        userBadgeBgColor: selected.userBadgeBgColor,
+        logBgColor: selected.logBgColor,
+        fabColor: selected.fabColor,
+        textColor: selected.textColor,
+      },
+      ui: {
+        backgroundColor: selected.uiBackgroundColor ?? selected.backgroundColor,
+        panelColor: selected.uiPanelColor ?? selected.backgroundColor,
+        panelSoftColor: selected.uiPanelSoftColor ?? selected.backgroundColor,
+        textColor: selected.uiTextColor ?? selected.textColor,
+        mutedColor: selected.uiMutedColor ?? selected.mutedColor,
+        accentColor: selected.uiAccentColor ?? selected.accentColor,
+        accentStrongColor: selected.uiAccentStrongColor ?? selected.accentColor,
+        borderColor: selected.uiBorderColor ?? selected.mutedColor,
+        successColor: selected.uiSuccessColor ?? settings.ui.successColor,
+        dangerColor: selected.uiDangerColor ?? settings.ui.dangerColor,
+        inputBgColor: selected.uiInputBgColor ?? selected.backgroundColor,
+        inputTextColor: selected.uiInputTextColor ?? selected.textColor,
+        inputBorderColor: selected.uiInputBorderColor ?? selected.mutedColor,
+        buttonBgColor: selected.uiButtonBgColor ?? selected.accentColor,
+        buttonTextColor: selected.uiButtonTextColor ?? selected.textColor,
+        linkColor: selected.uiLinkColor ?? selected.accentColor,
+        shadowColor: selected.uiShadowColor ?? settings.ui.shadowColor,
+      },
+    };
+    applyPalette(palette);
   };
 
   elements.colorTemplate?.addEventListener('change', (event) => {
@@ -538,6 +784,43 @@
     saveSettings(settings);
     scheduleSaveToServer();
     applyThemeTemplate(event.target.value);
+  });
+
+  elements.themeSaveButton?.addEventListener('click', () => {
+    const name = elements.themeSaveName?.value.trim();
+    if (!name) {
+      window.alert('ユーザーテーマ名を入力してください。');
+      return;
+    }
+    const id = window.crypto?.randomUUID ? window.crypto.randomUUID() : `${Date.now()}`;
+    const palette = buildCurrentPalette();
+    settings.theme.userThemes = settings.theme.userThemes || [];
+    settings.theme.userThemes.push({ id, name, palette });
+    settings.theme.template = `user:${id}`;
+    saveSettings(settings);
+    scheduleSaveToServer();
+    rebuildTemplateOptions();
+    if (elements.colorTemplate) elements.colorTemplate.value = settings.theme.template;
+    if (elements.themeSaveName) elements.themeSaveName.value = '';
+    applyToPage(settings);
+    document.dispatchEvent(new CustomEvent('app-settings:updated'));
+  });
+
+  elements.themeDeleteButton?.addEventListener('click', () => {
+    const selected = settings.theme.template || '';
+    if (!selected.startsWith('user:')) {
+      window.alert('削除できるユーザーテーマが選択されていません。');
+      return;
+    }
+    const id = selected.replace('user:', '');
+    settings.theme.userThemes = (settings.theme.userThemes || []).filter((item) => item.id !== id);
+    settings.theme.template = '';
+    saveSettings(settings);
+    scheduleSaveToServer();
+    rebuildTemplateOptions();
+    if (elements.colorTemplate) elements.colorTemplate.value = '';
+    applyToPage(settings);
+    document.dispatchEvent(new CustomEvent('app-settings:updated'));
   });
 
   elements.fontFamily?.addEventListener('change', (event) => {
@@ -573,6 +856,142 @@
 
   elements.mutedColor?.addEventListener('change', (event) => {
     settings.theme.mutedColor = event.target.value;
+    saveSettings(settings);
+    scheduleSaveToServer();
+    applyToPage(settings);
+    document.dispatchEvent(new CustomEvent('app-settings:updated'));
+  });
+
+  elements.uiBgColor?.addEventListener('change', (event) => {
+    settings.ui.backgroundColor = event.target.value;
+    saveSettings(settings);
+    scheduleSaveToServer();
+    applyToPage(settings);
+    document.dispatchEvent(new CustomEvent('app-settings:updated'));
+  });
+
+  elements.uiPanelColor?.addEventListener('change', (event) => {
+    settings.ui.panelColor = event.target.value;
+    saveSettings(settings);
+    scheduleSaveToServer();
+    applyToPage(settings);
+    document.dispatchEvent(new CustomEvent('app-settings:updated'));
+  });
+
+  elements.uiPanelSoftColor?.addEventListener('change', (event) => {
+    settings.ui.panelSoftColor = event.target.value;
+    saveSettings(settings);
+    scheduleSaveToServer();
+    applyToPage(settings);
+    document.dispatchEvent(new CustomEvent('app-settings:updated'));
+  });
+
+  elements.uiTextColor?.addEventListener('change', (event) => {
+    settings.ui.textColor = event.target.value;
+    saveSettings(settings);
+    scheduleSaveToServer();
+    applyToPage(settings);
+    document.dispatchEvent(new CustomEvent('app-settings:updated'));
+  });
+
+  elements.uiMutedColor?.addEventListener('change', (event) => {
+    settings.ui.mutedColor = event.target.value;
+    saveSettings(settings);
+    scheduleSaveToServer();
+    applyToPage(settings);
+    document.dispatchEvent(new CustomEvent('app-settings:updated'));
+  });
+
+  elements.uiAccentColor?.addEventListener('change', (event) => {
+    settings.ui.accentColor = event.target.value;
+    saveSettings(settings);
+    scheduleSaveToServer();
+    applyToPage(settings);
+    document.dispatchEvent(new CustomEvent('app-settings:updated'));
+  });
+
+  elements.uiAccentStrongColor?.addEventListener('change', (event) => {
+    settings.ui.accentStrongColor = event.target.value;
+    saveSettings(settings);
+    scheduleSaveToServer();
+    applyToPage(settings);
+    document.dispatchEvent(new CustomEvent('app-settings:updated'));
+  });
+
+  elements.uiBorderColor?.addEventListener('change', (event) => {
+    settings.ui.borderColor = event.target.value;
+    saveSettings(settings);
+    scheduleSaveToServer();
+    applyToPage(settings);
+    document.dispatchEvent(new CustomEvent('app-settings:updated'));
+  });
+
+  elements.uiSuccessColor?.addEventListener('change', (event) => {
+    settings.ui.successColor = event.target.value;
+    saveSettings(settings);
+    scheduleSaveToServer();
+    applyToPage(settings);
+    document.dispatchEvent(new CustomEvent('app-settings:updated'));
+  });
+
+  elements.uiDangerColor?.addEventListener('change', (event) => {
+    settings.ui.dangerColor = event.target.value;
+    saveSettings(settings);
+    scheduleSaveToServer();
+    applyToPage(settings);
+    document.dispatchEvent(new CustomEvent('app-settings:updated'));
+  });
+
+  elements.uiInputBgColor?.addEventListener('change', (event) => {
+    settings.ui.inputBgColor = event.target.value;
+    saveSettings(settings);
+    scheduleSaveToServer();
+    applyToPage(settings);
+    document.dispatchEvent(new CustomEvent('app-settings:updated'));
+  });
+
+  elements.uiInputTextColor?.addEventListener('change', (event) => {
+    settings.ui.inputTextColor = event.target.value;
+    saveSettings(settings);
+    scheduleSaveToServer();
+    applyToPage(settings);
+    document.dispatchEvent(new CustomEvent('app-settings:updated'));
+  });
+
+  elements.uiInputBorderColor?.addEventListener('change', (event) => {
+    settings.ui.inputBorderColor = event.target.value;
+    saveSettings(settings);
+    scheduleSaveToServer();
+    applyToPage(settings);
+    document.dispatchEvent(new CustomEvent('app-settings:updated'));
+  });
+
+  elements.uiButtonBgColor?.addEventListener('change', (event) => {
+    settings.ui.buttonBgColor = event.target.value;
+    saveSettings(settings);
+    scheduleSaveToServer();
+    applyToPage(settings);
+    document.dispatchEvent(new CustomEvent('app-settings:updated'));
+  });
+
+  elements.uiButtonTextColor?.addEventListener('change', (event) => {
+    settings.ui.buttonTextColor = event.target.value;
+    saveSettings(settings);
+    scheduleSaveToServer();
+    applyToPage(settings);
+    document.dispatchEvent(new CustomEvent('app-settings:updated'));
+  });
+
+  elements.uiLinkColor?.addEventListener('change', (event) => {
+    settings.ui.linkColor = event.target.value;
+    saveSettings(settings);
+    scheduleSaveToServer();
+    applyToPage(settings);
+    document.dispatchEvent(new CustomEvent('app-settings:updated'));
+  });
+
+  elements.uiShadowColor?.addEventListener('change', (event) => {
+    settings.ui.shadowColor = event.target.value;
     saveSettings(settings);
     scheduleSaveToServer();
     applyToPage(settings);
@@ -723,13 +1142,34 @@
     settings = {
       general: { ...defaultSettings.general, ...(serverSettings.general || {}) },
       main: { ...defaultSettings.main, ...(serverSettings.main || {}) },
+      ui: { ...defaultSettings.ui, ...(serverSettings.ui || {}) },
       character: { ...defaultSettings.character, ...(serverSettings.character || {}) },
       theme: { ...defaultSettings.theme, ...(serverSettings.theme || {}) },
     };
+    if (!Array.isArray(settings.theme.userThemes)) {
+      settings.theme.userThemes = [];
+    }
     if (elements.fontFamily) elements.fontFamily.value = settings.general.fontFamily;
-    if (elements.colorTemplate) elements.colorTemplate.value = settings.theme.template || '';
+    rebuildTemplateOptions();
     if (elements.accentColor) elements.accentColor.value = settings.theme.accentColor;
     if (elements.mutedColor) elements.mutedColor.value = settings.theme.mutedColor;
+    if (elements.uiBgColor) elements.uiBgColor.value = settings.ui.backgroundColor;
+    if (elements.uiPanelColor) elements.uiPanelColor.value = settings.ui.panelColor;
+    if (elements.uiPanelSoftColor) elements.uiPanelSoftColor.value = settings.ui.panelSoftColor;
+    if (elements.uiTextColor) elements.uiTextColor.value = settings.ui.textColor;
+    if (elements.uiMutedColor) elements.uiMutedColor.value = settings.ui.mutedColor;
+    if (elements.uiAccentColor) elements.uiAccentColor.value = settings.ui.accentColor;
+    if (elements.uiAccentStrongColor) elements.uiAccentStrongColor.value = settings.ui.accentStrongColor;
+    if (elements.uiBorderColor) elements.uiBorderColor.value = settings.ui.borderColor;
+    if (elements.uiSuccessColor) elements.uiSuccessColor.value = settings.ui.successColor;
+    if (elements.uiDangerColor) elements.uiDangerColor.value = settings.ui.dangerColor;
+    if (elements.uiInputBgColor) elements.uiInputBgColor.value = settings.ui.inputBgColor;
+    if (elements.uiInputTextColor) elements.uiInputTextColor.value = settings.ui.inputTextColor;
+    if (elements.uiInputBorderColor) elements.uiInputBorderColor.value = settings.ui.inputBorderColor;
+    if (elements.uiButtonBgColor) elements.uiButtonBgColor.value = settings.ui.buttonBgColor;
+    if (elements.uiButtonTextColor) elements.uiButtonTextColor.value = settings.ui.buttonTextColor;
+    if (elements.uiLinkColor) elements.uiLinkColor.value = settings.ui.linkColor;
+    if (elements.uiShadowColor) elements.uiShadowColor.value = settings.ui.shadowColor;
     if (elements.mainBgColor) elements.mainBgColor.value = settings.main.backgroundColor;
     if (elements.wakeWord) elements.wakeWord.value = settings.main.wakeWords || '';
     if (elements.stripeColor) elements.stripeColor.value = settings.main.stripeColor || '#7aa8ff';

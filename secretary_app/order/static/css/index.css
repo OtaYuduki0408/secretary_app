@@ -1,23 +1,23 @@
 :root {
-  --co-bg: #0A0F1A; /* より深いネイビーブルー */
-  --co-gradient: linear-gradient(140deg, #0A0F1A 0%, #111827 50%, #1A202C 100%); /* 彩度を抑えたグラデーション */
-  --co-card-bg: rgba(17, 24, 39, 0.7); /* カード背景。少し透明感を残す */
-  --co-border: rgba(255, 255, 255, 0.06);
-  --co-border-strong: rgba(110, 231, 255, 0.3); /* Cyan系 */
-  --co-text: #E5E7EB; /* 少し柔らかい白 */
-  --co-muted: rgba(229, 231, 235, 0.7);
-  --co-accent: #6EE7FF; /* Cyan */
-  --co-accent-strong: #818CF8; /* Indigo */
-  --co-danger: #F47174;
-  --co-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.4);
+    --co-bg: var(--app-bg, #0A0F1A); /* より深いネイビーブルー */
+    --co-gradient: linear-gradient(140deg, var(--app-bg, #0A0F1A) 0%, var(--app-panel, #111827) 50%, var(--app-panel-soft, #1A202C) 100%); /* 彩度を抑えたグラデーション */
+    --co-card-bg: color-mix(in srgb, var(--app-panel, #111827) 80%, transparent); /* カード背景。少し透明感を残す */
+    --co-border: rgba(var(--app-border-rgb, 255, 255, 255), 0.06);
+    --co-border-strong: rgba(var(--app-border-rgb, 110, 231, 255), 0.3); /* Cyan系 */
+    --co-text: var(--app-text, #E5E7EB); /* 少し柔らかい白 */
+    --co-muted: color-mix(in srgb, var(--app-muted, #E5E7EB) 70%, transparent);
+    --co-accent: var(--app-accent, #6EE7FF); /* Cyan */
+    --co-accent-strong: var(--app-accent-strong, #818CF8); /* Indigo */
+    --co-danger: var(--app-danger, #F47174);
+    --co-shadow: var(--app-shadow, 0 25px 50px -12px rgba(0, 0, 0, 0.4));
   --co-radius: 22px;
   --co-transition: 0.25s ease;
 
   /* Block Colors */
-  --action-bg-base: hsla(230, 60%, 35%, 0.4); /* アクション: 青紫系 */
-  --action-border-base: hsla(230, 60%, 55%, 0.6);
-  --condition-bg-base: hsla(180, 60%, 35%, 0.4); /* 条件: 青緑系 */
-  --condition-border-base: hsla(180, 60%, 55%, 0.6);
+  --action-bg-base: rgba(var(--app-accent-rgb, 110, 231, 255), 0.25); /* アクション: 青紫系 */
+  --action-border-base: rgba(var(--app-accent-rgb, 110, 231, 255), 0.55);
+  --condition-bg-base: rgba(var(--app-success-rgb, 16, 185, 129), 0.25); /* 条件: 青緑系 */
+  --condition-border-base: rgba(var(--app-success-rgb, 16, 185, 129), 0.55);
 }
 
 *,
