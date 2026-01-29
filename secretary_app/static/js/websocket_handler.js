@@ -470,6 +470,8 @@ function executeAction(action) {
 
             let speechPromise;
             if (typeof SpeechSynthesisUtterance !== 'undefined' && typeof speechSynthesis !== 'undefined') {
+                // オーバーレイ読み上げを最優先にするため、進行中のTTSを停止
+                speechSynthesis.cancel();
                 const utterance = new SpeechSynthesisUtterance(textToSpeak);
                 speechPromise = new Promise(resolveSpeech => {
                     utterance.onstart = () => {
