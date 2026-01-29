@@ -622,7 +622,7 @@ def _match_keywords(text, keywords):
     if not text or not keywords:
         return False
     lowered = text.lower()
-    return any(k.lower() in lowered for k in keywords)
+    return all(k.lower() in lowered for k in keywords)
 
 
 def _evaluate_filters(filters, text):
