@@ -284,9 +284,13 @@ export async function check_chat_Space(inputValue) {
           await window.executeOrderPayload(payload);
         }
       } else {
-        console.warn("executeOrderPayload is not available on window.");
+        console.warn("executeOrderPayload is not available on window. Queueing payloads.");
+        window.__pendingOrderPayloads = (window.__pendingOrderPayloads || []).concat(result.order_payloads);
       }
       return;
+    }
+    if (result.triggered_by_voice) {
+      console.warn("Voice trigger matched but no order_payloads were returned.", result);
     }
     }
 

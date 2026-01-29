@@ -74,8 +74,12 @@ def get_device_status(api_token: str, api_secret: str, device_id: str) -> dict:
     url = f"{SWITCHBOT_API_BASE_URL}/v1.1/devices/{device_id}/status"
     try:
         response = requests.get(url, headers=headers)
+        if response.status_code == 429:
+            return {"statusCode": 429, "message": "rate_limited"}
         response.raise_for_status()
         return response.json()
     except requests.exceptions.RequestException as e:
+        if hasattr(e, "response") and e.response is not None and e.response.status_code == 429:
+            return {"statusCode": 429, "message": "rate_limited"}
         print(f"SwitchBotデバイス状態取得エラー: {e}")
         return {"statusCode": 500, "message": str(e)}

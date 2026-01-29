@@ -960,7 +960,8 @@ def _handle_voice_triggers(user_input, user_id):
             continue
         trigger = triggers[0]
         category = trigger.get('category')
-        if category != '???':
+        cat = str(category).strip() if category is not None else ""
+        if cat not in ('ボイス', 'voice', 'VOICE'):
             continue
         value = trigger.get('value') or {}
         keywords = _normalize_keyword_list(value.get('keywords') or value.get('keyword') or value.get('value'))
@@ -999,6 +1000,7 @@ def chat_api_web():
         response_data['message'] = ""
         response_data['triggered_by_voice'] = True
         response_data['order_payloads'] = voice_payloads
+        response_data['triggered_by_voice_count'] = len(voice_payloads)
         return jsonify(response_data)
 
     # 高速実行のチェック

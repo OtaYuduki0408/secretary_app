@@ -162,6 +162,15 @@ window.executeOrderPayload = async function executeOrderPayload(orderData) {
     await executeStepsInOrder(steps);
 };
 
+if (Array.isArray(window.__pendingOrderPayloads) && window.__pendingOrderPayloads.length > 0) {
+    console.log('[DEBUG] Processing queued order_payloads:', window.__pendingOrderPayloads.length);
+    const queued = window.__pendingOrderPayloads.slice();
+    window.__pendingOrderPayloads = [];
+    queued.forEach((payload) => {
+        window.executeOrderPayload(payload);
+    });
+}
+
 /**
  * オーバーレイの終了ボタンを追加する
  * @param {HTMLElement} overlay - オーバーレイ要素
