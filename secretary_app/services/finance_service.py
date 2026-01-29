@@ -27,19 +27,18 @@ def get_all_finance_records(user_id: str | None = None):
     Supabaseから全レコードを取得する。
     DB接続失敗時は空のリストを返すことで、Flask/Jinja2でのTypeErrorを防ぐ。
     """
+    global _LAST_FINANCE_ERROR
     try:
         # DBから全データを取得
         q = supabase.table(TABLE_FINANCE).select("*").order("date", desc=True)
         if user_id:
             q = q.eq("user_id", user_id)
         all_records = q.execute().data
-        global _LAST_FINANCE_ERROR
         _LAST_FINANCE_ERROR = None
         return all_records
     except (APIError, Exception) as e:
         # 接続エラーやその他のエラーを捕捉
         print(f"ERROR: Failed to fetch all finance records from DB: {e}")
-        global _LAST_FINANCE_ERROR
         _LAST_FINANCE_ERROR = _format_finance_error(e)
         # 安全策として空のリストを返す
         return []
