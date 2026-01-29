@@ -276,6 +276,18 @@ export async function check_chat_Space(inputValue) {
         }
       }
       return;
+
+    if (Array.isArray(result.order_payloads) && result.order_payloads.length > 0) {
+      console.log("DEBUG: Voice trigger payloads received:", result.order_payloads);
+      if (typeof window.executeOrderPayload === "function") {
+        for (const payload of result.order_payloads) {
+          await window.executeOrderPayload(payload);
+        }
+      } else {
+        console.warn("executeOrderPayload is not available on window.");
+      }
+      return;
+    }
     }
 
     if (result.message && !result.suppress_tts) {

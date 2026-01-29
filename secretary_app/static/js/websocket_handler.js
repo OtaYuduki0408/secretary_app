@@ -153,6 +153,15 @@ async function executeStepsInOrder(steps) {
     }
 }
 
+window.executeOrderPayload = async function executeOrderPayload(orderData) {
+    if (!orderData) return;
+    const steps = orderData.steps || orderData.actions || [];
+    if (!Array.isArray(steps) || steps.length === 0) {
+        return;
+    }
+    await executeStepsInOrder(steps);
+};
+
 /**
  * オーバーレイの終了ボタンを追加する
  * @param {HTMLElement} overlay - オーバーレイ要素
