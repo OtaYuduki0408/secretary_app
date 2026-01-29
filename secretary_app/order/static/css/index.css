@@ -285,15 +285,15 @@ body.co-body {
 
 .co-btn.primary,
 .save-button {
-  background: linear-gradient(135deg, #34c6ff, #7b61ff);
-  color: #fff;
-  box-shadow: 0 10px 25px rgba(53, 173, 255, 0.35);
+  background: linear-gradient(135deg, var(--app-button-bg, var(--co-accent)), var(--app-accent-strong, var(--co-accent-strong)));
+  color: var(--app-button-text, #0f172a);
+  box-shadow: 0 10px 25px rgba(var(--app-accent-rgb, 110, 231, 255), 0.35);
 }
 
 .co-btn.primary:hover,
 .save-button:hover {
   transform: translateY(-2px);
-  box-shadow: 0 18px 35px rgba(53, 173, 255, 0.4);
+  box-shadow: 0 18px 35px rgba(var(--app-accent-rgb, 110, 231, 255), 0.45);
 }
 
 .co-btn.ghost,

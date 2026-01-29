@@ -112,6 +112,25 @@
       gap: 12px;
     }
 
+    .settings-button {
+      border: none;
+      border-radius: 999px;
+      padding: 10px 18px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: 0.25s ease;
+      letter-spacing: 0.02em;
+      background: linear-gradient(135deg, var(--app-button-bg, #38bdf8), var(--app-accent-strong, #0ea5e9));
+      color: var(--app-button-text, #0f172a);
+      box-shadow: 0 10px 25px rgba(var(--app-accent-rgb, 56, 189, 248), 0.3);
+    }
+
+    .settings-button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 18px 35px rgba(var(--app-accent-rgb, 56, 189, 248), 0.4);
+    }
+
     .field-inline input[type="range"] {
       flex: 1;
     }
@@ -174,8 +193,8 @@
             <div class="hint">現在の色設定を名前付きで保存します。</div>
           </div>
           <div class="field-inline">
-            <button id="theme-save-button" type="button">この色セットを保存</button>
-            <button id="theme-delete-button" type="button">選択中のユーザーテーマを削除</button>
+            <button id="theme-save-button" class="settings-button" type="button">この色セットを保存</button>
+            <button id="theme-delete-button" class="settings-button" type="button">選択中のユーザーテーマを削除</button>
           </div>
           <div class="field">
             <label for="accent-color">アクセント色</label>
