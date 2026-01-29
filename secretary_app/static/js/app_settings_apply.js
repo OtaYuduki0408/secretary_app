@@ -1,8 +1,18 @@
 (() => {
+  const hexToRgb = (hex) => {
+    if (!hex || typeof hex !== 'string') return null;
+    const raw = hex.replace('#', '');
+    const full = raw.length === 3 ? raw.split('').map((c) => c + c).join('') : raw;
+    const num = parseInt(full, 16);
+    if (Number.isNaN(num)) return null;
+    return { r: (num >> 16) & 255, g: (num >> 8) & 255, b: num & 255 };
+  };
+
   const applySettings = () => {
     const root = document.documentElement;
     const body = document.body;
     if (!body || !root) return;
+    const isMainSpecial = Boolean(document.querySelector('.parallax') || document.getElementById('plx-back'));
 
     let settings = null;
     try {
@@ -54,16 +64,44 @@
     }
 
     if (main.backgroundColor) {
-      root.style.backgroundColor = main.backgroundColor;
-      body.style.backgroundColor = main.backgroundColor;
-      root.style.backgroundImage = 'none';
-      body.style.backgroundImage = 'none';
-      root.style.backgroundRepeat = 'no-repeat';
-      body.style.backgroundRepeat = 'no-repeat';
-      root.style.backgroundAttachment = 'fixed';
-      body.style.backgroundAttachment = 'fixed';
-      root.style.backgroundSize = 'cover';
-      body.style.backgroundSize = 'cover';
+      const color = hexToRgb(main.backgroundColor);
+      if (color) {
+        const clamp = (value) => Math.min(255, Math.max(0, Math.round(value)));
+        const scale = (value, factor) => clamp(value * factor);
+        const dark = `rgb(${scale(color.r, 0.55)}, ${scale(color.g, 0.55)}, ${scale(color.b, 0.55)})`;
+        const mid = `rgb(${scale(color.r, 0.78)}, ${scale(color.g, 0.78)}, ${scale(color.b, 0.78)})`;
+        const glow1 = `rgba(${color.r}, ${color.g}, ${color.b}, 0.18)`;
+        const glow2 = `rgba(${color.r}, ${color.g}, ${color.b}, 0.12)`;
+        root.style.setProperty('--bg-1', dark);
+        root.style.setProperty('--bg-2', mid);
+        root.style.setProperty('--wallpaper', `radial-gradient(circle at 18% 22%, ${glow1}, transparent 45%), radial-gradient(circle at 70% 10%, ${glow2}, transparent 55%), linear-gradient(180deg, ${mid} 0%, ${dark} 100%)`);
+        root.style.setProperty('--wallpaper-darken', 'rgba(6,12,32,.18)');
+      }
+
+      if (!isMainSpecial) {
+        root.style.backgroundColor = main.backgroundColor;
+        body.style.backgroundColor = main.backgroundColor;
+        root.style.backgroundImage = 'none';
+        body.style.backgroundImage = 'none';
+        root.style.backgroundRepeat = 'no-repeat';
+        body.style.backgroundRepeat = 'no-repeat';
+        root.style.backgroundAttachment = 'fixed';
+        body.style.backgroundAttachment = 'fixed';
+        root.style.backgroundSize = 'cover';
+        body.style.backgroundSize = 'cover';
+      } else {
+        body.style.backgroundColor = body.style.backgroundColor || 'transparent';
+        root.style.backgroundColor = root.style.backgroundColor || 'transparent';
+        body.style.removeProperty('background-image');
+        root.style.removeProperty('background-image');
+        body.style.removeProperty('background-repeat');
+        root.style.removeProperty('background-repeat');
+        body.style.removeProperty('background-attachment');
+        root.style.removeProperty('background-attachment');
+        body.style.removeProperty('background-size');
+        root.style.removeProperty('background-size');
+      }
+
       root.style.setProperty('--co-bg', main.backgroundColor);
       root.style.setProperty('--co-gradient', `linear-gradient(140deg, ${main.backgroundColor} 0%, ${main.backgroundColor} 100%)`);
       root.style.setProperty('--co-card-bg', 'rgba(17, 24, 39, 0.7)');
@@ -79,6 +117,10 @@
       body.style.removeProperty('background-attachment');
       root.style.removeProperty('background-size');
       body.style.removeProperty('background-size');
+      root.style.removeProperty('--bg-1');
+      root.style.removeProperty('--bg-2');
+      root.style.removeProperty('--wallpaper');
+      root.style.removeProperty('--wallpaper-darken');
       root.style.removeProperty('--co-bg');
       root.style.removeProperty('--co-gradient');
       root.style.removeProperty('--co-card-bg');

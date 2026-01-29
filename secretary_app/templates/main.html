@@ -527,6 +527,7 @@
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.5/socket.io.min.js"></script>
+<script src="{{ url_for('static', filename='js/app_settings_apply.js') }}"></script>
 <script>
   (() => {
     const logoutLink = document.getElementById('logout-link');
@@ -657,6 +658,7 @@
 
     applySettings();
     window.addEventListener('storage', applySettings);
+    document.addEventListener('app-settings:updated', applySettings);
   })();
 </script>
 <script>
