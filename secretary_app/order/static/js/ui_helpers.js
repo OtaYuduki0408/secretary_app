@@ -110,10 +110,11 @@ export function updateSubOptions(categoryId, subId, data) {
       sub.style.display = 'block';
     }
   } else if (categoryId.includes('action')) {
-    if (cat && cat !== "カレンダー") {
+    const subOptions = data[cat] || [];
+    if (subOptions.length <= 1) {
       sub.style.display = 'none';
-      if (data[cat] && data[cat].length > 0) {
-        sub.value = data[cat][0];
+      if (subOptions.length === 1) {
+        sub.value = subOptions[0];
       }
     } else {
       sub.style.display = 'block';

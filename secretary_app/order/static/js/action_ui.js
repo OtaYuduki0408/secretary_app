@@ -386,6 +386,13 @@ export function createActionUI(prefix = '', initialValue = {}) {
         `;
       }
       break;
+    case "読み上げ":
+      detailContainer.innerHTML = `
+        <div class="co-help-text">
+          <p>選択した項目を読み上げます。</p>
+        </div>
+      `;
+      break;
     case "アラート":
       if (sub === "実行") {
         const alertSounds = [

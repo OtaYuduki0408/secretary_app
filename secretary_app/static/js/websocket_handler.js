@@ -309,6 +309,38 @@ function executeAction(action) {
             overlayCategoryClass = "overlay-speech";
             messageHtml = `<h3>${overlayTitle}</h3><p>${textToSpeak}</p>`;
 
+        } else if (action.category === '読み上げ') {
+            overlayTitle = "読み上げ";
+            overlayCategoryClass = "overlay-speech";
+            const nowDate = new Date();
+            const year = nowDate.getFullYear();
+            const month = String(nowDate.getMonth() + 1).padStart(2, '0');
+            const day = String(nowDate.getDate()).padStart(2, '0');
+            const hours = String(nowDate.getHours()).padStart(2, '0');
+            const minutes = String(nowDate.getMinutes()).padStart(2, '0');
+            const seconds = String(nowDate.getSeconds()).padStart(2, '0');
+            const weekdays = ["日", "月", "火", "水", "木", "金", "土"];
+            const weekday = weekdays[nowDate.getDay()];
+
+            switch (action.sub) {
+                case "今日の日付":
+                    textToSpeak = `今日は${Number(month)}月${Number(day)}日です。`;
+                    break;
+                case "今日の曜日":
+                    textToSpeak = `今日は${weekday}曜日です。`;
+                    break;
+                case "今の時間":
+                    textToSpeak = `今は${Number(hours)}時${Number(minutes)}分${Number(seconds)}秒です。`;
+                    break;
+                case "今日の年月日":
+                    textToSpeak = `今日は${year}年${Number(month)}月${Number(day)}日です。`;
+                    break;
+                default:
+                    textToSpeak = "読み上げ内容が選択されていません。";
+                    break;
+            }
+            messageHtml = `<h3>${overlayTitle}</h3><p>${textToSpeak}</p>`;
+
         } else if (action.category === 'アラート' && action.sub === '実行') {
             overlayTitle = "アラート";
             overlayCategoryClass = "overlay-speech";
