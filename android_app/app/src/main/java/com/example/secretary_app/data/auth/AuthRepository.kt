@@ -68,6 +68,11 @@ class AuthRepository(private val context: Context) {
             return null
         }
     }
+
+    fun signOut() {
+        sessionStorage.clear()
+        credentialStorage.clearCredentials()
+    }
 }
 
 data class UserSession(

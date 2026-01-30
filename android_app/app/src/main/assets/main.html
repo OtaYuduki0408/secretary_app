@@ -584,8 +584,16 @@
     const logoutLink = document.getElementById('logout-link');
     if (!logoutLink) return;
     logoutLink.addEventListener('click', (event) => {
-      if (!confirm('ログアウトしますか？')) {
-        event.preventDefault();
+      event.preventDefault(); // リンクのデフォルト動作を常にキャンセル
+      if (confirm('ログアウトしますか？')) {
+        // ネイティブのログアウト処理を呼び出す
+        if (window.AndroidSync && typeof window.AndroidSync.signOut === 'function') {
+            window.AndroidSync.signOut();
+        } else {
+            console.warn('AndroidSync.signOut is not available.');
+        }
+        // ログインページにリダイレクト
+        window.location.href = 'login.html';
       }
     });
   })();
