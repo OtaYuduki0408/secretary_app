@@ -108,8 +108,10 @@ recognition.onerror = (event) => {
 };
 
 startBtn.addEventListener('click', () => {
-  if (recognition && !startBtn.classList.contains('is-recording')) {
-    recognition.start();
+  try {
+    recognition?.start();
+  } catch (e) {
+    console.error("recognition.start 失敗", e);
   }
 });
 

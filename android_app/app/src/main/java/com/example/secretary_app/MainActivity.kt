@@ -7,6 +7,8 @@ import android.os.Bundle
 import android.graphics.Color
 import android.os.Build
 import android.util.Log
+import android.webkit.PermissionRequest
+import android.webkit.WebChromeClient
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
@@ -85,6 +87,16 @@ class MainActivity : ComponentActivity() {
                         it.setBackgroundColor(Color.parseColor("#0b1116"))
                         it.overScrollMode = android.view.View.OVER_SCROLL_NEVER
                         it.addJavascriptInterface(SyncBridge(this@MainActivity, this@MainActivity), "AndroidSync")
+                        it.webChromeClient = object : WebChromeClient() {
+                            override fun onPermissionRequest(request: PermissionRequest) {
+                                val resources = request.resources
+                                if (resources.contains(PermissionRequest.RESOURCE_AUDIO_CAPTURE)) {
+                                    request.grant(arrayOf(PermissionRequest.RESOURCE_AUDIO_CAPTURE))
+                                } else {
+                                    request.deny()
+                                }
+                            }
+                        }
                     }
                 )
             }
