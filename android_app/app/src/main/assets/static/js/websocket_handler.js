@@ -153,6 +153,24 @@ async function executeStepsInOrder(steps) {
     }
 }
 
+window.executeOrderPayload = async function executeOrderPayload(orderData) {
+    if (!orderData) return;
+    const steps = orderData.steps || orderData.actions || [];
+    if (!Array.isArray(steps) || steps.length === 0) {
+        return;
+    }
+    await executeStepsInOrder(steps);
+};
+
+if (Array.isArray(window.__pendingOrderPayloads) && window.__pendingOrderPayloads.length > 0) {
+    console.log('[DEBUG] Processing queued order_payloads:', window.__pendingOrderPayloads.length);
+    const queued = window.__pendingOrderPayloads.slice();
+    window.__pendingOrderPayloads = [];
+    queued.forEach((payload) => {
+        window.executeOrderPayload(payload);
+    });
+}
+
 /**
  * オーバーレイの終了ボタンを追加する
  * @param {HTMLElement} overlay - オーバーレイ要素
@@ -289,6 +307,38 @@ function executeAction(action) {
             textToSpeak = action.detail?.text || "";
             overlayTitle = "読み上げ";
             overlayCategoryClass = "overlay-speech";
+            messageHtml = `<h3>${overlayTitle}</h3><p>${textToSpeak}</p>`;
+
+        } else if (action.category === '読み上げ') {
+            overlayTitle = "読み上げ";
+            overlayCategoryClass = "overlay-speech";
+            const nowDate = new Date();
+            const year = nowDate.getFullYear();
+            const month = String(nowDate.getMonth() + 1).padStart(2, '0');
+            const day = String(nowDate.getDate()).padStart(2, '0');
+            const hours = String(nowDate.getHours()).padStart(2, '0');
+            const minutes = String(nowDate.getMinutes()).padStart(2, '0');
+            const seconds = String(nowDate.getSeconds()).padStart(2, '0');
+            const weekdays = ["日", "月", "火", "水", "木", "金", "土"];
+            const weekday = weekdays[nowDate.getDay()];
+
+            switch (action.sub) {
+                case "今日の日付":
+                    textToSpeak = `今日は${Number(month)}月${Number(day)}日です。`;
+                    break;
+                case "今日の曜日":
+                    textToSpeak = `今日は${weekday}曜日です。`;
+                    break;
+                case "今の時間":
+                    textToSpeak = `今は${Number(hours)}時${Number(minutes)}分${Number(seconds)}秒です。`;
+                    break;
+                case "今日の年月日":
+                    textToSpeak = `今日は${year}年${Number(month)}月${Number(day)}日です。`;
+                    break;
+                default:
+                    textToSpeak = "読み上げ内容が選択されていません。";
+                    break;
+            }
             messageHtml = `<h3>${overlayTitle}</h3><p>${textToSpeak}</p>`;
 
         } else if (action.category === 'アラート' && action.sub === '実行') {
@@ -437,9 +487,23 @@ function executeAction(action) {
             overlay.classList.add(overlayCategoryClass);
             messageElement.innerHTML = messageHtml;
             overlay.classList.add('visible');
+            overlay.style.position = 'fixed'; // オーバーレイが正しく表示されるようにpositionを強制的に設定
+
+            // ===== DEBUG START =====
+            const styles = window.getComputedStyle(overlay);
+            console.log('Overlay STYLE DEBUG:', {
+                opacity: styles.opacity,
+                visibility: styles.visibility,
+                display: styles.display,
+                position: styles.position,
+                zIndex: styles.zIndex
+            });
+            // ===== DEBUG END =====
 
             let speechPromise;
             if (typeof SpeechSynthesisUtterance !== 'undefined' && typeof speechSynthesis !== 'undefined') {
+                // オーバーレイ読み上げを最優先にするため、進行中のTTSを停止
+                speechSynthesis.cancel();
                 const utterance = new SpeechSynthesisUtterance(textToSpeak);
                 speechPromise = new Promise(resolveSpeech => {
                     utterance.onstart = () => {

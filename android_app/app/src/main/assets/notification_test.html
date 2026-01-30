@@ -165,7 +165,6 @@
     </style>
 </head>
 <body>
-  <script src=\"static/js/android_bridge.js\"></script>
     <div class="container">
         <div class="header">
             <h1>📧 メール通知マネージャー</h1>
@@ -373,7 +372,7 @@
                     .replace(/=+$/, '');
 
                 // 実際のGmail APIコール (疑似コード)
-                this.log(`⚠️ Gmail API送信: ${to} - "${subject}"`);
+                this.log(`⚠️ Gmail送信: ${to} - "${subject}"`);
                 
                 // 成功をシミュレート
                 await new Promise(resolve => setTimeout(resolve, 1000));
@@ -597,6 +596,6 @@
         // EmailJSの初期化
         emailjs.init('YOUR_PUBLIC_KEY');
     </script> -->
-      <script src="static/js/app_settings_apply.js"></script>
+    <script src="./static/js/app_settings_apply.js"></script>
 </body>
 </html>

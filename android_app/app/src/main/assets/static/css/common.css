@@ -11,8 +11,8 @@ body {
   margin: 0;
   padding: 0;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
-  color: #333; /* Default text color */
-  background-color: #f0f2f5; /* Default background */
+  color: var(--app-text, #333); /* Default text color */
+  background-color: var(--app-bg, #f0f2f5); /* Default background */
 }
 
 /* --- Container for centering content --- */
@@ -24,9 +24,9 @@ body {
 
 /* --- Card Component --- */
 .card {
-  background-color: #ffffff;
+  background-color: var(--app-panel, #ffffff);
   border-radius: 8px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  box-shadow: var(--app-shadow, 0 2px 4px rgba(0, 0, 0, 0.1));
   padding: 20px;
   margin-bottom: 20px;
 }
@@ -44,47 +44,47 @@ body {
   transition: background-color 0.2s ease;
 }
 .btn-primary {
-  background-color: #007bff;
-  color: #ffffff;
+  background-color: var(--app-button-bg, var(--app-accent, #007bff));
+  color: var(--app-button-text, var(--app-panel, #ffffff));
 }
 .btn-primary:hover {
-  background-color: #0056b3;
+  background-color: var(--app-accent-strong, #0056b3);
 }
 .btn-secondary {
-  background-color: #6c757d;
-  color: #ffffff;
+  background-color: var(--app-muted, #6c757d);
+  color: var(--app-panel, #ffffff);
 }
 .btn-secondary:hover {
-  background-color: #545b62;
+  background-color: color-mix(in srgb, var(--app-muted, #6c757d) 85%, #000);
 }
 .btn-danger {
-  background-color: #dc3545;
-  color: #ffffff;
+  background-color: var(--app-danger, #dc3545);
+  color: var(--app-panel, #ffffff);
 }
 .btn-danger:hover {
-  background-color: #bd2130;
+  background-color: color-mix(in srgb, var(--app-danger, #dc3545) 85%, #000);
 }
 .link-btn {
   background: none;
-  color: #007bff;
+  color: var(--app-accent, #007bff);
   text-decoration: underline;
   padding: 0;
   margin: 0;
 }
 .btn.ghost {
     background: transparent;
-    color: #007bff;
-    border: 1px solid #007bff;
+    color: var(--app-accent, #007bff);
+    border: 1px solid var(--app-accent, #007bff);
 }
 .btn.ghost:hover {
-    background: rgba(0, 123, 255, 0.1);
+    background: rgba(var(--app-accent-rgb, 0, 123, 255), 0.1);
 }
 .btn.success {
-    background-color: #28a745;
-    color: #ffffff;
+    background-color: var(--app-success, #28a745);
+    color: var(--app-panel, #ffffff);
 }
 .btn.success:hover {
-    background-color: #218838;
+    background-color: color-mix(in srgb, var(--app-success, #28a745) 85%, #000);
 }
 
 /* --- Forms --- */
@@ -99,7 +99,9 @@ body {
 .input {
   width: 100%;
   padding: 10px;
-  border: 1px solid #ced4da;
+  border: 1px solid var(--app-input-border, #ced4da);
+  background-color: var(--app-input-bg, #ffffff);
+  color: var(--app-input-text, var(--app-text, #333));
   border-radius: 4px;
   box-sizing: border-box; /* Include padding in width */
   font-size: 1rem;
@@ -124,18 +126,18 @@ table {
   width: 100%;
   border-collapse: collapse;
   margin-bottom: 1rem;
-  background-color: #ffffff;
-  color: #333;
+  background-color: var(--app-panel, #ffffff);
+  color: var(--app-text, #333);
 }
 table th, table td {
   padding: 0.75rem;
   vertical-align: top;
-  border-top: 1px solid #dee2e6;
+  border-top: 1px solid var(--app-border, #dee2e6);
   text-align: left;
 }
 table thead th {
   vertical-align: bottom;
-  border-bottom: 2px solid #dee2e6;
+  border-bottom: 2px solid var(--app-border, #dee2e6);
 }
 table tbody + tbody {
   border-top: 2px solid #dee2e6;
@@ -166,7 +168,7 @@ table tbody + tbody {
 .status-grid p {
   margin: 0;
   padding: 10px;
-  background-color: #e9ecef;
+  background-color: var(--app-panel-soft, #e9ecef);
   border-radius: 4px;
   font-size: 0.95rem;
 }
@@ -181,15 +183,15 @@ table tbody + tbody {
 .btn-type {
   flex-grow: 1;
   padding: 10px;
-  border: 1px solid #007bff;
+  border: 1px solid var(--app-accent, #007bff);
   border-radius: 4px;
-  background-color: #ffffff;
-  color: #007bff;
+  background-color: var(--app-panel, #ffffff);
+  color: var(--app-accent, #007bff);
   cursor: pointer;
 }
 .btn-type.active {
-  background-color: #007bff;
-  color: #ffffff;
+  background-color: var(--app-accent, #007bff);
+  color: var(--app-panel, #ffffff);
 }
 .category-buttons {
   display: flex;
@@ -198,15 +200,15 @@ table tbody + tbody {
 }
 .category-buttons button {
   padding: 8px 12px;
-  border: 1px solid #ced4da;
+  border: 1px solid var(--app-input-border, #ced4da);
   border-radius: 20px;
-  background-color: #f8f9fa;
+  background-color: var(--app-input-bg, #f8f9fa);
   cursor: pointer;
 }
 .category-buttons button.active {
-  background-color: #28a745;
-  color: #ffffff;
-  border-color: #28a745;
+  background-color: var(--app-success, #28a745);
+  color: var(--app-panel, #ffffff);
+  border-color: var(--app-success, #28a745);
 }
 .records-header {
   display: flex;
@@ -231,7 +233,7 @@ table tbody + tbody {
 .fd-section {
   margin-bottom: 20px;
   padding: 20px;
-  background-color: #ffffff;
+  background-color: var(--app-panel, #ffffff);
   border-radius: 8px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
@@ -248,7 +250,7 @@ table tbody + tbody {
   gap: 15px;
 }
 .fd-kpi {
-  background-color: #e9ecef;
+  background-color: var(--app-panel-soft, #e9ecef);
   padding: 15px;
   border-radius: 4px;
 }
@@ -256,12 +258,12 @@ table tbody + tbody {
   font-size: 1rem;
   margin-top: 0;
   margin-bottom: 10px;
-  color: #555;
+  color: var(--app-muted, #555);
 }
 .fd-kpi .fd-num {
   font-size: 1.5rem;
   font-weight: bold;
-  color: #007bff;
+  color: var(--app-accent, #007bff);
 }
 .fd-controls {
   display: flex;
@@ -272,7 +274,7 @@ table tbody + tbody {
 }
 .fd-radio-group {
   display: flex;
-  border: 1px solid #007bff;
+  border: 1px solid var(--app-accent, #007bff);
   border-radius: 4px;
   overflow: hidden;
 }
@@ -282,9 +284,9 @@ table tbody + tbody {
 .fd-radio-group label {
   padding: 8px 15px;
   cursor: pointer;
-  background-color: #ffffff;
-  color: #007bff;
-  border-right: 1px solid #007bff;
+  background-color: var(--app-panel, #ffffff);
+  color: var(--app-accent, #007bff);
+  border-right: 1px solid var(--app-accent, #007bff);
   flex-grow: 1;
   text-align: center;
 }
@@ -292,12 +294,12 @@ table tbody + tbody {
   border-right: none;
 }
 .fd-radio-group input[type="radio"]:checked + label {
-  background-color: #007bff;
-  color: #ffffff;
+  background-color: var(--app-accent, #007bff);
+  color: var(--app-panel, #ffffff);
 }
 .fd-input, .fd-select {
   padding: 8px 12px;
-  border: 1px solid #ced4da;
+  border: 1px solid var(--app-input-border, #ced4da);
   border-radius: 4px;
   font-size: 0.9rem;
   width: auto;
@@ -314,7 +316,7 @@ table tbody + tbody {
 .fd-date-input-group {
   display: flex;
   align-items: center;
-  border: 1px solid #ced4da;
+  border: 1px solid var(--app-input-border, #ced4da);
   border-radius: 4px;
   overflow: hidden;
 }
@@ -324,7 +326,7 @@ table tbody + tbody {
   outline: none;
 }
 .fd-date-input-group .fd-wheel-btn {
-  background-color: #e9ecef;
+  background-color: var(--app-panel-soft, #e9ecef);
   border: none;
   padding: 8px 10px;
   cursor: pointer;
@@ -350,7 +352,7 @@ table tbody + tbody {
 .fd-form input[type="number"], .fd-form select {
   width: 100%;
   padding: 10px;
-  border: 1px solid #ced4da;
+  border: 1px solid var(--app-input-border, #ced4da);
   border-radius: 4px;
   box-sizing: border-box;
 }
@@ -369,7 +371,7 @@ table tbody + tbody {
   z-index: 1000;
 }
 .fd-wheel-dialog {
-  background-color: #ffffff;
+  background-color: var(--app-panel, #ffffff);
   border-radius: 8px;
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
   padding: 20px;
@@ -415,10 +417,10 @@ table tbody + tbody {
 }
 .fd-wheel-cancel {
   background-color: #ccc;
-  color: #333;
+  color: var(--app-text, #333);
 }
 .fd-wheel-ok {
-  background-color: #007bff;
+  background-color: var(--app-accent, #007bff);
   color: #fff;
 }
 

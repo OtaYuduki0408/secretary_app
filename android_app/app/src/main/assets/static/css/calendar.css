@@ -1,14 +1,14 @@
 :root{
-  --bg:#0f172a;
-  --panel:#1e293b;
-  --panel-soft:#243045;
-  --text:#f8fafc;
-  --muted:#cbd5f5;
-  --accent:#38bdf8;
-  --accent-strong:#0ea5e9;
-  --success:#34d399;
-  --danger:#f87171;
-  --shadow:0 20px 45px rgba(15,23,42,.35);
+  --bg: var(--app-bg, #0f172a);
+  --panel: var(--app-panel, #1e293b);
+  --panel-soft: var(--app-panel-soft, #243045);
+  --text: var(--app-text, #f8fafc);
+  --muted: var(--app-muted, #cbd5f5);
+  --accent: var(--app-accent, #38bdf8);
+  --accent-strong: var(--app-accent-strong, #0ea5e9);
+  --success: var(--app-success, #34d399);
+  --danger: var(--app-danger, #f87171);
+  --shadow: var(--app-shadow, 0 20px 45px rgba(15,23,42,.35));
   --radius-lg:22px;
 }
 
@@ -19,9 +19,9 @@ html,body{
   min-height:100%;
   font-family:"Noto Sans JP","Hiragino Kaku Gothic ProN",YuGothic,Meiryo,sans-serif;
   color:var(--text);
-  background:radial-gradient(circle at 20% 20%, rgba(56,189,248,.15), transparent 40%),
-             radial-gradient(circle at 80% 20%, rgba(14,165,233,.25), transparent 45%),
-             linear-gradient(180deg,#0b1220,#0f172a);
+  background:radial-gradient(circle at 20% 20%, rgba(var(--app-accent-rgb, 56,189,248),.15), transparent 40%),
+             radial-gradient(circle at 80% 20%, rgba(var(--app-accent-strong-rgb, 14,165,233),.25), transparent 45%),
+             linear-gradient(180deg,var(--panel, #0b1220),var(--bg, #0f172a));
 }
 
 .page-bg{position:fixed; inset:0; pointer-events:none;}
@@ -37,7 +37,7 @@ html,body{
   gap:14px;
   padding:18px clamp(16px,4vw,36px);
   background:rgba(15,23,42,.8);
-  border-bottom:1px solid rgba(148,163,184,.25);
+  border-bottom:1px solid rgba(var(--app-border-rgb, 148,163,184),.25);
   backdrop-filter:blur(12px) saturate(140%);
 }
 
@@ -64,7 +64,7 @@ html,body{
   background:var(--panel);
   border-radius:var(--radius-lg);
   padding:26px;
-  border:1px solid rgba(148,163,184,.2);
+  border:1px solid rgba(var(--app-border-rgb, 148,163,184),.2);
   box-shadow:var(--shadow);
 }
 
@@ -101,7 +101,7 @@ html,body{
   width:100%;
   min-height:44px;
   border-radius:14px;
-  border:1px solid rgba(148,163,184,.35);
+  border:1px solid rgba(var(--app-border-rgb, 148,163,184),.35);
   background:var(--panel-soft);
   color:var(--text);
   padding:12px 14px;
@@ -112,7 +112,7 @@ html,body{
 
 .input:focus{
   border-color:var(--accent);
-  box-shadow:0 0 0 2px rgba(56,189,248,.3);
+  box-shadow:0 0 0 2px rgba(var(--app-accent-rgb, 56,189,248),.3);
 }
 
 input[type="date"]::-webkit-calendar-picker-indicator,
@@ -132,22 +132,22 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator{
   min-height:44px;
   padding:12px 22px;
   border-radius:18px;
-  border:1px solid rgba(148,163,184,.35);
-  background:rgba(56,189,248,.12);
+  border:1px solid rgba(var(--app-border-rgb, 148,163,184),.35);
+  background:rgba(var(--app-accent-rgb, 56,189,248),.12);
   color:var(--text);
   font-weight:600;
   letter-spacing:.02em;
   cursor:pointer;
   transition:.2s;
 }
-.btn:hover{background:rgba(56,189,248,.2);}
+.btn:hover{background:rgba(var(--app-accent-rgb, 56,189,248),.2);}
 .btn:disabled{opacity:.55; cursor:not-allowed;}
 
 .btn.primary{
   background:linear-gradient(135deg,var(--accent),var(--accent-strong));
-  color:#0f172a;
+  color: var(--app-button-text, #0f172a);
   border:none;
-  box-shadow:0 12px 24px rgba(14,165,233,.35);
+  box-shadow:0 12px 24px rgba(var(--app-accent-strong-rgb, 14,165,233),.35);
 }
 
 .btn.success{
@@ -160,12 +160,12 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator{
 .btn.danger{
   background:linear-gradient(135deg,#f87171,#ef4444);
   border:none;
-  color:#fff;
-  box-shadow:0 12px 24px rgba(248,113,113,.35);
+  color: var(--app-button-text, #fff);
+  box-shadow:0 12px 24px rgba(var(--app-danger-rgb, 248,113,113),.35);
 }
 
 .btn.ghost{
-  background:rgba(148,163,184,.18);
+  background:rgba(var(--app-border-rgb, 148,163,184),.18);
   color:var(--text);
 }
 
@@ -175,7 +175,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator{
   overflow:auto;
   background:var(--panel-soft);
   border-radius:16px;
-  border:1px solid rgba(148,163,184,.25);
+  border:1px solid rgba(var(--app-border-rgb, 148,163,184),.25);
   padding:16px;
   font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
   line-height:1.5;

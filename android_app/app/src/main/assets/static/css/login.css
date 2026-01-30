@@ -1,12 +1,12 @@
 :root{
-  --bg:#0f172a;
-  --panel:#1e293b;
-  --panel-soft:#243045;
-  --text:#f8fafc;
-  --muted:#cbd5f5;
-  --accent:#38bdf8;
-  --accent-strong:#0ea5e9;
-  --shadow:0 20px 45px rgba(15,23,42,.35);
+  --bg: var(--app-bg, #0f172a);
+  --panel: var(--app-panel, #1e293b);
+  --panel-soft: var(--app-panel-soft, #243045);
+  --text: var(--app-text, #f8fafc);
+  --muted: var(--app-muted, #cbd5f5);
+  --accent: var(--app-accent, #38bdf8);
+  --accent-strong: var(--app-accent-strong, #0ea5e9);
+  --shadow: var(--app-shadow, 0 20px 45px rgba(15,23,42,.35));
   --radius-lg:22px;
 }
 
@@ -17,9 +17,9 @@ html,body{
   font-family:"Noto Sans JP","Hiragino Kaku Gothic ProN",YuGothic,Meiryo,sans-serif;
   color:var(--text);
   background:
-    radial-gradient(circle at 20% 20%, rgba(56,189,248,.15), transparent 40%),
-    radial-gradient(circle at 80% 20%, rgba(14,165,233,.25), transparent 45%),
-    linear-gradient(180deg,#0b1220,#0f172a);
+    radial-gradient(circle at 20% 20%, rgba(var(--app-accent-rgb, 56,189,248),.15), transparent 40%),
+    radial-gradient(circle at 80% 20%, rgba(var(--app-accent-strong-rgb, 14,165,233),.25), transparent 45%),
+    linear-gradient(180deg,var(--panel, #0b1220),var(--bg, #0f172a));
   background-attachment: fixed;
 }
 
@@ -53,16 +53,16 @@ html,body{
 .auth-header .link-btn{
   text-decoration:none;
   color:var(--text);
-  border:1px solid rgba(148,163,184,.45);
+  border:1px solid rgba(var(--app-border-rgb, 148,163,184),.45);
   border-radius:999px;
   padding:10px 18px;
-  background:rgba(56,189,248,.12);
+  background:rgba(var(--app-accent-rgb, 56,189,248),.12);
   box-shadow:0 15px 30px rgba(8,47,73,.35);
   transition:.2s;
 }
 
 .auth-header .link-btn:hover{
-  background:rgba(56,189,248,.2);
+  background:rgba(var(--app-accent-rgb, 56,189,248),.2);
   transform:translateY(-1px);
 }
 
@@ -72,7 +72,7 @@ form[action="/register"]{
   margin:0;
   padding:26px;
   background:var(--panel);
-  border:1px solid rgba(148,163,184,.2);
+  border:1px solid rgba(var(--app-border-rgb, 148,163,184),.2);
   border-radius:var(--radius-lg);
   box-shadow:var(--shadow);
 }
@@ -94,7 +94,7 @@ form[action="/register"] input[type="text"]{
   box-sizing:border-box;
   font-size:1rem;
   border-radius:14px;
-  border:1px solid rgba(148,163,184,.35);
+  border:1px solid rgba(var(--app-border-rgb, 148,163,184),.35);
   background:var(--panel-soft);
   color:var(--text);
   padding:12px 14px;
@@ -108,7 +108,7 @@ form[action="/register"] input[type="email"]:focus,
 form[action="/register"] input[type="password"]:focus,
 form[action="/register"] input[type="text"]:focus{
   border-color:var(--accent);
-  box-shadow:0 0 0 2px rgba(56,189,248,.3);
+  box-shadow:0 0 0 2px rgba(var(--app-accent-rgb, 56,189,248),.3);
 }
 
 form[action="/login"] button[type="submit"],
@@ -120,7 +120,7 @@ form[action="/register"] button[type="submit"]{
   padding:12px 22px;
   font-size:1rem;
   font-weight:700;
-  color:#0f172a;
+  color: var(--app-button-text, #0f172a);
   background:linear-gradient(135deg,var(--accent),var(--accent-strong));
   cursor:pointer;
   transition:.2s;
@@ -129,7 +129,7 @@ form[action="/register"] button[type="submit"]{
 form[action="/login"] button[type="submit"]:hover,
 form[action="/register"] button[type="submit"]:hover{
   filter:brightness(1.05);
-  box-shadow:0 10px 25px rgba(14,165,233,.35);
+  box-shadow:0 10px 25px rgba(var(--app-accent-strong-rgb, 14,165,233),.35);
 }
 
 form[action="/login"] button[type="submit"]:active,
@@ -150,12 +150,12 @@ form[action="/register"] button[type="submit"]:active{
 }
 .cta-footer .cta-btn{
   text-decoration:none;
-  color:#0f172a;
+  color: var(--app-button-text, #0f172a);
   background:linear-gradient(135deg,var(--accent),var(--accent-strong));
   border-radius:18px;
   padding:12px 22px;
   font-weight:700;
-  box-shadow:0 10px 25px rgba(14,165,233,.35);
+  box-shadow:0 10px 25px rgba(var(--app-accent-strong-rgb, 14,165,233),.35);
   display:inline-block;
 }
 .cta-footer .cta-btn:hover{
@@ -169,7 +169,7 @@ form[action="/register"] button[type="submit"]:active{
 }
 
 .auth-links .link-text{
-  color:#cfe7ff;
+  color: var(--app-link, #cfe7ff);
   text-decoration:none;
   border-bottom:1px dashed rgba(207,231,255,.55);
   padding-bottom:2px;
@@ -183,7 +183,7 @@ form[action="/register"] button[type="submit"]:active{
 .error-msg{
   width:100%;
   margin:8px 0 0;
-  color:#fecaca;
+  color: var(--app-danger, #fecaca);
 }
 
 @media (max-width:520px){

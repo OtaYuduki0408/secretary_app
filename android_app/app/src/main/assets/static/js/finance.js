@@ -19,31 +19,11 @@ function normalizeDateToKey(s) {
   return `${y}-${mo}-${d}`;
 }
 
-async function localApiRequest(method, url, body = null) {
-    console.log(`[localApiRequest] ${method} ${url}`, body);
-    if (!window.AndroidSync?.request) {
-        console.error("AndroidSync.request is not available");
-        throw new Error("AndroidSync bridge not found");
-    }
-    const rawResponse = await window.AndroidSync.request(method, url, body ? JSON.stringify(body) : null);
-    console.log(`[localApiRequest] Raw response for ${url}:`, rawResponse);
-    const response = JSON.parse(rawResponse);
-    if (response.status >= 400) {
-        throw new Error(`API Error: ${response.status} ${response.body?.error}`);
-    }
-    return response.body;
-}
-
-document.addEventListener("DOMContentLoaded", async () => {
+document.addEventListener("DOMContentLoaded", () => {
   const container = document.getElementById("finance-data");
 
   // ---------- データ取得 ----------
-  let rawFinanceRecords = [];
-  try {
-    rawFinanceRecords = await localApiRequest("GET", "/api/finance");
-  } catch (e) {
-    console.error("Failed to load finance records", e);
-  }
+  const rawFinanceRecords = JSON.parse(container?.dataset.allRecords || "[]");
 
   // すべてのレコードへ dateKey を付与（内部比較用）
   rawFinanceRecords.forEach(r => {
@@ -384,7 +364,9 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   async function fetchGoalAmount() {
     try {
-      const data = await localApiRequest("GET", "/api/finance/goal");
+      const res = await fetch("/api/finance/goal");
+      if (!res.ok) throw new Error("failed to fetch goal");
+      const data = await res.json();
       const amount = data.goal_amount;
       if (amount === undefined || amount === null) {
         renderGoalAmount(null);
@@ -401,8 +383,22 @@ document.addEventListener("DOMContentLoaded", async () => {
       goal_amount: goalNum,
       year_month: new Date().toISOString().slice(0, 7),
     };
-    const result = await localApiRequest("POST", "/api/finance/goal", payload);
-    return result;
+    const res = await fetch("/api/finance/goal", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      let errMsg = "failed to save goal";
+      try {
+        const errData = await res.json();
+        errMsg = errData.error || errMsg;
+      } catch (_) {
+        // ignore
+      }
+      throw new Error(errMsg);
+    }
+    return res.json();
   }
 
   if (settingsForm) {

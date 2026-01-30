@@ -9,16 +9,7 @@
       .error { color: #f88 }
     </style>
  
-    {# prepare JSON-serialized values for JS to read (safe) #}
     
-      
-    
-      
-    
-    
-      
-    
-      
     
  
     <script>
@@ -88,9 +79,8 @@
     </script>
 </head>
 <body>
-  <script src=\"static/js/android_bridge.js\"></script>
     <!-- server から来る token/error を data 属性で受け渡す（JS 側で JSON.parse する） -->
-    <div id="server-data" data-token='' data-error='' style="display:none"></div>
+    <div id="server-data" data-token='null' data-error='null' style="display:none"></div>
  
     <h2 id="status">Authenticating... Please wait.</h2>
     <div>
@@ -99,6 +89,6 @@
       <p class="error" id="error"></p>
       <p><button onclick="closeOrRedirect()">Close window</button></p>
     </div>
-      <script src="static/js/app_settings_apply.js"></script>
+    <script src="./static/js/app_settings_apply.js"></script>
 </body>
 </html>

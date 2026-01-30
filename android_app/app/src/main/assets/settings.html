@@ -3,32 +3,9 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Voice Secretary — 設定</title>
-  <link rel="stylesheet" href="static/css/style.css">
+  <title>Voice Secretary - 設定</title>
+  <link rel="stylesheet" href="./static/css/style.css">
   <style>
-    /* width fix */
-    html, body {
-      max-width: 100%;
-      overflow-x: hidden;
-    }
-    .settings-shell {
-      width: 100%;
-      box-sizing: border-box;
-    }
-    .settings-card {
-      max-width: 100%;
-      width: min(760px, 92vw);
-      box-sizing: border-box;
-    }
-    .field input,
-    .field select {
-      max-width: 100%;
-      box-sizing: border-box;
-    }
-    .field-inline {
-      flex-wrap: wrap;
-    }
-
     body {
       font-family: var(--app-font, inherit);
     }
@@ -43,12 +20,12 @@
 
     .settings-card {
       width: min(760px, 92vw);
-      background: rgba(10, 18, 28, 0.72);
-      border: 1px solid rgba(148, 163, 184, 0.35);
+      background: color-mix(in srgb, var(--app-panel, #0a121c) 80%, transparent);
+      border: 1px solid rgba(var(--app-border-rgb, 148, 163, 184), 0.35);
       border-radius: 18px;
       padding: clamp(18px, 4vw, 28px);
-      color: #e2e8f0;
-      box-shadow: 0 18px 40px rgba(0, 0, 0, 0.35);
+      color: var(--app-text, #e2e8f0);
+      box-shadow: var(--app-shadow, 0 18px 40px rgba(0, 0, 0, 0.35));
       backdrop-filter: blur(10px);
     }
 
@@ -66,16 +43,16 @@
     }
 
     .settings-actions a {
-      color: #e2e8f0;
+      color: var(--app-text, #e2e8f0);
       text-decoration: none;
-      border: 1px solid rgba(148, 163, 184, 0.5);
+      border: 1px solid rgba(var(--app-border-rgb, 148, 163, 184), 0.5);
       border-radius: 999px;
       padding: 8px 16px;
-      background: rgba(15, 23, 42, 0.6);
+      background: color-mix(in srgb, var(--app-panel, #0f172a) 70%, transparent);
     }
 
     .settings-group {
-      border: 1px solid rgba(148, 163, 184, 0.25);
+      border: 1px solid rgba(var(--app-border-rgb, 148, 163, 184), 0.25);
       border-radius: 14px;
       margin-bottom: 16px;
       overflow: hidden;
@@ -85,7 +62,7 @@
       list-style: none;
       cursor: pointer;
       padding: 14px 16px;
-      background: rgba(30, 41, 59, 0.9);
+      background: color-mix(in srgb, var(--app-panel-soft, #1e293b) 85%, transparent);
       font-weight: 600;
       display: flex;
       align-items: center;
@@ -98,7 +75,7 @@
 
     .settings-group .details-body {
       padding: 16px;
-      background: rgba(8, 15, 24, 0.7);
+      background: color-mix(in srgb, var(--app-panel, #0b1220) 75%, transparent);
     }
 
     .field {
@@ -109,16 +86,16 @@
 
     .field label {
       font-size: 0.95rem;
-      color: #cbd5f5;
+      color: var(--app-muted, #cbd5f5);
     }
 
     .field input,
     .field select {
       padding: 10px 12px;
       border-radius: 10px;
-      border: 1px solid rgba(148, 163, 184, 0.35);
-      background: rgba(15, 23, 42, 0.7);
-      color: #e2e8f0;
+      border: 1px solid var(--app-input-border, rgba(148, 163, 184, 0.35));
+      background: var(--app-input-bg, rgba(15, 23, 42, 0.7));
+      color: var(--app-input-text, #e2e8f0);
     }
 
     .field input[type="color"] {
@@ -135,106 +112,172 @@
       gap: 12px;
     }
 
+    .settings-button {
+      border: none;
+      border-radius: 999px;
+      padding: 10px 18px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: 0.25s ease;
+      letter-spacing: 0.02em;
+      background: linear-gradient(135deg, var(--app-button-bg, #38bdf8), var(--app-accent-strong, #0ea5e9));
+      color: var(--app-button-text, #0f172a);
+      box-shadow: 0 10px 25px rgba(var(--app-accent-rgb, 56, 189, 248), 0.3);
+    }
+
+    .settings-button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 18px 35px rgba(var(--app-accent-rgb, 56, 189, 248), 0.4);
+    }
+
     .field-inline input[type="range"] {
       flex: 1;
     }
 
     .hint {
       font-size: 0.85rem;
-      color: #94a3b8;
-    }
-    #sync-now-btn {
-        padding: 10px 12px;
-        border-radius: 10px;
-        border: 1px solid rgba(148, 163, 184, 0.35);
-        background: rgba(15, 23, 42, 0.7);
-        color: #e2e8f0;
-        font-weight: 600;
-        cursor: pointer;
-    }
-    #sync-now-btn:disabled {
-        background: #555;
-        cursor: not-allowed;
+      color: var(--app-muted, #94a3b8);
     }
   </style>
 </head>
 <body>
-  <script src="static/js/android_bridge.js"></script>
   <main class="settings-shell">
     <section class="settings-card">
       <div class="settings-actions">
-        <a href="main.html">メインへ戻る</a>
+        <a href="main.html">メインに戻る</a>
       </div>
-
-      <details class="settings-group" open>
-  <summary>同期設定</summary>
-  <div class="details-body">
-    <div class="field">
-      <label for="sync-conflict-policy">自動同期の優先</label>
-      <select id="sync-conflict-policy">
-        <option value="LOCAL_WINS">スマホ優先</option>
-        <option value="SERVER_WINS">サーバー優先</option>
-      </select>
-    </div>
-    <div class="field">
-      <label for="sync-interval">自動同期の間隔</label>
-      <select id="sync-interval">
-        <option value="0">オフ</option>
-        <option value="6">6時間ごと</option>
-        <option value="12">12時間ごと</option>
-        <option value="24">1日1回</option>
-      </select>
-      <div class="hint">例: 1日1回 / 推奨: 毎日</div>
-    </div>
-    <div class="field">
-      <label for="sync-manual-policy">手動同期の優先</label>
-      <div class="field-inline">
-        <select id="sync-manual-policy">
-          <option value="LOCAL_WINS">スマホ優先</option>
-          <option value="SERVER_WINS">サーバー優先</option>
-        </select>
-        <button id="sync-now-btn" type="button">今すぐ同期</button>
-      </div>
-    </div>
-    <div class="hint" id="sync-status"></div>
-  </div>
-</details>
-
       <div class="settings-title">設定</div>
 
-      <details class="settings-group" open>
+      <details class="settings-group">
         <summary>全般の設定</summary>
         <div class="details-body">
           <div class="field">
             <label for="font-family">字体</label>
-            <select id="font-family">
-              <option value="">システム標準</option>
-              <option value="\"Yu Gothic\", \"Meiryo\", sans-serif">游ゴシック</option>
-              <option value="\"Noto Sans JP\", sans-serif">Noto Sans JP</option>
-              <option value="\"M PLUS 1\", sans-serif">M PLUS 1</option>
-              <option value="\"Sawarabi Gothic\", sans-serif">Sawarabi Gothic</option>
-              <option value="serif">Serif</option>
-              <option value="monospace">Monospace</option>
-            </select>
+            <input id="font-family" type="text" placeholder="(例: 'Noto Sans JP', 'Yu Gothic')">
           </div>
           <div class="field">
             <label for="color-template">カラーテンプレート</label>
             <select id="color-template">
-              <option value="">テンプレートを選択</option>
-              <option value="midnight">Midnight Blue</option>
-              <option value="sunset">Sunset Orange</option>
-              <option value="forest">Forest Green</option>
-              <option value="mono">Mono Slate</option>
-              <option value="neon">Neon Cyan</option>
+              <option value="">選択しない</option>
+              <option value="theme01">01: 霧夜ブルー</option>
+              <option value="theme02">02: 深海ネイビー</option>
+              <option value="theme03">03: 墨ブラック</option>
+              <option value="theme04">04: スチールグレー</option>
+              <option value="theme05">05: 夕焼けアンバー</option>
+              <option value="theme06">06: 焦がしオレンジ</option>
+              <option value="theme07">07: 苺ミルク</option>
+              <option value="theme08">08: 梅紫</option>
+              <option value="theme09">09: 夜桜パープル</option>
+              <option value="theme10">10: ライムグリーン</option>
+              <option value="theme11">11: 深緑フォレスト</option>
+              <option value="theme12">12: 抹茶</option>
+              <option value="theme13">13: 砂漠サンド</option>
+              <option value="theme14">14: コーヒーブラウン</option>
+              <option value="theme15">15: ミントソーダ</option>
+              <option value="theme16">16: アイスブルー</option>
+              <option value="theme17">17: サイバーシアン</option>
+              <option value="theme18">18: レモンイエロー</option>
+              <option value="theme19">19: ローズピンク</option>
+              <option value="theme20">20: ロイヤルブルー</option>
+              <option value="theme21">21: ベージュクリーム</option>
+              <option value="theme22">22: モノクロ（高コントラスト）</option>
+              <option value="theme23">23: ダークレッド</option>
+              <option value="theme24">24: ダークティール</option>
             </select>
+            <div class="hint">テンプレートを選ぶと各色が一括で反映されます。</div>
           </div>
           <div class="field">
-            <label for="accent-color">標準アクセント色</label>
+            <label for="theme-save-name">ユーザーテーマ名</label>
+            <input id="theme-save-name" type="text" placeholder="(例: 自分好みの青)">
+            <div class="hint">現在の色設定を名前付きで保存します。</div>
+          </div>
+          <div class="field-inline">
+            <button id="theme-save-button" class="settings-button" type="button">この色セットを保存</button>
+            <button id="theme-delete-button" class="settings-button" type="button">選択中のユーザーテーマを削除</button>
+          </div>
+          <div class="field">
+            <label for="accent-color">アクセント色</label>
             <input id="accent-color" type="color" value="#7aa8ff">
           </div>
           <div class="field">
-            <label for="muted-color">標準のグレー色</label>
+            <label for="muted-color">標準グレー色</label>
             <input id="muted-color" type="color" value="#cdd6df">
+          </div>
+        </div>
+      </details>
+
+      <details class="settings-group">
+        <summary>全画面共通の色</summary>
+        <div class="details-body">
+          <div class="field">
+            <label for="ui-bg-color">背景色</label>
+            <input id="ui-bg-color" type="color" value="#0f172a">
+          </div>
+          <div class="field">
+            <label for="ui-panel-color">パネル背景色</label>
+            <input id="ui-panel-color" type="color" value="#1e293b">
+          </div>
+          <div class="field">
+            <label for="ui-panel-soft-color">パネル背景色(淡)</label>
+            <input id="ui-panel-soft-color" type="color" value="#243045">
+          </div>
+          <div class="field">
+            <label for="ui-text-color">文字色</label>
+            <input id="ui-text-color" type="color" value="#f8fafc">
+          </div>
+          <div class="field">
+            <label for="ui-muted-color">補助文字色</label>
+            <input id="ui-muted-color" type="color" value="#cbd5f5">
+          </div>
+          <div class="field">
+            <label for="ui-accent-color">アクセント色</label>
+            <input id="ui-accent-color" type="color" value="#38bdf8">
+          </div>
+          <div class="field">
+            <label for="ui-accent-strong-color">アクセント色(濃)</label>
+            <input id="ui-accent-strong-color" type="color" value="#0ea5e9">
+          </div>
+          <div class="field">
+            <label for="ui-border-color">境界線の色</label>
+            <input id="ui-border-color" type="color" value="#94a3b8">
+          </div>
+          <div class="field">
+            <label for="ui-success-color">成功色</label>
+            <input id="ui-success-color" type="color" value="#34d399">
+          </div>
+          <div class="field">
+            <label for="ui-danger-color">警告色</label>
+            <input id="ui-danger-color" type="color" value="#f87171">
+          </div>
+          <div class="field">
+            <label for="ui-input-bg-color">入力欄の背景色</label>
+            <input id="ui-input-bg-color" type="color" value="#0f172a">
+          </div>
+          <div class="field">
+            <label for="ui-input-text-color">入力欄の文字色</label>
+            <input id="ui-input-text-color" type="color" value="#f8fafc">
+          </div>
+          <div class="field">
+            <label for="ui-input-border-color">入力欄の境界線</label>
+            <input id="ui-input-border-color" type="color" value="#94a3b8">
+          </div>
+          <div class="field">
+            <label for="ui-button-bg-color">ボタン背景色</label>
+            <input id="ui-button-bg-color" type="color" value="#38bdf8">
+          </div>
+          <div class="field">
+            <label for="ui-button-text-color">ボタン文字色</label>
+            <input id="ui-button-text-color" type="color" value="#0f172a">
+          </div>
+          <div class="field">
+            <label for="ui-link-color">リンク色</label>
+            <input id="ui-link-color" type="color" value="#38bdf8">
+          </div>
+          <div class="field">
+            <label for="ui-shadow-color">影の色</label>
+            <input id="ui-shadow-color" type="color" value="#0f172a">
+            <div class="hint">影は設定色に透明度を加えて描画します。</div>
           </div>
         </div>
       </details>
@@ -243,13 +286,13 @@
         <summary>メイン画面の設定</summary>
         <div class="details-body">
           <div class="field">
-            <label for="main-bg-color">背景色</label>
-            <input id="main-bg-color" type="color" value="#0b1f38">
+            <label for="wake-word">呼びかけワード</label>
+            <input id="wake-word" type="text" placeholder="(例: サイレントメイト君)" />
+            <div class="hint">複数入力する場合はカンマ区切りで入力してください。</div>
           </div>
           <div class="field">
-            <label for="wake-word">呼びかけワード</label>
-            <input id="wake-word" type="text" placeholder="(例:サイレントメイト)">
-            <div class="hint">複数指定する場合は「,」区切りで入力してください。</div>
+            <label for="main-bg-color">背景色(ストライプの裏)</label>
+            <input id="main-bg-color" type="color" value="#0b1f38">
           </div>
           <div class="field">
             <label for="stripe-color">ストライプの色</label>
@@ -258,6 +301,26 @@
           <div class="field">
             <label for="main-button-color">ボタンの色</label>
             <input id="main-button-color" type="color" value="#7aa8ff">
+          </div>
+          <div class="field">
+            <label for="mic-color">音声認識ボタンの色</label>
+            <input id="mic-color" type="color" value="#2a3440">
+          </div>
+          <div class="field">
+            <label for="user-badge-bg-color">ログイン表示の背景色</label>
+            <input id="user-badge-bg-color" type="color" value="#f1f5f9">
+          </div>
+          <div class="field">
+            <label for="log-bg-color">ログ表示の背景色</label>
+            <input id="log-bg-color" type="color" value="#ffffff">
+          </div>
+          <div class="field">
+            <label for="fab-color">各機能ボタンのテーマ色</label>
+            <input id="fab-color" type="color" value="#7aa8ff">
+          </div>
+          <div class="field">
+            <label for="main-text-color">文字色</label>
+            <input id="main-text-color" type="color" value="#0f1720">
           </div>
         </div>
       </details>
@@ -274,22 +337,22 @@
           </div>
           <div class="field">
             <label for="input-confirm-template">入力確認テンプレート</label>
-            <input id="input-confirm-template" type="text" value="でございますね。かしこまりました。">
-            <div class="hint">入力文の後ろに追加されます。</div>
+            <input id="input-confirm-template" type="text" value="だね、ちょっと待ってね！">
+            <div class="hint">入力確認時の読み上げに使用されます。</div>
           </div>
           <div class="field">
-            <label for="tone-response">口調の設定（返答）</label>
-            <input id="tone-response" type="text" placeholder="(例:関西弁、英語等)">
+            <label for="tone-response">口調の設定(返答)</label>
+            <input id="tone-response" type="text" placeholder="(例: 関西弁、英語等)">
           </div>
           <div class="field">
-            <label for="tone-error">口調の設定（エラーメッセージ）</label>
-            <input id="tone-error" type="text" placeholder="(例:関西弁、英語等)">
+            <label for="tone-error">口調の設定(エラーメッセージ)</label>
+            <input id="tone-error" type="text" placeholder="(例: 関西弁、英語等)">
             <div class="hint">空欄の場合は標準の口調で返答します。</div>
           </div>
           <div class="field">
             <label for="voice-select">喋っている声</label>
             <select id="voice-select">
-              <option value="">自動（既定）</option>
+              <option value="">既定を使用</option>
             </select>
             <div class="hint">利用可能な音声が無い場合は既定を使用します。</div>
           </div>
@@ -316,7 +379,7 @@
           </div>
           <div class="field">
             <label for="voice-test-text">テストテキスト</label>
-            <input id="voice-test-text" type="text" value="この声でよろしいでしょうか？">
+            <input id="voice-test-text" type="text" value="僕はサイレントメイト君だよ">
           </div>
           <div class="field">
             <button id="voice-test-button" type="button">テスト再生</button>
@@ -341,86 +404,14 @@
           <div class="field">
             <label for="character-color">色</label>
             <input id="character-color" type="color" value="#B1D656">
-            <div class="hint">初期色: RGB(177, 214, 86)</div>
+            <div class="hint">既定色: RGB(177, 214, 86)</div>
           </div>
         </div>
       </details>
     </section>
   </main>
 
-    <script src="static/js/app_settings_apply.js"></script>
-  <script src="static/js/settings.js"></script>
-
-  <script>
-    (() => {
-      const bridge = window.AndroidSync;
-      if (!bridge) return;
-
-      const conflictEl = document.getElementById('sync-conflict-policy');
-      const intervalEl = document.getElementById('sync-interval');
-      const manualEl = document.getElementById('sync-manual-policy');
-      const syncBtn = document.getElementById('sync-now-btn');
-      const statusEl = document.getElementById('sync-status');
-
-      const lastSyncTime = localStorage.getItem('lastSyncTime');
-      if (lastSyncTime) {
-          const d = new Date(parseInt(lastSyncTime));
-          statusEl.textContent = `前回の同期: ${d.toLocaleString()}`;
-      } else {
-          statusEl.textContent = '未同期';
-      }
-
-      try {
-        const raw = bridge.getSettingsJson?.();
-        const settings = raw ? JSON.parse(raw) : null;
-        if (settings?.conflictPolicy && conflictEl) conflictEl.value = settings.conflictPolicy;
-        if (typeof settings?.intervalHours === 'number' && intervalEl) intervalEl.value = String(settings.intervalHours);
-      } catch (e) {
-        console.log('[sync-ui] failed to read settings', e);
-      }
-
-      conflictEl?.addEventListener('change', (e) => {
-        bridge.setConflictPolicy?.(e.target.value);
-      });
-      intervalEl?.addEventListener('change', (e) => {
-        bridge.setIntervalHours?.(parseInt(e.target.value || '0', 10));
-      });
-      syncBtn?.addEventListener('click', () => {
-        if (syncBtn.disabled) return;
-
-        const policy = manualEl?.value || 'LOCAL_WINS';
-        
-        syncBtn.disabled = true;
-        let dotCount = 0;
-        const intervalId = setInterval(() => {
-            dotCount = (dotCount + 1) % 4;
-            statusEl.textContent = '同期中' + '.'.repeat(dotCount);
-        }, 500);
-
-        setTimeout(() => {
-            try {
-                const result = bridge.runSync?.(policy);
-                const res = JSON.parse(result || '{}');
-                
-                clearInterval(intervalId);
-
-                if (res.success) {
-                    statusEl.textContent = "同期が完了しました。アプリを再起動します。";
-                    localStorage.setItem('lastSyncTime', Date.now());
-                    setTimeout(() => bridge.clearCacheAndReload?.(), 1500);
-                } else {
-                    statusEl.textContent = "同期に失敗しました: " + (res.message || "不明なエラー");
-                    syncBtn.disabled = false;
-                }
-            } catch (e) {
-                clearInterval(intervalId);
-                syncBtn.disabled = false;
-                statusEl.textContent = "同期処理の呼び出しに失敗しました: " + e.message;
-            }
-        }, 10); // Allow UI to update before blocking
-      });
-    })();
-  </script>
-
+  <script src="./static/js/app_settings_apply.js"></script>
+  <script src="./static/js/settings.js"></script>
 </body>
 </html>

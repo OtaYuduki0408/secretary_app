@@ -4,10 +4,9 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>収支管理統計</title>
-  <link rel="stylesheet" href="static/css/finance.css">
+  <link rel="stylesheet" href="./static/css/finance.css">
 </head>
 <body>
-  <script src=\"static/js/android_bridge.js\"></script>
 
   <div class="fd-wrap">
     <div class="fd-button-container">
@@ -18,27 +17,29 @@
             <div class="fd-summary">
             <div class="fd-kpi">
               <h3>現在の所持金</h3>
-              <p id="current-balance" class="fd-num">-- 円</p>
+              <p id="current-balance" class="fd-num">0 円</p>
             </div>
             <div class="fd-kpi">
               <h3>今月の使用額</h3>
-              <p id="monthly-expense" class="fd-num">-- 円</p>
+              <p id="monthly-expense" class="fd-num">0 円</p>
             </div>
             <div class="fd-kpi">
               <h3>今月の目標額</h3>
-              <p id="goal-amount" class="fd-num">読み込み中...</p>
+              <p id="goal-amount" class="fd-num">
+                  0 円
+              </p>
             </div>
             <div class="fd-kpi">
               <h3>今月の収入</h3>
-              <p id="monthly-income" class="fd-num">-- 円</p>
+              <p id="monthly-income" class="fd-num">0 円</p>
             </div>
             <div class="fd-kpi">
               <h3>今日の使用額</h3>
-              <p id="daily-expense" class="fd-num">-- 円</p>
+              <p id="daily-expense" class="fd-num">0 円</p>
             </div>
             <div class="fd-kpi">
               <h3>今日の使用額(必需品抜き)</h3>
-              <p id="daily-expense-no-necessities" class="fd-num">-- 円</p>
+              <p id="daily-expense-no-necessities" class="fd-num">0 円</p>
             </div>
           </div>     </section>
 
@@ -103,9 +104,9 @@
         </div>
         <div 
           id="finance-data"
-          data-income=''
-          data-expense=''
-          data-all-records=''
+          data-income='{}'
+          data-expense='{}'
+          data-all-records='{}'
           style="display: none;">
         </div>
       </details>
@@ -120,7 +121,7 @@
             id="inputGoal"
             type="number"
             placeholder="例: 100000"
-            value=""
+            value="0"
           />
         </label>
         <label>通知設定
@@ -165,6 +166,6 @@
   </div>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="static/js/finance.js" defer></script>
-    <script src="static/js/app_settings_apply.js"></script>
+  <script src="./static/js/finance.js" defer></script>
+  <script src="./static/js/app_settings_apply.js"></script>
 </body></html>
