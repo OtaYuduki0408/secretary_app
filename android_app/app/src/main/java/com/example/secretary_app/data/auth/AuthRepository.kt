@@ -4,6 +4,8 @@ import android.content.Context
 import com.example.secretary_app.CredentialStorage
 import com.example.secretary_app.data.supabase.HttpClientProvider
 import com.example.secretary_app.data.supabase.SupabaseAuthApi
+import com.example.secretary_app.data.supabase.SupabaseAuthResponse
+import io.ktor.client.call.body
 import java.time.Instant
 
 class AuthRepository(private val context: Context) {
@@ -14,7 +16,17 @@ class AuthRepository(private val context: Context) {
     fun getCachedUserId(): String? = sessionStorage.getUserId()
 
     suspend fun signIn(email: String, password: String): UserSession {
-        val res = authApi.signInWithPassword(email, password)
+        val httpResponse = authApi.signInWithPassword(email, password)
+        val res: SupabaseAuthResponse = httpResponse.body()
+
+        if (httpResponse.status.value >= 400 || res.error != null) {
+            throw Exception(res.errorDescription ?: res.error ?: "ログインに失敗しました")
+        }
+
+        if (res.accessToken == null || res.refreshToken == null || res.expiresIn == null || res.user == null) {
+            throw Exception("ログインレスポンスが不完全です")
+        }
+
         credentialStorage.saveCredentials(email, password)
         val expiresAtEpoch = Instant.now().epochSecond + res.expiresIn
         sessionStorage.saveSession(res.user.id, res.accessToken, res.refreshToken, expiresAtEpoch)
@@ -38,10 +50,23 @@ class AuthRepository(private val context: Context) {
         val password = credentialStorage.getPassword()
         if (email.isNullOrBlank() || password.isNullOrBlank()) return null
 
-        val res = authApi.signInWithPassword(email, password)
-        val expiresAtEpoch = Instant.now().epochSecond + res.expiresIn
-        sessionStorage.saveSession(res.user.id, res.accessToken, res.refreshToken, expiresAtEpoch)
-        return UserSession(res.user.id, res.accessToken, res.refreshToken)
+        try {
+            val httpResponse = authApi.signInWithPassword(email, password)
+            val res: SupabaseAuthResponse = httpResponse.body()
+
+            if (httpResponse.status.value >= 400 || res.error != null) {
+                return null // Fail silently if session refresh fails
+            }
+            if (res.accessToken == null || res.refreshToken == null || res.expiresIn == null || res.user == null) {
+                return null
+            }
+
+            val expiresAtEpoch = Instant.now().epochSecond + res.expiresIn
+            sessionStorage.saveSession(res.user.id, res.accessToken, res.refreshToken, expiresAtEpoch)
+            return UserSession(res.user.id, res.accessToken, res.refreshToken)
+        } catch (e: Exception) {
+            return null
+        }
     }
 }
 

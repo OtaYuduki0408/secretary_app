@@ -17,6 +17,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class WakeWordDetectionService : Service(), RecognitionListener {
 
@@ -30,8 +31,11 @@ class WakeWordDetectionService : Service(), RecognitionListener {
         Log.d(TAG, "onCreate: Service creating.")
         settingsRepository = SyncSettingsRepository(this)
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
-            speechRecognizer = SpeechRecognizer.createSpeechRecognizer(this)
-            speechRecognizer.setRecognitionListener(this)
+            // SpeechRecognizer must be created on the main thread.
+            Handler(Looper.getMainLooper()).post {
+                speechRecognizer = SpeechRecognizer.createSpeechRecognizer(this)
+                speechRecognizer.setRecognitionListener(this)
+            }
         } else {
             Log.e(TAG, "RECORD_AUDIO permission not granted. Cannot create SpeechRecognizer.")
             stopSelf() // Stop the service if permission is not granted.
@@ -47,7 +51,9 @@ class WakeWordDetectionService : Service(), RecognitionListener {
         CoroutineScope(Dispatchers.IO).launch {
             wakeWords = settingsRepository.settingsFlow.first().wakeWords.split(",").map { it.trim() }.filter { it.isNotEmpty() }
             Log.d(TAG, "Loaded wake words: $wakeWords")
-            startListening()
+            withContext(Dispatchers.Main) {
+                startListening()
+            }
         }
         return START_STICKY // Service will be restarted if it's killed
     }
@@ -106,7 +112,7 @@ class WakeWordDetectionService : Service(), RecognitionListener {
     override fun onDestroy() {
         super.onDestroy()
         if(::speechRecognizer.isInitialized) {
-            speechRecognizer.destroy()
+             Handler(Looper.getMainLooper()).post { speechRecognizer.destroy() }
         }
         Log.d(TAG, "onDestroy: Service destroyed.")
     }
