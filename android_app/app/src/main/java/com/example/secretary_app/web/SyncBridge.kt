@@ -103,7 +103,7 @@ class SyncBridge(private val context: Context, private val mainActivity: MainAct
 
     @JavascriptInterface
     fun startVoiceRecognition() {
-        mainActivity.startLocalVoiceInteraction()
+        mainActivity.startLocalVoiceInteraction(null)
     }
 
     @JavascriptInterface
