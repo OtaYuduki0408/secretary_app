@@ -10,13 +10,22 @@ import com.example.secretary_app.data.sync.SyncScheduler
 import com.example.secretary_app.data.sync.SyncSettingsRepository
 import com.example.secretary_app.data.sync.NetworkUtils
 import com.example.secretary_app.data.local.AppDatabase
+import com.example.secretary_app.data.local.ApiResponse
 import com.example.secretary_app.data.local.LocalApiRouter
 import com.example.secretary_app.data.local.LocalStore
 import com.example.secretary_app.data.auth.AuthRepository
+import com.example.secretary_app.data.supabase.HttpClientProvider
+import com.example.secretary_app.data.supabase.SupabaseConfig
+import io.ktor.client.HttpClient
+import io.ktor.client.request.header
+import io.ktor.client.request.request
+import io.ktor.client.request.setBody
+import io.ktor.client.statement.bodyAsText
+import io.ktor.http.HttpMethod
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.json.JSONObject
 
@@ -24,6 +33,7 @@ class SyncBridge(private val context: Context, private val mainActivity: MainAct
     private val scope = CoroutineScope(Dispatchers.IO)
     private val settingsRepo = SyncSettingsRepository(context)
     private val authRepository = AuthRepository(context)
+    private val httpClient: HttpClient = HttpClientProvider.client
 
     @JavascriptInterface
     fun setConflictPolicy(policy: String) {
@@ -84,20 +94,46 @@ class SyncBridge(private val context: Context, private val mainActivity: MainAct
     @JavascriptInterface
     fun request(method: String, url: String, body: String?): String {
         return runBlocking {
-            val dao = AppDatabase.get(context).syncRecordDao()
-            val store = LocalStore(dao)
-            val session = authRepository.ensureSession()
-            val userId = session?.userId ?: "local"
-            val router = LocalApiRouter(store)
-            val response = router.handle(method, url, body, userId)
-            val isWrite = method.uppercase() != "GET"
-            if (isWrite && NetworkUtils.isOnline(context)) {
-                val policy = settingsRepo.settingsFlow.first().conflictPolicy
-                scope.launch {
-                    SyncManager(context).syncAll(policy)
+            if (url.startsWith("/api/") || url.startsWith("/web_api/")) {
+                val response = forwardRequestToWebServer(method, url, body)
+                "{\"status\":${response.status},\"body\":${response.body}}"
+            } else {
+                val dao = AppDatabase.get(context).syncRecordDao()
+                val store = LocalStore(dao)
+                val session = authRepository.ensureSession()
+                val userId = session?.userId ?: "local"
+                val router = LocalApiRouter(store)
+                val response = router.handle(method, url, body, userId)
+                val isWrite = method.uppercase() != "GET"
+                if (isWrite && NetworkUtils.isOnline(context)) {
+                    val policy = settingsRepo.settingsFlow.first().conflictPolicy
+                    scope.launch {
+                        SyncManager(context).syncAll(policy)
+                    }
+                }
+                "{\"status\":${response.status},\"body\":${response.body}}"
+            }
+        }
+    }
+
+    private suspend fun forwardRequestToWebServer(method: String, url: String, body: String?): ApiResponse {
+        val session = authRepository.ensureSession()
+        if (session == null) {
+            return ApiResponse(401, JSONObject("{'error':'unauthorized'}"))
+        }
+
+        try {
+            val response = httpClient.request("${SupabaseConfig.URL}$url") {
+                this.method = HttpMethod(method)
+                header("Authorization", "Bearer ${session.accessToken}")
+                if (body != null) {
+                    setBody(body)
                 }
             }
-            "{\"status\":${response.status},\"body\":${response.body}}"
+            val responseBody = response.bodyAsText()
+            return ApiResponse(response.status.value, JSONObject(responseBody))
+        } catch (e: Exception) {
+            return ApiResponse(500, JSONObject("{'error':'${e.message}'}"))
         }
     }
 

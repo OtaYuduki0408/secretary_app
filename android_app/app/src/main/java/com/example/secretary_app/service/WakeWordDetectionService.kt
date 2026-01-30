@@ -65,7 +65,7 @@ class WakeWordDetectionService : Service(), RecognitionListener {
             val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
                 putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
                 putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
-                putExtra(RecognizerIntent.EXTRA_LANGUAGE, "ja-JP") // Explicitly set Japanese
+                putExtra(RecognizerIntent.EXTRA_LANGUAGE, "ja-JP")
             }
             speechRecognizer.startListening(intent)
             Log.d(TAG, "startListening: Speech recognizer started.")
@@ -96,12 +96,12 @@ class WakeWordDetectionService : Service(), RecognitionListener {
         if (!matches.isNullOrEmpty()) {
             if (wakeWords.any { matches[0].contains(it, ignoreCase = true) }) {
                 Log.i(TAG, "Wake word detected in partial results!")
-                speechRecognizer.stopListening() // Stop listening to process this
                 val intent = Intent(this, MainActivity::class.java).apply {
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                     putExtra("start_voice_interaction", true)
                 }
                 startActivity(intent)
+                speechRecognizer.stopListening() // Stop listening to process this
             }
         }
     }

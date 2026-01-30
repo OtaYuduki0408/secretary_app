@@ -40,6 +40,8 @@ class LocalApiRouter(private val store: LocalStore) {
             path.startsWith("/api/tasks") -> handleTasks(normalizedMethod, segments, body, userId)
             path.startsWith("/api/user_settings") -> handleUserSettings(normalizedMethod, body, userId)
             path.startsWith("/api/custom_orders") -> handleCustomOrders(normalizedMethod, segments, body, userId)
+            path.startsWith("/custom_commands/triggers") -> handleCustomCommandTriggers(userId)
+            path.startsWith("/custom_commands") -> handleCustomCommand(uri, userId)
             path.startsWith("/order/api/past_addresses") -> handlePastAddresses(normalizedMethod, body, userId)
             path.startsWith("/order/api/pending_actions") -> handlePendingActions(segments, userId)
             path.startsWith("/api/switchbot/devices") -> ApiResponse(200, json.parseToJsonElement("[]"))
@@ -50,6 +52,29 @@ class LocalApiRouter(private val store: LocalStore) {
                 Log.w(TAG, "No handler for path: $path")
                 ApiResponse(404, json.parseToJsonElement("{\"error\":\"not_supported\"}"))
             }
+        }
+    }
+
+    private suspend fun handleCustomCommandTriggers(userId: String?): ApiResponse {
+        val orders = store.list("custom_orders", userId)
+        val triggers = orders.mapNotNull { it["trigger"]?.jsonPrimitive?.content }
+        return ApiResponse(200, buildJsonObject { put("triggers", json.parseToJsonElement(json.encodeToString(triggers))) })
+    }
+
+    private suspend fun handleCustomCommand(uri: Uri, userId: String?): ApiResponse {
+        val trigger = uri.getQueryParameter("trigger")
+        if (trigger == null) {
+            return ApiResponse(400, buildJsonObject { put("error", JsonPrimitive("trigger parameter is missing")) })
+        }
+
+        val orders = store.list("custom_orders", userId)
+        val matchedOrder = orders.find { it["trigger"]?.jsonPrimitive?.content == trigger }
+
+        return if (matchedOrder != null) {
+            val payloads = matchedOrder["actions"]?.jsonArray ?: json.parseToJsonElement("[]").jsonArray
+            ApiResponse(200, buildJsonObject { put("payloads", payloads) })
+        } else {
+            ApiResponse(404, buildJsonObject { put("error", JsonPrimitive("Not Found")) })
         }
     }
 
