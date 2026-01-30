@@ -98,6 +98,9 @@
     const API_URL_BASE = "/api/memos";
     let isBulkDeleteMode = false;
 
+    // AndroidSyncが利用可能かどうかをチェック
+    const useAndroidSync = window.AndroidSync && typeof window.AndroidSync.request === 'function';
+
     const focusRestoreState = {
       plan: null,
       depth: 0
@@ -105,7 +108,6 @@
 
     const getDefaultScrollContainer = () => document.scrollingElement || document.documentElement;
 
-    // 再描画後に元の位置へスクロールを補正するためにスクロール親を特定
     const getScrollParent = (element) => {
       if (!element) return getDefaultScrollContainer();
       let parent = element.parentElement;
@@ -178,7 +180,8 @@
       }
     };
 
-    async function fetchMemos(params = {}) {
+    // `async` を削除。SyncBridgeは同期的
+    function fetchMemos(params = {}) {
       const {
         keyword = "",
         searchType = "all",
@@ -197,17 +200,26 @@
       list.innerHTML = '<p class="memo-placeholder">読み込み中...</p>';
 
       try {
-        const res = await fetch(`${API_URL_BASE}?${query.toString()}`);
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-
-        const memos = await res.json();
-        if (!Array.isArray(memos) || memos.length === 0) {
-          list.innerHTML = '<p class="memo-placeholder">該当するメモがありません。</p>';
-          return;
+        let memos = [];
+        if (useAndroidSync) {
+            const resultJson = window.AndroidSync.request("GET", `${API_URL_BASE}?${query.toString()}`, null);
+            const result = JSON.parse(resultJson);
+            if (result.status !== 200) throw new Error(`HTTP ${result.status}`);
+            memos = result.body;
+        } else {
+            // Web用のフォールバック (元の非同期処理)
+            // この部分はasync関数として即時実行する
+            (async () => {
+                const res = await fetch(`${API_URL_BASE}?${query.toString()}`);
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                memos = await res.json();
+                renderMemos(memos);
+            })();
+            return; // フォールバックの場合はここで抜ける
         }
+        
+        renderMemos(memos);
 
-        list.innerHTML = "";
-        memos.forEach((memo) => list.appendChild(createMemoElement(memo)));
       } catch (err) {
         console.error(err);
         list.innerHTML = '<p class="memo-placeholder error">メモの読み込みに失敗しました。</p>';
@@ -216,239 +228,222 @@
       }
     }
 
-    function createMemoElement(memo) {
-      const wrapper = document.createElement("div");
-      wrapper.className = "memo";
-      wrapper.id = `memo-${memo.id}`;
-
-      if (memo.is_pinned) wrapper.classList.add("pinned");
-
-      const priorityValue = Number(memo.priority);
-      if (!Number.isNaN(priorityValue)) {
-        wrapper.classList.add(priorityValue >= 6 ? "priority-high" : `priority-${priorityValue}`);
-      }
-
-      const header = document.createElement("div");
-      header.className = "memo-item-header";
-
-      const title = document.createElement("strong");
-      title.textContent = memo.title || "無題のメモ";
-      header.appendChild(title);
-
-      const controls = document.createElement("div");
-      controls.className = "memo-controls";
-
-      // 優先度入力
-      const priorityInput = document.createElement("input");
-      priorityInput.type = "number";
-      priorityInput.min = "0";
-      priorityInput.className = "priority-input";
-      priorityInput.value = memo.priority ?? "";
-      priorityInput.placeholder = "優先度";
-      priorityInput.title = "優先度（ピン留め時のみ有効）";
-
-      const captureMemoRect = () => {
-        const memoEl = document.getElementById(`memo-${memo.id}`);
-        if (!memoEl) return null;
-        const rect = memoEl.getBoundingClientRect();
-        return {
-          top: rect.top,
-          scrollContainer: getScrollParent(memoEl)
-        };
-      };
-
-      const commitPriorityChange = (activeElementClass) => {
-        scheduleFocusRestore(memo.id, activeElementClass, captureMemoRect());
-        const maybePromise = updateMemo(memo.id, { priority: priorityInput.value, is_pinned: true });
-        if (maybePromise && typeof maybePromise.then === "function") {
-          maybePromise.then((success) => {
-            if (!success) cancelFocusRestore();
-          }).catch((err) => {
-            console.error(err);
-            cancelFocusRestore();
-          });
-        } else {
-          cancelFocusRestore();
+    function renderMemos(memos) {
+        const list = document.getElementById("memo-list");
+        if (!Array.isArray(memos) || memos.length === 0) {
+          list.innerHTML = '<p class="memo-placeholder">該当するメモがありません。</p>';
+          return;
         }
-      };
 
-      priorityInput.addEventListener("change", () => {
-        const value = Math.max(0, Number(priorityInput.value) || 0);
-        priorityInput.value = value;
-        commitPriorityChange("priority-input");
-      });
+        list.innerHTML = "";
+        memos.forEach((memo) => list.appendChild(createMemoElement(memo)));
+    }
 
-      const priorityWrap = document.createElement("div");
-      priorityWrap.className = "priority-input-wrap";
-      priorityWrap.appendChild(priorityInput);
 
-      const priorityArrows = document.createElement("div");
-      priorityArrows.className = "priority-arrows";
-
-      const changePriorityBy = (delta, targetClass) => {
-        let current = Number(priorityInput.value);
-        if (Number.isNaN(current)) current = 0;
-        current = Math.max(0, current + delta);
-        priorityInput.value = current;
-        commitPriorityChange(targetClass);
-      };
-
-      const arrowUp = document.createElement("button");
-      arrowUp.type = "button";
-      arrowUp.className = "priority-arrow arrow-up";
-      arrowUp.setAttribute("aria-label", "優先度を下げる");
-      arrowUp.textContent = "▲";
-      arrowUp.addEventListener("click", () => changePriorityBy(-1, "arrow-up"));
-
-      const arrowDown = document.createElement("button");
-      arrowDown.type = "button";
-      arrowDown.className = "priority-arrow arrow-down";
-      arrowDown.setAttribute("aria-label", "優先度を上げる");
-      arrowDown.textContent = "▼";
-      arrowDown.addEventListener("click", () => changePriorityBy(1, "arrow-down"));
-
-      priorityArrows.appendChild(arrowUp);
-      priorityArrows.appendChild(arrowDown);
-      priorityWrap.appendChild(priorityArrows);
-      controls.appendChild(priorityWrap);
-
-      // ピンチェック
-      const pinCheckbox = document.createElement("input");
-      pinCheckbox.type = "checkbox";
-      pinCheckbox.className = "pin-checkbox";
-      pinCheckbox.checked = !!memo.is_pinned;
-      pinCheckbox.title = "ピン留め";
-      pinCheckbox.addEventListener("change", () => {
-        updateMemo(memo.id, { is_pinned: pinCheckbox.checked });
-      });
-      controls.appendChild(pinCheckbox);
-
-      // 編集ボタン
-      const editBtn = document.createElement("button");
-      editBtn.type = "button";
-      editBtn.className = "icon-btn edit-btn";
-      editBtn.textContent = "✏️";
-      editBtn.title = "編集";
-      editBtn.addEventListener("click", () => toggleEditMode(wrapper, memo));
-      controls.appendChild(editBtn);
-
-      // 削除ボタン
-      const deleteBtn = document.createElement("button");
-      deleteBtn.type = "button";
-      deleteBtn.className = "icon-btn delete-btn";
-      deleteBtn.textContent = "🗑";
-      deleteBtn.title = "削除";
-      deleteBtn.addEventListener("click", () => deleteMemo(memo.id));
-      controls.appendChild(deleteBtn);
-
-      header.appendChild(controls);
-
-      // 一括削除チェック
-      const bulkWrap = document.createElement("div");
-      bulkWrap.className = "bulk-checkbox-wrap";
-
-      const bulkCheckbox = document.createElement("input");
-      bulkCheckbox.type = "checkbox";
-      bulkCheckbox.className = "bulk-delete-checkbox";
-      bulkCheckbox.value = memo.id;
-      bulkWrap.appendChild(bulkCheckbox);
-
-      header.appendChild(bulkWrap);
-      wrapper.appendChild(header);
-
-      const content = document.createElement("p");
-      content.textContent = memo.content || "";
-      wrapper.appendChild(content);
-
-      const meta = document.createElement("small");
-      const created = memo.created_at ? new Date(memo.created_at) : null;
-      meta.textContent = `作成日時: ${created ? created.toLocaleString('ja-JP') : "不明"}`;
-      wrapper.appendChild(meta);
-
-      return wrapper;
+    function createMemoElement(memo) {
+        const wrapper = document.createElement("div");
+        wrapper.className = "memo";
+        wrapper.id = `memo-${memo.id}`;
+        if (memo.is_pinned) wrapper.classList.add("pinned");
+        const priorityValue = Number(memo.priority);
+        if (!Number.isNaN(priorityValue)) {
+            wrapper.classList.add(priorityValue >= 6 ? "priority-high" : `priority-${priorityValue}`);
+        }
+        const header = document.createElement("div");
+        header.className = "memo-item-header";
+        const title = document.createElement("strong");
+        title.textContent = memo.title || "無題のメモ";
+        header.appendChild(title);
+        const controls = document.createElement("div");
+        controls.className = "memo-controls";
+        const priorityInput = document.createElement("input");
+        priorityInput.type = "number";
+        priorityInput.min = "0";
+        priorityInput.className = "priority-input";
+        priorityInput.value = memo.priority ?? "";
+        priorityInput.placeholder = "優先度";
+        priorityInput.title = "優先度（ピン留め時のみ有効）";
+        const captureMemoRect = () => {
+            const memoEl = document.getElementById(`memo-${memo.id}`);
+            if (!memoEl) return null;
+            const rect = memoEl.getBoundingClientRect();
+            return {
+                top: rect.top,
+                scrollContainer: getScrollParent(memoEl)
+            };
+        };
+        const commitPriorityChange = (activeElementClass) => {
+            scheduleFocusRestore(memo.id, activeElementClass, captureMemoRect());
+            const maybePromise = updateMemo(memo.id, {
+                priority: priorityInput.value,
+                is_pinned: true
+            });
+            if (maybePromise && typeof maybePromise.then === "function") {
+                maybePromise.then((success) => {
+                    if (!success) cancelFocusRestore();
+                }).catch((err) => {
+                    console.error(err);
+                    cancelFocusRestore();
+                });
+            } else {
+                cancelFocusRestore();
+            }
+        };
+        priorityInput.addEventListener("change", () => {
+            const value = Math.max(0, Number(priorityInput.value) || 0);
+            priorityInput.value = value;
+            commitPriorityChange("priority-input");
+        });
+        const priorityWrap = document.createElement("div");
+        priorityWrap.className = "priority-input-wrap";
+        priorityWrap.appendChild(priorityInput);
+        const priorityArrows = document.createElement("div");
+        priorityArrows.className = "priority-arrows";
+        const changePriorityBy = (delta, targetClass) => {
+            let current = Number(priorityInput.value);
+            if (Number.isNaN(current)) current = 0;
+            current = Math.max(0, current + delta);
+            priorityInput.value = current;
+            commitPriorityChange(targetClass);
+        };
+        const arrowUp = document.createElement("button");
+        arrowUp.type = "button";
+        arrowUp.className = "priority-arrow arrow-up";
+        arrowUp.setAttribute("aria-label", "優先度を下げる");
+        arrowUp.textContent = "▲";
+        arrowUp.addEventListener("click", () => changePriorityBy(-1, "arrow-up"));
+        const arrowDown = document.createElement("button");
+        arrowDown.type = "button";
+        arrowDown.className = "priority-arrow arrow-down";
+        arrowDown.setAttribute("aria-label", "優先度を上げる");
+        arrowDown.textContent = "▼";
+        arrowDown.addEventListener("click", () => changePriorityBy(1, "arrow-down"));
+        priorityArrows.appendChild(arrowUp);
+        priorityArrows.appendChild(arrowDown);
+        priorityWrap.appendChild(priorityArrows);
+        controls.appendChild(priorityWrap);
+        const pinCheckbox = document.createElement("input");
+        pinCheckbox.type = "checkbox";
+        pinCheckbox.className = "pin-checkbox";
+        pinCheckbox.checked = !!memo.is_pinned;
+        pinCheckbox.title = "ピン留め";
+        pinCheckbox.addEventListener("change", () => {
+            updateMemo(memo.id, {
+                is_pinned: pinCheckbox.checked
+            });
+        });
+        controls.appendChild(pinCheckbox);
+        const editBtn = document.createElement("button");
+        editBtn.type = "button";
+        editBtn.className = "icon-btn edit-btn";
+        editBtn.textContent = "✏️";
+        editBtn.title = "編集";
+        editBtn.addEventListener("click", () => toggleEditMode(wrapper, memo));
+        controls.appendChild(editBtn);
+        const deleteBtn = document.createElement("button");
+        deleteBtn.type = "button";
+        deleteBtn.className = "icon-btn delete-btn";
+        deleteBtn.textContent = "🗑";
+        deleteBtn.title = "削除";
+        deleteBtn.addEventListener("click", () => deleteMemo(memo.id));
+        controls.appendChild(deleteBtn);
+        header.appendChild(controls);
+        const bulkWrap = document.createElement("div");
+        bulkWrap.className = "bulk-checkbox-wrap";
+        const bulkCheckbox = document.createElement("input");
+        bulkCheckbox.type = "checkbox";
+        bulkCheckbox.className = "bulk-delete-checkbox";
+        bulkCheckbox.value = memo.id;
+        bulkWrap.appendChild(bulkCheckbox);
+        header.appendChild(bulkWrap);
+        wrapper.appendChild(header);
+        const content = document.createElement("p");
+        content.textContent = memo.content || "";
+        wrapper.appendChild(content);
+        const meta = document.createElement("small");
+        const created = memo.created_at ? new Date(memo.created_at) : null;
+        meta.textContent = `作成日時: ${created ? created.toLocaleString('ja-JP') : "不明"}`;
+        wrapper.appendChild(meta);
+        return wrapper;
     }
 
     function toggleEditMode(memoElement, memo) {
-      const isEditing = memoElement.classList.contains("editing");
-
-      // Clean up previous edit/view states
-      const oldTitle = memoElement.querySelector("strong, .edit-title-input");
-      const oldContent = memoElement.querySelector("p, .edit-content-textarea");
-      const oldControls = memoElement.querySelector(".edit-controls");
-
-      if (isEditing) {
-        // --- 編集モードを終了（キャンセル） ---
-        memoElement.classList.remove("editing");
-
-        const title = document.createElement("strong");
-        title.textContent = memo.title || "無題のメモ";
-        if (oldTitle) oldTitle.replaceWith(title);
-
-        const content = document.createElement("p");
-        content.textContent = memo.content || "";
-        if(oldContent) oldContent.replaceWith(content);
-
-        if (oldControls) oldControls.remove();
-
-      } else {
-        // --- 編集モードを開始 ---
-        memoElement.classList.add("editing");
-
-        const titleInput = document.createElement("input");
-        titleInput.type = "text";
-        titleInput.className = "edit-title-input";
-        titleInput.value = memo.title;
-        if (oldTitle) oldTitle.replaceWith(titleInput);
-
-
-        const contentArea = document.createElement("textarea");
-        contentArea.className = "edit-content-textarea";
-        contentArea.rows = "4";
-        contentArea.value = memo.content;
-        if(oldContent) oldContent.replaceWith(contentArea);
-
-        const editControls = document.createElement("div");
-        editControls.className = "edit-controls";
-
-        const saveBtn = document.createElement("button");
-        saveBtn.className = "primary-btn";
-        saveBtn.textContent = "保存";
-        saveBtn.onclick = async () => {
-          const newTitle = titleInput.value;
-          const newContent = contentArea.value;
-          await updateMemo(memo.id, { title: newTitle, content: newContent });
-          // The memo list will be re-fetched by updateMemo, so we don't need to do anything else.
-        };
-
-        const cancelBtn = document.createElement("button");
-        cancelBtn.className = "ghost-btn";
-        cancelBtn.textContent = "キャンセル";
-        cancelBtn.onclick = () => {
-             // Re-create the element to revert changes
-            const newMemoElement = createMemoElement(memo);
-            memoElement.replaceWith(newMemoElement);
-        };
-
-        editControls.appendChild(saveBtn);
-        editControls.appendChild(cancelBtn);
-        memoElement.appendChild(editControls);
-        titleInput.focus();
-      }
+        const isEditing = memoElement.classList.contains("editing");
+        const oldTitle = memoElement.querySelector("strong, .edit-title-input");
+        const oldContent = memoElement.querySelector("p, .edit-content-textarea");
+        const oldControls = memoElement.querySelector(".edit-controls");
+        if (isEditing) {
+            memoElement.classList.remove("editing");
+            const title = document.createElement("strong");
+            title.textContent = memo.title || "無題のメモ";
+            if (oldTitle) oldTitle.replaceWith(title);
+            const content = document.createElement("p");
+            content.textContent = memo.content || "";
+            if (oldContent) oldContent.replaceWith(content);
+            if (oldControls) oldControls.remove();
+        } else {
+            memoElement.classList.add("editing");
+            const titleInput = document.createElement("input");
+            titleInput.type = "text";
+            titleInput.className = "edit-title-input";
+            titleInput.value = memo.title;
+            if (oldTitle) oldTitle.replaceWith(titleInput);
+            const contentArea = document.createElement("textarea");
+            contentArea.className = "edit-content-textarea";
+            contentArea.rows = "4";
+            contentArea.value = memo.content;
+            if (oldContent) oldContent.replaceWith(contentArea);
+            const editControls = document.createElement("div");
+            editControls.className = "edit-controls";
+            const saveBtn = document.createElement("button");
+            saveBtn.className = "primary-btn";
+            saveBtn.textContent = "保存";
+            saveBtn.onclick = () => {
+                const newTitle = titleInput.value;
+                const newContent = contentArea.value;
+                updateMemo(memo.id, {
+                    title: newTitle,
+                    content: newContent
+                });
+            };
+            const cancelBtn = document.createElement("button");
+            cancelBtn.className = "ghost-btn";
+            cancelBtn.textContent = "キャンセル";
+            cancelBtn.onclick = () => {
+                const newMemoElement = createMemoElement(memo);
+                memoElement.replaceWith(newMemoElement);
+            };
+            editControls.appendChild(saveBtn);
+            editControls.appendChild(cancelBtn);
+            memoElement.appendChild(editControls);
+            titleInput.focus();
+        }
     }
 
 
-    async function updateMemo(id, data) {
+    function updateMemo(id, data) {
       if ("priority" in data && (data.priority === "" || data.priority === null)) {
         data.priority = null;
       }
       try {
-        const res = await fetch(`${API_URL_BASE}/${id}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(data)
-        });
-        if (!res.ok) throw new Error("update_failed");
-        await searchMemos();
+        if (useAndroidSync) {
+            const resultJson = window.AndroidSync.request("PUT", `${API_URL_BASE}/${id}`, JSON.stringify(data));
+            const result = JSON.parse(resultJson);
+            if (result.status !== 200) throw new Error(`HTTP ${result.status}`);
+        } else {
+            // Webフォールバック
+            (async () => {
+                const res = await fetch(`${API_URL_BASE}/${id}`, {
+                    method: "PUT",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(data)
+                });
+                if (!res.ok) throw new Error("update_failed");
+                searchMemos(); // 成功時のみ再検索
+            })();
+            return true;
+        }
+        searchMemos();
         return true;
       } catch (err) {
         console.error(err);
@@ -457,7 +452,7 @@
       }
     }
 
-    async function addMemo() {
+    function addMemo() {
       const titleEl = document.getElementById("title");
       const contentEl = document.getElementById("content");
       const priorityEl = document.getElementById("add-priority");
@@ -475,15 +470,34 @@
       }
 
       try {
-        const res = await fetch(API_URL_BASE, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload)
-        });
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({}));
-          throw new Error(err.error || "create_failed");
+        if (useAndroidSync) {
+            const resultJson = window.AndroidSync.request("POST", API_URL_BASE, JSON.stringify(payload));
+            const result = JSON.parse(resultJson);
+            if (result.status !== 200 && result.status !== 201) {
+                 const err = result.body || { error: "create_failed" };
+                 throw new Error(err.error);
+            }
+        } else {
+             // Webフォールバック
+            (async () => {
+                const res = await fetch(API_URL_BASE, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payload)
+                });
+                if (!res.ok) {
+                    const err = await res.json().catch(() => ({}));
+                    throw new Error(err.error || "create_failed");
+                }
+                 titleEl.value = "";
+                 contentEl.value = "";
+                 document.getElementById("add-is-pinned").checked = false;
+                 priorityEl.value = "";
+                 searchMemos();
+            })();
+            return;
         }
+        
         titleEl.value = "";
         contentEl.value = "";
         document.getElementById("add-is-pinned").checked = false;
@@ -495,11 +509,22 @@
       }
     }
 
-    async function deleteMemo(id) {
+    function deleteMemo(id) {
       if (!confirm("このメモを削除しますか？")) return;
       try {
-        const res = await fetch(`${API_URL_BASE}/${id}`, { method: "DELETE" });
-        if (!res.ok) throw new Error("delete_failed");
+        if (useAndroidSync) {
+            const resultJson = window.AndroidSync.request("DELETE", `${API_URL_BASE}/${id}`, null);
+            const result = JSON.parse(resultJson);
+            if (result.status !== 200) throw new Error("delete_failed");
+        } else {
+            // Webフォールバック
+            (async () => {
+                const res = await fetch(`${API_URL_BASE}/${id}`, { method: "DELETE" });
+                if (!res.ok) throw new Error("delete_failed");
+                searchMemos();
+            })();
+            return;
+        }
         searchMemos();
       } catch (err) {
         console.error(err);
@@ -526,7 +551,7 @@
         .forEach((cb) => { cb.checked = false; });
     }
 
-    async function deleteSelectedMemos() {
+    function deleteSelectedMemos() {
       const checked = [...document.querySelectorAll('#memo-list .bulk-delete-checkbox:checked')];
       if (checked.length === 0) {
         alert("削除するメモを選択してください。");
@@ -535,15 +560,32 @@
       if (!confirm(`${checked.length}件のメモを削除しますか？`)) return;
 
       try {
-        const res = await fetch(`${API_URL_BASE}/bulk`, {
-          method: "DELETE",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ ids: checked.map((cb) => cb.value) })
-        });
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({}));
-          throw new Error(err.error || "bulk_delete_failed");
+        const payload = { ids: checked.map((cb) => cb.value) };
+        if (useAndroidSync) {
+            const resultJson = window.AndroidSync.request("DELETE", `${API_URL_BASE}/bulk`, JSON.stringify(payload));
+            const result = JSON.parse(resultJson);
+            if (result.status !== 200) {
+                const err = result.body || {error: "bulk_delete_failed"};
+                throw new Error(err.error);
+            }
+        } else {
+            // Webフォールバック
+            (async () => {
+                const res = await fetch(`${API_URL_BASE}/bulk`, {
+                    method: "DELETE",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payload)
+                });
+                if (!res.ok) {
+                    const err = await res.json().catch(() => ({}));
+                    throw new Error(err.error || "bulk_delete_failed");
+                }
+                toggleBulkDeleteMode(false);
+                searchMemos();
+            })();
+            return;
         }
+
         toggleBulkDeleteMode(false);
         searchMemos();
       } catch (err) {
@@ -577,6 +619,9 @@
       searchMemos();
     });
   </script>
+  <script src="./static/js/app_settings_apply.js"></script>
+</body>
+</html>
   <script src="./static/js/app_settings_apply.js"></script>
 </body>
 </html>

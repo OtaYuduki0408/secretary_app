@@ -15,6 +15,35 @@ const manager = window.manager || new ScheduleManager();
 let abortRequested = false;
 let abortUntil = 0;
 
+// --- ここから高速応答用の修正 ---
+let localTriggers = [];
+let isLocalTriggersLoaded = false;
+
+async function loadLocalTriggers() {
+    if (window.AndroidSync && typeof window.AndroidSync.request === 'function') {
+        try {
+            // ネイティブ側にトリガーリストを要求
+            const resultJson = window.AndroidSync.request("GET", "/custom_commands/triggers", null);
+            const result = JSON.parse(resultJson);
+            if (result.status === 200 && Array.isArray(result.body.triggers)) {
+                localTriggers = result.body.triggers;
+                isLocalTriggersLoaded = true;
+                console.log('ローカルの高速応答トリガーをロードしました:', localTriggers);
+            } else {
+                console.error('ローカルの高速応答トリガーのロードに失敗しました:', result.body);
+            }
+        } catch (e) {
+            console.error('ローカルの高速応答トリガーのロード中にエラーが発生しました:', e);
+        }
+    } else {
+        console.log('AndroidSyncが利用できないため、ローカルの高速応答トリガーは無効です。');
+    }
+}
+// アプリ起動時にトリガーを読み込む
+loadLocalTriggers();
+// --- ここまで高速応答用の修正 ---
+
+
 function setAbortCooldown(ms = 10000) {
   abortUntil = Date.now() + ms;
 }
@@ -169,11 +198,46 @@ export async function check_chat_Space(inputValue) {
     }
     return;
   }
+
+  const cleanedInput = stripWakeWords(inputValue);
+
+  // --- 高速応答ロジック ---
+  if (isLocalTriggersLoaded) {
+    const matchedTrigger = localTriggers.find(trigger => cleanedInput.includes(trigger));
+    if (matchedTrigger) {
+        console.log(`ローカルの高速応答トリガーに一致: ${matchedTrigger}`);
+        fire('analysis:start', { steps: ['ローカル処理'] });
+        try {
+            // ローカルDBにアクションを問い合わせる
+            const resultJson = window.AndroidSync.request("GET", `/custom_commands?trigger=${encodeURIComponent(matchedTrigger)}`, null);
+            const result = JSON.parse(resultJson);
+
+            if (result.status === 200 && Array.isArray(result.body.payloads)) {
+                if (typeof window.executeOrderPayload === "function") {
+                    for (const payload of result.body.payloads) {
+                        await window.executeOrderPayload(payload);
+                    }
+                } else {
+                    console.warn("executeOrderPayload is not available on window.");
+                }
+            } else {
+                 throw new Error(result.body.error || 'ローカルコマンドの実行に失敗しました。');
+            }
+        } catch (e) {
+            console.error(e);
+            const errorMessage = await applyToneSetting("申し訳ございません。ローカルコマンドの実行に失敗しました。", 'error');
+            reader.speak(errorMessage);
+        } finally {
+            fire('analysis:end');
+        }
+        return; // サーバーには問い合わせない
+    }
+  }
+  // --- 高速応答ロジックここまで ---
+
   fire('analysis:start', { steps: ['処理開始'] });
   console.time("チャット解析 総所要時間");
   console.log("入力検知:", inputValue);
-  const cleanedInput = stripWakeWords(inputValue);
-  // console.log(`DEBUG: ユーザー入力読み上げ: "${inputValue}でございますね。かしこまりました。"`); // デバッグログ削除
 
   async function applyToneSetting(message, applyTarget) {
     try {

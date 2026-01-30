@@ -23,6 +23,8 @@ document.addEventListener("DOMContentLoaded", () => {
     allCategories: [],
     isDeleteMode: false,
   };
+  
+  const useAndroidSync = window.AndroidSync && typeof window.AndroidSync.request === 'function';
 
   const formatYen = (value) => Number(value || 0).toLocaleString();
 
@@ -41,11 +43,43 @@ document.addEventListener("DOMContentLoaded", () => {
     }, 3000);
   }
 
-  // --- API Functions ---
+  // --- API Functions (SyncBridge対応) ---
+  async function apiRequest(method, url, body = null) {
+    if (useAndroidSync) {
+        return new Promise((resolve, reject) => {
+            try {
+                const resultJson = window.AndroidSync.request(method, url, body ? JSON.stringify(body) : null);
+                const result = JSON.parse(resultJson);
+                if (result.status >= 200 && result.status < 300) {
+                    resolve(result.body);
+                } else {
+                    reject({ error: result.body.error || `HTTP ${result.status}` });
+                }
+            } catch (e) {
+                reject(e);
+            }
+        });
+    } else {
+        // Webフォールバック
+        const options = {
+            method,
+            headers: { "Content-Type": "application/json" },
+        };
+        if (body) {
+            options.body = JSON.stringify(body);
+        }
+        const res = await fetch(url, options);
+        const data = await res.json();
+        if (!res.ok) {
+            throw { error: data.error || `HTTP ${res.status}` };
+        }
+        return data;
+    }
+  }
+
   async function fetchCategories() {
     try {
-      const res = await fetch("/api/categories");
-      return await res.json();
+      return await apiRequest("GET", "/api/categories");
     } catch (err) {
       showToast("カテゴリの読み込みに失敗しました。", true);
       return [];
@@ -54,9 +88,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   async function fetchSummary() {
     try {
-      const res = await fetch("/api/finance/summary");
-      if (!res.ok) throw new Error("failed to fetch summary");
-      const data = await res.json();
+      const data = await apiRequest("GET", "/api/finance/summary");
       balanceEl.textContent = formatYen(data.balance);
       monthlyEl.textContent = formatYen(data.monthly_expense);
       dailyEl.textContent = formatYen(data.daily_expense);
@@ -67,8 +99,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   async function fetchRecords() {
     try {
-      const res = await fetch("/api/finance");
-      return await res.json();
+      return await apiRequest("GET", "/api/finance");
     } catch (err) {
       showToast("記録の読み込みに失敗しました。", true);
       return [];
@@ -78,9 +109,7 @@ document.addEventListener("DOMContentLoaded", () => {
   // --- UI Rendering ---
   function renderCategoryButtons() {
     categoryButtons.innerHTML = "";
-    // Temporarily show all categories until type is associated with category
     const filteredCategories = state.allCategories; 
-    // const filteredCategories = state.allCategories.filter(c => c.type === state.type);
 
     if (!filteredCategories || filteredCategories.length === 0) {
       categoryButtons.style.display = "none";
@@ -157,23 +186,17 @@ document.addEventListener("DOMContentLoaded", () => {
       amount,
       memo,
     };
-
-    const res = await fetch("/api/finance", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-
-    const data = await res.json();
-    if (data.error) {
-      showToast(data.error, true);
-    } else {
-      showToast("登録しました！");
-      amountEl.value = "";
-      memoEl.value = "";
-      state.category = null;
-      renderCategoryButtons();
-      loadData();
+    
+    try {
+        await apiRequest("POST", "/api/finance", payload);
+        showToast("登録しました！");
+        amountEl.value = "";
+        memoEl.value = "";
+        state.category = null;
+        renderCategoryButtons();
+        loadData();
+    } catch(data) {
+        showToast(data.error, true);
     }
   }
 
@@ -197,20 +220,14 @@ document.addEventListener("DOMContentLoaded", () => {
       showToast("削除する項目を選択してください。", true);
       return;
     }
-
-    const res = await fetch("/api/finance/bulk-delete", {
-      method: "DELETE",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ids: selectedIds }),
-    });
-
-    const data = await res.json();
-    if (data.error) {
-      showToast(data.error, true);
-    } else {
-      showToast(`${selectedIds.length}件の記録を削除しました。`);
-      toggleDeleteMode(); // Exit delete mode
-      loadData();
+    
+    try {
+        await apiRequest("DELETE", "/api/finance/bulk-delete", { ids: selectedIds });
+        showToast(`${selectedIds.length}件の記録を削除しました。`);
+        toggleDeleteMode(); // Exit delete mode
+        loadData();
+    } catch(data) {
+        showToast(data.error, true);
     }
   }
 
