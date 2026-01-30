@@ -2,20 +2,21 @@ package com.example.secretary_app.web
 
 import android.content.Context
 import android.content.Intent
+import android.speech.tts.TextToSpeech
 import android.webkit.JavascriptInterface
+import android.widget.Toast
 import com.example.secretary_app.MainActivity
+import com.example.secretary_app.data.auth.AuthRepository
+import com.example.secretary_app.data.local.ApiResponse
+import com.example.secretary_app.data.local.AppDatabase
+import com.example.secretary_app.data.local.LocalApiRouter
+import com.example.secretary_app.data.local.LocalStore
+import com.example.secretary_app.data.supabase.HttpClientProvider
+import com.example.secretary_app.data.supabase.SupabaseConfig
 import com.example.secretary_app.data.sync.SyncConflictPolicy
 import com.example.secretary_app.data.sync.SyncManager
 import com.example.secretary_app.data.sync.SyncScheduler
 import com.example.secretary_app.data.sync.SyncSettingsRepository
-import com.example.secretary_app.data.sync.NetworkUtils
-import com.example.secretary_app.data.local.AppDatabase
-import com.example.secretary_app.data.local.ApiResponse
-import com.example.secretary_app.data.local.LocalApiRouter
-import com.example.secretary_app.data.local.LocalStore
-import com.example.secretary_app.data.auth.AuthRepository
-import com.example.secretary_app.data.supabase.HttpClientProvider
-import com.example.secretary_app.data.supabase.SupabaseConfig
 import io.ktor.client.HttpClient
 import io.ktor.client.request.header
 import io.ktor.client.request.request
@@ -27,13 +28,33 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import org.json.JSONObject
+import java.util.Locale
 
-class SyncBridge(private val context: Context, private val mainActivity: MainActivity) {
+class SyncBridge(private val context: Context, private val mainActivity: MainActivity) : TextToSpeech.OnInitListener {
     private val scope = CoroutineScope(Dispatchers.IO)
     private val settingsRepo = SyncSettingsRepository(context)
     private val authRepository = AuthRepository(context)
     private val httpClient: HttpClient = HttpClientProvider.client
+    private var tts: TextToSpeech? = null
+
+    init {
+        tts = TextToSpeech(context, this)
+    }
+
+    override fun onInit(status: Int) {
+        if (status == TextToSpeech.SUCCESS) {
+            tts?.language = Locale.JAPANESE
+        } else {
+            // Handle TTS initialization failure
+        }
+    }
 
     @JavascriptInterface
     fun setConflictPolicy(policy: String) {
@@ -104,13 +125,6 @@ class SyncBridge(private val context: Context, private val mainActivity: MainAct
                 val userId = session?.userId ?: "local"
                 val router = LocalApiRouter(store)
                 val response = router.handle(method, url, body, userId)
-                val isWrite = method.uppercase() != "GET"
-                if (isWrite && NetworkUtils.isOnline(context)) {
-                    val policy = settingsRepo.settingsFlow.first().conflictPolicy
-                    scope.launch {
-                        SyncManager(context).syncAll(policy)
-                    }
-                }
                 "{\"status\":${response.status},\"body\":${response.body}}"
             }
         }
@@ -119,7 +133,7 @@ class SyncBridge(private val context: Context, private val mainActivity: MainAct
     private suspend fun forwardRequestToWebServer(method: String, url: String, body: String?): ApiResponse {
         val session = authRepository.ensureSession()
         if (session == null) {
-            return ApiResponse(401, JSONObject("{'error':'unauthorized'}"))
+            return ApiResponse(401, buildJsonObject { put("error", JsonPrimitive("unauthorized")) })
         }
 
         try {
@@ -131,9 +145,30 @@ class SyncBridge(private val context: Context, private val mainActivity: MainAct
                 }
             }
             val responseBody = response.bodyAsText()
-            return ApiResponse(response.status.value, JSONObject(responseBody))
+            return ApiResponse(response.status.value, Json.parseToJsonElement(responseBody))
         } catch (e: Exception) {
-            return ApiResponse(500, JSONObject("{'error':'${e.message}'}"))
+            return ApiResponse(500, buildJsonObject { put("error", JsonPrimitive(e.message)) })
+        }
+    }
+
+    @JavascriptInterface
+    fun executeOrderPayload(payloadJson: String) {
+        val payload = Json.parseToJsonElement(payloadJson).jsonObject
+        when (payload["action_type"]?.jsonPrimitive?.content) {
+            "TTS" -> {
+                val text = payload["parameters"]?.jsonObject?.get("text")?.jsonPrimitive?.content
+                if (text != null) {
+                    tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "");
+                }
+            }
+            "TOAST" -> {
+                val message = payload["parameters"]?.jsonObject?.get("message")?.jsonPrimitive?.content
+                if (message != null) {
+                    mainActivity.runOnUiThread {
+                        Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+                    }
+                }
+            }
         }
     }
 
@@ -145,5 +180,10 @@ class SyncBridge(private val context: Context, private val mainActivity: MainAct
     @JavascriptInterface
     fun clearCacheAndReload() {
         mainActivity.clearCacheAndReload()
+    }
+
+    fun shutdown() {
+        tts?.stop()
+        tts?.shutdown()
     }
 }

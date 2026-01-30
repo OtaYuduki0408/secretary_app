@@ -3,6 +3,8 @@ package com.example.secretary_app.data.local
 import android.net.Uri
 import android.util.Log
 import com.example.secretary_app.data.supabase.HttpClientProvider
+import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -58,7 +60,7 @@ class LocalApiRouter(private val store: LocalStore) {
     private suspend fun handleCustomCommandTriggers(userId: String?): ApiResponse {
         val orders = store.list("custom_orders", userId)
         val triggers = orders.mapNotNull { it["trigger"]?.jsonPrimitive?.content }
-        return ApiResponse(200, buildJsonObject { put("triggers", json.parseToJsonElement(json.encodeToString(triggers))) })
+        return ApiResponse(200, buildJsonObject { put("triggers", json.encodeToJsonElement(ListSerializer(String.serializer()), triggers)) })
     }
 
     private suspend fun handleCustomCommand(uri: Uri, userId: String?): ApiResponse {
@@ -84,7 +86,7 @@ class LocalApiRouter(private val store: LocalStore) {
             method == "GET" -> {
                 val list = store.list("categories", userId)
                 Log.d(TAG, "handleCategories GET: found ${list.size} records")
-                ApiResponse(200, json.parseToJsonElement(json.encodeToString(ListSerializer, list)))
+                ApiResponse(200, json.parseToJsonElement(json.encodeToString(ListSerializer(JsonObject.serializer()), list)))
             }
             method == "POST" -> {
                 val obj = json.parseToJsonElement(body ?: "{}").jsonObject
@@ -112,7 +114,7 @@ class LocalApiRouter(private val store: LocalStore) {
             method == "GET" -> {
                 val list = store.list("finance", userId)
                 Log.d(TAG, "handleFinance GET: found ${list.size} records")
-                ApiResponse(200, json.parseToJsonElement(json.encodeToString(ListSerializer, list)))
+                ApiResponse(200, json.parseToJsonElement(json.encodeToString(ListSerializer(JsonObject.serializer()), list)))
             }
             method == "POST" -> {
                 val obj = json.parseToJsonElement(body ?: "{}").jsonObject
@@ -203,7 +205,7 @@ class LocalApiRouter(private val store: LocalStore) {
                     okText && okStart && okEnd
                 }
                 Log.d(TAG, "handleMemos GET: found ${list.size} records")
-                ApiResponse(200, json.parseToJsonElement(json.encodeToString(ListSerializer, list)))
+                ApiResponse(200, json.parseToJsonElement(json.encodeToString(ListSerializer(JsonObject.serializer()), list)))
             }
             method == "POST" -> {
                 val obj = json.parseToJsonElement(body ?: "{}").jsonObject
@@ -240,7 +242,7 @@ class LocalApiRouter(private val store: LocalStore) {
             method == "GET" -> {
                 val list = store.list("tasks", userId)
                 Log.d(TAG, "handleTasks GET: found ${list.size} records")
-                ApiResponse(200, json.parseToJsonElement(json.encodeToString(ListSerializer, list)))
+                ApiResponse(200, json.parseToJsonElement(json.encodeToString(ListSerializer(JsonObject.serializer()), list)))
             }
             method == "POST" -> {
                 val obj = json.parseToJsonElement(body ?: "{}").jsonObject
@@ -295,7 +297,7 @@ class LocalApiRouter(private val store: LocalStore) {
         return when {
             method == "GET" -> {
                 val list = store.list("custom_orders", userId)
-                ApiResponse(200, json.parseToJsonElement(json.encodeToString(ListSerializer, list)))
+                ApiResponse(200, json.parseToJsonElement(json.encodeToString(ListSerializer(JsonObject.serializer()), list)))
             }
             method == "POST" -> {
                 val obj = json.parseToJsonElement(body ?: "{}").jsonObject
@@ -325,7 +327,7 @@ class LocalApiRouter(private val store: LocalStore) {
         return when (method) {
             "GET" -> {
                 val list = store.list("past_addresses", userId)
-                ApiResponse(200, json.parseToJsonElement(json.encodeToString(ListSerializer, list)))
+                ApiResponse(200, json.parseToJsonElement(json.encodeToString(ListSerializer(JsonObject.serializer()), list)))
             }
             "POST" -> {
                 val obj = json.parseToJsonElement(body ?: "{}").jsonObject
@@ -341,7 +343,7 @@ class LocalApiRouter(private val store: LocalStore) {
     private suspend fun handlePendingActions(segments: List<String>, userId: String?): ApiResponse {
         Log.d(TAG, "handlePendingActions: userId=$userId")
         val list = store.list("pending_user_actions", userId)
-        return ApiResponse(200, json.parseToJsonElement(json.encodeToString(ListSerializer, list)))
+        return ApiResponse(200, json.parseToJsonElement(json.encodeToString(ListSerializer(JsonObject.serializer()), list)))
     }
 }
 
