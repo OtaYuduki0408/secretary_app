@@ -1,13 +1,16 @@
 package com.example.secretary_app.service
 
+import android.Manifest
 import android.app.Service
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.Bundle
 import android.os.IBinder
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
 import android.util.Log
+import androidx.core.content.ContextCompat
 import com.example.secretary_app.MainActivity
 import com.example.secretary_app.data.sync.SyncSettingsRepository
 import kotlinx.coroutines.CoroutineScope
@@ -26,12 +29,21 @@ class WakeWordDetectionService : Service(), RecognitionListener {
         super.onCreate()
         Log.d(TAG, "onCreate: Service creating.")
         settingsRepository = SyncSettingsRepository(this)
-        speechRecognizer = SpeechRecognizer.createSpeechRecognizer(this)
-        speechRecognizer.setRecognitionListener(this)
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
+            speechRecognizer = SpeechRecognizer.createSpeechRecognizer(this)
+            speechRecognizer.setRecognitionListener(this)
+        } else {
+            Log.e(TAG, "RECORD_AUDIO permission not granted. Cannot create SpeechRecognizer.")
+            stopSelf() // Stop the service if permission is not granted.
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         Log.d(TAG, "onStartCommand: Service started.")
+        if (!::speechRecognizer.isInitialized) {
+            Log.e(TAG, "SpeechRecognizer not initialized. Stopping service.")
+            return START_NOT_STICKY
+        }
         CoroutineScope(Dispatchers.IO).launch {
             wakeWords = settingsRepository.settingsFlow.first().wakeWords.split(",").map { it.trim() }.filter { it.isNotEmpty() }
             Log.d(TAG, "Loaded wake words: $wakeWords")
@@ -93,7 +105,9 @@ class WakeWordDetectionService : Service(), RecognitionListener {
 
     override fun onDestroy() {
         super.onDestroy()
-        speechRecognizer.destroy()
+        if(::speechRecognizer.isInitialized) {
+            speechRecognizer.destroy()
+        }
         Log.d(TAG, "onDestroy: Service destroyed.")
     }
 
