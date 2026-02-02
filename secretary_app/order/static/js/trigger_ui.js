@@ -44,7 +44,10 @@ export function createTriggerUI(prefix = '', initialValue = {}) {
 
     const html = `
       <details class="co-details-group">
-        <summary>期間: <span id="${p}date_range_summary">指定なし</span></summary>
+        <summary style="font-size: 1.1em; font-weight: bold; cursor: pointer; display: flex; justify-content: space-between; align-items: center; padding: 8px; border-radius: 8px; background-color: var(--co-bg-2); border: 1px solid var(--co-border);">
+            <span>期間: <span id="${p}date_range_summary">指定なし</span></span>
+            <span class="co-disclosure-icon">▼</span>
+        </summary>
         <div class="co-preset-buttons" id="${p}date_presets">
           <button type="button" class="co-btn ghost" data-preset="today">今日</button>
           <button type="button" class="co-btn ghost" data-preset="this_month">今月</button>
