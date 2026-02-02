@@ -349,13 +349,6 @@ export function addAction(anchorElement, data={}) {
     <div class="co-block-content">
       <select class="action-category" id="${prefix}action_category"></select>
       <select class="action-sub" id="${prefix}action_sub"></select>
-      <div class="action-timing-container" style="margin-top: 10px;">
-        <label style="font-size:0.9em; opacity:0.8;">実行タイミング（無入力で即時実行）</label>
-        <input type="date" class="action-timing-date-abs" id="${prefix}action_timing_date_abs" title="実行日（絶対）">
-        <input type="number" class="action-timing-date-rel" id="${prefix}action_timing_date_rel" placeholder="+n 日" title="実行日（相対）" style="width: 80px;">
-        <input type="time" class="action-timing-time-abs" id="${prefix}action_timing_time_abs" title="実行時刻（絶対）">
-        <input type="text" class="action-timing-time-rel" id="${prefix}action_timing-time-rel" placeholder="+HH:MM:SS" title="実行時刻（相対）" style="width: 120px;">
-      </div>
       <div class="action-detail-container" id="${prefix}action_detail_container" style="margin-top: 10px;">
         <!-- ここに動的UIが挿入される -->
       </div>

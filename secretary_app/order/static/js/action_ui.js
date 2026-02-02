@@ -24,14 +24,69 @@ export function createActionUI(prefix = '', initialValue = {}) {
   switch (category) {
     case "カレンダー":
       if (sub === "追加") {
+        const createDateTimeUI = (group, iv) => {
+            const prefix = `action_cal_add_${group}_`; // 'start' or 'end'
+            const createDatalist = (type) => {
+                let options = '';
+                if (type === 'time') {
+                    options += `<option value="毎時"></option>`;
+                    for (let h = 0; h < 24; h++) for (let m = 0; m < 60; m += 15) options += `<option value="${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}"></option>`;
+                } else {
+                    const special = { year: '毎年', month: '毎月', day: '毎日' };
+                    options += `<option value="${special[type]}"></option>`;
+                    const d = new Date();
+                    if(type === 'year') for(let i=d.getFullYear(); i<=d.getFullYear()+5; i++) options += `<option value="${i}"></option>`;
+                    if(type === 'month') for(let i=1; i<=12; i++) options += `<option value="${i}"></option>`;
+                    if(type === 'day') for(let i=1; i<=31; i++) options += `<option value="${i}"></option>`;
+                }
+                return options;
+            };
+            
+            const yearVal = iv[`${group}_year`] === 'x' ? '毎年' : iv[`${group}_year`] || '';
+            const monthVal = iv[`${group}_month`] === 'x' ? '毎月' : iv[`${group}_month`] || '';
+            const dayVal = iv[`${group}_day`] === 'x' ? '毎日' : iv[`${group}_day`] || '';
+            const timeVal = iv[`${group}_time`] === 'x' ? '毎時' : iv[`${group}_time`] || '';
+
+            return `
+              <div class="co-fieldset">
+                  <label>年</label>
+                  <input type="text" id="${prefix}year" class="action-detail-cal-${group}-year" list="${prefix}year_opts" placeholder="例: 2025 または 毎年" value="${yearVal}">
+                  <datalist id="${prefix}year_opts">${createDatalist('year')}</datalist>
+              </div>
+              <div class="co-fieldset">
+                  <label>月</label>
+                  <input type="text" id="${prefix}month" class="action-detail-cal-${group}-month" list="${prefix}month_opts" placeholder="例: 12 または 毎月" value="${monthVal}">
+                  <datalist id="${prefix}month_opts">${createDatalist('month')}</datalist>
+              </div>
+              <div class="co-fieldset">
+                  <label>日</label>
+                  <input type="text" id="${prefix}day" class="action-detail-cal-${group}-day" list="${prefix}day_opts" placeholder="例: 15 または 毎日" value="${dayVal}">
+                  <datalist id="${prefix}day_opts">${createDatalist('day')}</datalist>
+              </div>
+              <div class="co-fieldset">
+                  <label>時間</label>
+                  <input type="text" id="${prefix}time" class="action-detail-cal-${group}-time" list="${prefix}time_opts" placeholder="例: 09:00 または 毎時" value="${timeVal}">
+                  <datalist id="${prefix}time_opts">${createDatalist('time')}</datalist>
+              </div>
+            `;
+        };
+
         detailContainer.innerHTML = `
           <label>タイトル</label>
           <input type="text" class="action-detail-cal-title" placeholder="予定のタイトル" value="${initialValue.title || ''}">
-          <label>開始日時</label>
-          <input type="datetime-local" class="action-detail-cal-start-time" value="${initialValue.start_time || ''}">
-          <label>終了日時</label>
-          <input type="datetime-local" class="action-detail-cal-end-time" value="${initialValue.end_time || ''}">
-          <label>説明</label>
+          <details class="co-details-group" open>
+            <summary>開始日時</summary>
+            <div class="co-details-content" style="padding-top: 10px;">
+              ${createDateTimeUI('start', initialValue)}
+            </div>
+          </details>
+          <details class="co-details-group" open style="margin-top: 10px;">
+            <summary>終了日時</summary>
+            <div class="co-details-content" style="padding-top: 10px;">
+              ${createDateTimeUI('end', initialValue)}
+            </div>
+          </details>
+          <label style="margin-top: 10px;">説明</label>
           <textarea class="action-detail-cal-description" placeholder="予定の説明">${initialValue.description || ''}</textarea>
         `;
       } else if (sub === "削除") {

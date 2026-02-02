@@ -19,8 +19,16 @@ export function createTriggerUI(prefix = '', initialValue = {}) {
   const createAdvancedDateRangeUI = (p, iv) => {
     const parentId = `${p}date-range-container`;
 
-    const createDatalist = (id, start, end) => {
+    const createDatalist = (id, start, end, type) => {
       let html = `<datalist id="${id}">`;
+      const specialOptionText = {
+          year: '実行された年',
+          month: '実行された月',
+          day: '実行された日'
+      };
+      if (specialOptionText[type]) {
+          html += `<option value="${specialOptionText[type]}"></option>`;
+      }
       for (let i = start; i <= end; i++) {
         html += `<option value="${String(i).padStart(id.includes('month') || id.includes('day') ? 2 : 0, '0')}"></option>`;
       }
@@ -33,11 +41,11 @@ export function createTriggerUI(prefix = '', initialValue = {}) {
     const timeOptsId = `${p}time_opts`;
     
     const currentYear = new Date().getFullYear();
-    const yearDatalist = createDatalist(yearOptsId, 2025, currentYear + 5);
-    const monthDatalist = createDatalist(monthOptsId, 1, 12);
-    const dayDatalist = createDatalist(dayOptsId, 1, 31);
+    const yearDatalist = createDatalist(yearOptsId, 2025, currentYear + 5, 'year');
+    const monthDatalist = createDatalist(monthOptsId, 1, 12, 'month');
+    const dayDatalist = createDatalist(dayOptsId, 1, 31, 'day');
     
-    let timeOptionsHtml = `<datalist id="${timeOptsId}">`;
+    let timeOptionsHtml = `<datalist id="${timeOptsId}"><option value="実行された時刻"></option>`;
     for (let h = 0; h < 24; h++) for (let m = 0; m < 60; m += 30) timeOptionsHtml += `<option value="${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}"></option>`;
     timeOptionsHtml += `</datalist>`;
 
@@ -107,31 +115,31 @@ export function createTriggerUI(prefix = '', initialValue = {}) {
 
         switch(preset) {
           case 'today':
-            fields.start.y.value = '(今日)';
-            fields.start.m.value = '';
-            fields.start.d.value = '';
+            fields.start.y.value = '実行された年';
+            fields.start.m.value = '実行された月';
+            fields.start.d.value = '実行された日';
             fields.start.t.value = '00:00';
-            fields.end.y.value = '(今日)';
-            fields.end.m.value = '';
-            fields.end.d.value = '';
+            fields.end.y.value = '実行された年';
+            fields.end.m.value = '実行された月';
+            fields.end.d.value = '実行された日';
             fields.end.t.value = '23:59';
             break;
           case 'this_month':
-            fields.start.y.value = '(今月)';
-            fields.start.m.value = '';
+            fields.start.y.value = '実行された年';
+            fields.start.m.value = '実行された月';
             fields.start.d.value = '1';
             fields.start.t.value = '00:00';
-            fields.end.y.value = '(今月)';
-            fields.end.m.value = '';
+            fields.end.y.value = '実行された年';
+            fields.end.m.value = '実行された月';
             fields.end.d.value = ''; // 月末はサーバー側で解釈
             fields.end.t.value = '23:59';
             break;
           case 'this_year':
-            fields.start.y.value = '(今年)';
+            fields.start.y.value = '実行された年';
             fields.start.m.value = '1';
             fields.start.d.value = '1';
             fields.start.t.value = '00:00';
-            fields.end.y.value = '(今年)';
+            fields.end.y.value = '実行された年';
             fields.end.m.value = '12';
             fields.end.d.value = '31';
             fields.end.t.value = '23:59';
