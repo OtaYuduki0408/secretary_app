@@ -224,180 +224,190 @@ export function createTriggerUI(prefix = '', initialValue = {}) {
         }
         break;
       case "カレンダー":
-        if (sub === "入力があったら") {
+        if (prefix && prefix.startsWith('cond_')) {
+          // New simplified UI for conditions
           triggerValueContainer.innerHTML = `
-            <label>アクション (複数選択可)</label>
-            <div id="${prefix}trigger_value_calendar_actions" class="co-day-of-week-selector">
-              <button type="button" data-value="追加">追加</button>
-              <button type="button" data-value="変更">変更</button>
-              <button type="button" data-value="取得">取得</button>
-              <button type="button" data-value="削除">削除</button>
-            </div>
-            <label>フィルター (任意)</label><br>
-            <small>単語を指定して、検知するアクションにフィルターを掛けれます。</small>
-            <div id="${prefix}trigger_value_calendar_filters">
-              <button type="button" class="add_filter_btn co-btn ghost">フィルターを追加</button>
-            </div>
-            
+            <label>名前</label>
+            <input type="text" id="${prefix}trigger_value_cal_title" class="trigger-input" placeholder="予定のタイトルを入力" value="${initialValue.title || ''}">
+            <small style="display: block; margin-top: 10px;"><b>ヒント:</b> 「特定の時間帯に予定があるか」を判定したい場合は、「＋条件を追加」から「時間」条件をANDで組み合わせてください。</small>
           `;
-          const actionButtonsContainer = triggerValueContainer.querySelector(`#${prefix}trigger_value_calendar_actions`);
-          if (actionButtonsContainer) {
-            actionButtonsContainer.addEventListener('click', (event) => {
-              if (event.target.tagName === 'BUTTON') {
-                event.target.classList.toggle('selected');
-              }
-            });
-            // 復元
-            if (initialValue.actions && Array.isArray(initialValue.actions)) {
-              initialValue.actions.forEach(action => {
-                const button = actionButtonsContainer.querySelector(`button[data-value="${action}"]`);
-                if (button) {
-                  button.classList.add('selected');
+        } else {
+          // Existing logic for triggers
+          if (sub === "入力があったら") {
+            triggerValueContainer.innerHTML = `
+              <label>アクション (複数選択可)</label>
+              <div id="${prefix}trigger_value_calendar_actions" class="co-day-of-week-selector">
+                <button type="button" data-value="追加">追加</button>
+                <button type="button" data-value="変更">変更</button>
+                <button type="button" data-value="取得">取得</button>
+                <button type="button" data-value="削除">削除</button>
+              </div>
+              <label>フィルター (任意)</label><br>
+              <small>単語を指定して、検知するアクションにフィルターを掛けれます。</small>
+              <div id="${prefix}trigger_value_calendar_filters">
+                <button type="button" class="add_filter_btn co-btn ghost">フィルターを追加</button>
+              </div>
+              
+            `;
+            const actionButtonsContainer = triggerValueContainer.querySelector(`#${prefix}trigger_value_calendar_actions`);
+            if (actionButtonsContainer) {
+              actionButtonsContainer.addEventListener('click', (event) => {
+                if (event.target.tagName === 'BUTTON') {
+                  event.target.classList.toggle('selected');
                 }
               });
-            }
-          }
-          const addFilterBtn = triggerValueContainer.querySelector(".add_filter_btn");
-          const filterContainer = triggerValueContainer.querySelector(`#${prefix}trigger_value_calendar_filters`);
-          if (addFilterBtn) {
-            const addFilter = (filter = {}) => {
-              const filterDiv = document.createElement("div");
-              filterDiv.className = "filter-item";
-
-              const isFirstItem = filterContainer.querySelectorAll('.filter-item').length === 0;
-
-              let logicOptions = '';
-              if (isFirstItem) {
-                logicOptions = `
-                  <option value="" ${filter.logic === '' ? 'selected' : ''}>(先頭)</option>
-                  <option value="NOT" ${filter.logic === 'NOT' ? 'selected' : ''}>NOT (この単語が含まれていないなら)</option>
-                `;
-              } else {
-                logicOptions = `
-                  <option value="AND" ${filter.logic === 'AND' ? 'selected' : ''}>AND (「上のフィルター」と「このフィルター」の両方を満たす)</option>
-                  <option value="OR" ${filter.logic === 'OR' ? 'selected' : ''}>OR (「上のフィルター」か「このフィルター」のどちらか一方でも満たす)</option>
-                  <option value="NAND" ${filter.logic === 'NAND' ? 'selected' : ''}>NAND (「上のフィルター」と「このフィルター」の両方を満たすものを含まない)</option>
-                  <option value="NOR" ${filter.logic === 'NOR' ? 'selected' : ''}>NOR (「上のフィルター」も「このフィルター」もどちらも満たさない)</option>
-                  <option value="XOR" ${filter.logic === 'XOR' ? 'selected' : ''}>XOR (「上のフィルター」か「このフィルター」のどちらか一方だけを満たす)</option>
-                  <option value="XNOR" ${filter.logic === 'XNOR' ? 'selected' : ''}>XNOR (「上のフィルター」と「このフィルター」の条件が同じである（両方満たす、または両方満たさない）)</option>
-                `;
+              // 復元
+              if (initialValue.actions && Array.isArray(initialValue.actions)) {
+                initialValue.actions.forEach(action => {
+                  const button = actionButtonsContainer.querySelector(`button[data-value="${action}"]`);
+                  if (button) {
+                    button.classList.add('selected');
+                  }
+                });
               }
-
-              filterDiv.innerHTML = `
-                <input type="text" class="calendar_filter_text trigger-input" placeholder="フィルター内容" value="${filter.text || ''}">
-                <select class="calendar_filter_logic trigger-input">
-                  ${logicOptions}
-                </select>
-                <button type="button" class="remove_filter_btn remove">削除</button>
-              `;
-              filterDiv.querySelector(".remove_filter_btn").addEventListener("click", (e) => e.target.parentNode.remove());
-              filterContainer.insertBefore(filterDiv, addFilterBtn);
-            };
-            addFilterBtn.addEventListener("click", () => addFilter());
-            initialValue.filters?.forEach(filter => addFilter(filter));
-          }
-        } else if (sub === "予定の時間になったら") {
-          const updateSummary = (group) => {
-            const details = triggerValueContainer.querySelector(`[data-group='${group}']`);
-            if (!details) return;
-
-            const year = details.querySelector(`[id$='_cal_${group}_year']`)?.value || '';
-            const month = details.querySelector(`[id$='_cal_${group}_month']`)?.value || '';
-            const day = details.querySelector(`[id$='_cal_${group}_day']`)?.value || '';
-            const time = details.querySelector(`[id$='_cal_${group}_time']`)?.value || '';
-            
-            let summaryText = '';
-            if (year) summaryText += `${year}年`;
-            if (month) summaryText += `${month}月`;
-            if (day) summaryText += `${day}日`;
-            if (summaryText && time) summaryText += ' ';
-            if (time) summaryText += time;
-
-            const summaryValueEl = details.querySelector('.co-summary-value');
-            if (summaryValueEl) {
-                summaryValueEl.textContent = summaryText || '未設定';
             }
-          };
+            const addFilterBtn = triggerValueContainer.querySelector(".add_filter_btn");
+            const filterContainer = triggerValueContainer.querySelector(`#${prefix}trigger_value_calendar_filters`);
+            if (addFilterBtn) {
+              const addFilter = (filter = {}) => {
+                const filterDiv = document.createElement("div");
+                filterDiv.className = "filter-item";
 
-          let html = `
-            <small><b>以下の条件を満たす予定の時間になったらトリガーが発動されます</b></small>
-            <input type="text" id="${prefix}trigger_value_cal_title" class="trigger-input" placeholder="タイトル (任意)" value="${initialValue.title || ''}">
-            
-            <label style="margin-top: 10px; display: block;">曜日 (任意)(複数選択可)</label>
-            <div id="${prefix}trigger_value_cal_day_of_week_buttons" class="co-day-of-week-selector">
-                <button type="button" data-value="月">月</button> <button type="button" data-value="火">火</button> <button type="button" data-value="水">水</button> <button type="button" data-value="木">木</button>
-                <button type="button" data-value="金">金</button> <button type="button" data-value="土">土</button> <button type="button" data-value="日">日</button>
-            </div>
+                const isFirstItem = filterContainer.querySelectorAll('.filter-item').length === 0;
 
-            <details class="co-details-group" data-group="start" style="margin-top: 10px; border: 1px solid var(--co-border); border-radius: 12px; padding: 10px;">
-              <summary style="font-weight: 600; cursor: pointer; display: flex; justify-content: space-between;">
-                <span>開始日時</span>
-                <span class="co-summary-value" style="color: var(--co-accent); padding-right: 10px;">未設定</span>
-              </summary>
-              <div class="co-details-content" style="margin-top: 15px;">
-                  <label>年 (任意)</label>
-                  <input type="text" id="${prefix}trigger_value_cal_start_year" class="trigger-input" list="${prefix}cal_start_year_options" value="${initialValue.start_year || ''}" placeholder="例: 2025" onfocus="this.setAttribute('data-prev-value', this.value); this.value='';" onblur="if(this.value==='') this.value=this.getAttribute('data-prev-value');">
-                  <datalist id="${prefix}cal_start_year_options">${(() => { let o = ''; const y = new Date().getFullYear(); for (let i = y; i <= y + 20; i++) { o += `<option value="${i}">`; } return o; })()}</datalist>
-                  <label>月 (任意)</label>
-                  <input type="text" id="${prefix}trigger_value_cal_start_month" class="trigger-input" list="${prefix}cal_start_month_options" value="${initialValue.start_month || ''}" placeholder="例: 1" onfocus="this.setAttribute('data-prev-value', this.value); this.value='';" onblur="if(this.value==='') this.value=this.getAttribute('data-prev-value');">
-                  <datalist id="${prefix}cal_start_month_options">${(() => { let o = ''; for (let i = 1; i <= 12; i++) { o += `<option value="${i}">`; } return o; })()}</datalist>
-                  <label>日 (任意)</label>
-                  <input type="text" id="${prefix}trigger_value_cal_start_day" class="trigger-input" list="${prefix}cal_start_day_options" value="${initialValue.start_day || ''}" placeholder="例: 15" onfocus="this.setAttribute('data-prev-value', this.value); this.value='';" onblur="if(this.value==='') this.value=this.getAttribute('data-prev-value');">
-                  <datalist id="${prefix}cal_start_day_options">${(() => { let o = ''; for (let i = 1; i <= 31; i++) { o += `<option value="${i}">`; } return o; })()}</datalist>
-                  <label>時刻 (任意)</label>
-                  <input type="text" id="${prefix}trigger_value_cal_start_time" class="trigger-input" list="${prefix}cal_start_time_options" value="${initialValue.start_time || initialValue.time_start || ''}" placeholder="例: 07:30" onfocus="this.setAttribute('data-prev-value', this.value); this.value='';" onblur="if(this.value==='') this.value=this.getAttribute('data-prev-value');">
-                  <datalist id="${prefix}cal_start_time_options">${(() => { let o = ''; for (let h = 0; h < 24; h++) for (let m = 0; m < 60; m += 15) o += `<option value="${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}">`; return o; })()}</datalist>
+                let logicOptions = '';
+                if (isFirstItem) {
+                  logicOptions = `
+                    <option value="" ${filter.logic === '' ? 'selected' : ''}>(先頭)</option>
+                    <option value="NOT" ${filter.logic === 'NOT' ? 'selected' : ''}>NOT (この単語が含まれていないなら)</option>
+                  `;
+                } else {
+                  logicOptions = `
+                    <option value="AND" ${filter.logic === 'AND' ? 'selected' : ''}>AND (「上のフィルター」と「このフィルター」の両方を満たす)</option>
+                    <option value="OR" ${filter.logic === 'OR' ? 'selected' : ''}>OR (「上のフィルター」か「このフィルター」のどちらか一方でも満たす)</option>
+                    <option value="NAND" ${filter.logic === 'NAND' ? 'selected' : ''}>NAND (「上のフィルター」と「このフィルター」の両方を満たすものを含まない)</option>
+                    <option value="NOR" ${filter.logic === 'NOR' ? 'selected' : ''}>NOR (「上のフィルター」も「このフィルター」もどちらも満たさない)</option>
+                    <option value="XOR" ${filter.logic === 'XOR' ? 'selected' : ''}>XOR (「上のフィルター」か「このフィルター」のどちらか一方だけを満たす)</option>
+                    <option value="XNOR" ${filter.logic === 'XNOR' ? 'selected' : ''}>XNOR (「上のフィルター」と「このフィルター」の条件が同じである（両方満たす、または両方満たさない）)</option>
+                  `;
+                }
+
+                filterDiv.innerHTML = `
+                  <input type="text" class="calendar_filter_text trigger-input" placeholder="フィルター内容" value="${filter.text || ''}">
+                  <select class="calendar_filter_logic trigger-input">
+                    ${logicOptions}
+                  </select>
+                  <button type="button" class="remove_filter_btn remove">削除</button>
+                `;
+                filterDiv.querySelector(".remove_filter_btn").addEventListener("click", (e) => e.target.parentNode.remove());
+                filterContainer.insertBefore(filterDiv, addFilterBtn);
+              };
+              addFilterBtn.addEventListener("click", () => addFilter());
+              initialValue.filters?.forEach(filter => addFilter(filter));
+            }
+          } else if (sub === "予定の時間になったら") {
+            const updateSummary = (group) => {
+              const details = triggerValueContainer.querySelector(`[data-group='${group}']`);
+              if (!details) return;
+
+              const year = details.querySelector(`[id$='_cal_${group}_year']`)?.value || '';
+              const month = details.querySelector(`[id$='_cal_${group}_month']`)?.value || '';
+              const day = details.querySelector(`[id$='_cal_${group}_day']`)?.value || '';
+              const time = details.querySelector(`[id$='_cal_${group}_time']`)?.value || '';
+              
+              let summaryText = '';
+              if (year) summaryText += `${year}年`;
+              if (month) summaryText += `${month}月`;
+              if (day) summaryText += `${day}日`;
+              if (summaryText && time) summaryText += ' ';
+              if (time) summaryText += time;
+
+              const summaryValueEl = details.querySelector('.co-summary-value');
+              if (summaryValueEl) {
+                  summaryValueEl.textContent = summaryText || '未設定';
+              }
+            };
+
+            let html = `
+              <small><b>以下の条件を満たす予定の時間になったらトリガーが発動されます</b></small>
+              <input type="text" id="${prefix}trigger_value_cal_title" class="trigger-input" placeholder="タイトル (任意)" value="${initialValue.title || ''}">
+              
+              <label style="margin-top: 10px; display: block;">曜日 (任意)(複数選択可)</label>
+              <div id="${prefix}trigger_value_cal_day_of_week_buttons" class="co-day-of-week-selector">
+                  <button type="button" data-value="月">月</button> <button type="button" data-value="火">火</button> <button type="button" data-value="水">水</button> <button type="button" data-value="木">木</button>
+                  <button type="button" data-value="金">金</button> <button type="button" data-value="土">土</button> <button type="button" data-value="日">日</button>
               </div>
-            </details>
 
-            <details class="co-details-group" data-group="end" style="margin-top: 10px; border: 1px solid var(--co-border); border-radius: 12px; padding: 10px;">
-              <summary style="font-weight: 600; cursor: pointer; display: flex; justify-content: space-between;">
-                <span>終了日時</span>
-                <span class="co-summary-value" style="color: var(--co-accent); padding-right: 10px;">未設定</span>
-              </summary>
-              <div class="co-details-content" style="margin-top: 15px;">
-                  <label>年 (任意)</label>
-                  <input type="text" id="${prefix}trigger_value_cal_end_year" class="trigger-input" list="${prefix}cal_end_year_options" value="${initialValue.end_year || ''}" placeholder="例: 2025" onfocus="this.setAttribute('data-prev-value', this.value); this.value='';" onblur="if(this.value==='') this.value=this.getAttribute('data-prev-value');">
-                  <datalist id="${prefix}cal_end_year_options">${(() => { let o = ''; const y = new Date().getFullYear(); for (let i = y; i <= y + 20; i++) { o += `<option value="${i}">`; } return o; })()}</datalist>
-                  <label>月 (任意)</label>
-                  <input type="text" id="${prefix}trigger_value_cal_end_month" class="trigger-input" list="${prefix}cal_end_month_options" value="${initialValue.end_month || ''}" placeholder="例: 1" onfocus="this.setAttribute('data-prev-value', this.value); this.value='';" onblur="if(this.value==='') this.value=this.getAttribute('data-prev-value');">
-                  <datalist id="${prefix}cal_end_month_options">${(() => { let o = ''; for (let i = 1; i <= 12; i++) { o += `<option value="${i}">`; } return o; })()}</datalist>
-                  <label>日 (任意)</label>
-                  <input type="text" id="${prefix}trigger_value_cal_end_day" class="trigger-input" list="${prefix}cal_end_day_options" value="${initialValue.end_day || ''}" placeholder="例: 15" onfocus="this.setAttribute('data-prev-value', this.value); this.value='';" onblur="if(this.value==='') this.value=this.getAttribute('data-prev-value');">
-                  <datalist id="${prefix}cal_end_day_options">${(() => { let o = ''; for (let i = 1; i <= 31; i++) { o += `<option value="${i}">`; } return o; })()}</datalist>
-                  <label>時刻 (任意)</label>
-                  <input type="text" id="${prefix}trigger_value_cal_end_time" class="trigger-input" list="${prefix}cal_end_time_options" value="${initialValue.end_time || initialValue.time_end || ''}" placeholder="例: 18:00" onfocus="this.setAttribute('data-prev-value', this.value); this.value='';" onblur="if(this.value==='') this.value=this.getAttribute('data-prev-value');">
-                  <datalist id="${prefix}cal_end_time_options">${(() => { let o = ''; for (let h = 0; h < 24; h++) for (let m = 0; m < 60; m += 15) o += `<option value="${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}">`; return o; })()}</datalist>
-              </div>
-            </details>
-          `;
-          triggerValueContainer.innerHTML = html;
+              <details class="co-details-group" data-group="start" style="margin-top: 10px; border: 1px solid var(--co-border); border-radius: 12px; padding: 10px;">
+                <summary style="font-weight: 600; cursor: pointer; display: flex; justify-content: space-between;">
+                  <span>開始日時</span>
+                  <span class="co-summary-value" style="color: var(--co-accent); padding-right: 10px;">未設定</span>
+                </summary>
+                <div class="co-details-content" style="margin-top: 15px;">
+                    <label>年 (任意)</label>
+                    <input type="text" id="${prefix}trigger_value_cal_start_year" class="trigger-input" list="${prefix}cal_start_year_options" value="${initialValue.start_year || ''}" placeholder="例: 2025" onfocus="this.setAttribute('data-prev-value', this.value); this.value='';" onblur="if(this.value==='') this.value=this.getAttribute('data-prev-value');">
+                    <datalist id="${prefix}cal_start_year_options">${(() => { let o = ''; const y = new Date().getFullYear(); for (let i = y; i <= y + 20; i++) { o += `<option value="${i}">`; } return o; })()}</datalist>
+                    <label>月 (任意)</label>
+                    <input type="text" id="${prefix}trigger_value_cal_start_month" class="trigger-input" list="${prefix}cal_start_month_options" value="${initialValue.start_month || ''}" placeholder="例: 1" onfocus="this.setAttribute('data-prev-value', this.value); this.value='';" onblur="if(this.value==='') this.value=this.getAttribute('data-prev-value');">
+                    <datalist id="${prefix}cal_start_month_options">${(() => { let o = ''; for (let i = 1; i <= 12; i++) { o += `<option value="${i}">`; } return o; })()}</datalist>
+                    <label>日 (任意)</label>
+                    <input type="text" id="${prefix}trigger_value_cal_start_day" class="trigger-input" list="${prefix}cal_start_day_options" value="${initialValue.start_day || ''}" placeholder="例: 15" onfocus="this.setAttribute('data-prev-value', this.value); this.value='';" onblur="if(this.value==='') this.value=this.getAttribute('data-prev-value');">
+                    <datalist id="${prefix}cal_start_day_options">${(() => { let o = ''; for (let i = 1; i <= 31; i++) { o += `<option value="${i}">`; } return o; })()}</datalist>
+                    <label>時刻 (任意)</label>
+                    <input type="text" id="${prefix}trigger_value_cal_start_time" class="trigger-input" list="${prefix}cal_start_time_options" value="${initialValue.start_time || initialValue.time_start || ''}" placeholder="例: 07:30" onfocus="this.setAttribute('data-prev-value', this.value); this.value='';" onblur="if(this.value==='') this.value=this.getAttribute('data-prev-value');">
+                    <datalist id="${prefix}cal_start_time_options">${(() => { let o = ''; for (let h = 0; h < 24; h++) for (let m = 0; m < 60; m += 15) o += `<option value="${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}">`; return o; })()}</datalist>
+                </div>
+              </details>
 
-          // 曜日選択ボタンのロジックと復元
-          const dayOfWeekButtonsContainer = document.getElementById(`${prefix}trigger_value_cal_day_of_week_buttons`);
-          if (dayOfWeekButtonsContainer) {
-            dayOfWeekButtonsContainer.addEventListener('click', (event) => {
-              if (event.target.tagName === 'BUTTON') {
-                event.target.classList.toggle('selected');
+              <details class="co-details-group" data-group="end" style="margin-top: 10px; border: 1px solid var(--co-border); border-radius: 12px; padding: 10px;">
+                <summary style="font-weight: 600; cursor: pointer; display: flex; justify-content: space-between;">
+                  <span>終了日時</span>
+                  <span class="co-summary-value" style="color: var(--co-accent); padding-right: 10px;">未設定</span>
+                </summary>
+                <div class="co-details-content" style="margin-top: 15px;">
+                    <label>年 (任意)</label>
+                    <input type="text" id="${prefix}trigger_value_cal_end_year" class="trigger-input" list="${prefix}cal_end_year_options" value="${initialValue.end_year || ''}" placeholder="例: 2025" onfocus="this.setAttribute('data-prev-value', this.value); this.value='';" onblur="if(this.value==='') this.value=this.getAttribute('data-prev-value');">
+                    <datalist id="${prefix}cal_end_year_options">${(() => { let o = ''; const y = new Date().getFullYear(); for (let i = y; i <= y + 20; i++) { o += `<option value="${i}">`; } return o; })()}</datalist>
+                    <label>月 (任意)</label>
+                    <input type="text" id="${prefix}trigger_value_cal_end_month" class="trigger-input" list="${prefix}cal_end_month_options" value="${initialValue.end_month || ''}" placeholder="例: 1" onfocus="this.setAttribute('data-prev-value', this.value); this.value='';" onblur="if(this.value==='') this.value=this.getAttribute('data-prev-value');">
+                    <datalist id="${prefix}cal_end_month_options">${(() => { let o = ''; for (let i = 1; i <= 12; i++) { o += `<option value="${i}">`; } return o; })()}</datalist>
+                    <label>日 (任意)</label>
+                    <input type="text" id="${prefix}trigger_value_cal_end_day" class="trigger-input" list="${prefix}cal_end_day_options" value="${initialValue.end_day || ''}" placeholder="例: 15" onfocus="this.setAttribute('data-prev-value', this.value); this.value='';" onblur="if(this.value==='') this.value=this.getAttribute('data-prev-value');">
+                    <datalist id="${prefix}cal_end_day_options">${(() => { let o = ''; for (let i = 1; i <= 31; i++) { o += `<option value="${i}">`; } return o; })()}</datalist>
+                    <label>時刻 (任意)</label>
+                    <input type="text" id="${prefix}trigger_value_cal_end_time" class="trigger-input" list="${prefix}cal_end_time_options" value="${initialValue.end_time || initialValue.time_end || ''}" placeholder="例: 18:00" onfocus="this.setAttribute('data-prev-value', this.value); this.value='';" onblur="if(this.value==='') this.value=this.getAttribute('data-prev-value');">
+                    <datalist id="${prefix}cal_end_time_options">${(() => { let o = ''; for (let h = 0; h < 24; h++) for (let m = 0; m < 60; m += 15) o += `<option value="${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}">`; return o; })()}</datalist>
+                </div>
+              </details>
+            `;
+            triggerValueContainer.innerHTML = html;
+
+            // 曜日選択ボタンのロジックと復元
+            const dayOfWeekButtonsContainer = document.getElementById(`${prefix}trigger_value_cal_day_of_week_buttons`);
+            if (dayOfWeekButtonsContainer) {
+              dayOfWeekButtonsContainer.addEventListener('click', (event) => {
+                if (event.target.tagName === 'BUTTON') {
+                  event.target.classList.toggle('selected');
+                }
+              });
+              const daysToRestore = initialValue.day_of_week || initialValue.start_day_of_week;
+              if (daysToRestore && Array.isArray(daysToRestore)) {
+                daysToRestore.forEach(day => {
+                  const button = dayOfWeekButtonsContainer.querySelector(`button[data-value="${day}"]`);
+                  if (button) button.classList.add('selected');
+                });
+              }
+            }
+
+            // Summaryの更新ロジック
+            ['start', 'end'].forEach(group => {
+              const details = triggerValueContainer.querySelector(`[data-group='${group}']`);
+              if(details) {
+                  details.addEventListener('input', () => updateSummary(group));
+                  updateSummary(group); // 初期表示の更新
               }
             });
-            const daysToRestore = initialValue.day_of_week || initialValue.start_day_of_week;
-            if (daysToRestore && Array.isArray(daysToRestore)) {
-              daysToRestore.forEach(day => {
-                const button = dayOfWeekButtonsContainer.querySelector(`button[data-value="${day}"]`);
-                if (button) button.classList.add('selected');
-              });
-            }
           }
-
-          // Summaryの更新ロジック
-          ['start', 'end'].forEach(group => {
-            const details = triggerValueContainer.querySelector(`[data-group='${group}']`);
-            if(details) {
-                details.addEventListener('input', () => updateSummary(group));
-                updateSummary(group); // 初期表示の更新
-            }
-          });
         }
         break;
       case "収支管理":
