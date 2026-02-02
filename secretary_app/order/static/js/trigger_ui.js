@@ -43,7 +43,7 @@ export function createTriggerUI(prefix = '', initialValue = {}) {
     timeOptionsHtml += `</datalist>`;
 
     const html = `
-      <details class="co-details-group">
+      <details class="co-details-group" style="margin-top: 15px;">
         <summary style="font-size: 1.1em; font-weight: bold; cursor: pointer; display: flex; justify-content: space-between; align-items: center; padding: 8px; border-radius: 8px; background-color: var(--co-bg-2); border: 1px solid var(--co-border);">
             <span>期間: <span id="${p}date_range_summary">指定なし</span></span>
             <span class="co-disclosure-icon">▼</span>
