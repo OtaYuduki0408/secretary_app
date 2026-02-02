@@ -2,7 +2,7 @@ import { populateSelect, updateSubOptions, updateActionSummary, updateConditionS
 import { createActionUI } from './action_ui.js';
 import { createTriggerUI } from './trigger_ui.js';
 
-import { TRIGGER_CATEGORIES, ACTION_CATEGORIES } from './constants.js';
+import { TRIGGER_CATEGORIES, ACTION_CATEGORIES, CONDITION_CATEGORIES } from './constants.js';
 
 export function addConditionBlock(anchorElement, data={}) {
   console.log(`[START] addConditionBlock called. anchorElement:`, anchorElement);
@@ -165,7 +165,7 @@ export function addConditionBlock(anchorElement, data={}) {
       const categorySelect = document.getElementById(`${prefix}trigger_category`);
       const subSelect = document.getElementById(`${prefix}trigger_sub`);
       
-      populateSelect(categorySelect.id, TRIGGER_CATEGORIES);
+      populateSelect(categorySelect.id, CONDITION_CATEGORIES);
 
       const exprData = (data.expr && typeof data.expr === 'object') ? data.expr : null;
 
@@ -174,7 +174,7 @@ export function addConditionBlock(anchorElement, data={}) {
       }
       
       const updateAndRestore = () => {
-        updateSubOptions(`${prefix}trigger_category`, `${prefix}trigger_sub`, TRIGGER_CATEGORIES);
+        updateSubOptions(`${prefix}trigger_category`, `${prefix}trigger_sub`, CONDITION_CATEGORIES);
         if (exprData) {
           subSelect.value = exprData.sub || '';
         }

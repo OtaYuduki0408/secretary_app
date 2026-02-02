@@ -17,6 +17,15 @@ export const TRIGGER_CATEGORIES_MAIN = {
   "SwitchBot": ["人感センサーが反応したら"]
 };
 
+export const CONDITION_CATEGORIES = {
+  "場所": [],
+  "カレンダー": ["入力があったら", "予定の時間になったら"],
+  "収支管理": ["入力があったら", "特定金額になったら"],
+  "メモ": ["入力があったら"],
+  "時間": [],
+  "SwitchBot": ["人感センサー"]
+};
+
 export const TRIGGER_VALUE_PLACEHOLDERS = {
   "場所": {
     "特定場所に近づいたら": "例: 東京駅",
@@ -41,7 +50,10 @@ export const TRIGGER_VALUE_PLACEHOLDERS = {
     "一定時間ごと": "例: 60 (分)"
   },
   "SwitchBot": {
-    "人感センサーが反応したら": "例: B0E9FE6E4D35"
+    "人感センサー": {
+      "detection": "例: 検知している",
+      "light": "例: 暗い"
+    }
   }
 };
 

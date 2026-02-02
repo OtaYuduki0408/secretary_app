@@ -463,7 +463,34 @@ export function createTriggerUI(prefix = '', initialValue = {}) {
             triggerValueContainer.innerHTML = `<input type="text" id="${prefix}trigger_value" placeholder="値" value="${initialValue.value || ''}">`;
         }
         break;
-      // Other cases (ボイス, SwitchBot) remain unchanged
+      case "SwitchBot":
+        if (prefix && prefix.startsWith('cond_')) {
+          if (sub === "人感センサー") {
+            triggerValueContainer.innerHTML = `
+              <div class="co-fieldset">
+                <label>人感センサー</label>
+                <select id="${prefix}switchbot_detection" class="trigger-input">
+                  <option value="">選択しない</option>
+                  <option value="detected" ${initialValue.detection === 'detected' ? 'selected' : ''}>検知しているなら</option>
+                  <option value="not_detected" ${initialValue.detection === 'not_detected' ? 'selected' : ''}>検知していないのなら</option>
+                </select>
+              </div>
+              <div class="co-fieldset">
+                <label>部屋の明るさ</label>
+                <select id="${prefix}switchbot_light" class="trigger-input">
+                  <option value="">選択しない</option>
+                  <option value="dark" ${initialValue.light === 'dark' ? 'selected' : ''}>暗いなら</option>
+                  <option value="bright" ${initialValue.light === 'bright' ? 'selected' : ''}>明るいなら</option>
+                </select>
+              </div>
+            `;
+          }
+        } else {
+            // トリガーのSwitchBotは現状維持
+            triggerValueContainer.innerHTML = `<input type="text" id="${prefix}trigger_value" placeholder="値を入力" value="${initialValue.value || ''}">`;
+        }
+        break;
+      // Other cases (ボイス) remain unchanged
       default:
         triggerValueContainer.innerHTML = `<input type="text" id="${prefix}trigger_value" placeholder="値" value="${initialValue.value || ''}">`;
         break;
