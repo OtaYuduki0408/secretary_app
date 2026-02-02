@@ -51,7 +51,7 @@ export function createTriggerUI(prefix = '', initialValue = {}) {
 
     const html = `
       <details class="co-details-group" style="margin-top: 15px;">
-        <summary style="font-size: 1.1em; font-weight: bold; cursor: pointer; display: flex; justify-content: space-between; align-items: center; padding: 8px; border-radius: 8px; background-color: var(--co-bg-2); border: 1px solid var(--co-border);">
+        <summary style="font-size: 1.1em; cursor: pointer; display: flex; justify-content: space-between; align-items: center; padding: 8px; border-radius: 8px; background-color: var(--co-bg-2); border: 1px solid var(--co-border);">
             <span>期間: <span id="${p}date_range_summary">指定なし</span></span>
             <span class="co-disclosure-icon">▼</span>
         </summary>
@@ -364,30 +364,7 @@ export function createTriggerUI(prefix = '', initialValue = {}) {
               }
             }
           } else if (sub === "予定の時間になったら") {
-            const generateDatalist = (type, p_prefix) => {
-              let options = '';
-              const currentYear = new Date().getFullYear();
-              switch(type) {
-                case 'year':
-                  options += `<option value="実行された年">`;
-                  for (let i = currentYear; i <= currentYear + 20; i++) options += `<option value="${i}">`;
-                  break;
-                case 'month':
-                  options += `<option value="実行された月">`;
-                  for (let i = 1; i <= 12; i++) options += `<option value="${i}">`;
-                  break;
-                case 'day':
-                  options += `<option value="実行された日">`;
-                  for (let i = 1; i <= 31; i++) options += `<option value="${i}">`;
-                  break;
-                case 'time':
-                  options += `<option value="実行された時刻">`;
-                  for (let h = 0; h < 24; h++) for (let m = 0; m < 60; m += 15) options += `<option value="${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}">`;
-                  break;
-              }
-              return options;
-            };
-            
+            const dateRange = createAdvancedDateRangeUI(prefix, initialValue);
             triggerValueContainer.innerHTML = `
               <small><b>以下の条件を満たす予定の時間になったらトリガーが発動されます</b></small>
               <input type="text" id="${prefix}trigger_value_cal_title" class="trigger-input" placeholder="タイトル (任意)" value="${initialValue.title || ''}">
@@ -396,83 +373,10 @@ export function createTriggerUI(prefix = '', initialValue = {}) {
                   <button type="button" data-value="月">月</button> <button type="button" data-value="火">火</button> <button type="button" data-value="水">水</button> <button type="button" data-value="木">木</button>
                   <button type="button" data-value="金">金</button> <button type="button" data-value="土">土</button> <button type="button" data-value="日">日</button>
               </div>
-              <details class="co-details-group" data-group="start" style="margin-top: 10px; border: 1px solid var(--co-border); border-radius: 12px; padding: 10px;">
-                <summary style="font-weight: 600; cursor: pointer; display: flex; justify-content: space-between;">
-                  <span>時間範囲 (開始)</span>
-                  <span class="co-summary-value" style="color: var(--co-accent); padding-right: 10px;">未設定</span>
-                </summary>
-                <div class="co-details-content" style="margin-top: 15px;">
-                    <label>年 (必須)</label>
-                    <input type="text" id="${prefix}trigger_value_cal_start_year" class="trigger-input" list="${prefix}trigger_value_cal_start_year_options" value="${initialValue.start_year || '実行された年'}" placeholder="例: 2025" onfocus="this.setAttribute('data-prev-value', this.value); this.value='';" onblur="if(this.value==='') this.value=this.getAttribute('data-prev-value');">
-                    <datalist id="${prefix}trigger_value_cal_start_year_options">${generateDatalist('year')}</datalist>
-                    <label>月 (必須)</label>
-                    <input type="text" id="${prefix}trigger_value_cal_start_month" class="trigger-input" list="${prefix}trigger_value_cal_start_month_options" value="${initialValue.start_month || '実行された月'}" placeholder="例: 1" onfocus="this.setAttribute('data-prev-value', this.value); this.value='';" onblur="if(this.value==='') this.value=this.getAttribute('data-prev-value');">
-                    <datalist id="${prefix}trigger_value_cal_start_month_options">${generateDatalist('month')}</datalist>
-                    <label>日 (必須)</label>
-                    <input type="text" id="${prefix}trigger_value_cal_start_day" class="trigger-input" list="${prefix}trigger_value_cal_start_day_options" value="${initialValue.start_day || '実行された日'}" placeholder="例: 15" onfocus="this.setAttribute('data-prev-value', this.value); this.value='';" onblur="if(this.value==='') this.value=this.getAttribute('data-prev-value');">
-                    <datalist id="${prefix}trigger_value_cal_start_day_options">${generateDatalist('day')}</datalist>
-                    <label>時刻 (必須)</label>
-                    <input type="text" id="${prefix}trigger_value_cal_start_time" class="trigger-input" list="${prefix}trigger_value_cal_start_time_options" value="${initialValue.start_time || '00:00'}" placeholder="例: 07:30" onfocus="this.setAttribute('data-prev-value', this.value); this.value='';" onblur="if(this.value==='') this.value=this.getAttribute('data-prev-value');">
-                    <datalist id="${prefix}trigger_value_cal_start_time_options">${generateDatalist('time')}</datalist>
-                </div>
-              </details>
-              <details class="co-details-group" data-group="end" style="margin-top: 10px; border: 1px solid var(--co-border); border-radius: 12px; padding: 10px;">
-                <summary style="font-weight: 600; cursor: pointer; display: flex; justify-content: space-between;">
-                  <span>時間範囲 (終了)</span>
-                  <span class="co-summary-value" style="color: var(--co-accent); padding-right: 10px;">未設定</span>
-                </summary>
-                <div class="co-details-content" style="margin-top: 15px;">
-                    <label>年 (必須)</label>
-                    <input type="text" id="${prefix}trigger_value_cal_end_year" class="trigger-input" list="${prefix}trigger_value_cal_end_year_options" value="${initialValue.end_year || '実行された年'}" placeholder="例: 2025" onfocus="this.setAttribute('data-prev-value', this.value); this.value='';" onblur="if(this.value==='') this.value=this.getAttribute('data-prev-value');">
-                    <datalist id="${prefix}trigger_value_cal_end_year_options">${generateDatalist('year')}</datalist>
-                    <label>月 (必須)</label>
-                    <input type="text" id="${prefix}trigger_value_cal_end_month" class="trigger-input" list="${prefix}trigger_value_cal_end_month_options" value="${initialValue.end_month || '実行された月'}" placeholder="例: 1" onfocus="this.setAttribute('data-prev-value', this.value); this.value='';" onblur="if(this.value==='') this.value=this.getAttribute('data-prev-value');">
-                    <datalist id="${prefix}trigger_value_cal_end_month_options">${generateDatalist('month')}</datalist>
-                    <label>日 (必須)</label>
-                    <input type="text" id="${prefix}trigger_value_cal_end_day" class="trigger-input" list="${prefix}trigger_value_cal_end_day_options" value="${initialValue.end_day || '実行された日'}" placeholder="例: 15" onfocus="this.setAttribute('data-prev-value', this.value); this.value='';" onblur="if(this.value==='') this.value=this.getAttribute('data-prev-value');">
-                    <datalist id="${prefix}trigger_value_cal_end_day_options">${generateDatalist('day')}</datalist>
-                    <label>時刻 (必須)</label>
-                    <input type="text" id="${prefix}trigger_value_cal_end_time" class="trigger-input" list="${prefix}trigger_value_cal_end_time_options" value="${initialValue.end_time || '23:55'}" placeholder="例: 18:00" onfocus="this.setAttribute('data-prev-value', this.value); this.value='';" onblur="if(this.value==='') this.value=this.getAttribute('data-prev-value');">
-                    <datalist id="${prefix}trigger_value_cal_end_time_options">${generateDatalist('time')}</datalist>
-                </div>
-              </details>
+              ${dateRange.html}
             `;
-
-            const updateSummary = (group) => {
-                const details = triggerValueContainer.querySelector(`[data-group='${group}']`);
-                if (!details) return;
-
-                const yearInput = details.querySelector(`[id*='_cal_${group}_year']`);
-                const monthInput = details.querySelector(`[id*='_cal_${group}_month']`);
-                const dayInput = details.querySelector(`[id*='_cal_${group}_day']`);
-                const timeInput = details.querySelector(`[id*='_cal_${group}_time']`);
-
-                const year = yearInput?.value || '';
-                const month = monthInput?.value || '';
-                const day = dayInput?.value || '';
-                const time = timeInput?.value || '';
-                
-                let summaryText = '';
-                if (year) summaryText += year.includes('実行された') ? 'n年' : `${year}年`;
-                if (month) summaryText += month.includes('実行された') ? 'n月' : `${month}月`;
-                if (day) summaryText += day.includes('実行された') ? 'n日' : `${day}日`;
-                if (summaryText && time) summaryText += ' ';
-                if (time) summaryText += time.includes('実行された') ? 'n:n' : time;
-
-                const summaryValueEl = details.querySelector('.co-summary-value');
-                if (summaryValueEl) {
-                    summaryValueEl.textContent = summaryText || '未設定';
-                }
-            };
-
-            ['start', 'end'].forEach(group => {
-              const details = triggerValueContainer.querySelector(`[data-group='${group}']`);
-              if(details) {
-                details.addEventListener('input', () => updateSummary(group));
-                updateSummary(group); // 初期表示の更新
-              }
-            });
-
+            dateRange.attachListeners(triggerValueContainer);
+            
             // 曜日ボタンの選択ロジック
             const dayOfWeekContainer = triggerValueContainer.querySelector(`#${prefix}trigger_value_cal_day_of_week_buttons`);
             if (dayOfWeekContainer) {
@@ -690,26 +594,50 @@ export function createTriggerUI(prefix = '', initialValue = {}) {
           if (sub === "人感センサー") {
             triggerValueContainer.innerHTML = `
               <div class="co-fieldset">
-                <label>人感センサー</label>
+                <label>人の検知状態</label>
                 <select id="${prefix}switchbot_detection" class="trigger-input">
                   <option value="">選択しない</option>
-                  <option value="detected" ${initialValue.detection === 'detected' ? 'selected' : ''}>検知しているなら</option>
-                  <option value="not_detected" ${initialValue.detection === 'not_detected' ? 'selected' : ''}>検知していないのなら</option>
+                  <option value="detected" ${initialValue.detection === 'detected' ? 'selected' : ''}>人を検知したら</option>
+                  <option value="not_detected" ${initialValue.detection === 'not_detected' ? 'selected' : ''}>人が居なくなったら</option>
                 </select>
               </div>
               <div class="co-fieldset">
                 <label>部屋の明るさ</label>
                 <select id="${prefix}switchbot_light" class="trigger-input">
                   <option value="">選択しない</option>
-                  <option value="dark" ${initialValue.light === 'dark' ? 'selected' : ''}>暗いなら</option>
-                  <option value="bright" ${initialValue.light === 'bright' ? 'selected' : ''}>明るいなら</option>
+                  <option value="bright" ${initialValue.light === 'bright' ? 'selected' : ''}>部屋が明るくなったら</option>
+                  <option value="dark" ${initialValue.light === 'dark' ? 'selected' : ''}>部屋が暗くなったら</option>
                 </select>
               </div>
             `;
           }
         } else {
-            // トリガーのSwitchBotは現状維持
-            triggerValueContainer.innerHTML = `<input type="text" id="${prefix}trigger_value" placeholder="値を入力" value="${initialValue.value || ''}">`;
+            if (sub === "人感センサーが反応したら") {
+                triggerValueContainer.innerHTML = `
+                  <small><b>状態が変化したときに検知します</b></small>
+                  <div class="co-fieldset">
+                    <label>人の検知状態</label>
+                    <select id="${prefix}trigger_value_switchbot_detection" class="trigger-input">
+                      <option value="">選択しない</option>
+                      <option value="detected" ${initialValue.detection === 'detected' ? 'selected' : ''}>人を検知したら</option>
+                      <option value="not_detected" ${initialValue.detection === 'not_detected' ? 'selected' : ''}>人が居なくなったら</option>
+                    </select>
+                  </div>
+                  <div class="co-fieldset">
+                    <label>部屋の明るさ</label>
+                    <select id="${prefix}trigger_value_switchbot_light" class="trigger-input">
+                      <option value="">選択しない</option>
+                      <option value="bright" ${initialValue.light === 'bright' ? 'selected' : ''}>部屋が明るくなったら</option>
+                      <option value="dark" ${initialValue.light === 'dark' ? 'selected' : ''}>部屋が暗くなったら</option>
+                    </select>
+                  </div>
+                  <div class="co-fieldset">
+                    <label>継続検知時間 (秒)</label>
+                    <input type="number" id="${prefix}trigger_value_switchbot_duration" class="trigger-input" placeholder="例: 5" value="${initialValue.duration || '5'}">
+                    <small>連続で指定の状態を検知したら発動</small>
+                  </div>
+                `;
+            }
         }
         break;
       case "ボイス":
