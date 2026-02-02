@@ -352,11 +352,6 @@ export function createTriggerUI(prefix = '', initialValue = {}) {
                 <button type="button" data-value="取得">取得</button>
                 <button type="button" data-value="削除">削除</button>
               </div>
-              <label>フィルター (任意)</label><br>
-              <small>単語を指定して、検知するアクションにフィルターを掛けれます。</small>
-              <div id="${prefix}trigger_value_calendar_filters">
-                <button type="button" class="add_filter_btn co-btn ghost">フィルターを追加</button>
-              </div>
             `;
             const actionButtonsContainer = triggerValueContainer.querySelector(`#${prefix}trigger_value_calendar_actions`);
             if (actionButtonsContainer) {
@@ -367,22 +362,6 @@ export function createTriggerUI(prefix = '', initialValue = {}) {
                   if (button) button.classList.add('selected');
                 });
               }
-            }
-            const addFilterBtn = triggerValueContainer.querySelector(".add_filter_btn");
-            const filterContainer = triggerValueContainer.querySelector(`#${prefix}trigger_value_calendar_filters`);
-            if (addFilterBtn) {
-              const addFilter = (filter = {}) => {
-                const filterDiv = document.createElement("div");
-                filterDiv.className = "filter-item";
-                const isFirstItem = filterContainer.querySelectorAll('.filter-item').length === 0;
-                let logicOptions = isFirstItem ? `<option value="" ${filter.logic === '' ? 'selected' : ''}>(先頭)</option><option value="NOT" ${filter.logic === 'NOT' ? 'selected' : ''}>NOT</option>`
-                  : `<option value="AND" ${filter.logic === 'AND' ? 'selected' : ''}>AND</option><option value="OR" ${filter.logic === 'OR' ? 'selected' : ''}>OR</option><option value="NAND" ${filter.logic === 'NAND' ? 'selected' : ''}>NAND</option><option value="NOR" ${filter.logic === 'NOR' ? 'selected' : ''}>NOR</option><option value="XOR" ${filter.logic === 'XOR' ? 'selected' : ''}>XOR</option><option value="XNOR" ${filter.logic === 'XNOR' ? 'selected' : ''}>XNOR</option>`;
-                filterDiv.innerHTML = `<input type="text" class="calendar_filter_text trigger-input" placeholder="フィルター内容" value="${filter.text || ''}"><select class="calendar_filter_logic trigger-input">${logicOptions}</select><button type="button" class="remove_filter_btn remove">削除</button>`;
-                filterDiv.querySelector(".remove_filter_btn").addEventListener("click", (e) => e.target.parentNode.remove());
-                filterContainer.insertBefore(filterDiv, addFilterBtn);
-              };
-              addFilterBtn.addEventListener("click", () => addFilter());
-              initialValue.filters?.forEach(filter => addFilter(filter));
             }
           } else if (sub === "予定の時間になったら") {
             const generateDatalist = (type, p_prefix) => {
