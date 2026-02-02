@@ -454,7 +454,16 @@ export function createTriggerUI(prefix = '', initialValue = {}) {
           `; // Content omitted for brevity but is unchanged
         }
         break;
-      // Other cases (時間, ボイス, SwitchBot) remain unchanged
+      case "時間":
+        if (prefix && prefix.startsWith('cond_')) {
+          const dateRange = createAdvancedDateRangeUI(prefix, initialValue);
+          triggerValueContainer.innerHTML = dateRange.html;
+          dateRange.attachListeners(triggerValueContainer);
+        } else {
+            triggerValueContainer.innerHTML = `<input type="text" id="${prefix}trigger_value" placeholder="値" value="${initialValue.value || ''}">`;
+        }
+        break;
+      // Other cases (ボイス, SwitchBot) remain unchanged
       default:
         triggerValueContainer.innerHTML = `<input type="text" id="${prefix}trigger_value" placeholder="値" value="${initialValue.value || ''}">`;
         break;
