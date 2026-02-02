@@ -96,7 +96,7 @@ export function updateSubOptions(categoryId, subId, data) {
   // }
   // 上記を削除し、UIの表示/非表示のみを制御するように変更。createTriggerUI/createActionUIの呼び出しは親側で行う。
   if (categoryId.includes('trigger')) {
-    if (cat === "場所" || cat === "メモ" || cat === "ボイス" || (cat === "カレンダー" && categoryId.startsWith("cond_"))) {
+    if (cat === "場所" || cat === "メモ" || cat === "ボイス" || (cat === "カレンダー" && categoryId.startsWith("cond_")) || (cat === "収支管理" && categoryId.startsWith("cond_"))) {
       sub.style.display = 'none';
       if (data[cat] && data[cat].length > 0) {
         sub.value = data[cat][0];

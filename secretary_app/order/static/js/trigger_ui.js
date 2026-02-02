@@ -411,28 +411,110 @@ export function createTriggerUI(prefix = '', initialValue = {}) {
         }
         break;
       case "収支管理":
-        if (sub === "入力があったら") {
+        if (prefix && prefix.startsWith('cond_')) {
+          // --- New UI for Finance Conditions ---
+
+          const createTimeDatalist = (id, start, end, step = 1, pad = 0) => {
+            let html = `<datalist id="${id}">`;
+            html += `<option value="now">(実行したとき)</option>`;
+            for (let i = start; i <= end; i += step) {
+              html += `<option value="${String(i).padStart(pad, '0')}"></option>`;
+            }
+            return html + `</datalist>`;
+          };
+          
+          const yearOptsId = `${prefix}year_options`;
+          const monthOptsId = `${prefix}month_options`;
+          const dayOptsId = `${prefix}day_options`;
+          const timeOptsId = `${prefix}time_options`;
+          
+          const currentYear = new Date().getFullYear();
+          const yearDatalist = createTimeDatalist(yearOptsId, 2025, currentYear + 5);
+          const monthDatalist = createTimeDatalist(monthOptsId, 1, 12);
+          const dayDatalist = createTimeDatalist(dayOptsId, 1, 31);
+          
+          let timeOptionsHtml = `<datalist id="${timeOptsId}">`;
+          timeOptionsHtml += `<option value="now">(実行したとき)</option>`;
+          for (let h = 0; h < 24; h++) {
+            for (let m = 0; m < 60; m += 30) {
+              timeOptionsHtml += `<option value="${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}"></option>`;
+            }
+          }
+          timeOptionsHtml += `</datalist>`;
+
           triggerValueContainer.innerHTML = `
-            <label>アクション (複数選択可)</label>
-            <div id="${prefix}trigger_value_finance_actions" class="co-day-of-week-selector">
-              <button type="button" data-value="追加">追加</button>
-              <button type="button" data-value="変更">変更</button>
-              <button type="button" data-value="取得">取得</button>
-              <button type="button" data-value="削除">削除</button>
+            <div class="co-grid">
+              <div class="co-cell-1-2">
+                <label>対象項目</label>
+                <select id="${prefix}finance_item" class="trigger-input">
+                  <option value="income" ${initialValue.item === 'income' ? 'selected' : ''}>収入</option>
+                  <option value="expense" ${initialValue.item === 'expense' ? 'selected' : ''}>支出</option>
+                  <option value="balance" ${initialValue.item === 'balance' ? 'selected' : ''}>収支</option>
+                </select>
+              </div>
             </div>
-            <div id="${prefix}trigger_value_finance_genres_container" style="display: none; margin-top: 15px;">
-              <label>ジャンル (複数選択可)</label>
-              <div id="${prefix}trigger_value_finance_genres" class="co-day-of-week-selector">
+
+            <details class="co-details-group" open>
+              <summary>期間設定</summary>
+              <div class="co-preset-buttons" id="${prefix}finance_presets">
+                <button type="button" class="co-btn ghost" data-preset="today">今日</button>
+                <button type="button" class="co-btn ghost" data-preset="this_month">今月</button>
+                <button type="button" class="co-btn ghost" data-preset="this_year">今年</button>
+                <button type="button" class="co-btn ghost" data-preset="all">全期間</button>
+              </div>
+              <div class="co-date-range-container">
+                <div class="co-date-range-group">
+                  <label>開始日時</label>
+                  <div class="co-datetime-inputs">
+                    <input type="text" id="${prefix}start_year" list="${yearOptsId}" placeholder="年" value="${initialValue.start_year || ''}">
+                    <input type="text" id="${prefix}start_month" list="${monthOptsId}" placeholder="月" value="${initialValue.start_month || ''}">
+                    <input type="text" id="${prefix}start_day" list="${dayOptsId}" placeholder="日" value="${initialValue.start_day || ''}">
+                    <input type="text" id="${prefix}start_time" list="${timeOptsId}" placeholder="時刻" value="${initialValue.start_time || ''}">
+                  </div>
+                </div>
+                <div class="co-date-range-group">
+                  <label>終了日時</label>
+                  <div class="co-datetime-inputs">
+                    <input type="text" id="${prefix}end_year" list="${yearOptsId}" placeholder="年" value="${initialValue.end_year || ''}">
+                    <input type="text" id="${prefix}end_month" list="${monthOptsId}" placeholder="月" value="${initialValue.end_month || ''}">
+                    <input type="text" id="${prefix}end_day" list="${dayOptsId}" placeholder="日" value="${initialValue.end_day || ''}">
+                    <input type="text" id="${prefix}end_time" list="${timeOptsId}" placeholder="時刻" value="${initialValue.end_time || ''}">
+                  </div>
+                </div>
+              </div>
+            </details>
+            ${yearDatalist}
+            ${monthDatalist}
+            ${dayDatalist}
+            ${timeOptionsHtml}
+
+            <details class="co-details-group" open>
+              <summary>ジャンル (任意)</summary>
+              <div id="${prefix}finance_genres" class="co-day-of-week-selector co-flex-wrap">
                 <p>ジャンルを読み込み中...</p>
+              </div>
+            </details>
+
+            <div class="co-grid">
+               <div class="co-cell-2-3">
+                <label>比較条件</label>
+                <select id="${prefix}finance_compare" class="trigger-input">
+                  <option value="gte" ${initialValue.compare === 'gte' ? 'selected' : ''}>次の金額を上回ったら</option>
+                  <option value="lte" ${initialValue.compare === 'lte' ? 'selected' : ''}>次の金額を下回ったら</option>
+                </select>
+              </div>
+              <div class="co-cell-1-3">
+                <label>金額</label>
+                <input type="number" id="${prefix}finance_amount" class="trigger-input" placeholder="金額 (円)" value="${initialValue.amount || ''}">
               </div>
             </div>
           `;
 
-          const actionButtonsContainer = triggerValueContainer.querySelector(`#${prefix}trigger_value_finance_actions`);
-          const genresContainer = triggerValueContainer.querySelector(`#${prefix}trigger_value_finance_genres_container`);
-          const genresButtonsContainer = triggerValueContainer.querySelector(`#${prefix}trigger_value_finance_genres`);
+          // --- Event Listeners and Dynamic Population ---
 
-          const populateGenres = async () => {
+          // Genre Buttons
+          const genresButtonsContainer = triggerValueContainer.querySelector(`#${prefix}finance_genres`);
+          (async () => {
             const genres = await fetchGenres();
             genresButtonsContainer.innerHTML = '';
             if (genres.length === 0) {
@@ -453,65 +535,173 @@ export function createTriggerUI(prefix = '', initialValue = {}) {
                 if (button) button.classList.add('selected');
               });
             }
-          };
 
-          const toggleGenresUI = () => {
-            const addButton = actionButtonsContainer.querySelector('button[data-value="追加"]');
-            if (addButton && addButton.classList.contains('selected')) {
-              genresContainer.style.display = 'block';
-            } else {
-              genresContainer.style.display = 'none';
-            }
-          };
-
-          if (actionButtonsContainer) {
-            actionButtonsContainer.addEventListener('click', (event) => {
-              if (event.target.tagName === 'BUTTON') {
-                event.target.classList.toggle('selected');
-                toggleGenresUI();
-              }
-            });
-            if (initialValue.actions && Array.isArray(initialValue.actions)) {
-              initialValue.actions.forEach(action => {
-                const button = actionButtonsContainer.querySelector(`button[data-value="${action}"]`);
-                if (button) button.classList.add('selected');
-              });
-            }
-          }
-          
-          if (genresButtonsContainer) {
             genresButtonsContainer.addEventListener('click', (event) => {
               if (event.target.tagName === 'BUTTON') {
                 event.target.classList.toggle('selected');
               }
             });
+          })();
+
+          // Preset Buttons
+          triggerValueContainer.querySelector(`#${prefix}finance_presets`).addEventListener('click', (event) => {
+            if (event.target.tagName !== 'BUTTON') return;
+
+            const preset = event.target.dataset.preset;
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = now.getMonth() + 1;
+            const day = now.getDate();
+            
+            const startYear = triggerValueContainer.querySelector(`#${prefix}start_year`);
+            const startMonth = triggerValueContainer.querySelector(`#${prefix}start_month`);
+            const startDay = triggerValueContainer.querySelector(`#${prefix}start_day`);
+            const startTime = triggerValueContainer.querySelector(`#${prefix}start_time`);
+            const endYear = triggerValueContainer.querySelector(`#${prefix}end_year`);
+            const endMonth = triggerValueContainer.querySelector(`#${prefix}end_month`);
+            const endDay = triggerValueContainer.querySelector(`#${prefix}end_day`);
+            const endTime = triggerValueContainer.querySelector(`#${prefix}end_time`);
+
+            const clearAll = () => [startYear, startMonth, startDay, startTime, endYear, endMonth, endDay, endTime].forEach(el => el.value = '');
+
+            clearAll();
+
+            switch(preset) {
+              case 'today':
+                startYear.value = endYear.value = year;
+                startMonth.value = endMonth.value = month;
+                startDay.value = endDay.value = day;
+                startTime.value = '00:00';
+                endTime.value = '23:59';
+                break;
+              case 'this_month':
+                startYear.value = endYear.value = year;
+                startMonth.value = endMonth.value = month;
+                startDay.value = '1';
+                const lastDay = new Date(year, month, 0).getDate();
+                endDay.value = lastDay;
+                startTime.value = '00:00';
+                endTime.value = '23:59';
+                break;
+              case 'this_year':
+                startYear.value = endYear.value = year;
+                startMonth.value = '1';
+                startDay.value = '1';
+                endMonth.value = '12';
+                endDay.value = '31';
+                startTime.value = '00:00';
+                endTime.value = '23:59';
+                break;
+              case 'all':
+                // Already cleared
+                break;
+            }
+          });
+
+        } else {
+          // --- Existing UI for Finance Triggers ---
+          if (sub === "入力があったら") {
+            triggerValueContainer.innerHTML = `
+              <label>アクション (複数選択可)</label>
+              <div id="${prefix}trigger_value_finance_actions" class="co-day-of-week-selector">
+                <button type="button" data-value="追加">追加</button>
+                <button type="button" data-value="変更">変更</button>
+                <button type="button" data-value="取得">取得</button>
+                <button type="button" data-value="削除">削除</button>
+              </div>
+              <div id="${prefix}trigger_value_finance_genres_container" style="display: none; margin-top: 15px;">
+                <label>ジャンル (複数選択可)</label>
+                <div id="${prefix}trigger_value_finance_genres" class="co-day-of-week-selector">
+                  <p>ジャンルを読み込み中...</p>
+                </div>
+              </div>
+            `;
+
+            const actionButtonsContainer = triggerValueContainer.querySelector(`#${prefix}trigger_value_finance_actions`);
+            const genresContainer = triggerValueContainer.querySelector(`#${prefix}trigger_value_finance_genres_container`);
+            const genresButtonsContainer = triggerValueContainer.querySelector(`#${prefix}trigger_value_finance_genres`);
+
+            const populateGenres = async () => {
+              const genres = await fetchGenres();
+              genresButtonsContainer.innerHTML = '';
+              if (genres.length === 0) {
+                  genresButtonsContainer.innerHTML = '<p>ジャンルが登録されていません。</p>';
+                  return;
+              }
+              genres.forEach(genre => {
+                const button = document.createElement('button');
+                button.type = 'button';
+                button.dataset.value = genre.name;
+                button.textContent = genre.name;
+                genresButtonsContainer.appendChild(button);
+              });
+
+              if (initialValue.genres && Array.isArray(initialValue.genres)) {
+                initialValue.genres.forEach(genreName => {
+                  const button = genresButtonsContainer.querySelector(`button[data-value="${genreName}"]`);
+                  if (button) button.classList.add('selected');
+                });
+              }
+            };
+
+            const toggleGenresUI = () => {
+              const addButton = actionButtonsContainer.querySelector('button[data-value="追加"]');
+              if (addButton && addButton.classList.contains('selected')) {
+                genresContainer.style.display = 'block';
+              } else {
+                genresContainer.style.display = 'none';
+              }
+            };
+
+            if (actionButtonsContainer) {
+              actionButtonsContainer.addEventListener('click', (event) => {
+                if (event.target.tagName === 'BUTTON') {
+                  event.target.classList.toggle('selected');
+                  toggleGenresUI();
+                }
+              });
+              if (initialValue.actions && Array.isArray(initialValue.actions)) {
+                initialValue.actions.forEach(action => {
+                  const button = actionButtonsContainer.querySelector(`button[data-value="${action}"]`);
+                  if (button) button.classList.add('selected');
+                });
+              }
+            }
+            
+            if (genresButtonsContainer) {
+              genresButtonsContainer.addEventListener('click', (event) => {
+                if (event.target.tagName === 'BUTTON') {
+                  event.target.classList.toggle('selected');
+                }
+              });
+            }
+            
+            populateGenres();
+            toggleGenresUI();
+          } else if (sub === "特定金額になったら") {
+            triggerValueContainer.innerHTML = `
+              <label>項目</label>
+              <select id="${prefix}trigger_value_finance_item" class="trigger-input" required>
+                <option value="total_balance" ${initialValue.item === 'total_balance' ? 'selected' : ''}>総所持金</option>
+                <option value="remaining_to_target" ${initialValue.item === 'remaining_to_target' ? 'selected' : ''}>目標金額までの残金</option>
+                <option value="monthly_expense" ${initialValue.item === 'monthly_expense' ? 'selected' : ''}>今月の支出</option>
+                <option value="monthly_expense_no_necessities" ${initialValue.item === 'monthly_expense_no_necessities' ? 'selected' : ''}>今月の支出(必需品なし)</option>
+                <option value="monthly_income" ${initialValue.item === 'monthly_income' ? 'selected' : ''}>今月の収入</option>
+                <option value="daily_expense" ${initialValue.item === 'daily_expense' ? 'selected' : ''}>今日の支出</option>
+                <option value="daily_expense_no_necessities" ${initialValue.item === 'daily_expense_no_necessities' ? 'selected' : ''}>今日の支出(必需品なし)</option>
+              </select>
+              <label>判定</label>
+              <select id="${prefix}trigger_value_finance_compare" class="trigger-input" required>
+                <option value="gte" ${initialValue.compare === 'gte' ? 'selected' : ''}>上回ったら</option>
+                <option value="lte" ${initialValue.compare === 'lte' ? 'selected' : ''}>下回ったら</option>
+              </select>
+              <label>金額</label>
+              <input type="number" id="${prefix}trigger_value_finance_amount" class="trigger-input" placeholder="金額 (円)" value="${initialValue.amount || ''}">
+              <label>または</label>
+              <input type="number" id="${prefix}trigger_value_finance_percentage" class="trigger-input" placeholder="目標額のn%" value="${initialValue.percentage || ''}">
+              <small>金額と目標額のn%はどちらか一方を入力してください。</small>
+            `;
           }
-          
-          populateGenres();
-          toggleGenresUI();
-        } else if (sub === "特定金額になったら") {
-          triggerValueContainer.innerHTML = `
-            <label>項目</label>
-            <select id="${prefix}trigger_value_finance_item" class="trigger-input" required>
-              <option value="total_balance" ${initialValue.item === 'total_balance' ? 'selected' : ''}>総所持金</option>
-              <option value="remaining_to_target" ${initialValue.item === 'remaining_to_target' ? 'selected' : ''}>目標金額までの残金</option>
-              <option value="monthly_expense" ${initialValue.item === 'monthly_expense' ? 'selected' : ''}>今月の支出</option>
-              <option value="monthly_expense_no_necessities" ${initialValue.item === 'monthly_expense_no_necessities' ? 'selected' : ''}>今月の支出(必需品なし)</option>
-              <option value="monthly_income" ${initialValue.item === 'monthly_income' ? 'selected' : ''}>今月の収入</option>
-              <option value="daily_expense" ${initialValue.item === 'daily_expense' ? 'selected' : ''}>今日の支出</option>
-              <option value="daily_expense_no_necessities" ${initialValue.item === 'daily_expense_no_necessities' ? 'selected' : ''}>今日の支出(必需品なし)</option>
-            </select>
-            <label>判定</label>
-            <select id="${prefix}trigger_value_finance_compare" class="trigger-input" required>
-              <option value="gte" ${initialValue.compare === 'gte' ? 'selected' : ''}>上回ったら</option>
-              <option value="lte" ${initialValue.compare === 'lte' ? 'selected' : ''}>下回ったら</option>
-            </select>
-            <label>金額</label>
-            <input type="number" id="${prefix}trigger_value_finance_amount" class="trigger-input" placeholder="金額 (円)" value="${initialValue.amount || ''}">
-            <label>または</label>
-            <input type="number" id="${prefix}trigger_value_finance_percentage" class="trigger-input" placeholder="目標額のn%" value="${initialValue.percentage || ''}">
-            <small>金額と目標額のn%はどちらか一方を入力してください。</small>
-          `;
         }
         break;
       case "メモ":
