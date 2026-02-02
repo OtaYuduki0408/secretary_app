@@ -460,7 +460,72 @@ export function createTriggerUI(prefix = '', initialValue = {}) {
           triggerValueContainer.innerHTML = dateRange.html;
           dateRange.attachListeners(triggerValueContainer);
         } else {
-            triggerValueContainer.innerHTML = `<input type="text" id="${prefix}trigger_value" placeholder="値" value="${initialValue.value || ''}">`;
+            const createDatalist = (id, start, end) => {
+              let html = `<datalist id="${id}">`;
+              html += `<option value="now"></option>`;
+              for (let i = start; i <= end; i++) {
+                html += `<option value="${String(i).padStart(id.includes('month') || id.includes('day') ? 2 : 0, '0')}"></option>`;
+              }
+              return html + `</datalist>`;
+            };
+
+            const yearOptsId = `${prefix}year_opts`;
+            const monthOptsId = `${prefix}month_opts`;
+            const dayOptsId = `${prefix}day_opts`;
+            const timeOptsId = `${prefix}time_opts`;
+
+            const currentYear = new Date().getFullYear();
+            const yearDatalist = createDatalist(yearOptsId, currentYear, currentYear + 5);
+            const monthDatalist = createDatalist(monthOptsId, 1, 12);
+            const dayDatalist = createDatalist(dayOptsId, 1, 31);
+            
+            let timeOptionsHtml = `<datalist id="${timeOptsId}"><option value="now"></option>`;
+            for (let h = 0; h < 24; h++) for (let m = 0; m < 60; m += 15) timeOptionsHtml += `<option value="${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}"></option>`;
+            timeOptionsHtml += `</datalist>`;
+
+            triggerValueContainer.innerHTML = `
+                <div class="co-fieldset">
+                    <label>年</label>
+                    <input type="text" id="${prefix}trigger_value_year" class="trigger-input" list="${yearOptsId}" placeholder="* (毎年)" value="${initialValue.year || ''}">
+                </div>
+                <div class="co-fieldset">
+                    <label>月</label>
+                    <input type="text" id="${prefix}trigger_value_month" class="trigger-input" list="${monthOptsId}" placeholder="* (毎月)" value="${initialValue.month || ''}">
+                </div>
+                <div class="co-fieldset">
+                    <label>日</label>
+                    <input type="text" id="${prefix}trigger_value_day" class="trigger-input" list="${dayOptsId}" placeholder="* (毎日)" value="${initialValue.day || ''}">
+                </div>
+                <div class="co-fieldset">
+                    <label>曜日 (複数選択可)</label>
+                    <div id="${prefix}trigger_value_day_of_week_buttons" class="co-day-of-week-selector">
+                        <button type="button" data-value="月">月</button> <button type="button" data-value="火">火</button> <button type="button" data-value="水">水</button> <button type="button" data-value="木">木</button>
+                        <button type="button" data-value="金">金</button> <button type="button" data-value="土">土</button> <button type="button" data-value="日">日</button>
+                    </div>
+                </div>
+                <div class="co-fieldset">
+                    <label>時間</label>
+                    <input type="text" id="${prefix}trigger_value_time" class="trigger-input" list="${timeOptsId}" placeholder="* (毎時)" value="${initialValue.time || ''}">
+                </div>
+                ${yearDatalist}${monthDatalist}${dayDatalist}${timeOptionsHtml}
+            `;
+
+            // 曜日ボタンの選択ロジック
+            const dayOfWeekContainer = triggerValueContainer.querySelector(`#${prefix}trigger_value_day_of_week_buttons`);
+            if (dayOfWeekContainer) {
+                dayOfWeekContainer.addEventListener('click', (event) => {
+                    if (event.target.tagName === 'BUTTON') {
+                        event.target.classList.toggle('selected');
+                    }
+                });
+                // Restore selection
+                if (initialValue.day_of_week && Array.isArray(initialValue.day_of_week)) {
+                    initialValue.day_of_week.forEach(day => {
+                        const button = dayOfWeekContainer.querySelector(`button[data-value="${day}"]`);
+                        if (button) button.classList.add('selected');
+                    });
+                }
+            }
         }
         break;
       case "SwitchBot":
