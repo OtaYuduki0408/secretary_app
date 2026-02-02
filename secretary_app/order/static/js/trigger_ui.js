@@ -521,9 +521,54 @@ export function createTriggerUI(prefix = '', initialValue = {}) {
                 genresButtonsContainer.addEventListener('click', (event) => { if (event.target.tagName === 'BUTTON') event.target.classList.toggle('selected'); });
             })();
         } else {
-          // Existing trigger logic remains untouched
-          if (sub === "入力があったら") { /* ... unchanged ... */ }
-          else if (sub === "特定金額になったら") { /* ... unchanged ... */ }
+          if (sub === "入力があったら") {
+            triggerValueContainer.innerHTML = `
+              <label>アクション (複数選択可)</label>
+              <div id="${prefix}trigger_value_finance_actions" class="co-day-of-week-selector">
+                <button type="button" data-value="追加">追加</button>
+                <button type="button" data-value="取得">取得</button>
+              </div>
+            `;
+            const actionButtonsContainer = triggerValueContainer.querySelector(`#${prefix}trigger_value_finance_actions`);
+            if (actionButtonsContainer) {
+              actionButtonsContainer.addEventListener('click', (event) => { if (event.target.tagName === 'BUTTON') event.target.classList.toggle('selected'); });
+              if (initialValue.actions && Array.isArray(initialValue.actions)) {
+                initialValue.actions.forEach(action => {
+                  const button = actionButtonsContainer.querySelector(`button[data-value="${action}"]`);
+                  if (button) button.classList.add('selected');
+                });
+              }
+            }
+          } else if (sub === "特定金額になったら") {
+            const dateRange = createAdvancedDateRangeUI(prefix, initialValue);
+            triggerValueContainer.innerHTML = `
+                <div class="co-grid">
+                    <div class="co-cell-1-2">
+                        <label>対象</label>
+                        <select id="${prefix}finance_item" class="trigger-input">
+                            <option value="balance" ${initialValue.item === 'balance' ? 'selected' : ''}>収支</option>
+                            <option value="income" ${initialValue.item === 'income' ? 'selected' : ''}>収入</option>
+                            <option value="expense" ${initialValue.item === 'expense' ? 'selected' : ''}>支出</option>
+                        </select>
+                    </div>
+                </div>
+                ${dateRange.html}
+                <div class="co-grid">
+                    <div class="co-cell-2-3">
+                        <label>比較条件</label>
+                        <select id="${prefix}finance_compare" class="trigger-input">
+                            <option value="gte" ${initialValue.compare === 'gte' ? 'selected' : ''}>次の金額を上回ったら</option>
+                            <option value="lte" ${initialValue.compare === 'lte' ? 'selected' : ''}>次の金額を下回ったら</option>
+                        </select>
+                    </div>
+                    <div class="co-cell-1-3">
+                        <label>金額</label>
+                        <input type="number" id="${prefix}finance_amount" class="trigger-input" placeholder="金額 (円)" value="${initialValue.amount || ''}">
+                    </div>
+                </div>
+            `;
+            dateRange.attachListeners(triggerValueContainer);
+          }
         }
         break;
       case "メモ":
@@ -543,13 +588,19 @@ export function createTriggerUI(prefix = '', initialValue = {}) {
           `;
           dateRange.attachListeners(triggerValueContainer);
         } else {
-          // Existing trigger logic remains untouched
+          const dateRange = createAdvancedDateRangeUI(prefix, initialValue);
           triggerValueContainer.innerHTML = `
-            <label>アクション (複数選択可)</label>
-            <div id="${prefix}trigger_value_memo_actions" class="co-day-of-week-selector"> ... </div>
-            <label>フィルター (任意)</label><br>
-            <div id="${prefix}trigger_value_memo_filters"> ... </div>
-          `; // Content omitted for brevity but is unchanged
+            <label>検索範囲</label>
+            <select id="${prefix}memo_scope" class="trigger-input">
+              <option value="full" ${initialValue.scope === 'full' ? 'selected' : ''}>全文</option>
+              <option value="title" ${initialValue.scope === 'title' ? 'selected' : ''}>タイトル</option>
+              <option value="body" ${initialValue.scope === 'body' ? 'selected' : ''}>本文</option>
+            </select>
+            <label>検索文 (カンマ区切りAND検索)</label>
+            <input type="text" id="${prefix}memo_content" class="trigger-input" placeholder="例: 重要,プロジェクトA" value="${initialValue.content || ''}">
+            ${dateRange.html}
+          `;
+          dateRange.attachListeners(triggerValueContainer);
         }
         break;
       case "時間":
@@ -661,7 +712,12 @@ export function createTriggerUI(prefix = '', initialValue = {}) {
             triggerValueContainer.innerHTML = `<input type="text" id="${prefix}trigger_value" placeholder="値を入力" value="${initialValue.value || ''}">`;
         }
         break;
-      // Other cases (ボイス) remain unchanged
+      case "ボイス":
+        triggerValueContainer.innerHTML = `
+          <label>検索ワード (カンマ区切りAND検索)</label>
+          <input type="text" id="${prefix}trigger_value_voice_keywords" class="trigger-input" placeholder="例: おはよう,今日の天気" value="${safeVoiceKeywords}">
+        `;
+        break;
       default:
         triggerValueContainer.innerHTML = `<input type="text" id="${prefix}trigger_value" placeholder="値" value="${initialValue.value || ''}">`;
         break;
