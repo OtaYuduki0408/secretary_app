@@ -21,7 +21,6 @@ export function createTriggerUI(prefix = '', initialValue = {}) {
 
     const createDatalist = (id, start, end) => {
       let html = `<datalist id="${id}">`;
-      html += `<option value="now">(実行したとき)</option>`;
       for (let i = start; i <= end; i++) {
         html += `<option value="${String(i).padStart(id.includes('month') || id.includes('day') ? 2 : 0, '0')}"></option>`;
       }
@@ -38,7 +37,7 @@ export function createTriggerUI(prefix = '', initialValue = {}) {
     const monthDatalist = createDatalist(monthOptsId, 1, 12);
     const dayDatalist = createDatalist(dayOptsId, 1, 31);
     
-    let timeOptionsHtml = `<datalist id="${timeOptsId}"><option value="now">(実行したとき)</option>`;
+    let timeOptionsHtml = `<datalist id="${timeOptsId}">`;
     for (let h = 0; h < 24; h++) for (let m = 0; m < 60; m += 30) timeOptionsHtml += `<option value="${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}"></option>`;
     timeOptionsHtml += `</datalist>`;
 
@@ -108,24 +107,33 @@ export function createTriggerUI(prefix = '', initialValue = {}) {
 
         switch(preset) {
           case 'today':
-            fields.start.y.value = fields.start.m.value = fields.start.d.value = 'now';
+            fields.start.y.value = '(今日)';
+            fields.start.m.value = '';
+            fields.start.d.value = '';
             fields.start.t.value = '00:00';
-            fields.end.y.value = fields.end.m.value = fields.end.d.value = 'now';
+            fields.end.y.value = '(今日)';
+            fields.end.m.value = '';
+            fields.end.d.value = '';
             fields.end.t.value = '23:59';
             break;
           case 'this_month':
-            fields.start.y.value = fields.start.m.value = 'now';
+            fields.start.y.value = '(今月)';
+            fields.start.m.value = '';
             fields.start.d.value = '1';
             fields.start.t.value = '00:00';
-            fields.end.y.value = fields.end.m.value = fields.end.d.value = 'now';
+            fields.end.y.value = '(今月)';
+            fields.end.m.value = '';
+            fields.end.d.value = ''; // 月末はサーバー側で解釈
             fields.end.t.value = '23:59';
             break;
           case 'this_year':
-            fields.start.y.value = 'now';
+            fields.start.y.value = '(今年)';
             fields.start.m.value = '1';
             fields.start.d.value = '1';
             fields.start.t.value = '00:00';
-            fields.end.y.value = fields.end.m.value = fields.end.d.value = 'now';
+            fields.end.y.value = '(今年)';
+            fields.end.m.value = '12';
+            fields.end.d.value = '31';
             fields.end.t.value = '23:59';
             break;
           case 'all':
@@ -460,9 +468,11 @@ export function createTriggerUI(prefix = '', initialValue = {}) {
           triggerValueContainer.innerHTML = dateRange.html;
           dateRange.attachListeners(triggerValueContainer);
         } else {
-            const createDatalist = (id, start, end) => {
+            const createDatalist = (id, start, end, specialOption) => {
               let html = `<datalist id="${id}">`;
-              html += `<option value="now"></option>`;
+              if (specialOption) {
+                html += `<option value="${specialOption}"></option>`;
+              }
               for (let i = start; i <= end; i++) {
                 html += `<option value="${String(i).padStart(id.includes('month') || id.includes('day') ? 2 : 0, '0')}"></option>`;
               }
@@ -475,26 +485,32 @@ export function createTriggerUI(prefix = '', initialValue = {}) {
             const timeOptsId = `${prefix}time_opts`;
 
             const currentYear = new Date().getFullYear();
-            const yearDatalist = createDatalist(yearOptsId, currentYear, currentYear + 5);
-            const monthDatalist = createDatalist(monthOptsId, 1, 12);
-            const dayDatalist = createDatalist(dayOptsId, 1, 31);
+            const yearDatalist = createDatalist(yearOptsId, currentYear, currentYear + 5, "毎年");
+            const monthDatalist = createDatalist(monthOptsId, 1, 12, "毎月");
+            const dayDatalist = createDatalist(dayOptsId, 1, 31, "毎日");
             
-            let timeOptionsHtml = `<datalist id="${timeOptsId}"><option value="now"></option>`;
+            let timeOptionsHtml = `<datalist id="${timeOptsId}"><option value="毎時"></option>`;
             for (let h = 0; h < 24; h++) for (let m = 0; m < 60; m += 15) timeOptionsHtml += `<option value="${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}"></option>`;
             timeOptionsHtml += `</datalist>`;
+
+            // initialValueの 'x' を '毎年' などに変換
+            const yearVal = initialValue.year === 'x' ? '毎年' : initialValue.year || '';
+            const monthVal = initialValue.month === 'x' ? '毎月' : initialValue.month || '';
+            const dayVal = initialValue.day === 'x' ? '毎日' : initialValue.day || '';
+            const timeVal = initialValue.time === 'x' ? '毎時' : initialValue.time || '';
 
             triggerValueContainer.innerHTML = `
                 <div class="co-fieldset">
                     <label>年</label>
-                    <input type="text" id="${prefix}trigger_value_year" class="trigger-input" list="${yearOptsId}" placeholder="* (毎年)" value="${initialValue.year || ''}">
+                    <input type="text" id="${prefix}trigger_value_year" class="trigger-input" list="${yearOptsId}" placeholder="例: 2025 または 毎年" value="${yearVal}">
                 </div>
                 <div class="co-fieldset">
                     <label>月</label>
-                    <input type="text" id="${prefix}trigger_value_month" class="trigger-input" list="${monthOptsId}" placeholder="* (毎月)" value="${initialValue.month || ''}">
+                    <input type="text" id="${prefix}trigger_value_month" class="trigger-input" list="${monthOptsId}" placeholder="例: 12 または 毎月" value="${monthVal}">
                 </div>
                 <div class="co-fieldset">
                     <label>日</label>
-                    <input type="text" id="${prefix}trigger_value_day" class="trigger-input" list="${dayOptsId}" placeholder="* (毎日)" value="${initialValue.day || ''}">
+                    <input type="text" id="${prefix}trigger_value_day" class="trigger-input" list="${dayOptsId}" placeholder="例: 15 または 毎日" value="${dayVal}">
                 </div>
                 <div class="co-fieldset">
                     <label>曜日 (複数選択可)</label>
@@ -505,7 +521,7 @@ export function createTriggerUI(prefix = '', initialValue = {}) {
                 </div>
                 <div class="co-fieldset">
                     <label>時間</label>
-                    <input type="text" id="${prefix}trigger_value_time" class="trigger-input" list="${timeOptsId}" placeholder="* (毎時)" value="${initialValue.time || ''}">
+                    <input type="text" id="${prefix}trigger_value_time" class="trigger-input" list="${timeOptsId}" placeholder="例: 09:00 または 毎時" value="${timeVal}">
                 </div>
                 ${yearDatalist}${monthDatalist}${dayDatalist}${timeOptionsHtml}
             `;
