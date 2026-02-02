@@ -50,8 +50,12 @@ export function createTriggerUI(prefix = '', initialValue = {}) {
             }
             const addresses = await response.json();
             pastAddressesList.innerHTML = ''; // リストをクリア
-            if (addresses.length > 0) {
-              addresses.forEach(addr => {
+            
+            // 重複を除去
+            const uniqueAddresses = [...new Set(addresses)];
+
+            if (uniqueAddresses.length > 0) {
+              uniqueAddresses.forEach(addr => {
                 const li = document.createElement('li');
                 li.textContent = addr;
                 li.addEventListener('click', () => {
