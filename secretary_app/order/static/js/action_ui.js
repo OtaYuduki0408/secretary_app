@@ -144,7 +144,20 @@ const createAdvancedDateRangeUI = (p, iv) => {
 export function createActionUI(prefix = '', initialValue = {}) {
   console.log(`createActionUI called with prefix: '${prefix}', initialValue:`, initialValue);
   const category = document.getElementById(`${prefix}action_category`).value;
-  const sub = document.getElementById(`${prefix}action_sub`).value;
+  const subSelect = document.getElementById(`${prefix}action_sub`);
+  let sub = subSelect?.value || '';
+
+  const fixedSubByCategory = {
+    '収支管理': '読み上げ',
+    'メモ': '読み上げ',
+    '時間読み上げ': '読み上げ内容'
+  };
+  if (fixedSubByCategory[category] && subSelect) {
+    sub = fixedSubByCategory[category];
+    subSelect.value = sub;
+    subSelect.disabled = true;
+    subSelect.style.display = 'none';
+  }
   const detailContainer = document.getElementById(`${prefix}action_detail_container`);
   detailContainer.innerHTML = '';
 
@@ -179,7 +192,8 @@ export function createActionUI(prefix = '', initialValue = {}) {
     case "収支管理":
       if (sub === "読み上げ") {
         const dateRange = createAdvancedDateRangeUI(prefix, initialValue);
-        detailContainer.innerHTML = `
+        const subNotice = subSelect?.disabled ? `<div class="co-help-text">サブカテゴリ: ${sub}</div>` : "";        detailContainer.innerHTML = `
+          ${subNotice}
           <label>読み上げ項目</label>
           <select class="action-detail-fin-read-item">
             <option value="total_balance" ${initialValue.item === 'total_balance' ? 'selected' : ''}>総所持金</option>
@@ -205,7 +219,8 @@ export function createActionUI(prefix = '', initialValue = {}) {
     case "メモ":
       if (sub === "読み上げ") {
         const dateRange = createAdvancedDateRangeUI(prefix, initialValue);
-        detailContainer.innerHTML = `
+        const subNotice = subSelect?.disabled ? `<div class="co-help-text">サブカテゴリ: ${sub}</div>` : "";        detailContainer.innerHTML = `
+          ${subNotice}
           <label>タイトル</label>
           <input type="text" class="action-detail-memo-title" placeholder="指定したタイトルのメモのみ読み上げます" value="${initialValue.title || ''}">
           <label style="margin-top: 10px;">ワード</label>
@@ -280,11 +295,41 @@ export function createActionUI(prefix = '', initialValue = {}) {
       }
       break;
     case "時間読み上げ":
-      detailContainer.innerHTML = `
-        <div class="co-help-text">
-          <p>選択した項目を読み上げます。</p>
-        </div>
-      `;
+      if (sub === "読み上げ内容") {
+        const subNotice = subSelect?.disabled ? `<div class="co-help-text">サブカテゴリ: ${sub}</div>` : "";
+        detailContainer.innerHTML = `
+          ${subNotice}
+          <div class="co-fieldset">
+            <label>読み上げ内容</label>
+            <div class="co-day-of-week-selector action-detail-time-read-content">
+              <button type="button" data-value="今の時間">今の時間</button>
+              <button type="button" data-value="今日の日付">今日の日付</button>
+              <button type="button" data-value="今日の曜日">今日の曜日</button>
+              <button type="button" data-value="年月日">年月日</button>
+            </div>
+          </div>
+        `;
+
+        const setupButtonSelector = (selector, initialValues) => {
+          const container = detailContainer.querySelector(selector);
+          if (container) {
+            container.addEventListener('click', (event) => {
+              if (event.target.tagName === 'BUTTON') {
+                event.target.classList.toggle('selected');
+              }
+            });
+            if (initialValues && (Array.isArray(initialValues) ? initialValues.length > 0 : initialValues)) {
+              const valuesToSelect = Array.isArray(initialValues) ? initialValues : [initialValues];
+              valuesToSelect.forEach(val => {
+                const button = container.querySelector(`button[data-value="${val}"]`);
+                if (button) button.classList.add('selected');
+              });
+            }
+          }
+        };
+
+        setupButtonSelector('.action-detail-time-read-content', initialValue.content);
+      }
       break;
     case "アラート":
       if (sub === "実行") {

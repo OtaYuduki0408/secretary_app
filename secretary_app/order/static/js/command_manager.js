@@ -87,7 +87,9 @@ function parseActionItem(actionItem) {
       }
       break;
     case "時間読み上げ":
-      // サブカテゴリと詳細はない
+      if (sub === "読み上げ内容") {
+        detail.content = [...detailContainer.querySelectorAll('.action-detail-time-read-content button.selected')].map(btn => btn.dataset.value);
+      }
       break;
     case "アラート":
       if (sub === "実行") {

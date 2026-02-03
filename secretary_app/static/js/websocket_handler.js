@@ -174,18 +174,33 @@ async function executeAction(action) {
         textToSpeak = detail.text || "";
         overlayTitle = "読み上げ";
     } else if (action.category === '時間読み上げ') {
-        overlayTitle = "時間読み上げ"; 
+        overlayTitle = "時間読み上げ";
         const nowDate = new Date();
-        const year = nowDate.getFullYear(), month = nowDate.getMonth() + 1, day = nowDate.getDate();
-        const hours = nowDate.getHours(), minutes = nowDate.getMinutes();
+        const year = nowDate.getFullYear();
+        const month = nowDate.getMonth() + 1;
+        const day = nowDate.getDate();
+        const hours = nowDate.getHours();
+        const minutes = nowDate.getMinutes();
         const weekday = ["日", "月", "火", "水", "木", "金", "土"][nowDate.getDay()];
-        switch (action.sub) {
-            case "今日の日付": textToSpeak = `今日は${month}月${day}日です。`; break;
-            case "今日の曜日": textToSpeak = `今日は${weekday}曜日です。`; break;
-            case "今の時間": textToSpeak = `今は${hours}時${minutes}分です。`; break;
-            case "今日の年月日": textToSpeak = `今日は${year}年${month}月${day}日です。`; break;
+
+        const selections = Array.isArray(detail.content) ? detail.content : (detail.content ? [detail.content] : []);
+        const parts = [];
+
+        if (selections.includes("今の時間") || selections.length === 0) {
+            parts.push(`今の時間?${hours}時${minutes}分???`);
         }
-    } else if (action.category === 'アラート') {
+        if (selections.includes("今日の日付") || selections.includes("年月日") || selections.length === 0) {
+            parts.push(`今日の日付?${month}月${day}日???`);
+        }
+        if (selections.includes("今日の曜日") || selections.length === 0) {
+            parts.push(`今日の曜日?${weekday}曜日???`);
+        }
+        if (selections.includes("年月日") || selections.length === 0) {
+            parts.push(`今日?${year}年${month}月${day}日???`);
+        }
+
+        textToSpeak = parts.join(' ');
+    }} else if (action.category === 'アラート') {
         overlayTitle = "アラート"; 
         playSound(detail.sound || 'default.mp3');
         textToSpeak = `アラートを再生しました。`;
