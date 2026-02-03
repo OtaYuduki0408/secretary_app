@@ -111,3 +111,24 @@ def api_switchbot_devices():
         })
 
     return jsonify({"devices": devices})
+
+from flask import session
+from datetime import datetime
+import pytz
+from order.evaluator import enrich_single_action
+from flask import current_app
+
+@command_bp.route("/actions/enrich", methods=["POST"])
+def api_enrich_action():
+    data = request.get_json()
+    action = data.get('action')
+    user_id = data.get('user_id') 
+
+    if not action or not user_id:
+        return jsonify({"error": "Invalid request"}), 400
+
+    now_jst = datetime.now(pytz.timezone('Asia/Tokyo'))
+    
+    enriched_action = enrich_single_action(action, user_id, now_jst, current_app.logger)
+    
+    return jsonify({"enriched_detail": enriched_action.get("detail", {})})
