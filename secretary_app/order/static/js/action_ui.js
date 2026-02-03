@@ -241,14 +241,11 @@ export function createActionUI(prefix = '', initialValue = {}) {
             }
             return response.json();
           })
-          .then(data => { // devices ではなく data という名前に変更して、受け取った生のレスポンスボディを表す
+          .then(devices => { // 'data' ではなく、直接 'devices' 配列を受け取る
             deviceSelect.innerHTML = ''; // "読み込み中..."をクリア
 
-            // APIレスポンスから実際のデバイスリストを抽出
-            const devices = data.devices; // ★ここを修正★
-
-            if (!Array.isArray(devices)) { // 防御的なチェックをここでも行い続ける
-              console.error('Error: API returned data.devices is not an array:', devices);
+            if (!Array.isArray(devices)) { // 防御的なチェック
+              console.error('Error: API returned data is not an array:', devices);
               deviceSelect.innerHTML = '<option value="">デバイスリストの形式が不正です</option>';
               return;
             }
@@ -259,11 +256,10 @@ export function createActionUI(prefix = '', initialValue = {}) {
             }
             devices.forEach(device => {
               const option = document.createElement('option');
-              // APIレスポンスのデバイスオブジェクトは {id: ..., name: ..., type: ...} 形式
-              // フロントエンドは {deviceId: ..., deviceName: ...} 形式を期待しているので変換
-              option.value = device.id; // ★ここを修正: device.deviceId -> device.id
-              option.textContent = device.name; // ★ここを修正: device.deviceName -> device.name
-              if (initialValue.deviceId === device.id) { // ★ここを修正: initialValue.deviceId === device.id
+              // バックエンドが返すキーは "deviceId" と "deviceName"
+              option.value = device.deviceId;
+              option.textContent = device.deviceName;
+              if (initialValue.deviceId === device.deviceId) {
                 option.selected = true;
               }
               deviceSelect.appendChild(option);
