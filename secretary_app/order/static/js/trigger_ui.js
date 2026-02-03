@@ -642,9 +642,65 @@ export function createTriggerUI(prefix = '', initialValue = {}) {
         break;
       case "ボイス":
         triggerValueContainer.innerHTML = `
-          <label>検索ワード (カンマ区切りAND検索)</label>
-          <input type="text" id="${prefix}trigger_value_voice_keywords" class="trigger-input" placeholder="例: おはよう,今日の天気" value="${safeVoiceKeywords}">
+          <label>検索ワード</label>
+          <p class="co-form-description" style="font-size: 0.8rem; color: var(--co-text-secondary); margin-bottom: 8px;">複数のワード欄はOR条件、各欄内のカンマ区切りはAND条件として扱われます。</p>
+          <div id="${prefix}voice_keywords_container" class="co-stack" style="gap: 8px;"></div>
+          <button type="button" id="${prefix}add_voice_keyword_btn" class="co-btn ghost" style="margin-top: 12px;">＋ 検索ワードを追加</button>
         `;
+
+        const keywordsContainer = triggerValueContainer.querySelector(`#${prefix}voice_keywords_container`);
+        const addBtn = triggerValueContainer.querySelector(`#${prefix}add_voice_keyword_btn`);
+
+        const createKeywordInput = (value = '') => {
+          const inputWrapper = document.createElement('div');
+          inputWrapper.style.display = 'flex';
+          inputWrapper.style.alignItems = 'center';
+          inputWrapper.style.gap = '8px';
+          
+          const input = document.createElement('input');
+          input.type = 'text';
+          input.className = 'trigger-input voice-keyword-input co-input';
+          input.style.flexGrow = '1';
+          input.placeholder = '例: おはよう,天気';
+          input.value = String(value).replace(/"/g, '&quot;');
+
+          const removeBtn = document.createElement('button');
+          removeBtn.type = 'button';
+          removeBtn.className = 'co-btn ghost';
+          removeBtn.textContent = '削除';
+          removeBtn.onclick = () => {
+            inputWrapper.remove();
+            if (keywordsContainer.children.length === 0) {
+              createKeywordInput();
+            }
+          };
+
+          inputWrapper.appendChild(input);
+          inputWrapper.appendChild(removeBtn);
+          keywordsContainer.appendChild(inputWrapper);
+        };
+
+        addBtn.addEventListener('click', () => {
+          createKeywordInput();
+        });
+
+        // initialValueの処理
+        const keywordsValue = initialValue.keywords ?? initialValue.keyword ?? initialValue.value;
+
+        if (Array.isArray(keywordsValue) && keywordsValue.length > 0) {
+            // サーバーから渡される形式を想定: [['おはよう', '天気'], ['こんにちは']]
+            // これはOR [['おはよう' AND '天気'], ['こんにちは']] を意味する
+            keywordsValue.forEach(keywordGroup => {
+                const value = Array.isArray(keywordGroup) ? keywordGroup.join(',') : keywordGroup;
+                createKeywordInput(String(value));
+            });
+        } else if (typeof keywordsValue === 'string' && keywordsValue) { 
+           // 従来の単一文字列またはカンマ区切り文字列の場合
+           createKeywordInput(keywordsValue);
+        } else {
+          // デフォルトで一つは表示
+          createKeywordInput();
+        }
         break;
       default:
         triggerValueContainer.innerHTML = `<input type="text" id="${prefix}trigger_value" placeholder="値" value="${initialValue.value || ''}">`;

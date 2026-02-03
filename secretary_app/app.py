@@ -600,6 +600,7 @@ import pytz
 JST = pytz.timezone('Asia/Tokyo')
 from services import local_calendar_service
 from services.memo_service import get_all_memos as get_all_memo_records
+from services.weather_service import get_weather_forecast_message, DEFAULT_AREA_CODE
 
 
 def _normalize_keyword_list(raw):
@@ -762,6 +763,33 @@ def _enrich_actions_for_dispatch(order_payload, user_id, app_logger):
             action['detail'] = _enrich_finance_read(detail, user_id, now_jst, app_logger)
         elif category == 'メモ' and sub == '読み上げ':
             action['detail'] = _enrich_memo_read(detail, user_id, now_jst, app_logger)
+        elif category == '天気' and sub == '読み上げ':
+            try:
+                # 現時点ではエリアコードは固定（東京都）
+                # 必要であればユーザー設定から取得できるように拡張
+                area_code = DEFAULT_AREA_CODE 
+                content = detail.get('content', ["天気", "気温"])
+                range_type = detail.get('range', "今日")
+                granularity = detail.get('granularity', "1日ごと")
+                
+                print(f"DEBUG: 天気予報アクション実行: area={area_code}, content={content}, range={range_type}, granularity={granularity}")
+                
+                weather_message = get_weather_forecast_message(area_code, content, range_type, granularity) # app_logger を渡さない
+                
+                print(f"DEBUG: 生成された天気予報メッセージ: {weather_message}")
+                
+                detail['message'] = weather_message
+                
+                # ★★★ デバッグ用に追加 ★★★
+                sid = connected_users.get(user_id)
+                if sid:
+                    socketio.emit('debug_message', {'source': 'enrich_action_weather', 'message': weather_message, 'detail': detail}, room=sid)
+                    print(f"DEBUG: Sent debug_message to frontend for user {user_id}")
+                # ★★★ ここまで ★★★
+            except Exception as e:
+                print(f"ERROR: 天気予報アクションエラー: {e}")
+                detail['message'] = "天気予報の取得に失敗しました。"
+            action['detail'] = detail
         elif (category in ('メール', '繝｡繝ｼ繝ｫ')) and (sub in ('送信', '騾∽ｿ｡') or not sub):
             try:
                 from services.action_executor_service import execute_action
@@ -887,12 +915,30 @@ def _handle_voice_triggers(user_input, user_id, app_logger):
         if str(category).strip().lower() not in ('ボイス', 'voice'): continue
 
         value = trigger.get('value', {})
-        keywords = _normalize_keyword_list(value.get('keywords') or value.get('keyword') or value.get('value'))
-        print(f"[VOICE_TRIGGER] Order {order_id} has voice trigger with keywords: {keywords}")
+        # keywordsは [['a', 'b'], ['c']] のような形式を期待
+        or_keyword_groups = value.get('keywords')
 
-        if not keywords: continue
+        # 従来の文字列/フラットリスト形式にも対応 (後方互換性)
+        if not isinstance(or_keyword_groups, list) or not or_keyword_groups or not any(isinstance(i, list) for i in or_keyword_groups):
+             legacy_keywords = _normalize_keyword_list(value.get('keywords') or value.get('keyword') or value.get('value'))
+             if legacy_keywords:
+                 or_keyword_groups = [legacy_keywords] # [[ 'a', 'b', 'c' ]] のようにラップして処理
+             else:
+                 continue
+        
+        print(f"[VOICE_TRIGGER] Order {order_id} has voice trigger with keyword groups: {or_keyword_groups}")
+        
+        match_found = False
+        for and_keywords in or_keyword_groups:
+            # and_keywords がリストでなければ、リストに変換 (単一キーワードの場合など)
+            if not isinstance(and_keywords, list):
+                and_keywords = [str(and_keywords)]
             
-        if _match_keywords(user_input, keywords):
+            if _match_keywords(user_input, and_keywords):
+                match_found = True
+                break # いずれかのOR条件が一致すればループを抜ける
+        
+        if match_found:
             print(f"[VOICE_TRIGGER] SUCCESS: Matched keywords for order ID: {order_id}")
             payload = {k: order.get(k) for k in ['triggers', 'actions', 'conditions', 'steps'] if k in order}
             # Enrichment is removed from here

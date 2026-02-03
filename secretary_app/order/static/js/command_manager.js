@@ -94,6 +94,15 @@ function parseActionItem(actionItem) {
         detail.sound = detailContainer.querySelector(".action-detail-alert-sound")?.value;
       }
       break;
+
+    // 新しく追加する case "天気":
+    case "天気":
+      if (sub === "読み上げ") {
+        detail.content = [...detailContainer.querySelectorAll('.action-detail-weather-content button.selected')].map(btn => btn.dataset.value);
+        detail.range = detailContainer.querySelector('.action-detail-weather-range button.selected')?.dataset.value;
+        detail.granularity = detailContainer.querySelector('.action-detail-weather-granularity button.selected')?.dataset.value;
+      }
+      break;
   }
 
   const actionData = { category, sub, detail };
@@ -368,7 +377,20 @@ export async function registerCommand(){
       // triggerValue.time_end = triggerContainer.querySelector("#trigger_value_time_time_end")?.value; // 時間カテゴリのメインUIにはtime_endがないため削除
       break;
     case "ボイス":
-      triggerValue.keywords = triggerContainer.querySelector("#trigger_value_voice_keywords")?.value;
+      const keywordInputs = triggerContainer.querySelectorAll('.voice-keyword-input');
+      const keywords = [];
+      keywordInputs.forEach(input => {
+        const value = input.value.trim();
+        if (value) {
+          // カンマで区切ってAND条件の配列を作成
+          const andKeywords = value.split(',').map(k => k.trim()).filter(k => k);
+          if (andKeywords.length > 0) {
+            keywords.push(andKeywords);
+          }
+        }
+      });
+      // 最終的に [['keyword1', 'keyword2'], ['keyword3']] のような形式になる
+      triggerValue.keywords = keywords;
       break;
     case "SwitchBot":
       triggerValue.device_id = triggerContainer.querySelector("#trigger_value_switchbot_device_select")?.value;
@@ -519,9 +541,19 @@ export async function pollPendingActions() {
             const utterance = new SpeechSynthesisUtterance(textToSpeak);
             speechSynthesis.speak(utterance);
             message += " -> " + textToSpeak;
-          }
-        } else if (actionData.category === 'アラート' && actionData.sub === '実行') {
-          // アラートアクションの場合、アラート音を鳴らす
+                      }
+                    } else if (actionData.category === '天気' && actionData.sub === '読み上げ') {
+                      // 天気読み上げアクションの場合、messageを音声合成で読み上げる
+                      const textToSpeak = actionData.detail.message;
+                      if (textToSpeak) {
+                        console.log("天気予報読み上げ: " + textToSpeak);
+                        const utterance = new SpeechSynthesisUtterance(textToSpeak);
+                        speechSynthesis.speak(utterance);
+                        message = textToSpeak; // メッセージ自体を天気予報の内容にする
+                      } else {
+                        message = "天気予報のメッセージがありません。";
+                      }
+                    } else if (actionData.category === 'アラート' && actionData.sub === '実行') {          // アラートアクションの場合、アラート音を鳴らす
           const alertSound = actionData.detail.sound || 'default';
           console.log("アラート音鳴動: " + alertSound);
           const soundMap = { sound1: 'bet.mp3', sound2: 'error.mp3', sound3: 'gako.mp3', default: 'bet.mp3' };

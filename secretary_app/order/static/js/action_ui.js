@@ -326,5 +326,74 @@ export function createActionUI(prefix = '', initialValue = {}) {
         }
       }
       break;
+
+    // 新しく追加する case "天気":
+    case "天気":
+      if (sub === "読み上げ") {
+        detailContainer.innerHTML = `
+          <div class="co-fieldset">
+            <label>読み上げ内容</label>
+            <div class="co-day-of-week-selector action-detail-weather-content">
+              <button type="button" data-value="天気">天気</button>
+              <button type="button" data-value="気温">気温</button>
+            </div>
+          </div>
+          <div class="co-fieldset">
+            <label>読み上げ範囲</label>
+            <div class="co-day-of-week-selector action-detail-weather-range">
+              <button type="button" data-value="今日">今日</button>
+              <button type="button" data-value="午前">午前</button>
+              <button type="button" data-value="午後">午後</button>
+              <button type="button" data-value="今週">今週</button>
+            </div>
+          </div>
+          <div class="co-fieldset">
+            <label>詳しさ</label>
+            <div class="co-day-of-week-selector action-detail-weather-granularity">
+              <button type="button" data-value="午前午後ごと">午前午後ごと</button>
+              <button type="button" data-value="1日ごと">1日ごと</button>
+            </div>
+          </div>
+        `;
+
+        // 選択状態の復元とイベントリスナー
+        const setupButtonSelector = (selector, initialValues, isSingleSelect = false) => {
+          const container = detailContainer.querySelector(selector);
+          if (container) {
+            container.addEventListener('click', (event) => {
+              if (event.target.tagName === 'BUTTON') {
+                if (isSingleSelect) {
+                  // 単一選択の場合、他のボタンの選択を解除
+                  Array.from(container.children).forEach(btn => btn.classList.remove('selected'));
+                  event.target.classList.add('selected');
+                } else {
+                  // 複数選択
+                  event.target.classList.toggle('selected');
+                }
+              }
+            });
+            if (initialValues && (Array.isArray(initialValues) ? initialValues.length > 0 : initialValues)) {
+              const valuesToSelect = Array.isArray(initialValues) ? initialValues : [initialValues];
+              valuesToSelect.forEach(val => {
+                const button = container.querySelector(`button[data-value="${val}"]`);
+                if (button) button.classList.add('selected');
+              });
+            }
+          }
+        };
+
+        // 読み上げ内容は複数選択
+        setupButtonSelector('.action-detail-weather-content', initialValue.content);
+        // 読み上げ範囲は単一選択
+        setupButtonSelector('.action-detail-weather-range', initialValue.range, true);
+        // 詳しさは単一選択
+        setupButtonSelector('.action-detail-weather-granularity', initialValue.granularity, true);
+
+      }
+      break;
+
+    default:
+      detailContainer.innerHTML = `<input type="text" class="action-detail-value" value="${initialValue.value || ''}" placeholder="追加情報">`;
+      break;
   }
 }

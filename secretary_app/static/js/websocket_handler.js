@@ -234,6 +234,11 @@ async function executeAction(action) {
         overlayCategoryClass = "overlay-memo"; 
         textToSpeak = detail.content || '読み上げるメモがありません。';
         messageHtml = `<h3>${overlayTitle}</h3><div class="details-section"><p>${textToSpeak}</p></div>`;
+    } else if (action.category === '天気' && action.sub === '読み上げ') {
+        overlayTitle = "天気予報";
+        overlayCategoryClass = "overlay-speech"; // or a new 'overlay-weather' class
+        textToSpeak = detail.message || "天気予報の情報を取得できませんでした。";
+        messageHtml = `<h3>${overlayTitle}</h3><p>${textToSpeak.replace(/。/g, '。<br>')}</p>`;
     }
 
     if (textToSpeak) {
@@ -287,6 +292,11 @@ function setupWebSocket() {
         if (actionPlan.length > 0) {
             await executePlan(actionPlan);
         }
+    });
+
+    // ★★★ デバッグ用に追加 ★★★
+    socket.on('debug_message', (data) => {
+        console.log('DEBUG_SERVER_MESSAGE:', data);
     });
 }
 
