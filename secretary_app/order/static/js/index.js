@@ -14,8 +14,8 @@ document.addEventListener("DOMContentLoaded",()=>{
   });
   document.getElementById("trigger_sub").addEventListener("change",()=>createTriggerUI(''));
   
-  document.getElementById("add-condition").addEventListener("click",(event)=>addConditionBlock(event.currentTarget));
-  document.getElementById("add-action").addEventListener("click",(event)=>addAction(event.currentTarget));
+  document.getElementById("add-condition-top").addEventListener("click",(event)=>addConditionBlock(event.currentTarget));
+  document.getElementById("add-action-top").addEventListener("click",(event)=>addAction(event.currentTarget));
   document.getElementById("register-btn").addEventListener("click",registerCommand);
   
   loadCommands();

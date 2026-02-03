@@ -96,7 +96,11 @@ export function addConditionBlock(anchorElement, data={}) {
     </div>
   `;
   
-  if (referenceElement) {
+  const shouldPrepend = anchorElement.id.endsWith('-top');
+
+  if (shouldPrepend) {
+    targetParent.prepend(block); // 先頭に追加
+  } else if (referenceElement) {
     // 兄弟要素として挿入
     referenceElement.insertAdjacentElement('afterend', block);
   } else {
@@ -360,7 +364,11 @@ export function addAction(anchorElement, data={}) {
     </div>
   `;
   
-  if (referenceElement) {
+  const shouldPrepend = anchorElement.id.endsWith('-top');
+
+  if (shouldPrepend) {
+    targetParent.prepend(el); // 先頭に追加
+  } else if (referenceElement) {
     // 兄弟要素として挿入
     referenceElement.insertAdjacentElement('afterend', el);
   } else {
