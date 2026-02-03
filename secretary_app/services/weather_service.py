@@ -46,13 +46,18 @@ def _parse_weather_forecast(data, target_date: datetime, granularity: str, conte
 
     # timeSeries[0] の timeDefines と weathers, pops を利用
     time_defines = [datetime.fromisoformat(t).astimezone(JST) for t in forecast_daily['timeSeries'][0]['timeDefines']]
-    weathers = forecast_daily['timeSeries'][0]['areas'][0]['weathers']
-    pops = forecast_daily['timeSeries'][0]['areas'][0]['pops']
+    areas0 = forecast_daily['timeSeries'][0]['areas'][0]
+    weathers = areas0.get('weathers', [])
+    # 気象庁APIの地点によっては pops が無い場合があるため安全に取得する
+    pops = areas0.get('pops', [])
 
     # timeSeries[2] の temps を利用 (時間帯別の気温)
-    temps_data_time_series = data[0]['timeSeries'][2]
-    temps_time_defines = [datetime.fromisoformat(t).astimezone(JST) for t in temps_data_time_series['timeDefines']]
-    temps_values = temps_data_time_series['areas'][0]['temps']
+    temps_time_defines = []
+    temps_values = []
+    if len(data[0].get('timeSeries', [])) > 2:
+        temps_data_time_series = data[0]['timeSeries'][2]
+        temps_time_defines = [datetime.fromisoformat(t).astimezone(JST) for t in temps_data_time_series.get('timeDefines', [])]
+        temps_values = temps_data_time_series.get('areas', [{}])[0].get('temps', [])
 
 
     for i, td in enumerate(time_defines):

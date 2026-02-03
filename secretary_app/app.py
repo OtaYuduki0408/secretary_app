@@ -747,8 +747,10 @@ def _enrich_memo_read(detail, user_id, now_jst, app_logger):
     detail['content'] = " / ".join(parts)
     return detail
 
-def _enrich_actions_for_dispatch(order_payload, user_id, app_logger):
+def _enrich_actions_for_dispatch(order_payload, user_id, app_logger=None):
     now_jst = datetime.now(JST)
+    if app_logger is None:
+        app_logger = app.logger
     steps = order_payload.get('steps') or []
     actions = order_payload.get('actions') or []
 
@@ -967,7 +969,9 @@ def chat_api_web():
 
     if voice_payloads:
         for payload in voice_payloads:
-            _dispatch_order_payload(user_id, payload)
+            # ボイストリガー経由でもアクション内容を補強してから送信する
+            enriched_payload = _enrich_actions_for_dispatch(payload, user_id, app.logger)
+            _dispatch_order_payload(user_id, enriched_payload)
         
         response_data['suppress_tts'] = True
         response_data['message'] = ""
