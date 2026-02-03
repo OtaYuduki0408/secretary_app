@@ -52,6 +52,7 @@ from routes.order_routes import order_bp
 from routes.calendar_routes import calendar_bp
 from routes.switchbot_routes import switchbot_bp # これを追加
 from order.evaluator import evaluate_triggers, evaluate_switchbot_triggers
+from order.evaluator import evaluate_triggers, evaluate_switchbot_triggers
 
 
 
