@@ -215,6 +215,38 @@ export function createActionUI(prefix = '', initialValue = {}) {
         dateRange.attachListeners(detailContainer);
       }
       break;
+    case "SwitchBot":
+      if (sub === "デバイス操作") {
+        detailContainer.innerHTML = `
+          <label>デバイス</label>
+          <select class="action-detail-switchbot-device" style="margin-bottom: 10px;">
+            <option value="">デバイスを選択してください</option>
+          </select>
+          <label>アクション</label>
+          <select class="action-detail-switchbot-action" style="margin-bottom: 10px;">
+            <option value="press" ${initialValue.action === 'press' ? 'selected' : ''}>スイッチを押す</option>
+            <option value="pull" ${initialValue.action === 'pull' ? 'selected' : ''}>スイッチを引く</option>
+          </select>
+          <small class="co-help-text">スイッチのオン,オフが反転している場合、設定→switchbotより変更してください</small>
+        `;
+
+        const deviceSelect = detailContainer.querySelector('.action-detail-switchbot-device');
+
+        // ===== 修正箇所: API fetchをダミーデータに置き換え =====
+        deviceSelect.innerHTML = ''; // オプションをクリア
+        const dummyDevice = { deviceId: 'dummy_bot_id', deviceName: 'スイッチボット' };
+        const option = document.createElement('option');
+        option.value = dummyDevice.deviceId;
+        option.textContent = dummyDevice.deviceName;
+        
+        // データの復元も考慮
+        if (initialValue.deviceId === dummyDevice.deviceId || !initialValue.deviceId) { // 編集時または新規作成時
+            option.selected = true;
+        }
+        deviceSelect.appendChild(option);
+        // ===============================================
+      }
+      break;
     case "発声":
       if (sub === "実行") {
         detailContainer.innerHTML = `

@@ -597,16 +597,16 @@ export function createTriggerUI(prefix = '', initialValue = {}) {
                 <label>人の検知状態</label>
                 <select id="${prefix}switchbot_detection" class="trigger-input">
                   <option value="">選択しない</option>
-                  <option value="detected" ${initialValue.detection === 'detected' ? 'selected' : ''}>人を検知したら</option>
-                  <option value="not_detected" ${initialValue.detection === 'not_detected' ? 'selected' : ''}>人が居なくなったら</option>
+                  <option value="detected" ${initialValue.detection === 'detected' ? 'selected' : ''}>人が居るなら</option>
+                  <option value="not_detected" ${initialValue.detection === 'not_detected' ? 'selected' : ''}>人が居ないなら</option>
                 </select>
               </div>
               <div class="co-fieldset">
                 <label>部屋の明るさ</label>
                 <select id="${prefix}switchbot_light" class="trigger-input">
                   <option value="">選択しない</option>
-                  <option value="bright" ${initialValue.light === 'bright' ? 'selected' : ''}>部屋が明るくなったら</option>
-                  <option value="dark" ${initialValue.light === 'dark' ? 'selected' : ''}>部屋が暗くなったら</option>
+                  <option value="bright" ${initialValue.light === 'bright' ? 'selected' : ''}>部屋が明るいなら</option>
+                  <option value="dark" ${initialValue.light === 'dark' ? 'selected' : ''}>部屋が暗いなら</option>
                 </select>
               </div>
             `;

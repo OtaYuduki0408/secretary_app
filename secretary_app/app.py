@@ -50,7 +50,7 @@ from order.custom_order_routes import custom_order_bp
 from order.command_routes import command_bp
 from routes.order_routes import order_bp
 from routes.calendar_routes import calendar_bp
-from order.evaluator import evaluate_triggers, evaluate_switchbot_triggers # 関数名を修正
+from routes.switchbot_routes import switchbot_bp # これを追加
 
 
 
@@ -92,6 +92,7 @@ app.register_blueprint(custom_order_bp, url_prefix='/api')
 app.register_blueprint(command_bp, url_prefix='/api')
 app.register_blueprint(order_bp, url_prefix='/order')
 app.register_blueprint(calendar_bp)
+app.register_blueprint(switchbot_bp) # これを追加
 
 from flask import Blueprint
 custom_order_pages_bp = Blueprint(
