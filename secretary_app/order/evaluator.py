@@ -454,6 +454,177 @@ def _evaluate_switchbot_motion_edge(trigger_value, app_logger=None, order_data=N
     return should_fire, state_changed
 
 
+# order/evaluator.py
+import os
+from supabase_client import supabase
+from datetime import datetime
+import pytz
+from services import local_calendar_service
+from services import switchbot_service
+from services.finance_service import (
+    get_all_finance_records,
+    get_last_finance_error,
+    get_current_balance,
+    get_monthly_expense,
+    get_daily_expense,
+    get_monthly_goal,
+)
+from services.memo_service import get_all_memos
+
+# タイムゾーン設定
+JST = pytz.timezone('Asia/Tokyo')
+# Supabase障害時のフォールバック用キャッシュ
+_CACHED_ORDERS = []
+_CACHED_AT = None
+
+def _parse_int_or_now(value, now_value):
+    if value is None:
+        return now_value
+    if isinstance(value, int):
+        return value
+    if isinstance(value, str):
+        raw = value.strip()
+        if not raw or "実行された" in raw:
+            return now_value
+        if raw.isdigit():
+            return int(raw)
+    return now_value
+
+def _parse_time_or_default(value, default_time):
+    if not value:
+        return default_time
+    if isinstance(value, str):
+        raw = value.strip()
+        if not raw or "実行された" in raw:
+            return default_time
+        if ":" in raw:
+            return raw
+    return default_time
+
+def _build_range_from_detail(detail, now_jst):
+    start_year = _parse_int_or_now((detail or {}).get('start_year'), now_jst.year)
+    start_month = _parse_int_or_now((detail or {}).get('start_month'), now_jst.month)
+    start_day = _parse_int_or_now((detail or {}).get('start_day'), now_jst.day)
+    end_year = _parse_int_or_now((detail or {}).get('end_year'), now_jst.year)
+    end_month = _parse_int_or_now((detail or {}).get('end_month'), now_jst.month)
+    end_day = _parse_int_or_now((detail or {}).get('end_day'), now_jst.day)
+
+    start_time = _parse_time_or_default((detail or {}).get('start_time'), "00:00")
+    end_time = _parse_time_or_default((detail or {}).get('end_time'), "23:59")
+
+    try:
+        start_hour, start_minute = [int(x) for x in start_time.split(":")[:2]]
+        end_hour, end_minute = [int(x) for x in end_time.split(":")[:2]]
+        start_dt = JST.localize(datetime(start_year, start_month, start_day, start_hour, start_minute))
+        end_dt = JST.localize(datetime(end_year, end_month, end_day, end_hour, end_minute, 59))
+        return start_dt, end_dt
+    except (ValueError, TypeError):
+        return None, None
+
+def _process_actions(actions_to_process, user_id, now_jst, app_logger):
+    """アクションリストを処理し、動的な情報を注入したり、サーバーサイドで実行したりする"""
+    modified_actions = []
+    
+    from services.user_settings_service import get_user_settings
+    settings = get_user_settings(user_id)
+
+    for action in actions_to_process:
+        if not isinstance(action, dict):
+            continue
+
+        category = action.get('category')
+        sub = action.get('sub')
+        detail = action.get('detail', {})
+
+        if category == 'カレンダー' and sub == '読み上げ':
+            try:
+                today_start = now_jst.replace(hour=0, minute=0, second=0, microsecond=0)
+                today_end = now_jst.replace(hour=23, minute=59, second=59, microsecond=999999)
+                events = local_calendar_service.get_events(user_id, today_start.isoformat(), today_end.isoformat())
+                if events:
+                    event_items = []
+                    for e in events:
+                        try:
+                            start_dt = datetime.fromisoformat(e['start_time']).astimezone(JST)
+                            end_dt = datetime.fromisoformat(e['end_time']).astimezone(JST)
+                            event_items.append({
+                                'summary': e.get('title', '予定'), 'start_time': start_dt.strftime('%H:%M'), 'end_time': end_dt.strftime('%H:%M'),
+                                'start_day': f"{start_dt.year}年{start_dt.month}月{start_dt.day}日", 'end_day': f"{end_dt.year}年{end_dt.month}月{end_dt.day}日",
+                                'event_link': None
+                            })
+                        except Exception as err:
+                            app_logger.debug(f"Failed to parse event for read aloud: {err}")
+                    if event_items:
+                        action.setdefault('detail', {})['events'] = event_items
+                        action['detail'].update(event_items[0])
+                        action['detail']['summary'] = event_items[0]['summary']
+                    else:
+                        action.setdefault('detail', {})['summary'] = '今日の予定はありません'
+                else:
+                    action.setdefault('detail', {})['summary'] = '今日の予定はありません'
+            except Exception as e:
+                app_logger.error(f"Error processing calendar action for user {user_id}: {e}")
+                action.setdefault('detail', {})['summary'] = 'カレンダー読み上げの処理に失敗しました。'
+
+        elif category == '収支管理' and sub == '読み上げ':
+            try:
+                all_records = get_all_finance_records(user_id)
+                finance_error = get_last_finance_error()
+                if finance_error:
+                    action.setdefault('detail', {})['error'] = finance_error
+                else:
+                    income_total = sum(r.get('amount', 0) for r in all_records if r.get('type') == 'income')
+                    expense_total = sum(r.get('amount', 0) for r in all_records if r.get('type') == 'expense')
+                    balance = income_total - expense_total
+                    if detail.get('format') == 'individual':
+                        action.setdefault('detail', {})['records'] = all_records
+                    else:
+                        detail.update({'income_total': income_total, 'expense_total': expense_total, 'balance': balance})
+                        action['detail'] = detail
+            except Exception as e:
+                app_logger.error(f"Error processing finance action for user {user_id}: {e}", exc_info=True)
+                action.setdefault('detail', {})['error'] = '収支読み上げの処理に失敗しました。'
+        
+        elif category == 'メモ' and sub == '読み上げ':
+            title_filter = detail.get('title', '')
+            word_filter = detail.get('word', '')
+            start_dt, end_dt = _build_range_from_detail(detail, now_jst)
+            start_iso = start_dt.isoformat() if start_dt else ''
+            end_iso = end_dt.isoformat() if end_dt else ''
+            
+            memos = get_all_memos(
+                user_id=user_id, title=title_filter, content=word_filter,
+                start_date=start_iso, end_date=end_iso
+            )
+            if isinstance(memos, dict) and memos.get('error'):
+                action.setdefault('detail', {})['content'] = 'メモの取得に失敗しました。'
+            elif not memos:
+                action.setdefault('detail', {})['content'] = '該当するメモは見つかりませんでした。'
+            else:
+                content_parts = [f"タイトル: {m.get('title', '無題')}, 内容: {m.get('content', 'なし')}" for m in memos[:5]]
+                action.setdefault('detail', {})['content'] = "。 ".join(content_parts)
+
+        elif category == 'SwitchBot' and sub == 'デバイス操作':
+            device_id = detail.get('deviceId')
+            command = detail.get('action') # 'press' or 'pull'
+            
+            if device_id and command:
+                token = (settings or {}).get('switchbot_token')
+                secret = (settings or {}).get('switchbot_secret')
+
+                if token and secret:
+                    api_command = 'press'
+                    result = switchbot_service.send_device_command(
+                        api_token=token, api_secret=secret, device_id=device_id,
+                        command_type='command', command=api_command, parameter='default'
+                    )
+                    action.setdefault('detail', {})['server_result'] = result
+                else:
+                    action.setdefault('detail', {})['server_result'] = {'error': 'SwitchBot API key not configured.'}
+        
+        modified_actions.append(action)
+    return modified_actions
+
 def evaluate_triggers(app_logger):
     # 定期的にトリガーを評価
     app_logger.debug(f"[{datetime.now()}] Evaluating triggers...")
@@ -487,13 +658,11 @@ def evaluate_triggers(app_logger):
         order_data = order.get('order_data')
         order_id = order.get('id')
         app_logger.debug(f"[ORDER] id={order.get('id')} user_id={order.get('user_id')}")
-        app_logger.debug(f"[ORDER] order_data keys: {list(order_data.keys()) if isinstance(order_data, dict) else order_data}")
 
         if not order_data or not order_data.get('triggers'):
             continue
 
         trigger = order_data['triggers'][0]
-        app_logger.debug(f"[TRIGGER] {trigger}")
         trigger_category = trigger.get('category')
         trigger_sub = trigger.get('sub')
         trigger_value = trigger.get('value') or {}
@@ -510,136 +679,25 @@ def evaluate_triggers(app_logger):
             if state_changed and isinstance(order_data, dict) and order_id:
                 try:
                     supabase.table('custom_orders').update({'order_data': order_data}).match({'id': order_id, 'user_id': user_id}).execute()
-                    app_logger.debug(f"[FIN_EDGE] state updated for order_id={order_id}")
                 except Exception as e:
                     app_logger.error(f"[FIN_EDGE] failed to update state: {e}")
         elif trigger_category == 'SwitchBot' and trigger_sub == '人感センサーが反応したら':
-            should_fire, state_changed = _evaluate_switchbot_motion_edge(
-                trigger_value, app_logger, order_data
-            )
-            if state_changed and isinstance(order_data, dict) and order_id:
-                try:
-                    supabase.table('custom_orders').update({'order_data': order_data}).match({'id': order_id, 'user_id': user_id}).execute()
-                    app_logger.debug(f"[SWITCHBOT_TRIGGER] state updated for order_id={order_id}")
-                except Exception as e:
-                    app_logger.error(f"[SWITCHBOT_TRIGGER] failed to update state: {e}")
+            # この評価は evaluate_switchbot_triggers で行うのでスキップ
+            continue
         else:
             app_logger.debug(f"[TRIGGER] skip category={trigger_category} sub={trigger_sub}")
             continue
 
         if should_fire:
             app_logger.debug(f"Trigger activated for user {user_id}. Processing actions...")
-            try:
-                steps = order_data.get("steps") or []
-                actions = order_data.get("actions") or []
-                step_summ = []
-                for s in steps:
-                    if not isinstance(s, dict):
-                        continue
-                    kind = s.get("kind", "action")
-                    if kind == "action":
-                        act = s.get("action", {}) or {}
-                        step_summ.append(f"action:{act.get('category')}:{act.get('sub')}")
-                    elif kind == "condition":
-                        step_summ.append("condition")
-                    else:
-                        step_summ.append(kind)
-                action_summ = [
-                    f"{a.get('category')}:{a.get('sub')}" for a in actions if isinstance(a, dict)
-                ]
-                print(f"[TRIGGER_FIRE] user_id={user_id} steps={len(steps)} actions={len(actions)} step_list={step_summ} action_list={action_summ}")
-            except Exception as e:
-                print(f"[TRIGGER_FIRE] summary log failed: {e}")
             steps = order_data.get('steps')
-            actions_to_process = []
-            if isinstance(steps, list) and steps:
-                actions_to_process = _collect_actions_from_steps(steps)
-                app_logger.debug(f"DEBUG: Actions in order_data steps before processing: {actions_to_process}")
-            else:
-                actions_to_process.extend(order_data.get('actions', []) or [])
-                for condition in order_data.get('conditions', []) or []:
-                    actions_to_process.extend(_collect_actions_from_condition(condition))
-                app_logger.debug(f"DEBUG: Actions in order_data before processing: {actions_to_process}")
-
-            modified_actions = []
-
-            for action in actions_to_process:
-                if not isinstance(action, dict):
-                    continue
-                if action.get('category') == 'カレンダー' and action.get('sub') == '読み上げ':
-                    try:
-                        today_start = now_jst.replace(hour=0, minute=0, second=0, microsecond=0)
-                        today_end = now_jst.replace(hour=23, minute=59, second=59, microsecond=999999)
-
-                        events = local_calendar_service.get_events(user_id, today_start.isoformat(), today_end.isoformat())
-                        app_logger.debug(f"list_events returned {len(events)} events.")
-
-                        if events:
-                            event_items = []
-                            for e in events:
-                                try:
-                                    start_dt = datetime.fromisoformat(e['start_time']).astimezone(JST)
-                                    end_dt = datetime.fromisoformat(e['end_time']).astimezone(JST)
-                                    event_items.append({
-                                        'summary': e.get('title', '予定'),
-                                        'start_time': start_dt.strftime('%H:%M'),
-                                        'end_time': end_dt.strftime('%H:%M'),
-                                        'start_day': f"{start_dt.year}年{start_dt.month}月{start_dt.day}日",
-                                        'end_day': f"{end_dt.year}年{end_dt.month}月{end_dt.day}日",
-                                        'event_link': None
-                                    })
-                                except Exception as err:
-                                    app_logger.debug(f"Failed to parse event for read aloud: {err}")
-
-                            if event_items:
-                                action.setdefault('detail', {})['events'] = event_items
-                                action['detail'].update(event_items[0])
-                                action['detail']['summary'] = event_items[0]['summary']
-                                app_logger.debug(f"Injected calendar event details: count={len(event_items)}")
-                            else:
-                                action.setdefault('detail', {})['summary'] = '今日の予定はありません'
-                        else:
-                            action.setdefault('detail', {})['summary'] = '今日の予定はありません'
-                    except Exception as e:
-                        app_logger.error(f"Error processing calendar action for user {user_id}: {e}")
-                        action.setdefault('detail', {})['summary'] = 'カレンダー読み上げの処理に失敗しました。'
-
-                elif action.get('category') == '収支管理' and action.get('sub') == '読み上げ':
-                    try:
-                        format_type = action.get('detail', {}).get('format')
-                        app_logger.debug(f"Processing finance action for format: {format_type}")
-
-                        all_records = get_all_finance_records(user_id)
-                        finance_error = get_last_finance_error()
-                        if finance_error:
-                            action.setdefault('detail', {})['error'] = finance_error
-                            app_logger.error(f"Finance data error for user {user_id}: {finance_error}")
-                            modified_actions.append(action)
-                            continue
-                        income_total = sum(r.get('amount', 0) for r in all_records if r.get('type') == 'income')
-                        expense_total = sum(r.get('amount', 0) for r in all_records if r.get('type') == 'expense')
-                        balance = income_total - expense_total
-
-                        if format_type == 'individual':
-                            action.setdefault('detail', {})['records'] = all_records
-                            app_logger.debug(f"Injected {len(all_records)} individual finance records.")
-                        else:
-                            detail = action.setdefault('detail', {})
-                            detail['income_total'] = income_total
-                            detail['expense_total'] = expense_total
-                            detail['balance'] = balance
-                            app_logger.debug(
-                                f"Injected finance summary: income={income_total}, expense={expense_total}, balance={balance}"
-                            )
-                    except Exception as e:
-                        app_logger.error(f"Error processing finance action for user {user_id}: {e}", exc_info=True)
-                        action.setdefault('detail', {})['error'] = '収支読み上げの処理に失敗しました。'
-
-                modified_actions.append(action)
+            actions_to_process = _collect_actions_from_steps(steps) if isinstance(steps, list) and steps else (order_data.get('actions', []) or [])
+            
+            processed_actions = _process_actions(actions_to_process, user_id, now_jst, app_logger)
 
             if not (isinstance(steps, list) and steps):
-                order_data['actions'] = modified_actions
-            app_logger.debug(f"[DISPATCH] user_id={user_id} order_id={order.get('id')} actions={len(modified_actions)} steps_present={isinstance(steps, list) and bool(steps)}")
+                order_data['actions'] = processed_actions
+            
             dispatch_list.append((user_id, order_data))
 
     return dispatch_list
@@ -659,6 +717,8 @@ def evaluate_switchbot_triggers(app_logger):
 
     if not orders:
         return dispatch_list
+    
+    now_jst = datetime.now(JST)
 
     for order in orders:
         user_id = order.get('user_id')
@@ -676,14 +736,12 @@ def evaluate_switchbot_triggers(app_logger):
         if trigger_category != 'SwitchBot' or trigger_sub != '人感センサーが反応したら':
             continue
 
-        scan_message = f"[SWITCHBOT_TRIGGER] scan start user_id={user_id} order_id={order_id} trigger={trigger}"
         should_fire, state_changed = _evaluate_switchbot_motion_edge(
             trigger_value, app_logger, order_data
         )
         if state_changed and isinstance(order_data, dict) and order_id:
             try:
                 supabase.table('custom_orders').update({'order_data': order_data}).match({'id': order_id, 'user_id': user_id}).execute()
-                app_logger.debug(f"[SWITCHBOT_TRIGGER] state updated for order_id={order_id}")
             except Exception as e:
                 app_logger.error(f"[SWITCHBOT_TRIGGER] failed to update state: {e}")
 
@@ -692,18 +750,12 @@ def evaluate_switchbot_triggers(app_logger):
 
         app_logger.debug(f"[SWITCHBOT_TRIGGER] Trigger activated for user {user_id}. Processing actions...")
         steps = order_data.get('steps')
-        actions_to_process = []
-        if isinstance(steps, list) and steps:
-            actions_to_process = _collect_actions_from_steps(steps)
-            app_logger.debug(f"[SWITCHBOT_TRIGGER] Actions in order_data steps: {actions_to_process}")
-        else:
-            actions_to_process.extend(order_data.get('actions', []) or [])
-            for condition in order_data.get('conditions', []) or []:
-                actions_to_process.extend(_collect_actions_from_condition(condition))
-            app_logger.debug(f"[SWITCHBOT_TRIGGER] Actions in order_data: {actions_to_process}")
-
+        actions_to_process = _collect_actions_from_steps(steps) if isinstance(steps, list) and steps else (order_data.get('actions', []) or [])
+        
+        processed_actions = _process_actions(actions_to_process, user_id, now_jst, app_logger)
+        
         if not (isinstance(steps, list) and steps):
-            order_data['actions'] = actions_to_process
+            order_data['actions'] = processed_actions
 
         dispatch_list.append((user_id, order_data))
 

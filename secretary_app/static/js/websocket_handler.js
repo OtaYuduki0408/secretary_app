@@ -309,8 +309,8 @@ function executeAction(action) {
             overlayCategoryClass = "overlay-speech";
             messageHtml = `<h3>${overlayTitle}</h3><p>${textToSpeak}</p>`;
 
-        } else if (action.category === '読み上げ') {
-            overlayTitle = "読み上げ";
+        } else if (action.category === '時間読み上げ') {
+            overlayTitle = "時間読み上げ";
             overlayCategoryClass = "overlay-speech";
             const nowDate = new Date();
             const year = nowDate.getFullYear();
@@ -340,6 +340,21 @@ function executeAction(action) {
                     break;
             }
             messageHtml = `<h3>${overlayTitle}</h3><p>${textToSpeak}</p>`;
+
+        } else if (action.category === 'SwitchBot' && action.sub === 'デバイス操作') {
+            overlayTitle = "SwitchBot 操作";
+            overlayCategoryClass = "overlay-speech";
+            const serverResult = action.detail?.server_result;
+            const deviceName = action.detail?.deviceName || 'デバイス'; // 将来のためにdeviceNameも考慮
+
+            if (serverResult && serverResult.statusCode === 100) {
+                textToSpeak = `${deviceName}の操作に成功しました。`;
+                messageHtml = `<h3>${overlayTitle}</h3><p>${textToSpeak}</p>`;
+            } else {
+                textToSpeak = `${deviceName}の操作に失敗しました。`;
+                const errorMessage = serverResult?.message || '不明なエラーです。';
+                messageHtml = `<h3>${overlayTitle}</h3><p class="error">${textToSpeak}</p><p><small>${errorMessage}</small></p>`;
+            }
 
         } else if (action.category === 'アラート' && action.sub === '実行') {
             overlayTitle = "アラート";

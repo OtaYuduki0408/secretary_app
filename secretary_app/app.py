@@ -689,51 +689,6 @@ def _map_purpose_to_action(purpose):
     return category, action
 
 
-def _parse_int_or_now(value, now_value):
-    if value is None:
-        return now_value
-    if isinstance(value, int):
-        return value
-    if isinstance(value, str):
-        raw = value.strip()
-        if not raw or "実行された" in raw:
-            return now_value
-        if raw.isdigit():
-            return int(raw)
-    return now_value
-
-
-def _parse_time_or_default(value, default_time):
-    if not value:
-        return default_time
-    if isinstance(value, str):
-        raw = value.strip()
-        if not raw or "実行された" in raw:
-            return default_time
-        if ":" in raw:
-            return raw
-    return default_time
-
-
-def _build_range_from_detail(detail, now_jst):
-    start_year = _parse_int_or_now(detail.get('start_year'), now_jst.year)
-    start_month = _parse_int_or_now(detail.get('start_month'), now_jst.month)
-    start_day = _parse_int_or_now(detail.get('start_day'), now_jst.day)
-    end_year = _parse_int_or_now(detail.get('end_year'), now_jst.year)
-    end_month = _parse_int_or_now(detail.get('end_month'), now_jst.month)
-    end_day = _parse_int_or_now(detail.get('end_day'), now_jst.day)
-
-    start_time = _parse_time_or_default(detail.get('start_time'), "00:00")
-    end_time = _parse_time_or_default(detail.get('end_time'), "23:59")
-
-    start_hour, start_minute = [int(x) for x in start_time.split(":")[:2]]
-    end_hour, end_minute = [int(x) for x in end_time.split(":")[:2]]
-
-    start_dt = JST.localize(datetime(start_year, start_month, start_day, start_hour, start_minute))
-    end_dt = JST.localize(datetime(end_year, end_month, end_day, end_hour, end_minute, 59))
-    return start_dt, end_dt
-
-
 def _date_range_to_utc_iso(start_dt, end_dt):
     start_utc = start_dt.astimezone(pytz.UTC).isoformat()
     end_utc = end_dt.astimezone(pytz.UTC).isoformat()
