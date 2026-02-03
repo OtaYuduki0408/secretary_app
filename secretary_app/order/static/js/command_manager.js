@@ -4,6 +4,21 @@ import { createTriggerUI, saveAddressToDB } from './trigger_ui.js';
 import { createActionUI } from './action_ui.js'; // createActionUI も必要
 import { TRIGGER_CATEGORIES, TRIGGER_CATEGORIES_MAIN, ACTION_CATEGORIES } from './constants.js';
 
+function getAdvancedDateRangeValues(container) {
+    if (!container) return {};
+    const getVal = (selector) => container.querySelector(selector)?.value || '';
+    return {
+        start_year: getVal('[id$="start_year"]'),
+        start_month: getVal('[id$="start_month"]'),
+        start_day: getVal('[id$="start_day"]'),
+        start_time: getVal('[id$="start_time"]'),
+        end_year: getVal('[id$="end_year"]'),
+        end_month: getVal('[id$="end_month"]'),
+        end_day: getVal('[id$="end_day"]'),
+        end_time: getVal('[id$="end_time"]'),
+    };
+}
+
 export function parseActionArray(actionRoot) {
   if (!actionRoot) return [];
   const allActionItems = [...actionRoot.children].filter(child => child.classList.contains('item'));
@@ -29,12 +44,7 @@ function parseActionItem(actionItem) {
   if (!sub && subSelect?.options?.length) {
     sub = subSelect.options[0].value;
   }
-  const timing = {
-    date_abs: actionItem.querySelector(".action-timing-date-abs")?.value || '',
-    date_rel: actionItem.querySelector(".action-timing-date-rel")?.value || '',
-    time_abs: actionItem.querySelector(".action-timing-time-abs")?.value || '',
-    time_rel: actionItem.querySelector(".action-timing-time-rel")?.value || '',
-  };
+  
   let detail = {};
   const detailContainer = actionItem.querySelector(".action-detail-container");
 
@@ -42,59 +52,42 @@ function parseActionItem(actionItem) {
     case "カレンダー":
       if (sub === "追加") {
         detail.title = detailContainer.querySelector(".action-detail-cal-title")?.value;
-        detail.start_time = detailContainer.querySelector(".action-detail-cal-start-time")?.value;
-        detail.end_time = detailContainer.querySelector(".action-detail-cal-end-time")?.value;
         detail.description = detailContainer.querySelector(".action-detail-cal-description")?.value;
+        Object.assign(detail, getAdvancedDateRangeValues(detailContainer));
       } else if (sub === "削除") {
-        detail.text = detailContainer.querySelector(".action-detail-cal-text")?.value;
+        detail.title = detailContainer.querySelector(".action-detail-cal-title")?.value;
+        Object.assign(detail, getAdvancedDateRangeValues(detailContainer));
       } else if (sub === "読み上げ") {
-        detail.start_year = detailContainer.querySelector(".action-detail-cal-read-start-year")?.value;
-        detail.start_month = detailContainer.querySelector(".action-detail-cal-read-start-month")?.value;
-        detail.start_day = detailContainer.querySelector(".action-detail-cal-read-start-day")?.value;
-        detail.start_time = detailContainer.querySelector(".action-detail-cal-read-start-time")?.value;
-        detail.end_year = detailContainer.querySelector(".action-detail-cal-read-end-year")?.value;
-        detail.end_month = detailContainer.querySelector(".action-detail-cal-read-end-month")?.value;
-        detail.end_day = detailContainer.querySelector(".action-detail-cal-read-end-day")?.value;
-        detail.end_time = detailContainer.querySelector(".action-detail-cal-read-end-time")?.value;
+        Object.assign(detail, getAdvancedDateRangeValues(detailContainer));
       }
       break;
     case "収支管理":
       if (sub === "読み上げ") {
         detail.item = detailContainer.querySelector(".action-detail-fin-read-item")?.value;
         detail.format = detailContainer.querySelector(".action-detail-fin-read-format")?.value;
-        detail.start_year = detailContainer.querySelector(".action-detail-fin-read-start-year")?.value;
-        detail.start_month = detailContainer.querySelector(".action-detail-fin-read-start-month")?.value;
-        detail.start_day = detailContainer.querySelector(".action-detail-fin-read-start-day")?.value;
-        detail.start_time = detailContainer.querySelector(".action-detail-fin-read-start-time")?.value;
-        detail.end_year = detailContainer.querySelector(".action-detail-fin-read-end-year")?.value;
-        detail.end_month = detailContainer.querySelector(".action-detail-fin-read-end-month")?.value;
-        detail.end_day = detailContainer.querySelector(".action-detail-fin-read-end-day")?.value;
-        detail.end_time = detailContainer.querySelector(".action-detail-fin-read-end-time")?.value;
+        Object.assign(detail, getAdvancedDateRangeValues(detailContainer));
       }
       break;
     case "メモ":
       if (sub === "読み上げ") {
-        detail.start_year = detailContainer.querySelector(".action-detail-memo-read-start-year")?.value;
-        detail.start_month = detailContainer.querySelector(".action-detail-memo-read-start-month")?.value;
-        detail.start_day = detailContainer.querySelector(".action-detail-memo-read-start-day")?.value;
-        detail.start_time = detailContainer.querySelector(".action-detail-memo-read-start-time")?.value;
-        detail.end_year = detailContainer.querySelector(".action-detail-memo-read-end-year")?.value;
-        detail.end_month = detailContainer.querySelector(".action-detail-memo-read-end-month")?.value;
-        detail.end_day = detailContainer.querySelector(".action-detail-memo-read-end-day")?.value;
-        detail.end_time = detailContainer.querySelector(".action-detail-memo-read-end-time")?.value;
+        detail.title = detailContainer.querySelector('.action-detail-memo-title')?.value;
+        detail.word = detailContainer.querySelector('.action-detail-memo-word')?.value;
+        Object.assign(detail, getAdvancedDateRangeValues(detailContainer));
       }
       break;
-    case "メール":
-      if (sub === "送信") {
-        detail.to = detailContainer.querySelector(".action-detail-mail-to")?.value;
-        detail.subject = detailContainer.querySelector(".action-detail-mail-subject")?.value;
-        detail.body = detailContainer.querySelector(".action-detail-mail-body")?.value;
+    case "SwitchBot":
+      if (sub === "デバイス操作") {
+        detail.deviceId = detailContainer.querySelector('.action-detail-switchbot-device')?.value;
+        detail.action = detailContainer.querySelector('.action-detail-switchbot-action')?.value;
       }
       break;
     case "発声":
       if (sub === "実行") {
         detail.text = detailContainer.querySelector(".action-detail-speak-text")?.value;
       }
+      break;
+    case "時間読み上げ":
+      // サブカテゴリと詳細はない
       break;
     case "アラート":
       if (sub === "実行") {
@@ -103,7 +96,7 @@ function parseActionItem(actionItem) {
       break;
   }
 
-  const actionData = { category, sub, timing, detail };
+  const actionData = { category, sub, detail };
   console.log("[DEBUG] parseActionItem:", actionData);
 
   return actionData;
@@ -127,9 +120,6 @@ function parseConditionBlock(block) {
       let value = {};
 
       if (valueContainer) {
-          const category = categorySelect.value;
-          const sub = subSelect.value;
-
           switch (category) {
             case "場所":
               value.address = valueContainer.querySelector(`[id$="trigger_value_address"]`)?.value;
@@ -138,64 +128,31 @@ function parseConditionBlock(block) {
               value.range = valueContainer.querySelector(`[id$="trigger_value_range"]`)?.value;
               break;
             case "カレンダー":
-              if (sub === "入力があったら") {
-                value.actions = [...valueContainer.querySelectorAll(`#${prefix}trigger_value_calendar_actions button.selected`)].map(btn => btn.dataset.value);
-                value.filters = [...valueContainer.querySelectorAll(".filter-item")].map(item => ({
-                  text: item.querySelector(".calendar_filter_text")?.value,
-                  logic: item.querySelector(".calendar_filter_logic")?.value
-                }));
-              } else if (sub === "予定の時間になったら") {
+                Object.assign(value, getAdvancedDateRangeValues(valueContainer));
                 value.title = valueContainer.querySelector(`[id$="trigger_value_cal_title"]`)?.value;
-                value.start_year = valueContainer.querySelector(`[id$="trigger_value_cal_start_year"]`)?.value;
-                value.start_month = valueContainer.querySelector(`[id$="trigger_value_cal_start_month"]`)?.value;
-                value.start_day = valueContainer.querySelector(`[id$="trigger_value_cal_start_day"]`)?.value;
-                value.day_of_week = [...valueContainer.querySelectorAll(`[id$="trigger_value_cal_day_of_week_buttons"] button.selected`)].map(btn => btn.dataset.value);
-                value.start_time = valueContainer.querySelector(`[id$="trigger_value_cal_start_time"]`)?.value;
-                value.end_year = valueContainer.querySelector(`[id$="trigger_value_cal_end_year"]`)?.value;
-                value.end_month = valueContainer.querySelector(`[id$="trigger_value_cal_end_month"]`)?.value;
-                value.end_day = valueContainer.querySelector(`[id$="trigger_value_cal_end_day"]`)?.value;
-                value.end_time = valueContainer.querySelector(`[id$="trigger_value_cal_end_time"]`)?.value;
-              }
               break;
             case "収支管理":
-              if (sub === "入力があったら") {
-                value.actions = [...valueContainer.querySelectorAll(`#${prefix}trigger_value_finance_actions button.selected`)].map(btn => btn.dataset.value);
-                if (value.actions.includes('追加')) {
-                  value.genres = [...valueContainer.querySelectorAll(`#${prefix}trigger_value_finance_genres button.selected`)].map(btn => btn.dataset.value);
-                }
-              } else if (sub === "特定金額になったら") {
-                value.item = valueContainer.querySelector(`[id$="trigger_value_finance_item"]`)?.value;
-                value.compare = valueContainer.querySelector(`[id$="trigger_value_finance_compare"]`)?.value;
-                value.amount = valueContainer.querySelector(`[id$="trigger_value_finance_amount"]`)?.value;
-                value.percentage = valueContainer.querySelector(`[id$="trigger_value_finance_percentage"]`)?.value;
-              }
+                value.item = valueContainer.querySelector(`[id$="finance_item"]`)?.value;
+                value.compare = valueContainer.querySelector(`[id$="finance_compare"]`)?.value;
+                value.amount = valueContainer.querySelector(`[id$="finance_amount"]`)?.value;
+                value.genres = [...valueContainer.querySelectorAll(`#${prefix}finance_genres button.selected`)].map(btn => btn.dataset.value);
+                Object.assign(value, getAdvancedDateRangeValues(valueContainer));
               break;
             case "メモ":
-              value.actions = [...valueContainer.querySelectorAll(`#${prefix}trigger_value_memo_actions button.selected`)].map(btn => btn.dataset.value);
-              value.filters = [...valueContainer.querySelectorAll(".filter-item")].map(item => ({
-                text: item.querySelector(".memo_filter_text")?.value,
-                logic: item.querySelector(".memo_filter_logic")?.value
-              }));
+                value.scope = valueContainer.querySelector(`[id$="memo_scope"]`)?.value;
+                value.content = valueContainer.querySelector(`[id$="memo_content"]`)?.value;
+                value.priority = valueContainer.querySelector(`[id$="memo_priority"]`)?.value;
+                Object.assign(value, getAdvancedDateRangeValues(valueContainer));
               break;
             case "時間":
-              value.start_year = valueContainer.querySelector(`[id$='_time_start_year']`)?.value;
-              value.start_month = valueContainer.querySelector(`[id$='_time_start_month']`)?.value;
-              value.start_day = valueContainer.querySelector(`[id$='_time_start_day']`)?.value;
-              value.day_of_week = [...valueContainer.querySelectorAll(`[id$='_time_day_of_week_buttons'] button.selected`)].map(btn => btn.dataset.value);
-              value.start_time = valueContainer.querySelector(`[id$='_time_start_time']`)?.value;
-              value.end_year = valueContainer.querySelector(`[id$='_time_end_year']`)?.value;
-              value.end_month = valueContainer.querySelector(`[id$='_time_end_month']`)?.value;
-              value.end_day = valueContainer.querySelector(`[id$='_time_end_day']`)?.value;
-              value.end_time = valueContainer.querySelector(`[id$='_time_end_time']`)?.value;
+                Object.assign(value, getAdvancedDateRangeValues(valueContainer));
               break;
-            case "ボイス":
-              value.keywords = valueContainer.querySelector(`[id$="trigger_value_voice_keywords"]`)?.value;
+            case "SwitchBot":
+                if (sub === "人感センサー") {
+                    value.detection = valueContainer.querySelector(`[id$="switchbot_detection"]`)?.value;
+                    value.light = valueContainer.querySelector(`[id$="switchbot_light"]`)?.value;
+                }
               break;
-    case "SwitchBot":
-      triggerValue.device_id = triggerContainer.querySelector(`#${prefix}trigger_value_switchbot_device_select`)?.value;
-      triggerValue.brightness_condition = triggerContainer.querySelector(`#${prefix}trigger_value_switchbot_brightness`)?.value;
-      triggerValue.motion_condition = triggerContainer.querySelector(`#${prefix}trigger_value_switchbot_motion`)?.value;
-      break;
             default:
               value.value = valueContainer.querySelector(`[id$="trigger_value"]`)?.value;
               break;
