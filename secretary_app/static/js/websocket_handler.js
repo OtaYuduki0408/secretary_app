@@ -191,12 +191,22 @@ async function executeAction(action) {
         textToSpeak = `アラートを再生しました。`;
     } else if (action.category === 'SwitchBot') {
         overlayTitle = "SwitchBot 操作"; 
-        const serverResult = detail.server_result;
-        const deviceName = action.detail?.deviceName || 'デバイス';
-        if (serverResult && serverResult.statusCode === 100) {
-            textToSpeak = `${deviceName}の操作に成功しました。`;
-        } else {
-            textToSpeak = `${deviceName}の操作に失敗しました。${serverResult?.message || ''}`;
+        const userId = document.body.dataset.userId;
+        try {
+            const response = await fetch('/api/actions/execute/switchbot', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ user_id: userId, detail: action.detail }),
+            });
+            const serverResult = await response.json();
+            if (serverResult && serverResult.statusCode === 100) {
+                textToSpeak = `SwitchBotの操作に成功しました。`;
+            } else {
+                textToSpeak = `SwitchBotの操作に失敗しました。${serverResult?.message || ''}`;
+            }
+        } catch (error) {
+            console.error('SwitchBot execution fetch failed:', error);
+            textToSpeak = `SwitchBotの操作リクエストに失敗しました。`;
         }
     } else if (action.category === 'カレンダー' && action.sub === '読み上げ') {
         overlayTitle = "カレンダー"; 

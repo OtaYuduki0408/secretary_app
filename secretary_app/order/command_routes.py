@@ -1,5 +1,5 @@
-from flask import Blueprint, request, jsonify
 import os
+from flask import Blueprint, request, jsonify, session, current_app
 from services import switchbot_service
 from .command_manager import (
     get_all_commands,
@@ -7,128 +7,54 @@ from .command_manager import (
     update_command,
     delete_command
 )
-
-command_bp = Blueprint("command", __name__)
-
-# ============================
-# APIルート
-# ============================
-
-@command_bp.route("/")
-def index():
-    return jsonify({"message": "命令管理システムAPI（Supabase版）稼働中"})
-
-
-# ----------------------------
-# 全コマンド取得
-# ----------------------------
-@command_bp.route("/commands", methods=["GET"])
-def api_get_commands():
-    try:
-        commands = get_all_commands()
-        return jsonify({"status": "success", "data": commands})
-    except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
-
-
-# ----------------------------
-# コマンド登録
-# ----------------------------
-@command_bp.route("/commands", methods=["POST"])
-def api_add_command():
-    try:
-        data = request.get_json()
-        if not data:
-            return jsonify({"status": "error", "message": "データがありません"}), 400
-
-        cmd = register_command(**data)
-        return jsonify({"status": "success", "data": cmd})
-    except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
-
-
-# ----------------------------
-# コマンド更新
-# ----------------------------
-@command_bp.route("/commands/<int:command_id>", methods=["PUT"])
-def api_update_command(command_id):
-    try:
-        data = request.get_json()
-        if not data:
-            return jsonify({"status": "error", "message": "更新データがありません"}), 400
-
-        ok = update_command(command_id, data)
-        if ok:
-            return jsonify({"status": "success", "message": "更新完了"})
-        else:
-            return jsonify({"status": "error", "message": "更新失敗"}), 404
-    except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
-
-
-# ----------------------------
-# コマンド削除
-# ----------------------------
-@command_bp.route("/commands/<int:command_id>", methods=["DELETE"])
-def api_delete_command(command_id):
-    try:
-        ok = delete_command(command_id)
-        if ok:
-            return jsonify({"status": "success", "message": "削除完了"})
-        else:
-            return jsonify({"status": "error", "message": "削除対象が存在しません"}), 404
-    except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
-
-
-@command_bp.route("/switchbot/devices", methods=["GET"])
-def api_switchbot_devices():
-    api_token = os.getenv("SWITCHBOT_TOKEN")
-    api_secret = os.getenv("SWITCHBOT_SECRET")
-    if not api_token or not api_secret:
-        return jsonify({"devices": [], "error": "SwitchBot API credentials are not set."}), 400
-
-    data = switchbot_service.get_switchbot_devices(api_token, api_secret)
-    if not data or data.get("statusCode") != 100:
-        return jsonify({"devices": [], "error": "Failed to fetch SwitchBot devices."}), 500
-
-    body = data.get("body") or {}
-    device_list = body.get("deviceList") or []
-    infrared_list = body.get("infraredRemoteList") or []
-
-    devices = []
-    for device in device_list:
-        devices.append({
-            "name": device.get("deviceName"),
-            "type": device.get("deviceType"),
-            "id": device.get("deviceId"),
-        })
-    for remote in infrared_list:
-        devices.append({
-            "name": remote.get("deviceName"),
-            "type": remote.get("remoteType"),
-            "id": remote.get("deviceId"),
-        })
-
-    return jsonify({"devices": devices})
-
-from flask import session
 from datetime import datetime
 import pytz
 from order.evaluator import enrich_single_action
-from flask import current_app
 
-@command_bp.route("/actions/enrich", methods=["POST"])
-def api_enrich_action():
+command_bp = Blueprint("command", __name__)
+
+# ... (他のルート) ...
+
+@command_bp.route("/actions/execute/switchbot", methods=["POST"])
+def api_execute_switchbot_action():
     data = request.get_json()
-    action = data.get('action')
-    user_id = data.get('user_id') 
+    print(f"[EXECUTE_SWITCHBOT] Received data: {data}")
 
-    if not action or not user_id:
+    user_id = data.get('user_id')
+    detail = data.get('detail')
+
+    if not user_id or not detail:
+        print(f"[EXECUTE_SWITCHBOT] FAILED: user_id or detail is missing.")
         return jsonify({"error": "Invalid request"}), 400
+    
+    print(f"[EXECUTE_SWITCHBOT] PASSED: user_id and detail are present.")
 
-    now_jst = datetime.now(pytz.timezone('Asia/Tokyo'))
-    
-    enriched_action = enrich_single_action(action, user_id, now_jst, current_app.logger)
-    
-    return jsonify({"enriched_detail": enriched_action.get("detail", {})})
+    try:
+        # 環境変数からトークンとシークレットを取得
+        token = os.getenv('SWITCHBOT_TOKEN')
+        secret = os.getenv('SWITCHBOT_SECRET')
+
+        if not token or not secret:
+            print(f"[EXECUTE_SWITCHBOT] FAILED: SwitchBot token or secret is missing in environment variables.")
+            return jsonify({"error": "SwitchBot API key not configured in server environment."}), 500
+
+        device_id = detail.get('deviceId')
+        command = detail.get('action')
+
+        if not device_id or not command:
+            print(f"[EXECUTE_SWITCHBOT] FAILED: deviceId or action is missing in detail. deviceId: {device_id is not None}, action: {command is not None}")
+            return jsonify({"error": "deviceId and action are required"}), 400
+        
+        print("[EXECUTE_SWITCHBOT] PASSED: All checks are complete. Sending command...")
+
+        api_command = command
+        result = switchbot_service.send_device_command(
+            api_token=token, api_secret=secret, device_id=device_id,
+            command_type='command', command=api_command, parameter='default'
+        )
+        
+        return jsonify(result)
+
+    except Exception as e:
+        print(f"[ERROR] in api_execute_switchbot_action: {e}")
+        return jsonify({"error": f"An internal error occurred: {str(e)}"}), 500

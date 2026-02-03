@@ -220,31 +220,59 @@ export function createActionUI(prefix = '', initialValue = {}) {
         detailContainer.innerHTML = `
           <label>デバイス</label>
           <select class="action-detail-switchbot-device" style="margin-bottom: 10px;">
-            <option value="">デバイスを選択してください</option>
+            <option value="">デバイスを読み込み中...</option>
           </select>
           <label>アクション</label>
           <select class="action-detail-switchbot-action" style="margin-bottom: 10px;">
+            <option value="turnOn" ${initialValue.action === 'turnOn' ? 'selected' : ''}>オンにする</option>
+            <option value="turnOff" ${initialValue.action === 'turnOff' ? 'selected' : ''}>オフにする</option>
             <option value="press" ${initialValue.action === 'press' ? 'selected' : ''}>スイッチを押す</option>
-            <option value="pull" ${initialValue.action === 'pull' ? 'selected' : ''}>スイッチを引く</option>
           </select>
           <small class="co-help-text">スイッチのオン,オフが反転している場合、設定→switchbotより変更してください</small>
         `;
 
         const deviceSelect = detailContainer.querySelector('.action-detail-switchbot-device');
 
-        // ===== 修正箇所: API fetchをダミーデータに置き換え =====
-        deviceSelect.innerHTML = ''; // オプションをクリア
-        const dummyDevice = { deviceId: 'dummy_bot_id', deviceName: 'スイッチボット' };
-        const option = document.createElement('option');
-        option.value = dummyDevice.deviceId;
-        option.textContent = dummyDevice.deviceName;
-        
-        // データの復元も考慮
-        if (initialValue.deviceId === dummyDevice.deviceId || !initialValue.deviceId) { // 編集時または新規作成時
-            option.selected = true;
-        }
-        deviceSelect.appendChild(option);
-        // ===============================================
+        // APIからデバイスリストを取得してselectを更新
+        fetch('/api/switchbot/devices')
+          .then(response => {
+            if (!response.ok) {
+              throw new Error('デバイスの取得に失敗しました');
+            }
+            return response.json();
+          })
+          .then(data => { // devices ではなく data という名前に変更して、受け取った生のレスポンスボディを表す
+            deviceSelect.innerHTML = ''; // "読み込み中..."をクリア
+
+            // APIレスポンスから実際のデバイスリストを抽出
+            const devices = data.devices; // ★ここを修正★
+
+            if (!Array.isArray(devices)) { // 防御的なチェックをここでも行い続ける
+              console.error('Error: API returned data.devices is not an array:', devices);
+              deviceSelect.innerHTML = '<option value="">デバイスリストの形式が不正です</option>';
+              return;
+            }
+
+            if (devices.length === 0) {
+              deviceSelect.innerHTML = '<option value="">利用可能なデバイスがありません</option>';
+              return;
+            }
+            devices.forEach(device => {
+              const option = document.createElement('option');
+              // APIレスポンスのデバイスオブジェクトは {id: ..., name: ..., type: ...} 形式
+              // フロントエンドは {deviceId: ..., deviceName: ...} 形式を期待しているので変換
+              option.value = device.id; // ★ここを修正: device.deviceId -> device.id
+              option.textContent = device.name; // ★ここを修正: device.deviceName -> device.name
+              if (initialValue.deviceId === device.id) { // ★ここを修正: initialValue.deviceId === device.id
+                option.selected = true;
+              }
+              deviceSelect.appendChild(option);
+            });
+          })
+          .catch(error => {
+            console.error('Error fetching SwitchBot devices:', error);
+            deviceSelect.innerHTML = `<option value="">${error.message}</option>`;
+          });
       }
       break;
     case "発声":
