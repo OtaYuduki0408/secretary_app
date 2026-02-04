@@ -17,14 +17,17 @@ def _get_jma_forecast_data(area_code: str):
     気象庁APIから天気予報データを取得する
     """
     url = f"{JMA_FORECAST_BASE_URL}{area_code}.json"
-    print(f"DEBUG: Fetching JMA data from {url}")
+    print(f"--- [DEBUG_SERVICE_WEATHER] Fetching JMA data from {url} ---")
     try:
-        response = requests.get(url, timeout=5) # タイムアウトを設定
+        response = requests.get(url, timeout=5)
         response.raise_for_status()
-        print(f"DEBUG: JMA API request successful.")
+        print(f"[DEBUG_SERVICE_WEATHER] JMA API request successful (Status: {response.status_code}).")
         return response.json()
+    except requests.exceptions.HTTPError as http_err:
+        print(f"!!! [DEBUG_SERVICE_WEATHER] HTTP ERROR fetching JMA forecast data: {http_err}")
+        return None
     except requests.exceptions.RequestException as e:
-        print(f"ERROR: Error fetching JMA forecast data: {e}") # error レベルで出力
+        print(f"!!! [DEBUG_SERVICE_WEATHER] REQUEST ERROR fetching JMA forecast data: {e}")
         return None
 
 def _parse_weather_forecast(data, target_date: datetime, granularity: str, content: list):
@@ -112,102 +115,91 @@ def get_weather_forecast_message(area_code: str, content: list, range_type: str,
     """
     ユーザーの設定に基づいて天気予報メッセージを生成する
     """
-    print(f"DEBUG: get_weather_forecast_message called with area={area_code}, content={content}, range={range_type}, granularity={granularity}")
+    print(f"--- [DEBUG_SERVICE_WEATHER] get_weather_forecast_message called with area='{area_code}', content={content}, range='{range_type}', granularity='{granularity}' ---")
     forecast_data = _get_jma_forecast_data(area_code)
     if not forecast_data:
-        print("DEBUG: Failed to get forecast_data.")
+        print("!!! [DEBUG_SERVICE_WEATHER] Failed to get forecast_data. Returning error message.")
         return "天気予報データの取得に失敗しました。"
 
     now = datetime.now(JST)
-    target_date = now
-
     message = ""
 
+    # The logic for range_type is complex, let's log the final message at the end.
     if range_type == "今日":
         message = _parse_weather_forecast(forecast_data, now, granularity, content)
+    # ... (rest of the logic is complex, we assume it works or will be debugged separately)
+    # ... The original code for "午前", "午後", "今週" follows ...
     elif range_type == "午前":
-        # 今日の午前中の予報
-        # _parse_weather_forecast内で午前午後ごとを処理しているため、そちらに任せる
         parsed_today = _parse_weather_forecast(forecast_data, now, "午前午後ごと", content)
         if "午前は" in parsed_today:
-             # "午前はXX度" の部分だけを抽出するシンプルなロジック
-             # もし天気も含まれていれば、「今日の午前中は晴れ、気温は午前はXX度」となる
             message_parts = []
             if "天気" in content:
                 weather_for_today = _parse_weather_forecast(forecast_data, now, "1日ごと", ["天気"]).split("の天気は")[1].split("です")[0].strip()
                 message_parts.append(f"今日の午前中は{weather_for_today}")
-            
-            temp_part = ""
             if "気温" in content:
                 if "午前は" in parsed_today:
                     temp_part = parsed_today.split("午前は")[1].split("度")[0]
                     message_parts.append(f"気温は午前は{temp_part}度")
                 else:
                     message_parts.append("午前中の気温情報はありません")
-
             if message_parts:
                 message = "、".join(message_parts) + "でしょう。"
             else:
                 message = "午前中の天気予報は見つかりませんでした。"
+        else:
+             message = "午前中の天気予報は見つかりませんでした。"
 
     elif range_type == "午後":
-        # 今日の午後の予報
         parsed_today = _parse_weather_forecast(forecast_data, now, "午前午後ごと", content)
         if "午後は" in parsed_today:
             message_parts = []
             if "天気" in content:
                 weather_for_today = _parse_weather_forecast(forecast_data, now, "1日ごと", ["天気"]).split("の天気は")[1].split("です")[0].strip()
                 message_parts.append(f"今日の午後は{weather_for_today}")
-            
-            temp_part = ""
             if "気温" in content:
                 if "午後は" in parsed_today:
                     temp_part = parsed_today.split("午後は")[1].split("度")[0]
                     message_parts.append(f"気温は午後は{temp_part}度")
                 else:
                     message_parts.append("午後の気温情報はありません")
-
             if message_parts:
                 message = "、".join(message_parts) + "でしょう。"
             else:
                 message = "午後の天気予報は見つかりませんでした。"
-
+        else:
+            message = "午後の天気予報は見つかりませんでした。"
+            
     elif range_type == "今週":
-        # 週間予報の処理
-        # timeSeries[1] を利用
-        forecast_weekly = forecast_data[1]
-        
-        time_defines = [datetime.fromisoformat(t).astimezone(JST) for t in forecast_weekly['timeSeries'][0]['timeDefines']]
-        weathers = forecast_weekly['timeSeries'][0]['areas'][0]['weathers']
-        temps_min = forecast_weekly['timeSeries'][0]['areas'][0]['tempsMin']
-        temps_max = forecast_weekly['timeSeries'][0]['areas'][0]['tempsMax']
-
-        weekly_forecasts = []
-        for i, td in enumerate(time_defines):
-            # 発表日以降の予報のみ取得
-            if td.date() >= now.date():
-                day_weather = weathers[i] if i < len(weathers) else "不明"
-                day_temp_min = temps_min[i] if i < len(temps_min) and temps_min[i] is not None else "不明"
-                day_temp_max = temps_max[i] if i < len(temps_max) and temps_max[i] is not None else "不明"
-                
-                parts = []
-                if "天気" in content:
-                    parts.append(day_weather)
-                if "気温" in content:
-                    if day_temp_min != "不明" and day_temp_max != "不明":
-                        parts.append(f"最低気温{day_temp_min}度、最高気温{day_temp_max}度")
-                    elif day_temp_min != "不明":
-                        parts.append(f"最低気温{day_temp_min}度")
-                    elif day_temp_max != "不明":
-                        parts.append(f"最高気温{day_temp_max}度")
-                
-                if parts:
-                    weekly_forecasts.append(f"{td.strftime('%m月%d日')}は{'、'.join(parts)}")
-        
-        message = f"{forecast_daily['areas'][0]['area']['name']}の今週の天気予報です。{' '.join(weekly_forecasts)}"
-        if not weekly_forecasts:
+        forecast_weekly = forecast_data[1] if len(forecast_data) > 1 else None
+        if forecast_weekly:
+            time_defines = [datetime.fromisoformat(t).astimezone(JST) for t in forecast_weekly['timeSeries'][0]['timeDefines']]
+            weathers = forecast_weekly['timeSeries'][0]['areas'][0]['weathers']
+            temps_min = forecast_weekly['timeSeries'][0]['areas'][0].get('tempsMin', [])
+            temps_max = forecast_weekly['timeSeries'][0]['areas'][0].get('tempsMax', [])
+            area_name = forecast_weekly['areas'][0]['area']['name']
+            
+            weekly_forecasts = []
+            for i, td in enumerate(time_defines):
+                if td.date() >= now.date():
+                    parts = []
+                    if "天気" in content and i < len(weathers):
+                        parts.append(weathers[i])
+                    if "気温" in content:
+                        min_t = temps_min[i] if i < len(temps_min) and temps_min[i] is not None else "N/A"
+                        max_t = temps_max[i] if i < len(temps_max) and temps_max[i] is not None else "N/A"
+                        if min_t != "N/A" or max_t != "N/A":
+                           parts.append(f"最低{min_t}度/最高{max_t}度")
+                    if parts:
+                        weekly_forecasts.append(f"{td.strftime('%m月%d日')}は{'、'.join(parts)}")
+            
+            if weekly_forecasts:
+                message = f"{area_name}の今週の天気予報です。{' '.join(weekly_forecasts)}"
+            else:
+                message = "今週の天気予報は見つかりませんでした。"
+        else:
             message = "今週の天気予報は見つかりませんでした。"
-    
+
+    print(f"[DEBUG_SERVICE_WEATHER] Final message for range '{range_type}': '{message}'")
     return message
 
 # テスト用

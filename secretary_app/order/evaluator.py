@@ -97,50 +97,55 @@ def _evaluate_time_trigger(trigger, now_jst, current_time_str, current_day_of_we
     if not trigger_value:
         return False
 
+    app_logger.debug(f"[DEBUG_EVAL] _evaluate_time_trigger called. Current time: {current_time_str}, Day: {current_day_of_week_jp}. Trigger value: {trigger_value}")
+
     # 1. 時刻のチェック
     trigger_time = trigger_value.get('time')
     if trigger_time != '毎時' and trigger_time != current_time_str:
+        app_logger.debug(f"[DEBUG_EVAL] Time mismatch. Trigger: '{trigger_time}', Current: '{current_time_str}'.")
         return False
 
     # 2. 曜日のチェック
     trigger_dow = trigger_value.get('day_of_week')
     if trigger_dow and current_day_of_week_jp not in trigger_dow:
+        app_logger.debug(f"[DEBUG_EVAL] Day of week mismatch. Trigger: {trigger_dow}, Current: '{current_day_of_week_jp}'.")
         return False
 
     # 3. 日のチェック
     trigger_day = trigger_value.get('day')
-    # 日が指定されていて、それが「毎日」ではなく、かつ現在の日と一致しない場合
     if trigger_day and str(trigger_day) not in ['毎日', 'x'] and str(now_jst.day) != str(trigger_day):
+        app_logger.debug(f"[DEBUG_EVAL] Day mismatch. Trigger: '{trigger_day}', Current: '{now_jst.day}'.")
         return False
 
     # 4. 月のチェック
     trigger_month = trigger_value.get('month')
-    # 月が指定されていて、それが「毎月」ではなく、かつ現在の月と一致しない場合
     if trigger_month and str(trigger_month) not in ['毎月', 'x'] and str(now_jst.month) != str(trigger_month):
+        app_logger.debug(f"[DEBUG_EVAL] Month mismatch. Trigger: '{trigger_month}', Current: '{now_jst.month}'.")
         return False
 
     # 5. 年のチェック
     trigger_year = trigger_value.get('year')
-    # 年が指定されていて、それが「毎年」ではなく、かつ現在の年と一致しない場合
     if trigger_year and str(trigger_year) not in ['毎年', 'x'] and str(now_jst.year) != str(trigger_year):
+        app_logger.debug(f"[DEBUG_EVAL] Year mismatch. Trigger: '{trigger_year}', Current: '{now_jst.year}'.")
         return False
 
-    # 全ての条件をクリアした場合
-    if app_logger:
-        app_logger.debug(f"Time trigger matched for value: {trigger_value}")
+    app_logger.debug(f"[DEBUG_EVAL] SUCCESS: Time trigger matched for value: {trigger_value}")
     return True
 
 def evaluate_triggers(app_logger):
-    app_logger.debug(f"[{datetime.now()}] Evaluating triggers...")
+    app_logger.debug(f"--- [EVAL_TRIG] START: Evaluating triggers at {datetime.now(JST)} ---")
     dispatch_list = []
     try:
         response = supabase.table('custom_orders').select('id, user_id, order_data').execute()
         orders = response.data
+        app_logger.debug(f"[EVAL_TRIG] Fetched {len(orders)} orders from Supabase.")
     except Exception as e:
-        app_logger.error(f"Error fetching custom orders from Supabase: {e}")
+        app_logger.error(f"!!! [EVAL_TRIG] Error fetching custom orders from Supabase: {e}", exc_info=True)
         orders = []
 
-    if not orders: return dispatch_list
+    if not orders:
+        app_logger.debug("[EVAL_TRIG] No orders found. Exiting.")
+        return dispatch_list
 
     now_jst = datetime.now(JST)
     current_time_str = now_jst.strftime('%H:%M')
@@ -149,7 +154,9 @@ def evaluate_triggers(app_logger):
 
     for order in orders:
         user_id, order_data, order_id = order.get('user_id'), order.get('order_data'), order.get('id')
-        if not all([user_id, order_data, order_id, order_data.get('triggers')]): continue
+        if not all([user_id, order_data, order_id, isinstance(order_data.get('triggers'), list) and order_data.get('triggers')]):
+            app_logger.warning(f"[EVAL_TRIG] Skipping invalid order object: {order}")
+            continue
         
         trigger = order_data['triggers'][0]
         should_fire = False
@@ -157,9 +164,10 @@ def evaluate_triggers(app_logger):
             should_fire = _evaluate_time_trigger(trigger, now_jst, current_time_str, current_day_of_week_jp, app_logger)
         
         if should_fire:
-            app_logger.debug(f"Trigger activated for user {user_id} (Order ID: {order_id}). Dispatching raw order data.")
+            app_logger.debug(f"!!! [EVAL_TRIG] FIRE: Trigger activated for user {user_id} (Order ID: {order_id}). Appending to dispatch list.")
             dispatch_list.append((user_id, order_data))
 
+    app_logger.debug(f"--- [EVAL_TRIG] END: evaluation finished. Found {len(dispatch_list)} triggers to fire. ---")
     return dispatch_list
 
 

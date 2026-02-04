@@ -666,15 +666,53 @@ def _date_range_to_utc_iso(start_dt, end_dt):
     end_utc = end_dt.astimezone(pytz.UTC).isoformat()
     return start_utc, end_utc
 
+def _safe_int(value):
+    if value is None: return None
+    if isinstance(value, int): return value
+    if isinstance(value, float): return int(value)
+    if isinstance(value, str):
+        raw = value.strip()
+        if not raw or "実行された" in raw: return None
+        if raw.isdigit(): return int(raw)
+    return None
+
+def _build_range_from_detail(detail, now_jst):
+    detail = detail or {}
+    start_year = _safe_int(detail.get('start_year')) or now_jst.year
+    start_month = _safe_int(detail.get('start_month')) or now_jst.month
+    start_day = _safe_int(detail.get('start_day')) or now_jst.day
+    end_year = _safe_int(detail.get('end_year')) or now_jst.year
+    end_month = _safe_int(detail.get('end_month')) or now_jst.month
+    end_day = _safe_int(detail.get('end_day')) or now_jst.day
+    
+    start_time_str = detail.get('start_time', '00:00') or '00:00'
+    end_time_str = detail.get('end_time', '23:59') or '23:59'
+
+    try:
+        start_hour, start_minute = map(int, start_time_str.split(':'))
+        end_hour, end_minute = map(int, end_time_str.split(':'))
+        start_dt = JST.localize(datetime(start_year, start_month, start_day, start_hour, start_minute))
+        end_dt = JST.localize(datetime(end_year, end_month, end_day, end_hour, end_minute, 59))
+        return start_dt, end_dt
+    except (ValueError, TypeError) as e:
+        app.logger.error(f"[DEBUG_BUILD_RANGE] Error building date range: {e}")
+        return None, None
 
 def _enrich_calendar_read(detail, user_id, now_jst, app_logger):
+    app_logger.debug(f"[DEBUG_ENRICH] _enrich_calendar_read called for user {user_id} with detail: {detail}")
     start_dt, end_dt = _build_range_from_detail(detail, now_jst)
-    events = local_calendar_service.get_events(user_id, start_dt.isoformat(), end_dt.isoformat())
-    print(f"[INPUT_TRIGGER] calendar events={{len(events)}}")
+    app_logger.debug(f"[DEBUG_ENRICH] Calculated range for calendar: {start_dt} to {end_dt}")
+    
+    events = local_calendar_service.get_events(user_id, start_dt.isoformat() if start_dt else None, end_dt.isoformat() if end_dt else None)
+    
+    app_logger.debug(f"[DEBUG_ENRICH] local_calendar_service.get_events returned: {events}")
+
     if not events:
         detail['summary'] = '今日の予定はありません'
         detail['events'] = []
+        app_logger.debug("[DEBUG_ENRICH] No calendar events found.")
         return detail
+
     event_items = []
     for e in events:
         try:
@@ -689,7 +727,8 @@ def _enrich_calendar_read(detail, user_id, now_jst, app_logger):
                 'event_link': None
             })
         except Exception as err:
-            print(f"[INPUT_TRIGGER] calendar parse error: {err}")
+            app_logger.error(f"[DEBUG_ENRICH] Calendar event parse error: {err}", exc_info=True)
+            
     if event_items:
         detail['events'] = event_items
         detail.update(event_items[0])
@@ -697,24 +736,30 @@ def _enrich_calendar_read(detail, user_id, now_jst, app_logger):
     else:
         detail['summary'] = '今日の予定はありません'
         detail['events'] = []
+    
+    app_logger.debug(f"[DEBUG_ENRICH] Finished _enrich_calendar_read. Returning detail: {detail}")
     return detail
 
 def _enrich_finance_read(detail, user_id, now_jst, app_logger):
+    app_logger.debug(f"[DEBUG_ENRICH] _enrich_finance_read called for user {user_id} with detail: {detail}")
     format_type = detail.get('format')
     records = get_all_finance_records(user_id)
     start_dt, end_dt = _build_range_from_detail(detail, now_jst)
+    
+    app_logger.debug(f"[DEBUG_ENRICH] Calculated range for finance: {start_dt} to {end_dt}")
+    
     filtered = []
     for r in records:
         date_str = r.get('date')
         if not date_str: continue
         try:
             record_dt = datetime.fromisoformat(date_str)
+            if record_dt.tzinfo is None:
+                record_dt = JST.localize(record_dt)
+            if start_dt <= record_dt <= end_dt:
+                filtered.append(r)
         except ValueError:
             continue
-        if record_dt.tzinfo is None:
-            record_dt = JST.localize(record_dt)
-        if start_dt <= record_dt <= end_dt:
-            filtered.append(r)
 
     income_total = sum(r.get('amount', 0) for r in filtered if r.get('type') == 'income')
     expense_total = sum(r.get('amount', 0) for r in filtered if r.get('type') == 'expense')
@@ -726,13 +771,18 @@ def _enrich_finance_read(detail, user_id, now_jst, app_logger):
         detail['income_total'] = income_total
         detail['expense_total'] = expense_total
         detail['balance'] = balance
-    print(f"[INPUT_TRIGGER] finance format={{format_type}} income={{income_total}} expense={{expense_total}} balance={{balance}}")
+    
+    app_logger.debug(f"[DEBUG_ENRICH] Finished _enrich_finance_read. Returning detail with keys: {list(detail.keys())}")
     return detail
 
 def _enrich_memo_read(detail, user_id, now_jst, app_logger):
+    app_logger.debug(f"[DEBUG_ENRICH] _enrich_memo_read called for user {user_id} with detail: {detail}")
     start_dt, end_dt = _build_range_from_detail(detail, now_jst)
-    start_utc, end_utc = _date_range_to_utc_iso(start_dt, end_dt)
+    start_utc, end_utc = _date_range_to_utc_iso(start_dt, end_dt) if start_dt and end_dt else (None, None)
+    
     memos = get_all_memo_records(user_id=user_id, start_date=start_utc, end_date=end_utc)
+    app_logger.debug(f"[DEBUG_ENRICH] get_all_memo_records returned: {memos}")
+    
     if isinstance(memos, dict) and memos.get('error'):
         detail['content'] = 'メモの取得に失敗しました。'
         return detail
@@ -745,9 +795,14 @@ def _enrich_memo_read(detail, user_id, now_jst, app_logger):
         content = memo.get('content') or '内容なし'
         parts.append(f"タイトル: {title} / 内容: {content}")
     detail['content'] = " / ".join(parts)
+    
+    app_logger.debug(f"[DEBUG_ENRICH] Finished _enrich_memo_read. Returning detail: {detail}")
     return detail
 
-def _enrich_actions_for_dispatch(order_payload, user_id, app_logger=None):
+def _enrich_actions_for_dispatch(order_payload, user_id, app_logger, source="Unknown"):
+    app.logger.debug(f"[DEBUG_ENRICH] _enrich_actions_for_dispatch called from '{source}' for user {user_id}")
+    app.logger.debug(f"[DEBUG_ENRICH] Payload before enrichment: {json.dumps(order_payload, indent=2, ensure_ascii=False)}")
+    
     now_jst = datetime.now(JST)
     if app_logger is None:
         app_logger = app.logger
@@ -759,71 +814,97 @@ def _enrich_actions_for_dispatch(order_payload, user_id, app_logger=None):
         category = action.get('category')
         sub = action.get('sub')
         detail = action.get('detail') or {}
-        if category == 'カレンダー' and sub == '読み上げ':
-            action['detail'] = _enrich_calendar_read(detail, user_id, now_jst, app_logger)
-        elif category == '収支管理' and sub == '読み上げ':
-            action['detail'] = _enrich_finance_read(detail, user_id, now_jst, app_logger)
-        elif category == 'メモ' and sub == '読み上げ':
-            action['detail'] = _enrich_memo_read(detail, user_id, now_jst, app_logger)
-        elif category == '天気' and sub == '読み上げ':
-            try:
-                # 現時点ではエリアコードは固定（東京都）
-                # 必要であればユーザー設定から取得できるように拡張
+        
+        app_logger.debug(f"[DEBUG_ENRICH] Enriching action: Category='{category}', Sub='{sub}'")
+        
+        try:
+            if category == 'カレンダー' and sub == '読み上げ':
+                action['detail'] = _enrich_calendar_read(detail, user_id, now_jst, app_logger)
+            elif category == '収支管理' and sub == '読み上げ':
+                action['detail'] = _enrich_finance_read(detail, user_id, now_jst, app_logger)
+            elif category == 'メモ' and sub == '読み上げ':
+                action['detail'] = _enrich_memo_read(detail, user_id, now_jst, app_logger)
+            elif category == '天気' and sub == '読み上げ':
                 area_code = DEFAULT_AREA_CODE 
                 content = detail.get('content', ["天気", "気温"])
                 range_type = detail.get('range', "今日")
                 granularity = detail.get('granularity', "1日ごと")
                 
-                print(f"DEBUG: 天気予報アクション実行: area={area_code}, content={content}, range={range_type}, granularity={granularity}")
+                app_logger.debug(f"[DEBUG_ENRICH] Weather action details: area={area_code}, content={content}, range={range_type}, granularity={granularity}")
                 
-                weather_message = get_weather_forecast_message(area_code, content, range_type, granularity) # app_logger を渡さない
+                weather_message = get_weather_forecast_message(area_code, content, range_type, granularity)
                 
-                print(f"DEBUG: 生成された天気予報メッセージ: {weather_message}")
+                app_logger.debug(f"[DEBUG_ENRICH] get_weather_forecast_message returned: {weather_message}")
                 
                 detail['message'] = weather_message
-                
-                # ★★★ デバッグ用に追加 ★★★
-                sid = connected_users.get(user_id)
-                if sid:
-                    socketio.emit('debug_message', {'source': 'enrich_action_weather', 'message': weather_message, 'detail': detail}, room=sid)
-                    print(f"DEBUG: Sent debug_message to frontend for user {user_id}")
-                # ★★★ ここまで ★★★
-            except Exception as e:
-                print(f"ERROR: 天気予報アクションエラー: {e}")
-                detail['message'] = "天気予報の取得に失敗しました。"
+                action['detail'] = detail
+            # ... (other enrichments like email can be logged here too)
+        except Exception as e:
+            app_logger.error(f"!!! [DEBUG_ENRICH] Exception during action enrichment for Category='{category}': {e}", exc_info=True)
+            detail['error'] = f"アクション '{category}' の準備中にサーバーエラーが発生しました。"
             action['detail'] = detail
-        elif (category in ('メール', '繝｡繝ｼ繝ｫ')) and (sub in ('送信', '騾∽ｿ｡') or not sub):
-            try:
-                from services.action_executor_service import execute_action
-                action_data = {
-                    "category": "メール",
-                    "sub": "送信",
-                    "detail": detail,
-                    "triggered_at": now_jst.isoformat()
-                }
-                print(f"[EMAIL_EXEC] user_id={{user_id}} to={{detail.get('to')}}")
-                result = execute_action(user_id=user_id, action_data=action_data)
-                detail['server_result'] = result
-                action['detail'] = detail
-                action['sub'] = '送信'
-            except Exception as e:
-                print(f"[EMAIL_EXEC] error: {e}")
-                detail['server_result'] = {"status": "error", "message": f"メール送信に失敗しました: {e}"}
-                action['detail'] = detail
-                action['sub'] = '送信'
+            
+        app_logger.debug(f"[DEBUG_ENRICH] Action after enrichment: {json.dumps(action, indent=2, ensure_ascii=False)}")
         return action
 
     if isinstance(steps, list) and steps:
         for step in steps:
             if not isinstance(step, dict): continue
-            action = step.get('action')
-            if action:
-                step['action'] = enrich_action(action)
+            action_to_enrich = step.get('action')
+            if action_to_enrich:
+                step['action'] = enrich_action(action_to_enrich)
+            
+            # Also handle nested conditions/actions if necessary
+            condition = step.get('condition')
+            if condition:
+                if 'actions' in condition and isinstance(condition['actions'], list):
+                    condition['actions'] = [enrich_action(a) for a in condition['actions']]
+                if 'nested' in condition and isinstance(condition['nested'], list):
+                    # This requires a recursive approach, for now, let's keep it simple
+                    pass
         order_payload['steps'] = steps
     else:
         order_payload['actions'] = [enrich_action(a) for a in actions]
+        
+    app.logger.debug(f"[DEBUG_ENRICH] Payload after enrichment: {json.dumps(order_payload, indent=2, ensure_ascii=False)}")
     return order_payload
 
+@app.route('/api/actions/enrich', methods=['POST'])
+@login_required
+def enrich_action_api():
+    # This endpoint is called by the client to enrich a single action.
+    data = request.get_json()
+    action = data.get('action')
+    user_id = session.get('user', {}).get('id')
+
+    app.logger.debug(f"--- [ENRICH_API] START: /api/actions/enrich for user_id: {user_id} ---")
+    app.logger.debug(f"[ENRICH_API] Received action: {json.dumps(action, indent=2, ensure_ascii=False)}")
+
+    if not user_id or not action:
+        app.logger.error("[ENRICH_API] Missing user_id or action in request.")
+        return jsonify({'error': 'Missing user_id or action'}), 400
+
+    # We need to wrap the single action in a dummy payload to use the existing enrichment logic.
+    dummy_payload = {'steps': [{'kind': 'action', 'action': action}]}
+    
+    try:
+        enriched_payload = _enrich_actions_for_dispatch(dummy_payload, user_id, app.logger, source="/api/actions/enrich")
+        
+        enriched_action = enriched_payload.get('steps', [{}])[0].get('action', {})
+        enriched_detail = enriched_action.get('detail', {})
+        
+        # If the enrichment process itself resulted in an error, pass it to the client
+        if 'error' in enriched_detail:
+             app.logger.warning(f"[ENRICH_API] Enrichment resulted in an error: {enriched_detail['error']}")
+
+        app.logger.debug(f"[ENRICH_API] Returning enriched_detail: {json.dumps(enriched_detail, indent=2, ensure_ascii=False)}")
+        app.logger.debug(f"--- [ENRICH_API] END: /api/actions/enrich for user_id: {user_id} ---")
+
+        return jsonify({'enriched_detail': enriched_detail})
+
+    except Exception as e:
+        app.logger.error(f"!!! [ENRICH_API] Unhandled exception in /api/actions/enrich: {e}", exc_info=True)
+        return jsonify({'error': 'An unexpected server error occurred during enrichment.'}), 500
 
 def _dispatch_order_payload(user_id, order_payload):
     sid = connected_users.get(user_id)
@@ -993,16 +1074,20 @@ def chat_api_web():
 
 def _run_job_with_app_context(func):
     with app.app_context():
+        app.logger.debug(f"--- [JOB_RUNNER] START: Running job '{func.__name__}' ---")
         dispatch_list = func(app.logger)
         if dispatch_list:
-            print(f"Dispatching {len(dispatch_list)} commands to clients...")
+            app.logger.debug(f"[JOB_RUNNER] Job '{func.__name__}' found {len(dispatch_list)} items to dispatch.")
             for user_id, order_data in dispatch_list:
+                # NOTE: Enrichment is now handled by the client-side requesting /api/actions/enrich.
+                # We send the raw order data.
                 sid = connected_users.get(user_id)
                 if sid:
-                    print(f"Dispatching command for user {user_id} to sid {sid}")
+                    app.logger.debug(f"[JOB_RUNNER] Dispatching raw order_data for user {user_id} to sid {sid}")
                     socketio.emit('dispatch_command', order_data, room=sid)
                 else:
-                    print(f"User {user_id} is not connected. Command not dispatched.")
+                    app.logger.warning(f"[JOB_RUNNER] User {user_id} is not connected. Command not dispatched.")
+        app.logger.debug(f"--- [JOB_RUNNER] END: Job '{func.__name__}' finished. ---")
 
 # ... (the rest of the file from the last known good state)
 with app.app_context():

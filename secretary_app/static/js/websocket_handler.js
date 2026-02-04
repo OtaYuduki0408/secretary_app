@@ -82,24 +82,43 @@ function needsEnrichment(action) {
 
 async function fetchEnrichedData(action) {
     const userId = document.body.dataset.userId;
+    console.log(`[DEBUG_WS] fetchEnrichedData called for action:`, action);
     if (!userId) {
-        console.error("Enrichment failed: User ID is not available.");
+        console.error("[DEBUG_WS] Enrichment failed: User ID is not available.");
         return { ...action.detail, error: "ユーザーIDが取得できませんでした。" };
     }
+
+    const requestBody = { action: action, user_id: userId };
+    console.log('[DEBUG_WS] Sending enrichment request to /api/actions/enrich with body:', JSON.stringify(requestBody, null, 2));
+
     try {
         const response = await fetch('/api/actions/enrich', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ action: action, user_id: userId }),
+            body: JSON.stringify(requestBody),
         });
+
+        const responseText = await response.text();
+        console.log(`[DEBUG_WS] Received response from /api/actions/enrich. Status: ${response.status}. Body:`, responseText);
+
         if (!response.ok) {
-            const errorData = await response.json();
+            let errorData = { error: `HTTP error! status: ${response.status}` };
+            try {
+                // Try to parse the text as JSON, it might contain error details
+                errorData = JSON.parse(responseText);
+            } catch (e) {
+                // If parsing fails, the response was likely not JSON (e.g., HTML error page)
+                console.error('[DEBUG_WS] Failed to parse error response as JSON.');
+            }
             throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
         }
-        const data = await response.json();
+
+        const data = JSON.parse(responseText); // We already have the text, so parse it
+        console.log('[DEBUG_WS] Successfully parsed enrichment response:', data);
         return data.enriched_detail;
+
     } catch (error) {
-        console.error("Enrichment fetch failed:", error);
+        console.error("!!! [DEBUG_WS] Enrichment fetch failed:", error);
         return { ...action.detail, error: `アクションの準備に失敗しました: ${error.message}` };
     }
 }

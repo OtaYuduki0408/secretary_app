@@ -22,6 +22,7 @@ def add_event(user_id, title, start_time, end_time, description=None):
 
 def get_events(user_id, start_time_iso=None, end_time_iso=None):
     """指定されたユーザーと期間のイベントをDBから取得する"""
+    print(f"[DEBUG_SERVICE_CAL] get_events called for user_id: {user_id}, start: {start_time_iso}, end: {end_time_iso}")
     try:
         query = Event.query.filter_by(user_id=user_id)
 
@@ -34,9 +35,15 @@ def get_events(user_id, start_time_iso=None, end_time_iso=None):
             query = query.filter(Event.start_time <= end_time)
 
         events = query.order_by(Event.start_time.asc()).all()
-        return [event.to_dict() for event in events]
+        print(f"[DEBUG_SERVICE_CAL] Found {len(events)} events in DB.")
+        
+        event_dicts = [event.to_dict() for event in events]
+        # Log only a part of the data if it's too long
+        print(f"[DEBUG_SERVICE_CAL] Returning event data (sample): {str(event_dicts)[:500]}")
+        return event_dicts
     except Exception as e:
-        print(f"[ERROR] Failed to get events: {e}")
+        print(f"!!! [DEBUG_SERVICE_CAL] ERROR in get_events: {e}")
+        # In a real app, you might want to use app_logger here and re-raise
         raise
 
 def get_event_by_id(event_id, user_id):
