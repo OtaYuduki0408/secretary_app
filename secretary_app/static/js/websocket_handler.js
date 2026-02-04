@@ -138,25 +138,25 @@ async function executePlan(plan) {
 }
 
 async function executeAction(action) {
-    console.log("アクションを実行します:", action);
+    console.log("???????????:", action);
     let textToSpeak = "";
-    let overlayTitle = ""; 
-    let overlayCategoryClass = "overlay-speech"; 
+    let overlayTitle = "";
+    let overlayCategoryClass = "overlay-speech";
 
-    const overlay = document.getElementById('read-aloud-overlay'); 
-    const messageElement = document.getElementById('overlay-message'); 
-    const timeElement = document.getElementById('overlay-time'); 
+    const overlay = document.getElementById('read-aloud-overlay');
+    const messageElement = document.getElementById('overlay-message');
+    const timeElement = document.getElementById('overlay-time');
 
-    if (!overlay || !messageElement) { 
-        console.warn("overlay要素が見つかりません。"); 
+    if (!overlay || !messageElement) {
+        console.warn("overlay???????????");
         if (textToSpeak) await speak(textToSpeak);
-        return; 
+        return;
     }
 
-    // オーバーレイのリセット
+    // ???????????
     overlay.classList.remove('overlay-calendar', 'overlay-finance', 'overlay-memo', 'overlay-speech');
 
-    // 時刻表示
+    // ????
     const now = new Date();
     const formattedTime = now.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
     if (timeElement) {
@@ -169,43 +169,43 @@ async function executeAction(action) {
 
     if (detail.error) {
         textToSpeak = detail.error;
-        overlayTitle = "エラー";
-    } else if (action.category === '発声') {
+        overlayTitle = "???";
+    } else if (action.category === '??') {
         textToSpeak = detail.text || "";
-        overlayTitle = "読み上げ";
-    } else if (action.category === '時間読み上げ') {
-        overlayTitle = "時間読み上げ";
+        overlayTitle = "????";
+    } else if (action.category === '??????') {
+        overlayTitle = "??????";
         const nowDate = new Date();
         const year = nowDate.getFullYear();
         const month = nowDate.getMonth() + 1;
         const day = nowDate.getDate();
         const hours = nowDate.getHours();
         const minutes = nowDate.getMinutes();
-        const weekday = ["日", "月", "火", "水", "木", "金", "土"][nowDate.getDay()];
+        const weekday = ["?", "?", "?", "?", "?", "?", "?"][nowDate.getDay()];
 
         const selections = Array.isArray(detail.content) ? detail.content : (detail.content ? [detail.content] : []);
         const parts = [];
 
-        if (selections.includes("今の時間") || selections.length === 0) {
-            parts.push(`今の時間?${hours}時${minutes}分???`);
+        if (selections.includes("????") || selections.length === 0) {
+            parts.push(`?????${hours}?${minutes}????`);
         }
-        if (selections.includes("今日の日付") || selections.includes("年月日") || selections.length === 0) {
-            parts.push(`今日の日付?${month}月${day}日???`);
+        if (selections.includes("?????") || selections.includes("???") || selections.length === 0) {
+            parts.push(`??????${month}?${day}????`);
         }
-        if (selections.includes("今日の曜日") || selections.length === 0) {
-            parts.push(`今日の曜日?${weekday}曜日???`);
+        if (selections.includes("?????") || selections.length === 0) {
+            parts.push(`??????${weekday}?????`);
         }
-        if (selections.includes("年月日") || selections.length === 0) {
-            parts.push(`今日?${year}年${month}月${day}日???`);
+        if (selections.includes("???") || selections.length === 0) {
+            parts.push(`???${year}?${month}?${day}????`);
         }
 
         textToSpeak = parts.join(' ');
-    }} else if (action.category === 'アラート') {
-        overlayTitle = "アラート"; 
+    } else if (action.category === '????') {
+        overlayTitle = "????";
         playSound(detail.sound || 'default.mp3');
-        textToSpeak = `アラートを再生しました。`;
+        textToSpeak = "????????????";
     } else if (action.category === 'SwitchBot') {
-        overlayTitle = "SwitchBot 操作"; 
+        overlayTitle = "SwitchBot ??";
         const userId = document.body.dataset.userId;
         try {
             const response = await fetch('/api/actions/execute/switchbot', {
@@ -215,20 +215,20 @@ async function executeAction(action) {
             });
             const serverResult = await response.json();
             if (serverResult && serverResult.statusCode === 100) {
-                textToSpeak = `SwitchBotの操作に成功しました。`;
+                textToSpeak = "SwitchBot???????????";
             } else {
-                textToSpeak = `SwitchBotの操作に失敗しました。${serverResult?.message || ''}`;
+                textToSpeak = `SwitchBot???????????${serverResult?.message || ''}`;
             }
         } catch (error) {
             console.error('SwitchBot execution fetch failed:', error);
-            textToSpeak = `SwitchBotの操作リクエストに失敗しました。`;
+            textToSpeak = "SwitchBot???????????";
         }
-    } else if (action.category === 'カレンダー' && action.sub === '読み上げ') {
-        overlayTitle = "カレンダー"; 
-        overlayCategoryClass = "overlay-calendar"; 
+    } else if (action.category === '?????' && action.sub === '????') {
+        overlayTitle = "?????";
+        overlayCategoryClass = "overlay-calendar";
         if (detail.events && detail.events.length > 0) {
-            textToSpeak = `カレンダーの予定が${detail.events.length}件あります。` +
-                detail.events.map((e, i) => `${i + 1}件目、${e.summary}、${e.start_time}から。`).join(' ');
+            textToSpeak = `?????????${detail.events.length}??????` +
+                detail.events.map((e, i) => `${i + 1}???${e.summary}?${e.start_time}???`).join(' ');
             messageHtml = `
                 <h3>${overlayTitle}</h3>
                 <div class="calendar-cards">${detail.events.map((e, idx) => `
@@ -241,33 +241,38 @@ async function executeAction(action) {
                     </div>`).join('')}
                 </div>`;
         } else {
-            textToSpeak = detail.summary || '予定はありません。';
+            textToSpeak = detail.summary || '????????????';
             messageHtml = `<h3>${overlayTitle}</h3><p>${textToSpeak}</p>`;
         }
-    } else if (action.category === 'メモ' && action.sub === '読み上げ') {
-        overlayTitle = "メモ"; 
-        overlayCategoryClass = "overlay-memo"; 
-        textToSpeak = detail.content || '読み上げるメモがありません。';
+    } else if (action.category === '??' && action.sub === '????') {
+        overlayTitle = "??";
+        overlayCategoryClass = "overlay-memo";
+        textToSpeak = detail.content || '??????????????';
         messageHtml = `<h3>${overlayTitle}</h3><div class="details-section"><p>${textToSpeak}</p></div>`;
-    } else if (action.category === '天気' && action.sub === '読み上げ') {
-        overlayTitle = "天気予報";
-        overlayCategoryClass = "overlay-speech"; // or a new 'overlay-weather' class
-        textToSpeak = detail.message || "天気予報の情報を取得できませんでした。";
-        messageHtml = `<h3>${overlayTitle}</h3><p>${textToSpeak.replace(/。/g, '。<br>')}</p>`;
+    } else if (action.category === '??' && action.sub === '????') {
+        overlayTitle = "????";
+        overlayCategoryClass = "overlay-speech";
+        textToSpeak = detail.message || "???????????????????";
+        messageHtml = `<h3>${overlayTitle}</h3><p>${textToSpeak.replace(/ã/g, 'ã<br>')}</p>`;
+    } else if (action.category === '????' && action.sub === '????') {
+        overlayTitle = "????";
+        overlayCategoryClass = "overlay-finance";
+        textToSpeak = detail.message || detail.summary || "???????????";
+        messageHtml = `<h3>${overlayTitle}</h3><p>${textToSpeak}</p>`;
     }
 
     if (textToSpeak) {
-        overlay.classList.add(overlayCategoryClass); 
+        overlay.classList.add(overlayCategoryClass);
         if (messageHtml) {
-            messageElement.innerHTML = messageHtml; 
+            messageElement.innerHTML = messageHtml;
         } else {
-            messageElement.innerHTML = `<h3>${overlayTitle}</h3><p>${textToSpeak}</p>`; 
+            messageElement.innerHTML = `<h3>${overlayTitle}</h3><p>${textToSpeak}</p>`;
         }
-        overlay.classList.add('visible'); 
-        
-        await speak(textToSpeak); 
+        overlay.classList.add('visible');
 
-        overlay.classList.remove('visible'); 
+        await speak(textToSpeak);
+
+        overlay.classList.remove('visible');
     }
 }
 
