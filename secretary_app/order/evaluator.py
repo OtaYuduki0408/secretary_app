@@ -94,20 +94,41 @@ def enrich_single_action(action, user_id, now_jst, app_logger):
 
 def _evaluate_time_trigger(trigger, now_jst, current_time_str, current_day_of_week_jp, app_logger=None):
     trigger_value = trigger.get('value')
-    if not trigger_value: return False
-    trigger_time_start = trigger_value.get('time_start')
-    if trigger_time_start != current_time_str: return False
-    date_match = True
-    trigger_year, trigger_month, trigger_day = trigger_value.get('year'), trigger_value.get('month'), trigger_value.get('day')
-    if trigger_year and trigger_month and trigger_day:
-        try:
-            date_match = datetime(int(trigger_year), int(trigger_month), int(trigger_day)).date() == now_jst.date()
-        except (ValueError, TypeError): date_match = False
-    day_of_week_match = True
-    trigger_day_of_week = trigger_value.get('day_of_week')
-    if trigger_day_of_week and current_day_of_week_jp not in trigger_day_of_week:
-        day_of_week_match = False
-    return date_match and day_of_week_match
+    if not trigger_value:
+        return False
+
+    # 1. 時刻のチェック
+    trigger_time = trigger_value.get('time')
+    if trigger_time != '毎時' and trigger_time != current_time_str:
+        return False
+
+    # 2. 曜日のチェック
+    trigger_dow = trigger_value.get('day_of_week')
+    if trigger_dow and current_day_of_week_jp not in trigger_dow:
+        return False
+
+    # 3. 日のチェック
+    trigger_day = trigger_value.get('day')
+    # 日が指定されていて、それが「毎日」ではなく、かつ現在の日と一致しない場合
+    if trigger_day and str(trigger_day) not in ['毎日', 'x'] and str(now_jst.day) != str(trigger_day):
+        return False
+
+    # 4. 月のチェック
+    trigger_month = trigger_value.get('month')
+    # 月が指定されていて、それが「毎月」ではなく、かつ現在の月と一致しない場合
+    if trigger_month and str(trigger_month) not in ['毎月', 'x'] and str(now_jst.month) != str(trigger_month):
+        return False
+
+    # 5. 年のチェック
+    trigger_year = trigger_value.get('year')
+    # 年が指定されていて、それが「毎年」ではなく、かつ現在の年と一致しない場合
+    if trigger_year and str(trigger_year) not in ['毎年', 'x'] and str(now_jst.year) != str(trigger_year):
+        return False
+
+    # 全ての条件をクリアした場合
+    if app_logger:
+        app_logger.debug(f"Time trigger matched for value: {trigger_value}")
+    return True
 
 def evaluate_triggers(app_logger):
     app_logger.debug(f"[{datetime.now()}] Evaluating triggers...")
