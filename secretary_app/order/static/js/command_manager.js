@@ -371,12 +371,11 @@ export async function registerCommand(){
       break;
     case "時間":
       // `prefix` がない場合はメインのトリガー設定なので、特定時間UIから値を取得
-      triggerValue.year = triggerContainer.querySelector("#trigger_value_time_year")?.value;
-      triggerValue.month = triggerContainer.querySelector("#trigger_value_time_month")?.value;
-      triggerValue.day = triggerContainer.querySelector("#trigger_value_time_day")?.value;
-      triggerValue.day_of_week = [...triggerContainer.querySelectorAll("#trigger_value_time_day_of_week_buttons button.selected")].map(btn => btn.dataset.value);
-      triggerValue.time_start = triggerContainer.querySelector("#trigger_value_time_time_start")?.value;
-      // triggerValue.time_end = triggerContainer.querySelector("#trigger_value_time_time_end")?.value; // 時間カテゴリのメインUIにはtime_endがないため削除
+      triggerValue.year = triggerContainer.querySelector("#trigger_value_year")?.value;
+      triggerValue.month = triggerContainer.querySelector("#trigger_value_month")?.value;
+      triggerValue.day = triggerContainer.querySelector("#trigger_value_day")?.value;
+      triggerValue.day_of_week = [...triggerContainer.querySelectorAll("#trigger_value_day_of_week_buttons button.selected")].map(btn => btn.dataset.value);
+      triggerValue.time = triggerContainer.querySelector("#trigger_value_time")?.value;
       break;
     case "ボイス":
       const keywordInputs = triggerContainer.querySelectorAll('.voice-keyword-input');
