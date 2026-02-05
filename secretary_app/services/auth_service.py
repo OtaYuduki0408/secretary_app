@@ -1,6 +1,10 @@
 from supabase_client import supabase
 from datetime import datetime
 from supabase_auth.errors import AuthApiError
+import copy # For deepcopy
+
+from services.official_commands import OFFICIAL_COMMANDS
+from services.custom_order_service import create_order as create_custom_order
 
 # プロフィールテーブル（public.users）
 TABLE_PROFILES = "users"
@@ -47,6 +51,13 @@ def register_user(name: str, email: str, password: str):
                 pass
             return {"error": f"プロフィール作成に失敗しました: {getattr(prof, 'error', '')}"}
 
+        # 新規ユーザーに公式命令を自動登録
+        for official_cmd_data in OFFICIAL_COMMANDS:
+            # create_orderがデータを変更するため、deepcopyを渡す
+            result = create_custom_order(user_id, copy.deepcopy(official_cmd_data))
+            if "error" in result:
+                print(f"ERROR: 公式命令 '{official_cmd_data.get('name')}' の自動登録に失敗しました: {result['error']}")
+        
         return {
             "message": "登録成功",
             "user": {
