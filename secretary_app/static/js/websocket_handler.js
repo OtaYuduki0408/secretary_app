@@ -263,6 +263,21 @@ async function executeAction(action) {
             textToSpeak = detail.summary || '予定はありません。';
             messageHtml = `<h3>${overlayTitle}</h3><p>${textToSpeak}</p>`;
         }
+    } else if (action.category === '収支管理' && action.sub === '読み上げ') {
+        overlayTitle = "収支管理";
+        overlayCategoryClass = "overlay-finance";
+        const incomeTotal = detail.income_total !== undefined ? detail.income_total : 0;
+        const expenseTotal = detail.expense_total !== undefined ? detail.expense_total : 0;
+        const balance = detail.balance !== undefined ? detail.balance : 0;
+
+        textToSpeak = `現在の総収入は${incomeTotal}円、総支出は${expenseTotal}円、差し引き残高は${balance}円です。`;
+        messageHtml = `
+            <h3>${overlayTitle}</h3>
+            <div class="finance-summary">
+                <p><strong>総収入:</strong> ${incomeTotal} 円</p>
+                <p><strong>総支出:</strong> ${expenseTotal} 円</p>
+                <p><strong>残高:</strong> ${balance} 円</p>
+            </div>`;
     } else if (action.category === 'メモ' && action.sub === '読み上げ') {
         overlayTitle = "メモ";
         overlayCategoryClass = "overlay-memo";
