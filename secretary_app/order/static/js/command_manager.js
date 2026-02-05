@@ -471,45 +471,87 @@ export async function loadCommands() {
       console.error("--- [ERROR] Fetch failed with status:", res.status);
       const errorText = await res.text();
       console.error("--- [ERROR] Fetch error response text:", errorText);
-      document.getElementById("command-list").innerHTML = `<p style="color:red;">一覧の読み込みに失敗しました。</p>`;
+      document.getElementById("user-command-list").innerHTML = `<p style="color:red;">ユーザー命令の読み込みに失敗しました。</p>`;
+      document.getElementById("official-command-list").innerHTML = `<p style="color:red;">公式命令の読み込みに失敗しました。</p>`;
       return;
     }
-    const list = await res.json();
-    console.log("--- [DEBUG] loadCommands received list:", list);
+    const allCommands = await res.json();
+    console.log("--- [DEBUG] loadCommands received allCommands:", allCommands);
 
-    const container = document.getElementById("command-list");
-    container.innerHTML = "";
-    if (!list || !list.length) {
-      container.innerHTML = "<p>登録された命令はありません。</p>";
+    const userCommandListContainer = document.getElementById("user-command-list");
+    const officialCommandListContainer = document.getElementById("official-command-list");
+    
+    userCommandListContainer.innerHTML = "";
+    officialCommandListContainer.innerHTML = "";
+
+    if (!allCommands || !allCommands.length) {
+      userCommandListContainer.innerHTML = "<p>登録されたユーザー命令はありません。</p>";
+      officialCommandListContainer.innerHTML = "<p>登録された公式命令はありません。</p>";
       return;
     }
-    list.forEach(cmd => {
-      const div = document.createElement("div");
-      div.className = "item";
-      // nameプロパティが存在しない場合も考慮
-      div.innerHTML = `<b>${cmd.name || '名前なし'}</b> (ID:${cmd.id})`;
-      const editBtn = document.createElement("button");
-      editBtn.className = "nest-button";
-      editBtn.innerText = "編集";
-      editBtn.onclick = () => loadCommandToForm(cmd);
-      const delBtn = document.createElement("button");
-      delBtn.className = "remove";
-      delBtn.innerText = "削除";
-      delBtn.onclick = async () => {
-        if (confirm("削除しますか？")) {
-          await fetch(`/api/custom_orders/${cmd.id}`, {
-            method: "DELETE"
-          });
-          loadCommands();
-        }
-      };
-      div.appendChild(editBtn);
-      div.appendChild(delBtn);
-      container.appendChild(div);
+
+    const officialCommands = [];
+    const userCommands = [];
+
+    allCommands.forEach(cmd => {
+      if (cmd.name && cmd.name.includes('【公式設定】')) {
+        officialCommands.push(cmd);
+      } else {
+        userCommands.push(cmd);
+      }
     });
+
+    // 公式命令は名前順でソート
+    officialCommands.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+    // ユーザー命令はID順（降順）でソート
+    userCommands.sort((a, b) => (b.id || 0) - (a.id || 0));
+
+    const renderCommandList = (commands, container) => {
+      if (commands.length === 0) {
+        container.innerHTML = `<p>${container.id === 'user-command-list' ? '登録されたユーザー命令はありません。' : '登録された公式命令はありません。'}</p>`;
+        return;
+      }
+      commands.forEach(cmd => {
+        const div = document.createElement("div");
+        div.className = "item";
+        div.innerHTML = `<b>${cmd.name || '名前なし'}</b> (ID:${cmd.id})`;
+        const editBtn = document.createElement("button");
+        editBtn.className = "nest-button";
+        editBtn.innerText = "編集";
+        editBtn.onclick = () => loadCommandToForm(cmd);
+        const delBtn = document.createElement("button");
+        delBtn.className = "remove";
+        delBtn.innerText = "削除";
+        delBtn.onclick = async () => {
+          if (confirm("削除しますか？")) {
+            await fetch(`/api/custom_orders/${cmd.id}`, {
+              method: "DELETE"
+            });
+            loadCommands(); // 再読み込みしてリストを更新
+          }
+        };
+        div.appendChild(editBtn);
+        div.appendChild(delBtn);
+        container.appendChild(div);
+      });
+    };
+
+    renderCommandList(userCommands, userCommandListContainer);
+    renderCommandList(officialCommands, officialCommandListContainer);
+
+    // 公式命令表示/非表示のトグル機能
+    const toggleButton = document.getElementById('toggle-official-commands');
+    const officialList = document.getElementById('official-command-list');
+    if (toggleButton && officialList) {
+      toggleButton.onclick = () => {
+        officialList.classList.toggle('co-hidden');
+      };
+    }
+
   } catch (error) {
     console.error("--- [ERROR] loadCommands failed:", error);
-    document.getElementById("command-list").innerHTML = `<p style="color:red;">一覧の読み込み中にエラーが発生しました。</p>`;
+    document.getElementById("user-command-list").innerHTML = `<p style="color:red;">一覧の読み込み中にエラーが発生しました。</p>`;
+    document.getElementById("official-command-list").innerHTML = `<p style="color:red;">一覧の読み込み中にエラーが発生しました。</p>`;
   }
 }
 

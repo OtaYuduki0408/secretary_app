@@ -572,6 +572,11 @@ body.co-body {
   }
 }
 
+/* Utility class for hiding elements */
+.co-hidden {
+  display: none !important;
+}
+
 /* ネストレベルに応じたインデント */
 .condition-block[data-nest-level="1"], .item[data-nest-level="1"] {
   margin-left: 20px;

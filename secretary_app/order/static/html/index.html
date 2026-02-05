@@ -75,11 +75,19 @@
         <div class="co-section-head">
           <div>
             <p class="co-eyebrow">Library</p>
-            <h2 class="co-section-title">既存命令一覧</h2>
+            <h2 class="co-section-title">ユーザー命令一覧</h2>
           </div>
           <p class="co-section-desc">登録済みのフローをリアルタイムで編集・削除できます。</p>
         </div>
-        <div id="command-list" class="co-command-list"></div>
+        <div id="user-command-list" class="co-command-list"></div>
+
+        <div class="co-section-head" style="margin-top: 30px;">
+          <div>
+            <h2 class="co-section-title">公式命令一覧</h2>
+          </div>
+          <button id="toggle-official-commands" class="co-btn ghost" type="button">公式命令を表示/非表示</button>
+        </div>
+        <div id="official-command-list" class="co-command-list co-hidden"></div>
       </section>
     </main>
   </div>
