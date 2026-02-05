@@ -6,20 +6,77 @@
   <title>Voice Secretary — Main</title>
   <script src="https://apis.google.com/js/api.js"></script>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-  <style>
-    .modal-overlay {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: rgba(0, 0, 0, 0.7);
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      z-index: 10000;
-    }
-
+      <style>
+        /* 新しいオーバーレイのスタイル */
+        #audio-permission-overlay {
+          position: fixed;
+          top: 0;
+          left: 0;
+          width: 100%;
+          height: 100%;
+          background-color: rgba(0, 0, 0, 0.9); /* 半透明の暗い背景 */
+          display: flex;
+          flex-direction: column;
+          justify-content: center;
+          align-items: center;
+          z-index: 15000; /* 既存のmodal-overlay (10000) よりも高く */
+          color: white;
+          text-align: center;
+          padding: 20px;
+          box-sizing: border-box;
+        }
+  
+        #audio-permission-overlay.hidden {
+          display: none;
+        }
+  
+        #audio-permission-overlay h2 {
+          font-size: 2.2em;
+          margin-bottom: 20px;
+          color: #7aa8ff; /* メインボタンの色に合わせる */
+        }
+  
+        #audio-permission-overlay p {
+          font-size: 1.3em;
+          margin-bottom: 30px;
+          line-height: 1.5;
+        }
+  
+        #activate-audio-button {
+          background-color: #7aa8ff; /* メインボタンの色に合わせる */
+          color: #1f2a33; /* メインボタンのテキスト色に合わせる */
+          border: none;
+          padding: 18px 40px;
+          border-radius: 999px; /* 角を丸く */
+          font-size: 1.6em;
+          font-weight: bold;
+          cursor: pointer;
+          transition: background-color 0.3s ease, transform 0.2s ease;
+          box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+        }
+  
+        #activate-audio-button:hover {
+          background-color: #5d8ce6; /* ホバー時の色 */
+          transform: translateY(-2px);
+        }
+  
+        #activate-audio-button:active {
+          transform: translateY(0);
+          box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+        }
+        .modal-overlay {
+          position: fixed;
+          top: 0;
+          left: 0;
+          width: 100%;
+          height: 100%;
+          background: rgba(0, 0, 0, 0.7);
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          z-index: 10000;
+        }
+      
     .modal-content {
       background: var(--main-log-bg, #1f2a33);
       padding: 20px;
@@ -369,7 +426,11 @@
   </style>
 </head>
 <body data-user-id="{{ user.id or '' }}">
- 
+ <div id="audio-permission-overlay">
+    <h2>音声機能の有効化</h2>
+    <p>より快適な操作のために、音声認識と応答機能を利用するには、以下のボタンをクリックしてください。</p>
+    <button id="activate-audio-button">音声を有効にする</button>
+ </div>
   <div class="parallax" aria-hidden="true">
     <div id="plx-back"  class="plx-layer back"></div>
     <div id="plx-mid"   class="plx-layer mid"></div>

@@ -370,7 +370,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
 
-    console.log("DEBUG: DOMContentLoaded fired.");
+
+
+
+
+        console.log("DEBUG: DOMContentLoaded fired.");
 
 
 
@@ -378,31 +382,115 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
 
-    // --- Audio Unlock ---
+        const audioPermissionOverlay = document.getElementById('audio-permission-overlay');
 
 
 
-    const unlockAudio = () => {
+        const activateAudioButton = document.getElementById('activate-audio-button');
 
 
 
-        if (userInteracted) return;
 
 
 
-        userInteracted = true;
+
+        // --- Audio Unlock ---
 
 
 
-        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        const unlockAudio = () => {
 
 
 
-        if (audioContext.state === 'suspended') {
 
 
 
-            audioContext.resume().then(() => console.log('AudioContext resumed successfully.'));
+
+            if (userInteracted) return;
+
+
+
+
+
+
+
+            userInteracted = true;
+
+
+
+
+
+
+
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+
+
+
+
+
+
+
+            if (audioContext.state === 'suspended') {
+
+
+
+
+
+
+
+                audioContext.resume().then(() => console.log('AudioContext resumed successfully.'));
+
+
+
+
+
+
+
+            }
+
+
+
+            // オーバーレイボタンがクリックされたときにのみunlockAudioが呼ばれるため、bodyからのリスナーは不要
+
+
+
+            // document.body.removeEventListener('click', unlockAudio);
+
+
+
+            // document.body.removeEventListener('keydown', unlockAudio);
+
+
+
+        };
+
+
+
+
+
+
+
+        if (activateAudioButton) {
+
+
+
+            activateAudioButton.addEventListener('click', () => {
+
+
+
+                audioPermissionOverlay.classList.add('hidden'); // オーバーレイを非表示にする
+
+
+
+                unlockAudio(); // オーディオコンテキストを再開
+
+
+
+                initializeVoiceRecognition(); // 音声認識の初期化を開始
+
+
+
+            });
 
 
 
@@ -410,23 +498,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
 
-        document.body.removeEventListener('click', unlockAudio);
-
-
-
-        document.body.removeEventListener('keydown', unlockAudio);
-
-
-
-    };
-
-
-
-    document.body.addEventListener('click', unlockAudio, { once: true });
-
-
-
-    document.body.addEventListener('keydown', unlockAudio, { once: true });
 
 
 
@@ -434,15 +505,24 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
 
-    const micButton = document.querySelector('.mic-btn');
+
+        const micButton = document.querySelector('.mic-btn');
 
 
 
-    const searchBox = document.getElementById('searchbox');
 
 
 
-    const voiceLogContainer = document.getElementById('voice-log-container');
+
+        const searchBox = document.getElementById('searchbox');
+
+
+
+
+
+
+
+        const voiceLogContainer = document.getElementById('voice-log-container');
 
 
 
@@ -1235,7 +1315,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
 
-    // 初期起動
+
+
+
+
+    // 初期起動関数
+
+
+
+
 
 
 
@@ -1243,23 +1331,63 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
 
-    setMode('waiting');
 
 
 
-    try {
+
+    function initializeVoiceRecognition() {
 
 
 
-        recognition.start();
 
 
 
-    } catch(e) {
+
+        setMode('waiting');
 
 
 
-        console.error("初期認識開始に失敗", e);
+
+
+
+
+        try {
+
+
+
+
+
+
+
+            recognition.start();
+
+
+
+
+
+
+
+        } catch(e) {
+
+
+
+
+
+
+
+            console.error("初期認識開始に失敗", e);
+
+
+
+
+
+
+
+        }
+
+
+
+
 
 
 
@@ -1267,4 +1395,80 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
 
-});
+
+
+
+
+    
+
+
+
+
+
+
+
+    // オーバーレイが表示されている場合、DOMContentLoadedでは音声認識を開始しない
+
+
+
+
+
+
+
+    // オーバーレイがない場合は通常通り開始
+
+
+
+
+
+
+
+    if (!audioPermissionOverlay || audioPermissionOverlay.classList.contains('hidden')) {
+
+
+
+
+
+
+
+        initializeVoiceRecognition();
+
+
+
+
+
+
+
+    } else {
+
+
+
+
+
+
+
+        console.log("DEBUG: 音声許可オーバーレイが表示中のため、音声認識の自動開始をスキップしました。");
+
+
+
+
+
+
+
+    }
+
+
+
+
+
+
+
+    
+
+
+
+
+
+
+
+    });
