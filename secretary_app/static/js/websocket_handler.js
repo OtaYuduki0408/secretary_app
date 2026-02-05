@@ -130,6 +130,34 @@ function extractActionFromStep(step) {
     return null;
 }
 
+function flattenActionsFromSteps(stepList) {
+    let actions = [];
+    for (const step of (stepList || [])) {
+        const action = extractActionFromStep(step);
+        if (action) {
+            actions.push(action);
+        }
+        const condition = (step && step.kind === 'condition') ? step.condition : null;
+        if (condition) {
+            actions = actions.concat(flattenActionsFromSteps(condition.actions));
+            actions = actions.concat(flattenActionsFromSteps(condition.nested));
+        }
+    }
+    return actions;
+}
+
+async function executeOrderPayload(orderData) {
+    if (!orderData || typeof orderData !== 'object') return;
+    const steps = orderData.steps || [];
+    const actions = orderData.actions || [];
+    const actionPlan = steps.length > 0 ? flattenActionsFromSteps(steps) : actions;
+    if (actionPlan.length > 0) {
+        await executePlan(actionPlan);
+    }
+}
+
+window.executeOrderPayload = executeOrderPayload;
+
 async function executePlan(plan) {
     const enrichedDataCache = new Map();
 
@@ -306,7 +334,9 @@ async function executeAction(action) {
 }
 
 function setupWebSocket() {
-    const socket = io.connect('https://127.0.0.1:5000');
+    const socket = io(window.location.origin, {
+        transports: ['websocket', 'polling'],
+    });
 
     socket.on('connect', () => {
         console.log('WebSocketサーバーに接続しました (SID: ' + socket.id + ')');
@@ -319,28 +349,7 @@ function setupWebSocket() {
 
     socket.on('dispatch_command', async (order_data) => {
         console.log('サーバーからコマンドディスパッチを受け取りました:', order_data);
-
-        function flattenActions(stepList) {
-            let actions = [];
-            for (const step of (stepList || [])) {
-                const action = extractActionFromStep(step);
-                if (action) {
-                    actions.push(action);
-                }
-                const condition = (step.kind === 'condition') ? step.condition : null;
-                if (condition) {
-                    actions.push(...flattenActions(condition.actions));
-                    actions.push(...flattenActions(condition.nested));
-                }
-            }
-            return actions;
-        }
-
-        const actionPlan = flattenActions(order_data.steps || []);
-
-        if (actionPlan.length > 0) {
-            await executePlan(actionPlan);
-        }
+        await executeOrderPayload(order_data);
     });
 
     // ★★★ デバッグ用に追加 ★★★

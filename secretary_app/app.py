@@ -473,6 +473,25 @@ def upsert_finance_goal_route():
         return jsonify({'error': result['error']}), 500
     return jsonify(result)
 
+@app.route('/api/user_settings', methods=['GET'])
+@login_required
+def get_user_settings_route():
+    user_id = session.get('user', {}).get('id')
+    settings = get_user_settings(user_id) or {}
+    return jsonify(settings)
+
+@app.route('/api/user_settings', methods=['POST'])
+@login_required
+def upsert_user_settings_route():
+    user_id = session.get('user', {}).get('id')
+    data = request.get_json() or {}
+    if not isinstance(data, dict):
+        return jsonify({'error': 'Invalid settings payload'}), 400
+    result = upsert_user_settings(user_id, data)
+    if isinstance(result, dict) and result.get('error'):
+        return jsonify(result), 500
+    return jsonify(result)
+
 @app.route('/users', methods=['GET'])
 def get_users_route():
     return jsonify(get_all_users())
@@ -1049,15 +1068,18 @@ def chat_api_web():
     print(f"[CHAT_API] Voice trigger check completed. Found {len(voice_payloads)} matching orders.")
 
     if voice_payloads:
+        enriched_payloads = []
         for payload in voice_payloads:
             # ボイストリガー経由でもアクション内容を補強してから送信する
             enriched_payload = _enrich_actions_for_dispatch(payload, user_id, app.logger)
             _dispatch_order_payload(user_id, enriched_payload)
+            enriched_payloads.append(enriched_payload)
         
         response_data['suppress_tts'] = True
         response_data['message'] = ""
         response_data['triggered_by_voice'] = True
         response_data['triggered_by_voice_count'] = len(voice_payloads)
+        response_data['order_payloads'] = enriched_payloads
         return jsonify(response_data)
 
     # ... (rest of the chat_api_web function)
