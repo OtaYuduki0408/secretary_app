@@ -41,8 +41,16 @@ function parseActionItem(actionItem) {
   const category = actionItem.querySelector(".action-category").value;
   const subSelect = actionItem.querySelector(".action-sub");
   let sub = subSelect?.value || "";
-  if (!sub && subSelect?.options?.length) {
-    sub = subSelect.options[0].value;
+
+  // Fallback for disabled sub-category selects
+  const fixedSubByCategory = {
+    '収支管理': '読み上げ',
+    'メモ': '読み上げ',
+    '時間読み上げ': '読み上げ内容'
+  };
+
+  if (fixedSubByCategory[category] && (!sub || subSelect.disabled)) {
+    sub = fixedSubByCategory[category];
   }
   
   let detail = {};
