@@ -514,7 +514,12 @@ export async function loadCommands() {
       commands.forEach(cmd => {
         const div = document.createElement("div");
         div.className = "item";
-        div.innerHTML = `<b>${cmd.name || '名前なし'}</b> (ID:${cmd.id})`;
+        div.innerHTML = `
+          <span class="command-info"><b>${cmd.name || '名前なし'}</b> (ID:${cmd.id})</span>
+          <div class="command-actions">
+          </div>
+        `;
+        const actionContainer = div.querySelector(".command-actions");
         const editBtn = document.createElement("button");
         editBtn.className = "nest-button";
         editBtn.innerText = "編集";
@@ -530,8 +535,8 @@ export async function loadCommands() {
             loadCommands(); // 再読み込みしてリストを更新
           }
         };
-        div.appendChild(editBtn);
-        div.appendChild(delBtn);
+        actionContainer.appendChild(editBtn);
+        actionContainer.appendChild(delBtn);
         container.appendChild(div);
       });
     };

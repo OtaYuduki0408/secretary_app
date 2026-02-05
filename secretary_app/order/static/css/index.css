@@ -473,10 +473,24 @@ body.co-body {
   padding: 16px;
   background: rgba(255, 255, 255, 0.02);
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: wrap; /* 必要に応じて折り返す */
   justify-content: space-between;
   align-items: center;
   gap: 12px;
+}
+
+.co-command-list .item .command-info {
+  flex-grow: 1; /* 利用可能なスペースを占有 */
+  min-width: 150px; /* 最小幅を設定して、名前が短くてもボタンに近づきすぎないようにする */
+  /* white-space: nowrap; */ /* 名前が長い場合に折り返しを許可するならコメントアウト */
+  /* overflow: hidden; */
+  /* text-overflow: ellipsis; */
+}
+
+.co-command-list .item .command-actions {
+  display: flex;
+  gap: 8px; /* ボタン間の間隔 */
+  flex-shrink: 0; /* ボタン群は縮まない */
 }
 
 .co-command-list .item b {
