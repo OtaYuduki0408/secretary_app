@@ -378,6 +378,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
 
+        console.log("DEBUG: URL:", window.location.href);
+
+
+
 
 
 
@@ -390,6 +394,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
 
+        console.log("DEBUG: audioPermissionOverlay element:", audioPermissionOverlay ? "Found" : "Not Found");
+
+
+
+        console.log("DEBUG: activateAudioButton element:", activateAudioButton ? "Found" : "Not Found");
+
+
+
+
+
+
+
 
 
 
@@ -399,6 +415,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
         const unlockAudio = () => {
+
+
+
+            console.log("DEBUG: unlockAudio called. userInteracted:", userInteracted);
 
 
 
@@ -434,15 +454,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
 
-
-
-
-
-                audioContext.resume().then(() => console.log('AudioContext resumed successfully.'));
-
-
-
-
+                audioContext.resume().then(() => console.log('DEBUG: AudioContext resumed successfully.')).catch(e => console.error('DEBUG: Failed to resume AudioContext:', e));
 
 
 
@@ -450,27 +462,67 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
 
-            // オーバーレイボタンがクリックされたときにのみunlockAudioが呼ばれるため、bodyからのリスナーは不要
-
-
-
-            // document.body.removeEventListener('click', unlockAudio);
-
-
-
-            // document.body.removeEventListener('keydown', unlockAudio);
-
-
-
         };
 
 
 
+        
+
+
+
+        const urlParams = new URLSearchParams(window.location.search);
+
+
+
+        const isInternalNav = urlParams.get('internal_nav')?.toLowerCase() === 'true';
+
+
+
+        console.log("DEBUG: URLSearchParams:", window.location.search);
+
+
+
+        console.log("DEBUG: isInternalNav:", isInternalNav);
 
 
 
 
-        if (activateAudioButton) {
+
+
+
+        if (isInternalNav) {
+
+
+
+            console.log("DEBUG: internal_navパラメータを検出。オーバーレイをスキップし、音声認識を開始します。");
+
+
+
+            if (audioPermissionOverlay) audioPermissionOverlay.classList.add('hidden');
+
+
+
+            else console.error("DEBUG: audioPermissionOverlayが見つかりません。オーバーレイを隠せませんでした。");
+
+
+
+            unlockAudio();
+
+
+
+            initializeVoiceRecognition();
+
+
+
+            console.log("DEBUG: initializeVoiceRecognition called via internal_nav.");
+
+
+
+        } else if (activateAudioButton) { // internal_navパラメータがない場合はオーバーレイを表示
+
+
+
+            console.log("DEBUG: internal_navパラメータなし。アクティベーションボタンイベントリスナーを設定します。");
 
 
 
@@ -478,7 +530,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
 
-                audioPermissionOverlay.classList.add('hidden'); // オーバーレイを非表示にする
+                console.log("DEBUG: アクティベーションボタンがクリックされました。");
+
+
+
+                if (audioPermissionOverlay) audioPermissionOverlay.classList.add('hidden'); // オーバーレイを非表示にする
+
+
+
+                else console.error("DEBUG: audioPermissionOverlayが見つかりません。オーバーレイを隠せませんでした。");
 
 
 
@@ -490,7 +550,27 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
 
+                console.log("DEBUG: initializeVoiceRecognition called via button click.");
+
+
+
             });
+
+
+
+        } else { // ボタンがない場合や、その他の状況で音声認識を自動開始しない
+
+
+
+            console.log("DEBUG: internal_navパラメータがなく、アクティベーションボタンも見つからないため、オーバーレイ表示を維持または自動開始をスキップします。");
+
+
+
+            // オーバーレイが表示されたままになるか、自動開始しない場合はここを調整
+
+
+
+            // 例えば、オーバーレイが表示されていれば、ユーザーが手動でクリックするのを待つ
 
 
 

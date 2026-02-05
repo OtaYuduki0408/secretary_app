@@ -206,7 +206,7 @@ async function executeAction(action) {
         const parts = [];
 
         if (selections.includes("今の時間") || selections.length === 0) {
-            parts.push(`今の時間は${hours}時${minutes}分です。`);
+            parts.push(`${hours}時${minutes}分です。`);
         }
         if (selections.includes("今日の日付") || selections.includes("年月日") || selections.length === 0) {
             parts.push(`今日の日付は${month}月${day}日です。`);

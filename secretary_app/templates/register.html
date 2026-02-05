@@ -28,7 +28,7 @@
 
   <div class="cta-footer">
     <a href="{{ url_for('login') }}" class="link-btn">ログインはこちら</a>
-    <a href="{{ url_for('main') }}" class="link-btn">メインへ戻る</a>
+    <a href="{{ url_for('main', internal_nav=true) }}" class="link-btn">メインへ戻る</a>
   </div>
 </div>
 {% endblock %}
