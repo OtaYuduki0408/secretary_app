@@ -1,5 +1,7 @@
 #最新の情報を読み込めているかテスト 番号は22132
 # -*- coding: utf-8 -*-
+from gevent import monkey
+monkey.patch_all()
 import os
 import sys
 import re
