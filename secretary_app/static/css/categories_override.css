@@ -37,15 +37,15 @@
 
 /* expense.css のスタイルよりも優先されるように !important を使用 */
 .chips .chip.expense {
-  background: var(--app-danger, #ef4444) !important;
-  color: #fff !important;
-  border-color: var(--app-danger, #ef4444) !important;
+  background: rgba(239, 68, 68, 0.3) !important; /* 赤系を少し薄く */
+  color: var(--app-text) !important; /* 標準文字色に変更 */
+  border-color: rgba(239, 68, 68, 0.45) !important;
 }
 
 .chips .chip.income {
-  background: #10b981 !important; /* 明示的に緑色を指定 */
-  color: #fff !important;
-  border-color: #10b981 !important; /* border-colorも緑色に */
+  background: rgba(16, 185, 129, 0.3) !important; /* 緑系を少し薄く */
+  color: var(--app-text) !important; /* 標準文字色に変更 */
+  border-color: rgba(16, 185, 129, 0.45) !important;
 }
 
 

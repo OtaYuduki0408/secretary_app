@@ -11,6 +11,16 @@ def get_all_categories():
 
 def add_category(name: str, type: str):
     try:
+        # 重複チェック
+        existing_categories = supabase.table(TABLE_NAME)\\
+            .select("id")\\
+            .eq("name", name)\\
+            .eq("type", type)\\
+            .execute()
+        
+        if existing_categories.data:
+            return {"error": "同じ名前と種類のカテゴリが既に存在します。"}
+
         response = supabase.table(TABLE_NAME).insert({"name": name, "type": type}).execute()
         return {"message": "Category added", "data": response.data}
     except Exception as e:
