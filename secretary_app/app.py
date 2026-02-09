@@ -393,9 +393,16 @@ def get_categories_route():
 def add_category_route():
     data = request.get_json() or {}
     name = (data.get('name') or '').strip()
+    type = (data.get('type') or '').strip() # type の値を取得
     if not name:
+        print("DEBUG: Category name is empty") # デバッグログ
         return jsonify({'error': 'カテゴリ名が空です'}), 400
-    return jsonify(add_category(name))
+    if not type: # type がない場合のエラーハンドリング
+        print("DEBUG: Category type is missing") # デバッグログ
+        return jsonify({'error': 'カテゴリタイプが指定されていません'}), 400
+    
+    print(f"DEBUG: Calling add_category with name={name}, type={type}") # デバッグログ
+    return jsonify(add_category(name, type)) # add_category に type を渡す
 
 @app.route('/api/categories/<string:cat_id>', methods=['DELETE'])
 def delete_category_route(cat_id):

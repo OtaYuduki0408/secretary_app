@@ -9,9 +9,9 @@ def get_all_categories():
     except Exception as e:
         return {"error": str(e)}
 
-def add_category(name: str):
+def add_category(name: str, type: str):
     try:
-        response = supabase.table(TABLE_NAME).insert({"name": name}).execute()
+        response = supabase.table(TABLE_NAME).insert({"name": name, "type": type}).execute()
         return {"message": "Category added", "data": response.data}
     except Exception as e:
         return {"error": str(e)}

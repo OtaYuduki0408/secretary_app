@@ -32,7 +32,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const name = input.value.trim();
         const type = typeSelect.value;
         
-        if (!name) return;
+
 
         const payload = { name, type }; 
         
