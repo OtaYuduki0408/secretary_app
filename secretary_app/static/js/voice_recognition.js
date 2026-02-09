@@ -382,316 +382,120 @@ async function sendCommandToBackend(command) {
 
 document.addEventListener('DOMContentLoaded', () => {
 
-
-
-
-
-
-
         console.log("DEBUG: DOMContentLoaded fired.");
-
-
-
         console.log("DEBUG: URL:", window.location.href);
 
-
-
-
-
-
-
         const audioPermissionOverlay = document.getElementById('audio-permission-overlay');
-
-
-
         const activateAudioButton = document.getElementById('activate-audio-button');
 
-
-
         console.log("DEBUG: audioPermissionOverlay element:", audioPermissionOverlay ? "Found" : "Not Found");
-
-
-
         console.log("DEBUG: activateAudioButton element:", activateAudioButton ? "Found" : "Not Found");
 
-
-
-
-
-
-
-
-
-
-
         // --- Audio Unlock ---
-
-
-
         const unlockAudio = () => {
-
-
-
             console.log("DEBUG: unlockAudio called. userInteracted:", userInteracted);
-
-
-
-
-
-
 
             if (userInteracted) return;
 
-
-
-
-
-
-
             userInteracted = true;
-
-
-
-
-
-
 
             const audioContext = new (window.AudioContext || window.webkitAudioContext)();
 
-
-
-
-
-
-
             if (audioContext.state === 'suspended') {
-
-
-
                 audioContext.resume().then(() => console.log('DEBUG: AudioContext resumed successfully.')).catch(e => console.error('DEBUG: Failed to resume AudioContext:', e));
-
-
-
             }
-
-
-
         };
-
-
-
         
-
-
-
         const urlParams = new URLSearchParams(window.location.search);
+        const isInternalNavParam = urlParams.get('internal_nav')?.toLowerCase() === 'true';
 
-
-
-        const isInternalNav = urlParams.get('internal_nav')?.toLowerCase() === 'true';
-
-
+        // ページのナビゲーションタイプを取得 (navigate, reload, back_forward)
+        const navigationType = window.performance.getEntriesByType("navigation")[0]?.type;
 
         console.log("DEBUG: URLSearchParams:", window.location.search);
-
-
-
-        console.log("DEBUG: isInternalNav:", isInternalNav);
-
-
-
-
-
-
-
-        if (isInternalNav) {
-
-
-
-            console.log("DEBUG: internal_navパラメータを検出。オーバーレイをスキップし、音声認識を開始します。");
-
-
-
-            if (audioPermissionOverlay) audioPermissionOverlay.classList.add('hidden');
-
-
-
-            else console.error("DEBUG: audioPermissionOverlayが見つかりません。オーバーレイを隠せませんでした。");
-
-
-
-            unlockAudio();
-
-
-
-            initializeVoiceRecognition();
-
-
-
-            console.log("DEBUG: initializeVoiceRecognition called via internal_nav.");
-
-
-
-        } else if (activateAudioButton) { // internal_navパラメータがない場合はオーバーレイを表示
-
-
-
-            console.log("DEBUG: internal_navパラメータなし。アクティベーションボタンイベントリスナーを設定します。");
-
-
-
-            activateAudioButton.addEventListener('click', () => {
-
-
-
-                console.log("DEBUG: アクティベーションボタンがクリックされました。");
-
-
-
-                if (audioPermissionOverlay) audioPermissionOverlay.classList.add('hidden'); // オーバーレイを非表示にする
-
-
-
-                else console.error("DEBUG: audioPermissionOverlayが見つかりません。オーバーレイを隠せませんでした。");
-
-
-
-                unlockAudio(); // オーディオコンテキストを再開
-
-
-
-                initializeVoiceRecognition(); // 音声認識の初期化を開始
-
-
-
-                console.log("DEBUG: initializeVoiceRecognition called via button click.");
-
-
-
-            });
-
-
-
-        } else { // ボタンがない場合や、その他の状況で音声認識を自動開始しない
-
-
-
-            console.log("DEBUG: internal_navパラメータがなく、アクティベーションボタンも見つからないため、オーバーレイ表示を維持または自動開始をスキップします。");
-
-
-
-            // オーバーレイが表示されたままになるか、自動開始しない場合はここを調整
-
-
-
-            // 例えば、オーバーレイが表示されていれば、ユーザーが手動でクリックするのを待つ
-
-
-
+        console.log("DEBUG: isInternalNavParam:", isInternalNavParam);
+        console.log("DEBUG: navigationType:", navigationType);
+
+        let shouldSkipOverlay = false;
+
+        if (isInternalNavParam) {
+            // internal_nav=True がある場合
+            if (navigationType === "reload") {
+                // リロードの場合はオーバーレイをスキップしない (表示する)
+                console.log("DEBUG: internal_nav=Trueだがリロードのためオーバーレイを表示します。");
+                shouldSkipOverlay = false;
+            } else {
+                // リロード以外 (例: 別の内部ページからのnavigate) の場合はオーバーレイをスキップする
+                console.log("DEBUG: internal_nav=Trueかつリロードではないためオーバーレイをスキップします。");
+                shouldSkipOverlay = true;
+            }
+        } else if (navigationType === "back_forward") {
+            // internal_navパラメータがないが、戻る/進むでナビゲートされた場合はオーバーレイをスキップする
+            console.log("DEBUG: back_forwardナビゲーションのためオーバーレイをスキップします。");
+            shouldSkipOverlay = true;
+        } else {
+            // 上記以外 (初回 navigate, リロード (internal_navなし)) はオーバーレイを表示
+            console.log("DEBUG: 初回アクセスまたはリロードのためオーバーレイを表示します。");
+            shouldSkipOverlay = false;
         }
 
-
-
-
-
-
-
-
-
-
+        if (shouldSkipOverlay) {
+            console.log("DEBUG: shouldSkipOverlayがtrueのため、オーバーレイを非表示にし、音声認識を開始します。");
+            if (audioPermissionOverlay) audioPermissionOverlay.classList.add('hidden');
+            else console.error("DEBUG: audioPermissionOverlayが見つかりません。オーバーレイを隠せませんでした。");
+            unlockAudio();
+            initializeVoiceRecognition();
+            console.log("DEBUG: initializeVoiceRecognition called via shouldSkipOverlay.");
+        } else if (activateAudioButton) { // オーバーレイをスキップしない場合は、アクティベーションボタンの有無で処理を分岐
+            console.log("DEBUG: shouldSkipOverlayがfalseまたはactivateAudioButtonが存在するため、アクティベーションボタンイベントリスナーを設定します。");
+            activateAudioButton.addEventListener('click', () => {
+                console.log("DEBUG: アクティベーションボタンがクリックされました。");
+                if (audioPermissionOverlay) audioPermissionOverlay.classList.add('hidden'); // オーバーレイを非表示にする
+                else console.error("DEBUG: audioPermissionOverlayが見つかりません。オーバーレイを隠せませんでした。");
+                unlockAudio(); // オーディオコンテキストを再開
+                initializeVoiceRecognition(); // 音声認識の初期化を開始
+                console.log("DEBUG: initializeVoiceRecognition called via button click.");
+            });
+        } else { // ボタンがない場合や、その他の状況で音声認識を自動開始しない
+            console.log("DEBUG: オーバーレイが表示中のため、音声認識の自動開始をスキップしました。ユーザーのアクションを待ちます。");
+            // オーバーレイが表示されたままになるか、自動開始しない場合はここを調整
+            // 例えば、オーバーレイが表示されていれば、ユーザーが手動でクリックするのを待つ
+        }
 
         const micButton = document.querySelector('.mic-btn');
 
-
-
-
-
-
-
         const searchBox = document.getElementById('searchbox');
-
-
-
-
-
-
 
         const voiceLogContainer = document.getElementById('voice-log-container');
 
-
-
-
-
-
-
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-
-
 
     if (!SpeechRecognition) {
 
-
-
         console.error("Web Speech API はこのブラウザでサポートされていません。");
-
-
 
         micButton.disabled = true;
 
-
-
         searchBox.placeholder = "音声認識非対応";
-
-
 
         return;
 
-
-
     }
-
-
-
-
-
-
 
     recognition = new SpeechRecognition();
 
-
-
     recognition.lang = 'ja-JP';
-
-
 
     recognition.continuous = true;
 
-
-
     recognition.interimResults = true;
-
-
-
-
-
-
 
     let lastTranscript = ''; // diff-based logging用
     let displayOffset = 0; // ウェイクワード以降を表示するための開始位置
 
-
-
-
-
-
-
     // ------------------------------------------------------------------------
 
-
-
     // 音声認識イベント
-
-
 
     // ------------------------------------------------------------------------
 
