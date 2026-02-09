@@ -11,6 +11,7 @@ let recognition; // SpeechRecognitionインスタンス
 let currentMode = 'waiting'; // 'waiting' or 'listening'
 let recognitionTimeoutId; // 音声入力タイムアウトのID
 let shouldDisplayAllSpeech = false; // 全ての音声をログに表示するかどうかの設定
+let END_WORD = '命令完了'; // 音声入力の強制終了ワード
 
 // モバイル環境のみの制御
 const isMobileDevice = (() => {
@@ -59,10 +60,12 @@ function loadAppSettings() {
 
         // ログ表示設定を読み込む
         shouldDisplayAllSpeech = settings?.main?.displayAllSpeech ?? false;
+        END_WORD = settings?.main?.endWord || '命令完了'; // エンドワードを読み込む
 
     } catch (e) {
         console.warn('アプリ設定の読み込みに失敗しました。', e);
         shouldDisplayAllSpeech = false; // エラー時はデフォルトOff
+        END_WORD = '命令完了'; // エラー時はデフォルト値を設定
     }
 }
 
@@ -503,10 +506,23 @@ document.addEventListener('DOMContentLoaded', () => {
 
     recognition.onresult = (event) => {
         const last = event.results.length - 1;
-        const transcript = event.results[last][0].transcript;
-        const isFinal = event.results[last].isFinal;
+        let transcript = event.results[last][0].transcript; // Make transcript mutable
+        let isFinal = event.results[last].isFinal; // Make isFinal mutable
 
         let tempLogEntry = document.getElementById('interim-log');
+
+        // --- エンドワード検出ロジック ---
+        let endWordDetected = false;
+        let originalFinalCommand = '';
+        if (currentMode === 'listening' && END_WORD && transcript.includes(END_WORD)) {
+            console.log(`DEBUG: エンドワード "${END_WORD}" を検出しました。`);
+            const endWordIndex = transcript.indexOf(END_WORD);
+            originalFinalCommand = transcript.substring(0, endWordIndex).trim(); // エンドワード以前をコマンドとする
+            endWordDetected = true;
+            isFinal = true; // 強制的に最終結果とする
+            // 以降の処理のためにtranscriptを切り詰める
+            transcript = originalFinalCommand;
+        }
 
         // --- ログ表示の制御ロジック ---
         let shouldProcessDisplay = false;
@@ -618,7 +634,7 @@ document.addEventListener('DOMContentLoaded', () => {
         let finalCommand = '';
 
         if (isFinal) {
-            finalCommand = shouldDisplayAllSpeech ? transcript.trim() : (displayOffset > 0 ? transcript.slice(displayOffset).trim() : transcript.trim());
+            finalCommand = originalFinalCommand || (shouldDisplayAllSpeech ? transcript.trim() : (displayOffset > 0 ? transcript.slice(displayOffset).trim() : transcript.trim()));
 
             if (currentMode === 'listening' && finalCommand) {
                 setEntryContent(tempLogEntry, finalCommand);
@@ -628,6 +644,15 @@ document.addEventListener('DOMContentLoaded', () => {
             tempLogEntry.removeAttribute('id');
             lastTranscript = ''; // 次の発話のためにリセット
             displayOffset = 0; // 次の発話のためにリセット
+            
+            // エンドワードが検出された場合、ここで認識を停止する
+            if (endWordDetected) {
+                console.log("DEBUG: エンドワード検出により音声認識を停止します。");
+                recognition.stop();
+                setMode('waiting'); // 待機モードに戻す
+                processInput(finalCommand, 'voice'); // 強制的にコマンドを処理
+                return; // 以降の処理をスキップ
+            }
         }
         
         // --- モードとコマンドロジック ---
