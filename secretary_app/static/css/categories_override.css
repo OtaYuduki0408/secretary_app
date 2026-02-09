@@ -43,9 +43,9 @@
 }
 
 .chips .chip.income {
-  background: var(--app-success, #10b981) !important;
+  background: #10b981 !important; /* 明示的に緑色を指定 */
   color: #fff !important;
-  border-color: var(--app-success, #10b981) !important;
+  border-color: #10b981 !important; /* border-colorも緑色に */
 }
 
 
