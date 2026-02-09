@@ -1,0 +1,263 @@
+/* ===== カテゴリ管理 ===== */
+.actions{
+  display:flex;
+  flex-wrap:wrap;
+  gap:12px;
+  align-items:center;
+  margin-bottom:10px;
+}
+.actions .input{
+  flex:1 1 220px;
+}
+.actions select.input{
+  flex:0 0 120px;
+}
+.actions .btn{
+  min-width:110px;
+}
+#cat-clear.btn{
+  background:linear-gradient(135deg,#f87171,#ef4444);
+  color: var(--app-button-text, #fff);
+}
+
+.chips{
+  display:flex;
+  flex-wrap:wrap;
+  gap:12px;
+}
+
+.chip{
+  position:relative;
+  padding:10px 40px 10px 14px;
+  border-radius:20px;
+  font-weight:600;
+  letter-spacing:.02em;
+  background:rgba(var(--app-border-rgb, 148,163,184),.25);
+  border:1px solid rgba(var(--app-border-rgb, 148,163,184),.35);
+  color:var(--text);
+  box-shadow:0 10px 20px rgba(15,23,42,.25);
+}
+
+.chip.expense{
+  background:rgba(var(--app-danger-rgb, 248,113,113),.18);
+  border-color:rgba(var(--app-danger-rgb, 248,113,113),.45);
+  color:#fecaca;
+}
+.chip.income{
+  background:rgba(var(--app-success-rgb, 16,185,129),.18);
+  border-color:rgba(var(--app-success-rgb, 16,185,129),.45);
+  color:#bbf7d0;
+}
+
+.chip .delete{
+  position:absolute;
+  top:50%;
+  right:10px;
+  transform:translateY(-50%);
+  border:none;
+  border-radius:50%;
+  width:26px;
+  height:26px;
+  font-size:.85rem;
+  cursor:pointer;
+  color: var(--app-button-text, #0f172a);
+  background:#f1f5f9;
+  transition:.15s;
+}
+.chip .delete:hover{
+  background:#f87171;
+  color: var(--app-button-text, #fff);
+}
+
+#cat-empty{
+  color:var(--muted);
+  font-size:.95rem;
+}
+
+@media (max-width:640px){
+  .actions{
+    flex-direction:column;
+    align-items:stretch;
+  }
+  .actions .input,
+  .actions select.input{
+    width:100%;
+  }
+  .actions .btn{
+    width:100%;
+  }
+}
+
+@media (max-width:520px){
+  .container{
+    width:calc(100% - 24px);
+    margin:24px auto 70px;
+  }
+  .header{
+    flex-direction:column;
+    align-items:flex-start;
+    gap:12px;
+  }
+  .header-actions{
+    width:100%;
+    flex-direction:column;
+    align-items:stretch;
+  }
+  .header-actions .link-btn,
+  .actions .btn{
+    width:100%;
+    text-align:center;
+  }
+  .card{
+    padding:18px;
+  }
+  table{
+    display:block;
+    overflow-x:auto;
+    min-width:520px;
+  }
+  th,
+  td{
+    white-space:nowrap;
+  }
+}
+
+/* --- Toast Notification --- */
+#toast-container {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+.toast {
+  background-color: var(--accent-strong);
+  color: var(--bg);
+  padding: 12px 20px;
+  border-radius: 999px;
+  box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+  opacity: 0;
+  transform: translateY(20px);
+  transition: opacity 0.3s, transform 0.3s;
+}
+.toast.show {
+  opacity: 1;
+  transform: translateY(0);
+}
+.toast.error {
+  background-color: var(--danger);
+  color: white;
+}
+
+/* --- Form Buttons --- */
+.type-selector, .category-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.btn-type, .btn-category {
+  border: 1px solid rgba(var(--app-border-rgb, 148,163,184),.35);
+  background: var(--panel-soft);
+  color: var(--text);
+  padding: 10px 16px;
+  border-radius: 14px;
+  cursor: pointer;
+  transition: .2s;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+.btn-type:hover, .btn-category:hover {
+  border-color: var(--accent);
+}
+.btn-type.active {
+  background-color: var(--accent);
+  color: var(--bg);
+  border-color: var(--accent);
+}
+.btn-category.active {
+  background-color: var(--accent-strong);
+  color: var(--bg);
+  border-color: var(--accent-strong);
+}
+
+/* Specific colors for category buttons */
+.btn-category[data-type="income"] {
+  background-color: rgba(var(--app-success-rgb, 16,185,129),.1);
+  border-color: rgba(var(--app-success-rgb, 16,185,129),.4);
+}
+.btn-category[data-type="income"].active {
+  background-color: #10b981;
+  border-color: #10b981;
+  color: #fff;
+}
+.btn-category[data-type="expense"] {
+  background-color: rgba(var(--app-danger-rgb, 248,113,113),.1);
+  border-color: rgba(var(--app-danger-rgb, 248,113,113),.4);
+}
+.btn-category[data-type="expense"].active {
+  background-color: #f87171;
+  border-color: #f87171;
+  color: #fff;
+}
+
+
+/* --- Records Table --- */
+.records-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.records-header h2 {
+  margin: 0;
+}
+.records-footer {
+  margin-top: 16px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.btn-secondary {
+  background: var(--panel-soft);
+  color: var(--text);
+  border: 1px solid rgba(var(--app-border-rgb, 148,163,184),.35);
+}
+.btn-danger {
+  background: var(--danger);
+  color: #fff;
+}
+.btn-danger:hover {
+  filter: brightness(1.1);
+  box-shadow:0 10px 25px rgba(239, 68, 68, .35);
+}
+
+
+/* Row Colors */
+.income-row {
+  background-color: rgba(16, 185, 129, 0.05);
+}
+.income-row:hover {
+  background-color: rgba(16, 185, 129, 0.15) !important;
+}
+.expense-row {
+   background-color: rgba(239, 68, 68, 0.05);
+}
+.expense-row:hover {
+  background-color: rgba(239, 68, 68, 0.15) !important;
+}
+
+/* Checkbox Column for Delete Mode */
+.checkbox-col {
+  width: 1%;
+  padding-right: 0;
+}
+.checkbox-col input {
+  width: 18px;
+  height: 18px;
+}

@@ -1,7 +1,9 @@
 {% extends "base.html" %}
 
 {% block head %}
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/common.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/expense.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/categories_override.css') }}">
 {% endblock %}
 
 {% block content %}
