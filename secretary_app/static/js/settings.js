@@ -22,6 +22,7 @@
       wakeWords: 'サイレントメイト,サイレントメイト君,さいれんとめいと,silentmate,ボイスメイト',
       inputConfirmEnabled: true,
       inputConfirmTemplate: 'だね、ちょっと待ってね！',
+      displayAllSpeech: false,
     },
     ui: {
       backgroundColor: '#0f172a',
@@ -106,6 +107,7 @@
     characterSize: document.getElementById('character-size'),
     characterSizeValue: document.getElementById('character-size-value'),
     characterColor: document.getElementById('character-color'),
+    displayAllSpeechToggle: document.getElementById('display-all-speech-toggle'),
   };
 
   const loadSettings = () => {
@@ -343,11 +345,11 @@
   }
   if (elements.characterEnabled) elements.characterEnabled.checked = settings.character.enabled !== false;
   if (elements.characterSize) elements.characterSize.value = settings.character.size;
-  if (elements.characterColor) elements.characterColor.value = settings.character.color;
-  updateSizeLabel(settings.character.size);
-
-  const updateVoiceValue = (valueElement, value, unit = '') => {
-    if (!valueElement) return;
+      if (elements.characterColor) elements.characterColor.value = settings.character.color;
+      if (elements.displayAllSpeechToggle) elements.displayAllSpeechToggle.checked = settings.main.displayAllSpeech;
+      updateSizeLabel(settings.character.size);
+  
+      const updateVoiceValue = (valueElement, value, unit = '') => {    if (!valueElement) return;
     valueElement.textContent = `${value}${unit}`;
   };
   updateVoiceValue(elements.voiceRateValue, settings.main.voiceRate ?? 1.2);
@@ -1542,6 +1544,13 @@
     settings.character.color = event.target.value;
     saveSettings(settings);
     scheduleSaveToServer();
+  });
+
+  elements.displayAllSpeechToggle?.addEventListener('change', (event) => {
+    settings.main.displayAllSpeech = event.target.checked;
+    saveSettings(settings);
+    scheduleSaveToServer();
+    document.dispatchEvent(new CustomEvent('app-settings:updated'));
   });
 
   const applySettingsFromServer = (serverSettings) => {

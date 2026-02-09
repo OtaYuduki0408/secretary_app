@@ -10,6 +10,7 @@ const INPUT_COOLTIME_MS = 500; // 0.5秒の入力クールタイム
 let recognition; // SpeechRecognitionインスタンス
 let currentMode = 'waiting'; // 'waiting' or 'listening'
 let recognitionTimeoutId; // 音声入力タイムアウトのID
+let shouldDisplayAllSpeech = false; // 全ての音声をログに表示するかどうかの設定
 
 // モバイル環境のみの制御
 const isMobileDevice = (() => {
@@ -32,28 +33,41 @@ speechUtterance.pitch = 1;
 
 let userInteracted = false; // ユーザーがページとインタラクトしたかどうかのフラグ
 
-// 設定から呼びかけワードを読み込む
-function loadWakeWordsFromSettings() {
+// 設定からアプリ関連の値を読み込む (呼びかけワード、ログ表示設定など)
+function loadAppSettings() {
     try {
         const raw = localStorage.getItem('appSettings');
-        if (!raw) return;
-        const settings = JSON.parse(raw);
-        const wakeWordsRaw = settings?.main?.wakeWords || '';
-        if (!wakeWordsRaw) return;
-        const words = wakeWordsRaw
-            .split(',')
-            .map(word => word.trim())
-            .filter(Boolean);
-        if (words.length > 0) {
-            WAKE_WORDS = words;
+        if (!raw) {
+            shouldDisplayAllSpeech = false; // デフォルトはOff
+            return;
         }
+        const settings = JSON.parse(raw);
+        
+        // 呼びかけワードを読み込む
+        const wakeWordsRaw = settings?.main?.wakeWords || '';
+        if (wakeWordsRaw) {
+            const words = wakeWordsRaw
+                .split(',')
+                .map(word => word.trim())
+                .filter(Boolean);
+            if (words.length > 0) {
+                WAKE_WORDS = words;
+            }
+        } else {
+            WAKE_WORDS = ['サイレントメイト', 'ぼいすめいと', 'voicemate', '高速実行', 'クイックコマンド']; // デフォルト値
+        }
+
+        // ログ表示設定を読み込む
+        shouldDisplayAllSpeech = settings?.main?.displayAllSpeech ?? false;
+
     } catch (e) {
-        console.warn('呼びかけワード設定の読み込みに失敗しました。', e);
+        console.warn('アプリ設定の読み込みに失敗しました。', e);
+        shouldDisplayAllSpeech = false; // エラー時はデフォルトOff
     }
 }
 
-loadWakeWordsFromSettings();
-document.addEventListener('app-settings:updated', loadWakeWordsFromSettings);
+loadAppSettings();
+document.addEventListener('app-settings:updated', loadAppSettings);
 
 // ============================================================================
 // ヘルパー関数
@@ -684,73 +698,43 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
     recognition.onresult = (event) => {
-
-
-
         const last = event.results.length - 1;
-
-
-
         const transcript = event.results[last][0].transcript;
-
-
-
         const isFinal = event.results[last].isFinal;
-
-
-
-
-
-
 
         let tempLogEntry = document.getElementById('interim-log');
 
-
-
-
-
-
-
-        // --- Diff-based Logging Logic ---
-
-
-
-        if (!tempLogEntry) {
-
-
-
-            tempLogEntry = document.createElement('div');
-
-
-
-            tempLogEntry.id = 'interim-log';
-
-
-
-            tempLogEntry.className = 'voice-log-entry log-interim';
-
-
-
-            voiceLogContainer.appendChild(tempLogEntry);
-
-
-
-            lastTranscript = ''; // Start new line, reset history
-
-            displayOffset = 0;
-
-
-
+        // --- ログ表示の制御ロジック ---
+        let shouldProcessDisplay = false;
+        if (shouldDisplayAllSpeech) {
+            shouldProcessDisplay = true; // 設定がtrueなら常に表示
+        } else {
+            // ウェイクワードが検出された場合、またはlisteningモードの場合のみ表示
+            const wakeWordDetectedInTranscript = WAKE_WORDS.some(word => transcript.toLowerCase().includes(word.toLowerCase()));
+            if (wakeWordDetectedInTranscript || currentMode === 'listening') {
+                shouldProcessDisplay = true;
+            }
         }
 
+        if (!shouldProcessDisplay) {
+            if (tempLogEntry) {
+                tempLogEntry.remove(); // 表示対象外なら中間ログを削除
+            }
+            lastTranscript = ''; // リセット
+            displayOffset = 0; // リセット
+            return; // 処理を終了
+        }
 
-
-
-
-
+        if (!tempLogEntry) {
+            tempLogEntry = document.createElement('div');
+            tempLogEntry.id = 'interim-log';
+            tempLogEntry.className = 'voice-log-entry log-interim';
+            voiceLogContainer.appendChild(tempLogEntry);
+            lastTranscript = ''; // 新しい行の開始、履歴をリセット
+            displayOffset = 0;
+        }
 
         let displayTranscript = transcript;
-
         const findWakeWordIndex = (text) => {
             let earliestIndex = -1;
             WAKE_WORDS.forEach(word => {
@@ -772,181 +756,83 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const wakeIndexInTranscript = findWakeWordIndex(transcript);
 
-        if (currentMode === 'waiting') {
-            const wakeIndex = wakeIndexInTranscript;
-            if (wakeIndex !== -1) {
-                const beforeWake = transcript.slice(0, wakeIndex).trim();
-                if (tempLogEntry) {
-                    if (beforeWake) {
-                        setEntryContent(tempLogEntry, beforeWake);
-                        tempLogEntry.classList.remove('log-interim');
-                        tempLogEntry.removeAttribute('id');
-                    } else {
+        if (!shouldDisplayAllSpeech) { // 全ての音声をデフォルトで表示しない場合
+            if (currentMode === 'waiting') {
+                const wakeIndex = wakeIndexInTranscript;
+                if (wakeIndex !== -1) {
+                    // ウェイクワードが検出された場合のみ、その時点から表示
+                    // 以前の中間ログがあればクリア
+                    if (tempLogEntry && tempLogEntry.id === 'interim-log' && lastTranscript.length > 0) {
+                        tempLogEntry.innerHTML = '';
+                    }
+                    displayOffset = wakeIndex;
+                    displayTranscript = transcript.slice(displayOffset);
+                    lastTranscript = ''; // 新しいセグメントのためにリセット
+                } else {
+                    // ウェイクワードが検出されず、waitingモードの場合は表示しない（shouldProcessDisplayで処理済みだが念のため）
+                    if (tempLogEntry) {
                         tempLogEntry.remove();
                     }
+                    lastTranscript = '';
+                    displayOffset = 0;
+                    return;
                 }
-
-                tempLogEntry = document.createElement('div');
-                tempLogEntry.id = 'interim-log';
-                tempLogEntry.className = 'voice-log-entry log-interim';
-                voiceLogContainer.appendChild(tempLogEntry);
-
-                displayOffset = wakeIndex;
+            } else if (currentMode === 'listening') {
+                // listeningモードでは、ウェイクワード検出位置（もしあれば）から全て表示
+                if (wakeIndexInTranscript !== -1) {
+                    displayOffset = wakeIndexInTranscript;
+                } else if (displayOffset === 0 && lastTranscript === '') {
+                    // ウェイクワードなしでlisteningモードが開始された場合（例：手動切り替え）は、最初から表示
+                    displayOffset = 0;
+                }
                 displayTranscript = transcript.slice(displayOffset);
-                lastTranscript = '';
             }
+        } else { // shouldDisplayAllSpeechがtrueの場合、全て表示
+            displayOffset = 0;
+            displayTranscript = transcript;
         }
 
-        if (currentMode === 'listening') {
-            if (wakeIndexInTranscript !== -1) {
-                displayOffset = wakeIndexInTranscript;
-            } else {
-                displayOffset = 0;
-            }
-        }
-
-        if (displayOffset > 0 && transcript.length >= displayOffset) {
-            displayTranscript = transcript.slice(displayOffset);
-        }
-
-        // Calculate diff and append
-
-
-
+        // 差分を計算して追加
         if (displayTranscript.length > lastTranscript.length) {
-
-
-
             const diff = displayTranscript.substring(lastTranscript.length);
-
-
-
             const diffSpan = document.createElement('span');
-
-
-
             diffSpan.textContent = diff;
-
-
-
             
-
-
-
-            // Highlight wake words within the diff
-
-
-
+            // 差分内のウェイクワードをハイライト
             WAKE_WORDS.forEach(word => {
-
-
-
                 if (diff.toLowerCase().includes(word.toLowerCase())) {
-
-
-
                      diffSpan.innerHTML = highlightWakeWords(diff);
-
-
-
                 }
-
-
-
             });
 
-
-
-
-
-
-
             tempLogEntry.appendChild(diffSpan);
-
-
-
             lastTranscript = displayTranscript;
-
-
-
         }
-
-
-
         
-
-
-
         voiceLogContainer.scrollTop = voiceLogContainer.scrollHeight;
-
-
-
-
-
-
 
         let finalCommand = '';
 
         if (isFinal) {
-            finalCommand = displayOffset > 0
-                ? transcript.slice(displayOffset).trim()
-                : transcript.trim();
+            finalCommand = shouldDisplayAllSpeech ? transcript.trim() : (displayOffset > 0 ? transcript.slice(displayOffset).trim() : transcript.trim());
 
             if (currentMode === 'listening' && finalCommand) {
                 setEntryContent(tempLogEntry, finalCommand);
             }
 
-
-
             tempLogEntry.classList.remove('log-interim');
-
-
-
             tempLogEntry.removeAttribute('id');
-
-
-
-            lastTranscript = ''; // Reset for the next utterance
-            displayOffset = 0;
-
-
-
+            lastTranscript = ''; // 次の発話のためにリセット
+            displayOffset = 0; // 次の発話のためにリセット
         }
-
-
-
         
-
-
-
-        // --- Mode and Command Logic ---
-
-
-
+        // --- モードとコマンドロジック ---
         if (currentMode === 'waiting' && WAKE_WORDS.some(word => transcript.toLowerCase().includes(word.toLowerCase()))) {
-
-
-
             console.log("DEBUG: ウェイクワードを検出");
-
-
-
             playWakeWordSound();
-
-
-
             setMode('listening');
-
-
-
         } 
-
-
-
         
-
-
-
         if (currentMode === 'listening' && isFinal && finalCommand) {
             const now = Date.now();
             if (isMobileDevice) {
@@ -963,9 +849,6 @@ document.addEventListener('DOMContentLoaded', () => {
             console.log(`DEBUG: 音声入力確定: "${transcript.trim()}"`);
             processInput(finalCommand, 'voice');
         }
-
-
-
     };
 
 
