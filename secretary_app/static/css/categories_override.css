@@ -1,0 +1,56 @@
+/*
+ * categories_override.css
+ * expense.css のスタイルを上書きし、categories.html のレイアウトを修正する
+ */
+
+/* --- 1. ボタンと入力フォームの横並び問題を解決 --- */
+
+/* .actionsコンテナのflex設定を強制的に上書き */
+.form-group.actions {
+  display: flex !important;
+  flex-direction: row !important; /* ★重要: 縦並びを強制的に横並びに戻す */
+  align-items: center !important;
+  flex-wrap: wrap; /* 小さい画面では折り返す */
+  gap: 10px;
+}
+
+/* 各要素の幅を再設定 */
+.form-group.actions > * {
+  width: auto !important; /* ★重要: width:100% をリセット */
+  flex-shrink: 0; /* 勝手に縮まないようにする */
+}
+
+/* input要素は残りのスペースを埋めるようにする */
+.form-group.actions input#cat-input {
+  flex-grow: 1;
+  height: 40px; /* 固定値で高さを設定 */
+  min-width: 150px; /* 最小幅を確保 */
+}
+
+/* select要素の幅を固定 */
+.form-group.actions select#cat-type {
+  width: 120px !important;
+}
+
+
+/* --- 2. 「現在の種類」の色の問題を解決 --- */
+
+/* expense.css のスタイルよりも優先されるように !important を使用 */
+.chips .chip.expense {
+  background: var(--app-danger, #ef4444) !important;
+  color: #fff !important;
+  border-color: var(--app-danger, #ef4444) !important;
+}
+
+.chips .chip.income {
+  background: var(--app-success, #10b981) !important;
+  color: #fff !important;
+  border-color: var(--app-success, #10b981) !important;
+}
+
+
+/* --- 3. 注意書きの文字色 --- */
+/* このスタイルは前回成功しているので、念のため残す */
+p.empty {
+  color: var(--app-text, #f8fafc) !important;
+}
