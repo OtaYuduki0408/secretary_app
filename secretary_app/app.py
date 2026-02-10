@@ -1178,33 +1178,59 @@ atexit.register(lambda: scheduler.shutdown())
 def diagnose_ip():
     """
     サーバーの外向きIPアドレスと地域情報を確認するための診断用エンドポイント。
+    IPv4とIPv6の両方の接続を試みます。
     """
+    import requests
+    import subprocess
+    import json
+
+    results = {}
+
+    # --- IPv4 (or default) connection test ---
     try:
-        # requestsライブラリを使用してipinfo.ioにリクエスト
-        import requests
-        
-        # まずはOSデフォルトで接続試行
-        print("--- [DIAGNOSE] Attempting to connect to ipinfo.io (default)... ---")
-        response_default = requests.get('https://ipinfo.io/json', timeout=10)
-        response_default.raise_for_status()
-        data_default = response_default.json()
-        print(f"--- [DIAGNOSE] Default IP Info: {data_default} ---")
-
-        # 結果を格納する辞書
-        result = {
-            'default_connection': data_default
-        }
-
-        # PythonのrequestsでIPv4/v6を明示的に指定するのは複雑なため、
-        # まずはデフォルト接続の結果を返し、それで判断します。
-        # もし詳細な切り分けが必要な場合は、curlをサブプロセスで呼び出すなどの方法も考えられますが、
-        # まずはこの情報で十分なことが多いです。
-
-        return jsonify(result)
-
+        print("--- [DIAGNOSE] Attempting IPv4/default connection to ipinfo.io... ---")
+        response_v4 = requests.get('https://ipinfo.io/json', timeout=10)
+        response_v4.raise_for_status()
+        data_v4 = response_v4.json()
+        print(f"--- [DIAGNOSE] IPv4/default IP Info: {data_v4} ---")
+        results['ipv4_or_default'] = data_v4
     except Exception as e:
-        print(f"--- [DIAGNOSE] Error during IP diagnosis: {e} ---")
-        return jsonify({'error': str(e)}), 500
+        error_message = f"IPv4/default connection failed: {str(e)}"
+        print(f"--- [DIAGNOSE] {error_message} ---")
+        results['ipv4_or_default'] = {'error': error_message}
+
+    # --- IPv6 connection test using curl ---
+    try:
+        print("--- [DIAGNOSE] Attempting IPv6 connection to ipinfo.io via curl... ---")
+        # curlコマンドをサブプロセスとして実行
+        process = subprocess.run(
+            ['curl', '-6', 'https://ipinfo.io/json', '--connect-timeout', '10'],
+            capture_output=True,
+            text=True,
+            check=False  # check=Trueにすると0以外の終了コードで例外が発生する
+        )
+        
+        if process.returncode == 0:
+            data_v6 = json.loads(process.stdout)
+            print(f"--- [DIAGNOSE] IPv6 IP Info: {data_v6} ---")
+            results['ipv6'] = data_v6
+        else:
+            # curlが失敗した場合（IPv6で接続できない、タイムアウトなど）
+            error_message = f"curl command failed with exit code {process.returncode}. Stderr: {process.stderr.strip()}"
+            print(f"--- [DIAGNOSE] {error_message} ---")
+            results['ipv6'] = {'error': error_message}
+    
+    except FileNotFoundError:
+        # curlコマンド自体が見つからない場合
+        error_message = "curl command not found in the environment."
+        print(f"--- [DIAGNOSE] {error_message} ---")
+        results['ipv6'] = {'error': error_message}
+    except Exception as e:
+        error_message = f"IPv6 connection via curl failed with an unexpected exception: {str(e)}"
+        print(f"--- [DIAGNOSE] {error_message} ---")
+        results['ipv6'] = {'error': error_message}
+
+    return jsonify(results)
 
 
 if __name__ == '__main__':
