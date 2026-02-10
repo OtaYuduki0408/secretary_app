@@ -1171,6 +1171,42 @@ def _run_job_with_app_context(func):
 with app.app_context():
     db.create_all()
 atexit.register(lambda: scheduler.shutdown())
+
+
+# ============== 診断用エンドポイント ==============
+@app.route('/diagnose_ip')
+def diagnose_ip():
+    """
+    サーバーの外向きIPアドレスと地域情報を確認するための診断用エンドポイント。
+    """
+    try:
+        # requestsライブラリを使用してipinfo.ioにリクエスト
+        import requests
+        
+        # まずはOSデフォルトで接続試行
+        print("--- [DIAGNOSE] Attempting to connect to ipinfo.io (default)... ---")
+        response_default = requests.get('https://ipinfo.io/json', timeout=10)
+        response_default.raise_for_status()
+        data_default = response_default.json()
+        print(f"--- [DIAGNOSE] Default IP Info: {data_default} ---")
+
+        # 結果を格納する辞書
+        result = {
+            'default_connection': data_default
+        }
+
+        # PythonのrequestsでIPv4/v6を明示的に指定するのは複雑なため、
+        # まずはデフォルト接続の結果を返し、それで判断します。
+        # もし詳細な切り分けが必要な場合は、curlをサブプロセスで呼び出すなどの方法も考えられますが、
+        # まずはこの情報で十分なことが多いです。
+
+        return jsonify(result)
+
+    except Exception as e:
+        print(f"--- [DIAGNOSE] Error during IP diagnosis: {e} ---")
+        return jsonify({'error': str(e)}), 500
+
+
 if __name__ == '__main__':
     if os.environ.get('WERKZEUG_RUN_MAIN') != 'true':
         scheduler.add_job(id='time_trigger_evaluator',func=_run_job_with_app_context,trigger='cron',minute='*',second=0,replace_existing=True,args=[evaluate_triggers])
