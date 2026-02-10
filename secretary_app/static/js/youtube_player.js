@@ -1,6 +1,8 @@
 let player;
 let currentPlaylist = [];
 let currentVideoIndex = 0;
+let youtubeApiReady = false;
+let pendingVideoId = null;
 
 const overlay = document.getElementById('youtube-overlay');
 const playerWrapper = document.getElementById('youtube-player-wrapper');
@@ -9,41 +11,64 @@ const closeBtn = document.getElementById('youtube-close-btn');
 const prevBtn = document.getElementById('youtube-prev-btn');
 const nextBtn = document.getElementById('youtube-next-btn');
 
-// This function creates an <iframe> (and YouTube player)
-// after the API code downloads. It's called automatically.
-// We are declaring it on window because this is a module.
-window.onYouTubeIframeAPIReady = function() {
-  // Player will be initialized on demand.
+// main.html から呼び出されるための関数
+window.setYoutubeApiReady = function(isReady) {
+    if (isReady) {
+        youtubeApiReady = true;
+        console.log("DEBUG: setYoutubeApiReadyが呼ばれ、APIが準備完了になりました。");
+        if (pendingVideoId) {
+            initializePlayer(pendingVideoId);
+            pendingVideoId = null;
+        }
+    }
+};
+
+// playYoutubeVideoが呼ばれる前に、main.htmlで先にフラグが立っていた場合を考慮
+if (window._youtubeApiReadyGlobal) {
+    if (typeof window.setYoutubeApiReady === 'function') {
+        window.setYoutubeApiReady(true);
+    }
 }
+
 
 function initializePlayer(videoId) {
     if (player) {
         player.loadVideoById(videoId);
+        console.log("DEBUG: 既存のプレーヤーに動画をロードしました:", videoId);
     } else {
+        console.log("DEBUG: 新しいYouTubeプレーヤーを初期化します (videoId:", videoId, ")");
         player = new YT.Player('youtube-player', {
             height: '360',
             width: '640',
             videoId: videoId,
             playerVars: {
                 'playsinline': 1,
-                'autoplay': 1
+                'autoplay': 1 // 自動再生を試みる
             },
             events: {
                 'onReady': onPlayerReady,
-                'onStateChange': onPlayerStateChange
+                'onStateChange': onPlayerStateChange,
+                'onError': onPlayerError // エラーハンドリングを追加
             }
         });
     }
 }
 
 function onPlayerReady(event) {
-    event.target.playVideo();
+    console.log("DEBUG: YouTubeプレーヤーの準備ができました。");
+    event.target.playVideo(); // 再生を開始
 }
 
 function onPlayerStateChange(event) {
+    console.log("DEBUG: プレーヤーの状態が変更されました:", event.data);
     if (event.data === YT.PlayerState.ENDED) {
         playNextVideo();
     }
+}
+
+function onPlayerError(event) {
+    console.error("DEBUG: YouTubeプレーヤーでエラーが発生しました:", event.data);
+    playNextVideo(); // エラー発生時も次の動画へ進む
 }
 
 function showOverlay() {
@@ -68,7 +93,11 @@ function updateControls() {
 function playNextVideo() {
     if (currentVideoIndex < currentPlaylist.length - 1) {
         currentVideoIndex++;
-        player.loadVideoById(currentPlaylist[currentVideoIndex].id);
+        if (youtubeApiReady) {
+            initializePlayer(currentPlaylist[currentVideoIndex].id);
+        } else {
+            pendingVideoId = currentPlaylist[currentVideoIndex].id;
+        }
         updateControls();
     } else {
         hideOverlay();
@@ -78,46 +107,41 @@ function playNextVideo() {
 function playPrevVideo() {
     if (currentVideoIndex > 0) {
         currentVideoIndex--;
-        player.loadVideoById(currentPlaylist[currentVideoIndex].id);
+        if (youtubeApiReady) {
+            initializePlayer(currentPlaylist[currentVideoIndex].id);
+        } else {
+            pendingVideoId = currentPlaylist[currentVideoIndex].id;
+        }
         updateControls();
     }
 }
 
-// Public function to be called from other scripts
 export function playYoutubeVideo(searchQuery) {
     if (!searchQuery) return;
 
     fetch(`/api/youtube_search?q=${encodeURIComponent(searchQuery)}`)
-        .then(response => {
-            if (!response.ok) {
-                throw new Error('Network response was not ok');
-            }
-            return response.json();
-        })
+        .then(response => response.json())
         .then(data => {
             if (data.videos && data.videos.length > 0) {
                 currentPlaylist = data.videos;
                 currentVideoIndex = 0;
                 
                 showOverlay();
-                
-                console.log("DEBUG: YouTube動画を検索しました:", currentPlaylist); // ★追加
-                console.log("DEBUG: 再生を試みます (videoId:", currentPlaylist[currentVideoIndex].id, ")"); // ★追加
+                updateControls(); 
 
-                if (typeof YT === 'undefined' || typeof YT.Player === 'undefined') {
-                     console.log("DEBUG: YouTube IFrame APIがまだロードされていません。onYouTubeIframeAPIReadyを再定義します。"); // ★追加
-                     window.onYouTubeIframeAPIReady = function() {
-                         initializePlayer(currentPlaylist[currentVideoIndex].id);
-                         console.log("DEBUG: onYouTubeIframeAPIReadyからinitializePlayerを呼び出しました。"); // ★追加
-                     };
+                console.log("DEBUG: YouTube動画を検索しました:", currentPlaylist);
+                const videoId = currentPlaylist[currentVideoIndex].id;
+                console.log("DEBUG: 再生を試みます (videoId:", videoId, ")");
+
+                if (youtubeApiReady) {
+                    console.log("DEBUG: YouTube IFrame APIは既にロード済みです。initializePlayerを呼び出します。");
+                    initializePlayer(videoId);
                 } else {
-                    console.log("DEBUG: YouTube IFrame APIは既にロードされています。initializePlayerを直接呼び出します。"); // ★追加
-                    initializePlayer(currentPlaylist[currentVideoIndex].id);
+                    console.log("DEBUG: YouTube IFrame APIはまだロードされていません。APIロード後に初期化を試みます。");
+                    pendingVideoId = videoId;
                 }
-                updateControls();
             } else {
                 console.warn("No YouTube videos found for query:", searchQuery);
-                // Here you could dispatch a notification to the user
             }
         })
         .catch(error => {
