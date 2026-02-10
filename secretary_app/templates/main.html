@@ -788,6 +788,7 @@
         <span id="youtube-video-title"></span>
         <button id="youtube-close-btn">&times;</button>
     </div>
+    <div id="youtube-error-message" style="color: red; text-align: center; margin-top: 10px; display: none;"></div>
     <div id="youtube-player"></div>
     <div id="youtube-controls">
       <button id="youtube-prev-btn">前の動画</button>
@@ -796,6 +797,6 @@
   </div>
 </div>
 
-<script src="{{ url_for('static', filename='js/youtube_player.js', _t=config['VERSION_TIMESTAMP']) }}" type="module"></script>
+<script src="{{ url_for('static', filename='js/youtube_player.js', _t=config['VERSION_TIMESTAMP']) }}" type="module" defer></script>
 </body>
 </html>
