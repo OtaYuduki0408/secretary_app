@@ -12,10 +12,10 @@ def get_all_categories():
 def add_category(name: str, type: str):
     try:
         # 重複チェック
-        existing_categories = supabase.table(TABLE_NAME)\\
-            .select("id")\\
-            .eq("name", name)\\
-            .eq("type", type)\\
+        existing_categories = supabase.table(TABLE_NAME)\
+            .select("id")\
+            .eq("name", name)\
+            .eq("type", type)\
             .execute()
         
         if existing_categories.data:
