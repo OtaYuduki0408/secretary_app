@@ -157,8 +157,8 @@ if not GEMINI_API_KEY:
     print('Warning: GEMINI_API_KEY not set. ChatSpaceModel may not work.')
 chat_space_model = ChatSpaceModel(gemini_api_key=GEMINI_API_KEY)
 chat_space_model.set_logger(app.logger)
-calendar_manager = ScheduleManager()
-app.calendar_manager = calendar_manager
+# calendar_manager = ScheduleManager()
+# app.calendar_manager = calendar_manager
 
 QUICK_COMMANDS_FILE = os.path.join(os.path.dirname(__file__), 'quick_commands.json')
 
@@ -178,7 +178,7 @@ GOOGLE_SCOPES = [
     'https://www.googleapis.com/auth/gmail.readonly',
     'https://www.googleapis.com/auth/userinfo.profile',
     'https://www.googleapis.com/auth/userinfo.email',
-    'https://www.googleapis.com/auth/calendar',
+    # 'https://www.googleapis.com/auth/calendar',
 ]
 GOOGLE_REDIRECT_URI = get_google_redirect_uri()
 
@@ -267,52 +267,51 @@ def settings_page():
 @app.route('/calender')
 @login_required
 def calender_page():
-    gcp_api_key = os.getenv('GCP_API_KEY')
-    return render_template('calender.html', gcp_api_key=gcp_api_key)
+    return render_template('calender.html')
 
 
-# ============== Google OAuth ログイン ============== (print statements are kept as they are)
-@app.route('/google-login')
-def google_login():
-    flow = build_web_flow(
-        GOOGLE_SCOPES,
-        redirect_uri=GOOGLE_REDIRECT_URI,
-    )
-    auth_url, state = flow.authorization_url(prompt='consent')
-    session['oauth_state'] = state
-    return redirect(auth_url)
+# ============== Google OAuth ログイン (無効化) ==============
+# @app.route('/google-login')
+# def google_login():
+#     flow = build_web_flow(
+#         GOOGLE_SCOPES,
+#         redirect_uri=GOOGLE_REDIRECT_URI,
+#     )
+#     auth_url, state = flow.authorization_url(prompt='consent')
+#     session['oauth_state'] = state
+#     return redirect(auth_url)
 
-@app.route('/oauth-callback')
-def oauth_callback():
-    state = session.pop('oauth_state', None)
-    flow = build_web_flow(
-        GOOGLE_SCOPES,
-        state=state,
-        redirect_uri=GOOGLE_REDIRECT_URI,
-    )
-    try:
-        flow.fetch_token(authorization_response=request.url)
-    except Exception as e:
-        return render_template('oauth-callback.html', error=str(e))
+# @app.route('/oauth-callback')
+# def oauth_callback():
+#     state = session.pop('oauth_state', None)
+#     flow = build_web_flow(
+#         GOOGLE_SCOPES,
+#         state=state,
+#         redirect_uri=GOOGLE_REDIRECT_URI,
+#     )
+#     try:
+#         flow.fetch_token(authorization_response=request.url)
+#     except Exception as e:
+#         return render_template('oauth-callback.html', error=str(e))
 
-    creds = flow.credentials
-    creds_info = {
-        'token': creds.token,
-        'refresh_token': creds.refresh_token,
-        'token_uri': creds.token_uri,
-        'client_id': creds.client_id,
-        'client_secret': creds.client_secret,
-        'scopes': list(creds.scopes),
-    }
+#     creds = flow.credentials
+#     creds_info = {
+#         'token': creds.token,
+#         'refresh_token': creds.refresh_token,
+#         'token_uri': creds.token_uri,
+#         'client_id': creds.client_id,
+#         'client_secret': creds.client_secret,
+#         'scopes': list(creds.scopes),
+#     }
 
-    sm = ScheduleManager()
-    user = session.get('user') or {}
-    user_id = user.get('id')
-    if not user_id:
-        return render_template('oauth-callback.html', error='ユーザー未ログインのため、認証情報が取得できません')
-    sm.set_credentials_from_info(user_id, creds_info)
+#     sm = ScheduleManager()
+#     user = session.get('user') or {}
+#     user_id = user.get('id')
+#     if not user_id:
+#         return render_template('oauth-callback.html', error='ユーザー未ログインのため、認証情報が取得できません')
+#     sm.set_credentials_from_info(user_id, creds_info)
 
-    return render_template('oauth-callback.html', token=creds.token)
+#     return render_template('oauth-callback.html', token=creds.token)
 
 
 # ============== Finance 画面 ============== (print statements are kept as they are)
@@ -629,38 +628,38 @@ def chat_api_external():
                 response_data['status'] = 'error'
                 print(f"DEBUG: SwitchBot操作失敗。response_data: {response_data}")
 
-    elif action == 'calendar_update':
-        sm = ScheduleManager()
-        # Webブラウザからのアクセスなので、user_idはsessionから取得
-        if user_id and sm.is_google_linked(user_id):
-            try:
-                calendar_id = response_data.get('calendar_id')
-                event_id = response_data.get('event_id')
-                changes = response_data.get('changes', {})
-                if calendar_id and event_id and changes:
-                    ok = sm.update_event(user_id, calendar_id, event_id, changes)
-                    if ok:
-                        response_data['message'] = 'Googleカレンダーのイベントを更新しました'
-                        response_data['status'] = 'success'
-                    else:
-                        response_data['message'] = 'Googleカレンダーの更新に失敗しました'
-                        response_data['status'] = 'error'
-                else:
-                    response_data['message'] = '変更必須のイベントIDが欠落しています'
-                    response_data['status'] = 'error'
-            except Exception as e:
-                response_data['message'] = f'Google繧ｫ繝ｬ繝ｳ繝繝ｼ縺ｮ莠亥ｮ壼､画峩縺ｫ螟ｱ謨励＠縺ｾ縺励◆: {str(e)}'
-                response_data['status'] = 'error'
-        else:
-            # Webブラウザからのアクセスなので、GoogleログインページへのURLを返す
-            purpose = response_data.get('purpose', '')
-            if isinstance(purpose, str) and purpose.startswith('C'):
-                oauth_url = url_for('google_login')
-                response_data['message'] = f'Googleアカウントがリンクされていません。こちらからリンクしてください: {oauth_url}'
-                response_data['status'] = 'needs_link'
-                print(f"DEBUG: Googleアカウントがリンクされていません。response_data: {response_data}")
-                return jsonify(response_data), 401
-            response_data['status'] = 'error'
+    # elif action == 'calendar_update':
+    #     sm = ScheduleManager()
+    #     # Webブラウザからのアクセスなので、user_idはsessionから取得
+    #     if user_id and sm.is_google_linked(user_id):
+    #         try:
+    #             calendar_id = response_data.get('calendar_id')
+    #             event_id = response_data.get('event_id')
+    #             changes = response_data.get('changes', {})
+    #             if calendar_id and event_id and changes:
+    #                 ok = sm.update_event(user_id, calendar_id, event_id, changes)
+    #                 if ok:
+    #                     response_data['message'] = 'Googleカレンダーのイベントを更新しました'
+    #                     response_data['status'] = 'success'
+    #                 else:
+    #                     response_data['message'] = 'Googleカレンダーの更新に失敗しました'
+    #                     response_data['status'] = 'error'
+    #             else:
+    #                 response_data['message'] = '変更必須のイベントIDが欠落しています'
+    #                 response_data['status'] = 'error'
+    #         except Exception as e:
+    #             response_data['message'] = f'Google繧ｫ繝ｬ繝ｳ繝繝ｼ縺ｮ莠亥ｮ壼､画峩縺ｫ螟ｱ謨励＠縺ｾ縺励◆: {str(e)}'
+    #             response_data['status'] = 'error'
+    #     else:
+    #         # Webブラウザからのアクセスなので、GoogleログインページへのURLを返す
+    #         purpose = response_data.get('purpose', '')
+    #         if isinstance(purpose, str) and purpose.startswith('C'):
+    #             oauth_url = url_for('google_login')
+    #             response_data['message'] = f'Googleアカウントがリンクされていません。こちらからリンクしてください: {oauth_url}'
+    #             response_data['status'] = 'needs_link'
+    #             print(f"DEBUG: Googleアカウントがリンクされていません。response_data: {response_data}")
+    #             return jsonify(response_data), 401
+    #         response_data['status'] = 'error'
     triggered_by_voice = _handle_input_triggers(user_input, response_data, user_id)
     if triggered_by_voice:
         response_data['suppress_tts'] = True

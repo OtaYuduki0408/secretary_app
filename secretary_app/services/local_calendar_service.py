@@ -1,92 +1,125 @@
-from models.event import Event
-from order.models import db
+import pytz
 from datetime import datetime
+from supabase_client import supabase
+from flask import current_app
+
+# Supabaseのテーブル名を定義
+TABLE_NAME = 'events'
+# タイムゾーンを定義
+JST = pytz.timezone('Asia/Tokyo')
+UTC = pytz.utc
+
+def _to_utc(dt_str: str) -> str:
+    """
+    JST（日本時間）を想定したISO形式の文字列をUTCのISO形式文字列に変換する。
+    タイムゾーン情報が含まれている場合はそれを尊重する。
+    """
+    if not dt_str:
+        return None
+    try:
+        dt = datetime.fromisoformat(dt_str.replace('Z', '+00:00'))
+        if dt.tzinfo is None:
+            # タイムゾーン情報がない場合、JSTと見なしてUTCに変換
+            dt = JST.localize(dt).astimezone(UTC)
+        else:
+            # タイムゾーン情報がある場合、UTCに変換
+            dt = dt.astimezone(UTC)
+        return dt.isoformat()
+    except (ValueError, TypeError) as e:
+        current_app.logger.error(f"Error converting timestamp to UTC: {dt_str} ({e})")
+        # 変換に失敗した場合は元の値を返すか、エラーを発生させる
+        # ここではNoneを返して、後続の処理でバリデーションすることを期待
+        return None
 
 def add_event(user_id, title, start_time, end_time, description=None):
-    """新しいイベントをDBに追加する"""
+    """新しいイベントをSupabaseに追加する"""
     try:
-        new_event = Event(
-            user_id=user_id,
-            title=title,
-            start_time=start_time,
-            end_time=end_time,
-            description=description
-        )
-        db.session.add(new_event)
-        db.session.commit()
-        return new_event.to_dict()
+        utc_start = _to_utc(start_time)
+        utc_end = _to_utc(end_time)
+
+        if not all([user_id, title, utc_start, utc_end]):
+             raise ValueError("Missing required fields for creating an event.")
+
+        new_event_data = {
+            'user_id': user_id,
+            'title': title,
+            'start_time': utc_start,
+            'end_time': utc_end,
+            'description': description
+        }
+        
+        data, count = supabase.table(TABLE_NAME).insert(new_event_data).execute()
+        
+        if count and len(data[1]) > 0:
+            return data[1][0]
+        else:
+            raise Exception("Failed to insert event into Supabase.")
+            
     except Exception as e:
-        db.session.rollback()
-        print(f"[ERROR] Failed to add event: {e}")
+        current_app.logger.error(f"[ERROR] Failed to add event to Supabase: {e}", exc_info=True)
         raise
 
 def get_events(user_id, start_time_iso=None, end_time_iso=None):
-    """指定されたユーザーと期間のイベントをDBから取得する"""
-    print(f"[DEBUG_SERVICE_CAL] get_events called for user_id: {user_id}, start: {start_time_iso}, end: {end_time_iso}")
+    """指定されたユーザーと期間のイベントをSupabaseから取得する"""
     try:
-        query = Event.query.filter_by(user_id=user_id)
+        query = supabase.table(TABLE_NAME).select("*").eq('user_id', user_id)
 
         if start_time_iso:
-            start_time = datetime.fromisoformat(start_time_iso.replace('Z', '+00:00'))
-            query = query.filter(Event.end_time >= start_time)
+            utc_start = _to_utc(start_time_iso)
+            query = query.filter('end_time', 'gte', utc_start)
 
         if end_time_iso:
-            end_time = datetime.fromisoformat(end_time_iso.replace('Z', '+00:00'))
-            query = query.filter(Event.start_time <= end_time)
+            utc_end = _to_utc(end_time_iso)
+            query = query.filter('start_time', 'lte', utc_end)
 
-        events = query.order_by(Event.start_time.asc()).all()
-        print(f"[DEBUG_SERVICE_CAL] Found {len(events)} events in DB.")
+        data, count = query.order('start_time', desc=False).execute()
         
-        event_dicts = [event.to_dict() for event in events]
-        # Log only a part of the data if it's too long
-        print(f"[DEBUG_SERVICE_CAL] Returning event data (sample): {str(event_dicts)[:500]}")
-        return event_dicts
+        return data[1] if count else []
     except Exception as e:
-        print(f"!!! [DEBUG_SERVICE_CAL] ERROR in get_events: {e}")
-        # In a real app, you might want to use app_logger here and re-raise
+        current_app.logger.error(f"!!! [ERROR] Failed to get events from Supabase: {e}", exc_info=True)
         raise
 
 def get_event_by_id(event_id, user_id):
-    """IDで単一のイベントを取得する"""
+    """IDで単一のイベントをSupabaseから取得する"""
     try:
-        event = Event.query.filter_by(id=event_id, user_id=user_id).first()
-        return event.to_dict() if event else None
+        data, count = supabase.table(TABLE_NAME).select("*").eq('id', event_id).eq('user_id', user_id).maybe_single().execute()
+        return data[1] if count else None
     except Exception as e:
-        print(f"[ERROR] Failed to get event by id: {e}")
+        current_app.logger.error(f"[ERROR] Failed to get event by id from Supabase: {e}", exc_info=True)
         raise
 
 def update_event(event_id, user_id, **kwargs):
-    """イベント情報を更新する"""
+    """イベント情報をSupabaseで更新する"""
     try:
-        event = Event.query.filter_by(id=event_id, user_id=user_id).first()
-        if not event:
+        update_data = {}
+        for key, value in kwargs.items():
+            if key in ['title', 'description']:
+                update_data[key] = value
+            elif key in ['start_time', 'end_time'] and value:
+                update_data[key] = _to_utc(value)
+
+        if not update_data:
+            return None # 更新するフィールドがない
+
+        data, count = supabase.table(TABLE_NAME).update(update_data).eq('id', event_id).eq('user_id', user_id).execute()
+        
+        if count and len(data[1]) > 0:
+            return data[1][0]
+        else:
+            # 更新対象がなかった場合も data[1] は空リスト
             return None
 
-        for key, value in kwargs.items():
-            if hasattr(event, key):
-                # 日時文字列はdatetimeオブジェクトに変換
-                if key in ['start_time', 'end_time'] and isinstance(value, str):
-                    value = datetime.fromisoformat(value.replace('Z', '+00:00'))
-                setattr(event, key, value)
-        
-        db.session.commit()
-        return event.to_dict()
     except Exception as e:
-        db.session.rollback()
-        print(f"[ERROR] Failed to update event: {e}")
+        current_app.logger.error(f"[ERROR] Failed to update event in Supabase: {e}", exc_info=True)
         raise
 
 def delete_event(event_id, user_id):
-    """イベントを削除する"""
+    """イベントをSupabaseから削除する"""
     try:
-        event = Event.query.filter_by(id=event_id, user_id=user_id).first()
-        if not event:
-            return False # 削除対象が見つからない
+        data, count = supabase.table(TABLE_NAME).delete().eq('id', event_id).eq('user_id', user_id).execute()
         
-        db.session.delete(event)
-        db.session.commit()
-        return True
+        # 削除が成功したかどうかを返す
+        return bool(count and len(data[1]) > 0)
     except Exception as e:
-        db.session.rollback()
-        print(f"[ERROR] Failed to delete event: {e}")
+        current_app.logger.error(f"[ERROR] Failed to delete event from Supabase: {e}", exc_info=True)
         raise

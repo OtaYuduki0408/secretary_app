@@ -651,18 +651,23 @@ class ChatSpaceModel:
         added_events = []
         for event_data in list_to_add:
             try:
-                start_time = self._parse_datetime(event_data.get('start_time'))
-                end_time = self._parse_datetime(event_data.get('end_time'))
-                if not start_time: continue
+                if not event_data.get('start_time'): continue
 
-                if not end_time:
-                    end_time = start_time + timedelta(hours=1)
-                
+                # If end_time is not specified, use start_time + 1 hour.
+                # The service layer will handle the conversion.
+                end_time_str = event_data.get('end_time')
+                if not end_time_str:
+                    try:
+                        start_dt = datetime.fromisoformat(event_data['start_time'])
+                        end_time_str = (start_dt + timedelta(hours=1)).isoformat()
+                    except ValueError:
+                        end_time_str = event_data['start_time']
+
                 new_event = local_calendar_service.add_event(
                     user_id=user_id,
                     title=event_data['name'],
-                    start_time=start_time,
-                    end_time=end_time
+                    start_time=event_data['start_time'], # Pass as string
+                    end_time=end_time_str               # Pass as string
                 )
                 added_events.append(new_event)
             except Exception as e:
@@ -687,8 +692,8 @@ class ChatSpaceModel:
         
         start_time_iso, end_time_iso = None, None
         if range_info and range_info[0]:
-            start_time_iso = self._to_rfc3339(range_info[0].get('start_time'))
-            end_time_iso = self._to_rfc3339(range_info[0].get('end_time'))
+            start_time_iso = range_info[0].get('start_time')
+            end_time_iso = range_info[0].get('end_time')
 
         try:
             events = local_calendar_service.get_events(user_id, start_time_iso, end_time_iso)
@@ -777,14 +782,15 @@ class ChatSpaceModel:
                 try:
                     update_payload = {
                         "title": event_data.get("after_name"),
-                        "start_time": self._parse_datetime(event_data.get("after_start_time")),
-                        "end_time": self._parse_datetime(event_data.get("after_end_time")),
+                        "start_time": event_data.get("after_start_time"),
+                        "end_time": event_data.get("after_end_time"),
                     }
-                    # Remove None values so we don't overwrite with nulls
-                    update_payload = {k: v for k, v in update_payload.items() if v is not None}
+                    # Remove None or empty values so we don't overwrite with nulls
+                    update_payload = {k: v for k, v in update_payload.items() if v}
                     
-                    local_calendar_service.update_event(target_id, user_id, **update_payload)
-                    changed_count += 1
+                    if update_payload:
+                        local_calendar_service.update_event(target_id, user_id, **update_payload)
+                        changed_count += 1
                 except Exception as e:
                     print(f"ローカルイベント更新エラー: {e}")
         

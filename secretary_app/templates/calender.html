@@ -177,13 +177,10 @@
   </div>
 
   <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.13/index.global.min.js'></script>
-  <script src='https://cdn.jsdelivr.net/npm/@fullcalendar/google-calendar@6.1.13/index.global.min.js'></script>
+  <!-- <script src='https://cdn.jsdelivr.net/npm/@fullcalendar/google-calendar@6.1.13/index.global.min.js'></script> -->
 
   <script>
     document.addEventListener('DOMContentLoaded', () => {
-        const gcpApiKey = '{{ gcp_api_key|safe }}';
-        if (!gcpApiKey) console.warn('GCP_API_KEYが設定されていません。祝日カレンダーは表示されません。');
-
         const calendarEl = document.getElementById('calendar');
         const modal = document.getElementById('event-modal');
         const $ = s => document.querySelector(s);
@@ -199,14 +196,8 @@
                         id: data.id, title: data.title, start: data.start_time, end: data.end_time,
                         description: data.description, classNames: ['fc-event-local']
                     })
-                },
-                gcpApiKey ? {
-                    googleCalendarId: 'ja.japanese#holiday@group.v.calendar.google.com',
-                    className: 'fc-event-holiday',
-                    display: 'list-item'
-                } : {}
+                }
             ],
-            googleCalendarApiKey: gcpApiKey,
             locale: 'ja',
             buttonText: { today: '今日', month: '月', week: '週', day: '日' },
             allDayText: '終日',
@@ -215,7 +206,6 @@
                 openModal(info.dateStr);
             },
             eventClick: (info) => {
-                if (info.event.source.publicId === 'ja.japanese#holiday@group.v.calendar.google.com') return;
                 const desc = info.event.extendedProps.description ? `\n説明: ${info.event.extendedProps.description}` : '';
                 if (confirm(`イベント「${info.event.title}」を削除しますか？${desc}`)) {
                     api.deleteEvent(info.event.id);
@@ -319,7 +309,6 @@
         });
 
         calendar.setOption('eventClick', (info) => {
-            if (info.event.source.publicId === 'ja.japanese#holiday@group.v.calendar.google.com') return;
             openModal(info.event); // 編集時はeventオブジェクトを渡す
         });
 
