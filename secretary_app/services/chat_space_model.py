@@ -51,6 +51,7 @@ class ChatSpaceModel:
     T:時刻、年月日、曜日確認(行動はn)
     R:過去の命令の修正(行動はn)
     S:SwitchBot iot等。例:電気を消す、エアコンを付ける、鍵を掛ける)(行動はn)
+    Y:YouTubeの音楽を再生する(行動はp)
     Re:強制終了コマンド(処理を停止して等)
     K:計算(行動はn)
     -行動-
@@ -206,6 +207,16 @@ class ChatSpaceModel:
     User input: {input_value}
     Available devices: {available_devices_json}
     """
+
+    YOUTUBE_PLAY_PROMPT_TEMPLATE = """
+    目的: ユーザーが再生したい曲名やアーティスト名、または動画のキーワードを抽出してください。
+    抽出項目:
+    - query (検索キーワード)
+    出力はJSON形式で、'query'キーに文字列を入れてください。
+    例: {{ "query": "米津玄師 Lemon" }}
+    ユーザー入力: {input_value}
+    """
+
     def __init__(self, gemini_api_key: str, calendar_manager=None):
         genai.configure(api_key=gemini_api_key)
         self.model_name = "gemini-2.5-flash"
@@ -587,6 +598,25 @@ class ChatSpaceModel:
                 result["message"] = self._gemini_request(time_prompt)
             elif purpose == "Sn":
                 result["data"], result["message"] = self._get_switchbot_devices(cleaned_input, user_id)
+            elif purpose == "Yp":
+                prompt = self.YOUTUBE_PLAY_PROMPT_TEMPLATE.format(input_value=cleaned_input)
+                raw_json = self._gemini_request(prompt)
+                print(f"--- [DEBUG] raw_json from Gemini for Yp: {raw_json} ---") # ★追加
+                try:
+                    # '```json' と '```' で囲まれた部分を抽出
+                    match = re.search(r"```json\s*([\s\S]*?)\s*```", raw_json, re.I)
+                    s = match.group(1) if match else raw_json
+                    data = json.loads(s)
+                    print(f"--- [DEBUG] Parsed data for Yp: {data} (type: {type(data)}) ---") # ★追加
+                    extracted_query = data.get("query")
+                    if extracted_query:
+                        result["purpose"] = "Yp" # 目的を明示的に設定
+                        result["data"] = {"search_query": extracted_query}
+                        result["message"] = f"「{extracted_query}」をYouTubeで検索します。"
+                    else:
+                        result["message"] = "再生したい曲名を特定できませんでした。"
+                except (json.JSONDecodeError, AttributeError):
+                    result["message"] = "キーワードの抽出に失敗しました。"
             elif purpose in ("Kn", "K"):
                 result["message"] = self._calculate_expression(cleaned_input)
             else:

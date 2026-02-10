@@ -609,3 +609,111 @@ html.theme-light{ --crack-color: rgba(0,0,0,.55); }
     border-left-color: #8b5cf6;
 }
 
+/* YouTube Player Overlay Styles */
+.youtube-overlay-hidden {
+    display: none !important; /* Use important to override other potential display styles */
+}
+
+#youtube-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.85);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 20000; /* Must be on top of other elements */
+    opacity: 0;
+    transition: opacity 0.3s ease-in-out;
+}
+
+#youtube-overlay:not(.youtube-overlay-hidden) {
+    opacity: 1;
+}
+
+#youtube-player-wrapper {
+    background-color: var(--panel, #181818);
+    padding: 16px;
+    border-radius: var(--radius, 12px);
+    box-shadow: var(--shadow, 0 5px 15px rgba(0,0,0,0.5));
+    width: auto;
+    max-width: 90vw;
+    border: 1px solid rgba(255,255,255,.12);
+    transform: scale(0.95);
+    transition: transform 0.3s ease-in-out;
+}
+
+#youtube-overlay:not(.youtube-overlay-hidden) #youtube-player-wrapper {
+    transform: scale(1);
+}
+
+
+#youtube-player-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    color: var(--text, #fff);
+    margin-bottom: 10px;
+}
+
+#youtube-video-title {
+    font-size: 1.1em;
+    font-weight: bold;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-right: 20px;
+    max-width: 580px; /* Adjust as needed */
+}
+
+#youtube-close-btn {
+    background: none;
+    border: none;
+    color: var(--muted, #fff);
+    font-size: 2em;
+    cursor: pointer;
+    line-height: 1;
+    padding: 0 5px;
+    transition: color 0.2s ease;
+}
+#youtube-close-btn:hover {
+    color: var(--text, #fff);
+}
+
+#youtube-player iframe {
+    border-radius: 8px;
+    overflow: hidden; /* Ensures the player respects the border radius */
+    border: none;
+}
+
+#youtube-controls {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 10px;
+}
+
+#youtube-controls button {
+    background-color: var(--panel-2, #333);
+    color: var(--text, #fff);
+    border: 1px solid rgba(255,255,255,.12);
+    padding: 8px 16px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+#youtube-controls button:disabled {
+    background-color: #222;
+    color: #666;
+    cursor: not-allowed;
+    opacity: 0.5;
+}
+
+#youtube-controls button:hover:not(:disabled) {
+    background-color: var(--accent, #444);
+    color: var(--bg-1, #fff);
+}
+
+

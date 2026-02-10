@@ -328,6 +328,19 @@ export async function check_chat_Space(inputValue) {
     console.log("DEBUG: APIからの最終応答:", result); // ここにresultオブジェクト全体をログ出力
     fire('analysis:step', { index: 1, label: '処理完了' });
 
+    // YouTube再生リクエストをハンドル
+    if (result.purpose === 'Yp' && result.data && result.data.search_query) {
+        if (typeof window.playYoutubeVideo === 'function') {
+            window.playYoutubeVideo(result.data.search_query);
+        } else {
+            console.error("YouTube player function (playYoutubeVideo) is not available.");
+            // フォールバックとしてメッセージを読み上げる
+            reader.speak("YouTubeプレーヤーを読み込めませんでした。");
+        }
+        // YouTube再生がトリガーされた場合、以降のメッセージ読み上げなどはスキップ
+        return;
+    }
+
     if (result.abort_command) {
       setAbortCooldown();
       stopStandardTts();

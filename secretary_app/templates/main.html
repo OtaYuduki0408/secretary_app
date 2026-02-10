@@ -768,5 +768,22 @@
   <script src="{{ url_for('static', filename='js/voice_recognition.js', _t=config['VERSION_TIMESTAMP']) }}"></script>
   <script src="{{ url_for('static', filename='js/Parallax_and_Theme_rotation.js', _t=config['VERSION_TIMESTAMP']) }}" type="module"></script>
 <!-- <script src="{{ url_for('static', filename='js/calendar_toast.js') }}" defer></script> -->
+
+<!-- YouTube Player Overlay -->
+<div id="youtube-overlay" class="youtube-overlay-hidden">
+  <div id="youtube-player-wrapper">
+    <div id="youtube-player-header">
+        <span id="youtube-video-title"></span>
+        <button id="youtube-close-btn">&times;</button>
+    </div>
+    <div id="youtube-player"></div>
+    <div id="youtube-controls">
+      <button id="youtube-prev-btn">前の動画</button>
+      <button id="youtube-next-btn">次の動画</button>
+    </div>
+  </div>
+</div>
+
+<script src="{{ url_for('static', filename='js/youtube_player.js', _t=config['VERSION_TIMESTAMP']) }}" type="module"></script>
 </body>
 </html>

@@ -525,6 +525,52 @@ def delete_user_route():
     return jsonify(delete_user(email))
 
 
+# ============== YouTube Search API ==============
+@app.route('/api/youtube_search', methods=['GET'])
+@login_required
+def youtube_search():
+    query = request.args.get('q')
+    if not query:
+        return jsonify({'error': 'Query parameter is required'}), 400
+
+    api_key = os.getenv('GEMINI_API_KEY')
+    if not api_key:
+        return jsonify({'error': 'API key is not configured on the server'}), 500
+
+    try:
+        import requests
+    except ImportError:
+        # If requests is not installed, we can't proceed.
+        print("--- [ERROR] The 'requests' library is not installed. Please run 'pip install requests'. ---")
+        return jsonify({'error': 'The "requests" library is not installed on the server.'}), 500
+
+    search_url = 'https://www.googleapis.com/youtube/v3/search'
+    params = {
+        'part': 'snippet',
+        'q': query,
+        'type': 'video',
+        'maxResults': 10, # Get 10 results to allow for "next" functionality
+        'key': api_key
+    }
+    try:
+        response = requests.get(search_url, params=params)
+        response.raise_for_status() # Raise an exception for bad status codes
+        search_results = response.json()
+
+        videos = []
+        for item in search_results.get('items', []):
+            video_id = item.get('id', {}).get('videoId')
+            title = item.get('snippet', {}).get('title')
+            if video_id and title:
+                videos.append({'id': video_id, 'title': title})
+        
+        return jsonify({'videos': videos})
+
+    except requests.exceptions.RequestException as e:
+        print(f"--- [ERROR] YouTube Search API request failed: {e} ---")
+        return jsonify({'error': str(e)}), 500
+
+
 # ============== Chat API・SwitchBot/カレンダー更新処理 ============== (print statements are kept as they are)
 
 
