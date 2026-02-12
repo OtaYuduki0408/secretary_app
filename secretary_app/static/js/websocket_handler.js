@@ -5,6 +5,8 @@ let currentAudioSource = null; // 現在再生中のオーディオソースを�
 let lastPayloadSignature = '';
 let lastPayloadExecutedAt = 0;
 const DUPLICATE_PAYLOAD_SUPPRESS_MS = 8000;
+let isWebSocketConnected = false;
+let fallbackBootstrapTimer = null;
 
 // =====================================================================
 // ヘルパー関数
@@ -481,12 +483,26 @@ function setupWebSocket() {
 
     socket.on('connect', () => {
         console.log('WebSocketサーバーに接続しました (SID: ' + socket.id + ')');
+        isWebSocketConnected = true;
+        stopPendingActionPolling();
+        if (fallbackBootstrapTimer) {
+            clearTimeout(fallbackBootstrapTimer);
+            fallbackBootstrapTimer = null;
+        }
         const userId = document.body.dataset.userId;
         if (userId) socket.emit('authenticate', { 'user_id': userId });
     });
 
-    socket.on('disconnect', () => console.warn('WebSocketサーバーから切断されました。'));
-    socket.on('connect_error', (err) => console.error('WebSocket接続エラー:', err.message));
+    socket.on('disconnect', () => {
+        isWebSocketConnected = false;
+        console.warn('WebSocketサーバーから切断されました。フォールバックのpending_actionsポーリングを開始します。');
+        startPendingActionPolling();
+    });
+    socket.on('connect_error', (err) => {
+        isWebSocketConnected = false;
+        console.error('WebSocket接続エラー:', err.message);
+        startPendingActionPolling();
+    });
 
     socket.on('dispatch_command', async (order_data) => {
         console.log('サーバーからコマンドディスパッチを受け取りました:', order_data);
@@ -538,8 +554,16 @@ async function pollPendingActions() {
 
 function startPendingActionPolling() {
     if (pendingActionPollTimer) return;
+    console.log('[DEBUG_WS] pending_actionsポーリングを開始します。');
     pollPendingActions();
     pendingActionPollTimer = setInterval(pollPendingActions, 3000);
+}
+
+function stopPendingActionPolling() {
+    if (!pendingActionPollTimer) return;
+    clearInterval(pendingActionPollTimer);
+    pendingActionPollTimer = null;
+    console.log('[DEBUG_WS] pending_actionsポーリングを停止しました。');
 }
 
 if (document.readyState === 'loading') {
@@ -548,10 +572,22 @@ if (document.readyState === 'loading') {
     setupWebSocket();
 }
 
+function bootstrapPendingPollingFallback() {
+    // WebSocketが一定時間で確立しない場合のみフォールバックを起動する。
+    if (fallbackBootstrapTimer) return;
+    fallbackBootstrapTimer = setTimeout(() => {
+        if (!isWebSocketConnected) {
+            console.warn('[DEBUG_WS] WebSocket未接続のため、pending_actionsポーリングをフォールバック起動します。');
+            startPendingActionPolling();
+        }
+        fallbackBootstrapTimer = null;
+    }, 5000);
+}
+
 if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', startPendingActionPolling);
+    document.addEventListener('DOMContentLoaded', bootstrapPendingPollingFallback);
 } else {
-    startPendingActionPolling();
+    bootstrapPendingPollingFallback();
 }
 
 // Keep-alive for Render
