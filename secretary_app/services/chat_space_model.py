@@ -453,6 +453,33 @@ class ChatSpaceModel:
             return f"{len(changed_events)}件の予定を変更しました。"
         return f"{len(changed_events)}件の予定を変更しました。変更内容は、" + "、".join(details) + "です。"
 
+    def _build_added_finance_message(self, added_records: list[dict]) -> str:
+        if not added_records:
+            return "収支の追加は行われませんでした。"
+
+        details = []
+        for record in added_records:
+            if not isinstance(record, dict):
+                continue
+            record_type = "収入" if record.get("type") == "income" else "支出"
+            category = (record.get("category") or "未分類").strip()
+            amount = record.get("amount")
+            date = (record.get("date") or "").strip()
+
+            try:
+                amount_text = f"{int(amount):,}円"
+            except (TypeError, ValueError):
+                amount_text = f"{amount}円" if amount is not None else "金額不明"
+
+            if date:
+                details.append(f"{date}の{record_type}として{category}を{amount_text}")
+            else:
+                details.append(f"{record_type}として{category}を{amount_text}")
+
+        if not details:
+            return f"{len(added_records)}件の収支を追加しました。"
+        return f"{len(added_records)}件の収支を追加しました。追加内容は、" + "、".join(details) + "です。"
+
     def _to_prompt_calendar_task_list(self, task_list: list[dict]) -> list[dict]:
         """Geminiに渡す予定一覧をJST文字列へ正規化する"""
         prompt_list: list[dict] = []
@@ -1056,7 +1083,7 @@ class ChatSpaceModel:
         raw = self._gemini_request(prompt)
         income_expenses_to_add = self._parse_income_expense_list(raw)
 
-        added_info = []
+        added_info: list[dict] = []
         if not income_expenses_to_add:
             return None, "収支の追加に失敗しました。入力内容を確認してください。"
 
@@ -1070,12 +1097,16 @@ class ChatSpaceModel:
                     "user_id": user_id
                 }
                 created_record = add_finance_record(data, user_id)
-                added_info.append(created_record)
+                created_rows = created_record.get("data") if isinstance(created_record, dict) else None
+                if isinstance(created_rows, list) and created_rows:
+                    added_info.extend([row for row in created_rows if isinstance(row, dict)])
+                elif isinstance(created_record, dict) and not created_record.get("error"):
+                    added_info.append(data)
             except Exception as e:
                 print(f"収支登録エラー: {e}")
 
         if added_info:
-            message = f"{len(added_info)}件の収支を追加しました。"
+            message = self._build_added_finance_message(added_info)
             return added_info, message
 
         return None, "収支の追加は行われませんでした。"
