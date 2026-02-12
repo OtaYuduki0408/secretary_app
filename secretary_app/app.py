@@ -729,7 +729,11 @@ import pytz
 JST = pytz.timezone('Asia/Tokyo')
 from services import local_calendar_service
 from services.memo_service import get_all_memos as get_all_memo_records
-from services.weather_service import get_weather_forecast_message, DEFAULT_AREA_CODE
+from services.weather_service import (
+    get_weather_forecast_message,
+    DEFAULT_AREA_CODE,
+    resolve_area_code_from_address,
+)
 
 
 def _normalize_keyword_list(raw):
@@ -993,14 +997,26 @@ def _enrich_actions_for_dispatch(order_payload, user_id, app_logger, source="Unk
             elif category == 'メモ' and sub == '読み上げ':
                 action['detail'] = _enrich_memo_read(detail, user_id, now_jst, app_logger)
             elif category == '天気' and sub == '読み上げ':
-                area_code = DEFAULT_AREA_CODE 
+                address = detail.get('address', '')
+                area_code = resolve_area_code_from_address(address, DEFAULT_AREA_CODE)
                 content = detail.get('content', ["天気", "気温"])
                 range_type = detail.get('range', "今日")
                 granularity = detail.get('granularity', "1日ごと")
+                hours = detail.get('hours', [])
                 
-                app_logger.debug(f"[DEBUG_ENRICH] Weather action details: area={area_code}, content={content}, range={range_type}, granularity={granularity}")
+                app_logger.debug(
+                    f"[DEBUG_ENRICH] Weather action details: area={area_code}, address={address}, "
+                    f"content={content}, range={range_type}, granularity={granularity}, hours={hours}"
+                )
                 
-                weather_message = get_weather_forecast_message(area_code, content, range_type, granularity)
+                weather_message = get_weather_forecast_message(
+                    area_code=area_code,
+                    content=content,
+                    range_type=range_type,
+                    granularity=granularity,
+                    hours=hours,
+                    now_jst=now_jst,
+                )
                 
                 app_logger.debug(f"[DEBUG_ENRICH] get_weather_forecast_message returned: {weather_message}")
                 

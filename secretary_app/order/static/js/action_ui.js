@@ -1,5 +1,6 @@
 import { updateActionSummary } from './ui_helpers.js';
 import { fetchGenres } from './command_manager.js';
+import { geocodeAddress } from './geolocation.js';
 
 function normalizeTimeReadSelections(raw) {
   const list = Array.isArray(raw) ? raw : (raw ? [raw] : []);
@@ -397,29 +398,40 @@ export function createActionUI(prefix = '', initialValue = {}) {
     // 新しく追加する case "天気":
     case "天気":
       if (sub === "読み上げ") {
+        const hourButtons = [0, 3, 6, 9, 12, 15, 18, 21]
+          .map((h) => `<button type="button" data-value="${h}" class="action-detail-weather-hour-btn">${h}</button>`)
+          .join('');
+
         detailContainer.innerHTML = `
           <div class="co-fieldset">
             <label>読み上げ内容</label>
             <div class="co-day-of-week-selector action-detail-weather-content">
-              <button type="button" data-value="天気">天気</button>
-              <button type="button" data-value="気温">気温</button>
+              <button type="button" data-value="weather">天気</button>
+              <button type="button" data-value="temp">気温</button>
+              <button type="button" data-value="pop">降水確率</button>
             </div>
           </div>
           <div class="co-fieldset">
             <label>読み上げ範囲</label>
             <div class="co-day-of-week-selector action-detail-weather-range">
-              <button type="button" data-value="今日">今日</button>
-              <button type="button" data-value="午前">午前</button>
-              <button type="button" data-value="午後">午後</button>
-              <button type="button" data-value="今週">今週</button>
+              <button type="button" data-value="today">今日</button>
+              <button type="button" data-value="tomorrow">明日</button>
+              <button type="button" data-value="weekly">週間</button>
             </div>
           </div>
-          <div class="co-fieldset">
-            <label>詳しさ</label>
-            <div class="co-day-of-week-selector action-detail-weather-granularity">
-              <button type="button" data-value="午前午後ごと">午前午後ごと</button>
-              <button type="button" data-value="1日ごと">1日ごと</button>
+          <div class="co-fieldset action-detail-weather-hours-wrap">
+            <label>時刻（複数選択可）</label>
+            <div class="co-day-of-week-selector action-detail-weather-hours">
+              ${hourButtons}
             </div>
+            <small>実行時刻が読み上げ対象の時刻を過ぎている場合、その時刻以前の情報は読み上げません。</small>
+          </div>
+          <div class="co-fieldset">
+            <label>場所</label>
+            <input type="text" class="action-detail-weather-address trigger-input" placeholder="例: 群馬県高崎市">
+            <input type="text" class="action-detail-weather-lat trigger-input" placeholder="緯度" readonly>
+            <input type="text" class="action-detail-weather-lng trigger-input" placeholder="経度" readonly>
+            <div class="action-detail-weather-location-message" style="margin-top:6px;font-size:12px;"></div>
           </div>
         `;
 
@@ -449,12 +461,87 @@ export function createActionUI(prefix = '', initialValue = {}) {
           }
         };
 
-        // 読み上げ内容は複数選択
-        setupButtonSelector('.action-detail-weather-content', initialValue.content);
-        // 読み上げ範囲は単一選択
-        setupButtonSelector('.action-detail-weather-range', initialValue.range, true);
-        // 詳しさは単一選択
-        setupButtonSelector('.action-detail-weather-granularity', initialValue.granularity, true);
+        const normalizedContent = (Array.isArray(initialValue.content) ? initialValue.content : (initialValue.content ? [initialValue.content] : []))
+          .map((v) => ({ 天気: 'weather', 気温: 'temp', 降水確率: 'pop' }[v] || v));
+        const normalizedRange = ({ 今日: 'today', 明日: 'tomorrow', 週間: 'weekly', 今週: 'weekly' }[initialValue.range] || initialValue.range);
+
+        setupButtonSelector('.action-detail-weather-content', normalizedContent);
+        setupButtonSelector('.action-detail-weather-range', normalizedRange, true);
+        setupButtonSelector('.action-detail-weather-hours', initialValue.hours);
+
+        const setInputValue = (selector, value) => {
+          const el = detailContainer.querySelector(selector);
+          if (el) el.value = value || '';
+        };
+
+        const enforceWeatherSelectionRules = () => {
+          const selectedRange = detailContainer.querySelector('.action-detail-weather-range button.selected')?.dataset.value;
+          const selectedContents = [...detailContainer.querySelectorAll('.action-detail-weather-content button.selected')].map((b) => b.dataset.value);
+          const hasPop = selectedContents.includes('pop');
+          const hourWrap = detailContainer.querySelector('.action-detail-weather-hours-wrap');
+          const hourButtonsEls = [...detailContainer.querySelectorAll('.action-detail-weather-hours button')];
+
+          if (selectedRange === 'weekly') {
+            if (hourWrap) hourWrap.style.display = 'none';
+            return;
+          }
+          if (hourWrap) hourWrap.style.display = '';
+
+          hourButtonsEls.forEach((btn) => {
+            const hour = Number(btn.dataset.value);
+            const canUse = !hasPop || [0, 6, 12, 18].includes(hour);
+            btn.disabled = !canUse;
+            if (!canUse) btn.classList.remove('selected');
+          });
+        };
+
+        const addressInput = detailContainer.querySelector('.action-detail-weather-address');
+        const locationMessage = detailContainer.querySelector('.action-detail-weather-location-message');
+        let geocodeTimer = null;
+
+        const geocodeNow = async () => {
+          const address = (addressInput?.value || '').trim();
+          if (!address) {
+            setInputValue('.action-detail-weather-lat', '');
+            setInputValue('.action-detail-weather-lng', '');
+            if (locationMessage) locationMessage.textContent = '';
+            return;
+          }
+          if (locationMessage) locationMessage.textContent = '場所を検索しています...';
+          const result = await geocodeAddress(address, window.gcp_api_key);
+          if (result && result.type === 'success') {
+            setInputValue('.action-detail-weather-lat', result.lat);
+            setInputValue('.action-detail-weather-lng', result.lng);
+            if (locationMessage) locationMessage.textContent = '場所と緯度経度を取得しました。';
+          } else {
+            setInputValue('.action-detail-weather-lat', '');
+            setInputValue('.action-detail-weather-lng', '');
+            if (locationMessage) locationMessage.textContent = '場所の取得に失敗しました。';
+          }
+        };
+
+        if (addressInput) {
+          addressInput.value = initialValue.address || '';
+          addressInput.addEventListener('input', () => {
+            if (geocodeTimer) clearTimeout(geocodeTimer);
+            geocodeTimer = setTimeout(geocodeNow, 500);
+          });
+        }
+        setInputValue('.action-detail-weather-lat', initialValue.latitude || '');
+        setInputValue('.action-detail-weather-lng', initialValue.longitude || '');
+
+        detailContainer.querySelector('.action-detail-weather-content')?.addEventListener('click', enforceWeatherSelectionRules);
+        detailContainer.querySelector('.action-detail-weather-range')?.addEventListener('click', enforceWeatherSelectionRules);
+
+        if (!detailContainer.querySelector('.action-detail-weather-content button.selected')) {
+          const defaultContent = detailContainer.querySelector('.action-detail-weather-content button[data-value="weather"]');
+          if (defaultContent) defaultContent.classList.add('selected');
+        }
+        if (!detailContainer.querySelector('.action-detail-weather-range button.selected')) {
+          const defaultRange = detailContainer.querySelector('.action-detail-weather-range button[data-value="today"]');
+          if (defaultRange) defaultRange.classList.add('selected');
+        }
+        enforceWeatherSelectionRules();
 
       }
       break;

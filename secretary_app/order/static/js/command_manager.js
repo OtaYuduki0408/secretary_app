@@ -139,7 +139,10 @@ function parseActionItem(actionItem) {
       if (sub === "読み上げ") {
         detail.content = [...detailContainer.querySelectorAll('.action-detail-weather-content button.selected')].map(btn => btn.dataset.value);
         detail.range = detailContainer.querySelector('.action-detail-weather-range button.selected')?.dataset.value;
-        detail.granularity = detailContainer.querySelector('.action-detail-weather-granularity button.selected')?.dataset.value;
+        detail.hours = [...detailContainer.querySelectorAll('.action-detail-weather-hours button.selected')].map(btn => Number(btn.dataset.value));
+        detail.address = detailContainer.querySelector('.action-detail-weather-address')?.value || '';
+        detail.latitude = detailContainer.querySelector('.action-detail-weather-lat')?.value || '';
+        detail.longitude = detailContainer.querySelector('.action-detail-weather-lng')?.value || '';
       }
       break;
 
