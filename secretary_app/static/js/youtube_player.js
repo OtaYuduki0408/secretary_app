@@ -13,6 +13,13 @@ const closeBtn = document.getElementById('youtube-close-btn');
 const prevBtn = document.getElementById('youtube-prev-btn');
 const nextBtn = document.getElementById('youtube-next-btn');
 
+function extractVideoId(url) {
+    if (!url) return null;
+    const regex = /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:[^\/\n\s]+\/\S+\/|(?:v|e(?:mbed)?)\/|\S*?[?&]v=)|youtu\.be\/)([a-zA-Z0-9_-]{11})/;
+    const matches = url.match(regex);
+    return matches ? matches[1] : null;
+}
+
 // main.html から呼び出されるための関数
 window.setYoutubeApiReady = function(isReady) {
     if (isReady) {
@@ -122,10 +129,16 @@ function hideOverlay() {
 }
 
 function updateControls() {
-    prevBtn.disabled = currentVideoIndex === 0;
-    nextBtn.disabled = currentVideoIndex >= currentPlaylist.length - 1;
+    const isPlaylist = currentPlaylist.length > 1;
+    prevBtn.style.display = isPlaylist ? 'inline-block' : 'none';
+    nextBtn.style.display = isPlaylist ? 'inline-block' : 'none';
+
+    if (isPlaylist) {
+        prevBtn.disabled = currentVideoIndex === 0;
+        nextBtn.disabled = currentVideoIndex >= currentPlaylist.length - 1;
+    }
     if (currentPlaylist[currentVideoIndex]) {
-        videoTitle.textContent = currentPlaylist[currentVideoIndex].title;
+        videoTitle.textContent = currentPlaylist[currentVideoIndex].title || '動画を再生中';
     }
 }
 
@@ -156,39 +169,56 @@ function playPrevVideo() {
     }
 }
 
-export function playYoutubeVideo(searchQuery) {
-    if (!searchQuery) return;
+export function playYoutubeVideo(queryOrUrl) {
+    if (!queryOrUrl) return;
     
-    errorCount = 0; // ★追加: 再生開始時にエラーカウントをリセット
+    errorCount = 0;
 
-    fetch(`/api/youtube_search?q=${encodeURIComponent(searchQuery)}`)
-        .then(response => response.json())
-        .then(data => {
-            if (data.videos && data.videos.length > 0) {
-                currentPlaylist = data.videos;
-                currentVideoIndex = 0;
-                
-                showOverlay();
-                updateControls(); 
+    const videoId = extractVideoId(queryOrUrl);
 
-                console.log("DEBUG: YouTube動画を検索しました:", currentPlaylist);
-                const videoId = currentPlaylist[currentVideoIndex].id;
-                console.log("DEBUG: 再生を試みます (videoId:", videoId, ")");
+    if (videoId) {
+        // URLから直接再生
+        console.log("DEBUG: URLから動画IDを抽出しました:", videoId);
+        currentPlaylist = [{ id: videoId, title: '指定されたURLの動画' }];
+        currentVideoIndex = 0;
+        
+        showOverlay();
+        updateControls();
 
-                if (youtubeApiReady) {
-                    console.log("DEBUG: YouTube IFrame APIは既にロード済みです。initializePlayerを呼び出します。");
-                    initializePlayer(videoId);
+        if (youtubeApiReady) {
+            initializePlayer(videoId);
+        } else {
+            pendingVideoId = videoId;
+        }
+    } else {
+        // キーワードで検索
+        fetch(`/api/youtube_search?q=${encodeURIComponent(queryOrUrl)}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.videos && data.videos.length > 0) {
+                    currentPlaylist = data.videos;
+                    currentVideoIndex = 0;
+                    
+                    showOverlay();
+                    updateControls(); 
+
+                    console.log("DEBUG: YouTube動画を検索しました:", currentPlaylist);
+                    const firstVideoId = currentPlaylist[currentVideoIndex].id;
+                    console.log("DEBUG: 再生を試みます (videoId:", firstVideoId, ")");
+
+                    if (youtubeApiReady) {
+                        initializePlayer(firstVideoId);
+                    } else {
+                        pendingVideoId = firstVideoId;
+                    }
                 } else {
-                    console.log("DEBUG: YouTube IFrame APIはまだロードされていません。APIロード後に初期化を試みます。");
-                    pendingVideoId = videoId;
+                    console.warn("No YouTube videos found for query:", queryOrUrl);
                 }
-            } else {
-                console.warn("No YouTube videos found for query:", searchQuery);
-            }
-        })
-        .catch(error => {
-            console.error('There has been a problem with your fetch operation:', error);
-        });
+            })
+            .catch(error => {
+                console.error('There has been a problem with your fetch operation:', error);
+            });
+    }
 }
 
 // Event Listeners

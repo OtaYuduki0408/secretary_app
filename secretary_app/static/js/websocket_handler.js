@@ -318,22 +318,20 @@ async function executeAction(action) {
         messageHtml = `<h3>${overlayTitle}</h3><p>${textToSpeak.replace(/。/g, '。<br>')}</p>`;
     } else if (action.category === 'Youtube' && action.sub === '再生') {
         overlayTitle = "Youtube 再生";
-        const searchQuery = detail.search_query;
-        
-        if (searchQuery && typeof window.playYoutubeVideo === 'function') {
-            textToSpeak = `${searchQuery}を再生します。`;
-            
-            // 先に「再生します」と喋ってから再生を開始する
-            await speak(textToSpeak); 
-            window.playYoutubeVideo(searchQuery);
+        const { mode, search_query, video_url } = detail;
+        const queryOrUrl = mode === 'url' ? video_url : search_query;
 
-            // playYoutubeVideoが呼ばれたらこの関数の役目は終わるので、
-            // オーバーレイ表示や後続のspeakは行わない
+        if (queryOrUrl && typeof window.playYoutubeVideo === 'function') {
+            textToSpeak = `${mode === 'url' ? 'URLの動画' : search_query}を再生します。`;
+            
+            await speak(textToSpeak); 
+            window.playYoutubeVideo(queryOrUrl);
+
             return; 
 
         } else {
-            textToSpeak = "Youtubeの再生機能が見つからないか、検索キーワードが指定されていません。";
-            console.error(textToSpeak);
+            textToSpeak = "Youtubeの再生情報が正しく設定されていません。";
+            console.error(textToSpeak, detail);
             messageHtml = `<h3>${overlayTitle}</h3><p>${textToSpeak}</p>`;
         }
     }

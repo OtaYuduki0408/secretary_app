@@ -118,7 +118,13 @@ function parseActionItem(actionItem) {
     // 新しく追加する case "Youtube":
     case "Youtube":
       if (sub === "再生") {
-        detail.search_query = detailContainer.querySelector(".action-detail-youtube-query")?.value;
+        const mode = detailContainer.querySelector('input[name*="youtube_mode"]:checked')?.value;
+        detail.mode = mode;
+        if (mode === 'search') {
+          detail.search_query = detailContainer.querySelector(".action-detail-youtube-query")?.value;
+        } else if (mode === 'url') {
+          detail.video_url = detailContainer.querySelector(".action-detail-youtube-url")?.value;
+        }
       }
       break;
   }

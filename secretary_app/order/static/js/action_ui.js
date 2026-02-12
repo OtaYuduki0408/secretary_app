@@ -442,11 +442,43 @@ export function createActionUI(prefix = '', initialValue = {}) {
     case "Youtube":
       if (sub === "再生") {
         const subNotice = subSelect?.disabled ? `<div class="co-help-text">サブカテゴリ: ${sub}</div>` : "";
+        const mode = initialValue.mode || 'search';
+        
         detailContainer.innerHTML = `
           ${subNotice}
-          <label>検索キーワード</label>
-          <input type="text" class="action-detail-youtube-query" placeholder="再生したい動画のキーワード" value="${initialValue.search_query || ''}">
+          <div class="co-fieldset" style="margin-top: 10px;">
+            <label>再生方法</label>
+            <div class="co-radio-group">
+              <input type="radio" id="${prefix}youtube_mode_search" name="${prefix}youtube_mode" value="search" ${mode === 'search' ? 'checked' : ''}>
+              <label for="${prefix}youtube_mode_search">キーワードで検索</label>
+              <input type="radio" id="${prefix}youtube_mode_url" name="${prefix}youtube_mode" value="url" ${mode === 'url' ? 'checked' : ''}>
+              <label for="${prefix}youtube_mode_url">URLを直接指定</label>
+            </div>
+          </div>
+          <div id="${prefix}youtube_input_container"></div>
         `;
+
+        const renderYoutubeInput = () => {
+          const selectedMode = detailContainer.querySelector(`input[name="${prefix}youtube_mode"]:checked`).value;
+          const inputContainer = detailContainer.querySelector(`#${prefix}youtube_input_container`);
+          if (selectedMode === 'search') {
+            inputContainer.innerHTML = `
+              <label>検索キーワード</label>
+              <input type="text" class="action-detail-youtube-query" placeholder="再生したい動画のキーワード" value="${initialValue.search_query || ''}">
+            `;
+          } else {
+            inputContainer.innerHTML = `
+              <label>動画のURL</label>
+              <input type="text" class="action-detail-youtube-url" placeholder="https://www.youtube.com/watch?v=..." value="${initialValue.video_url || ''}">
+            `;
+          }
+        };
+
+        detailContainer.querySelectorAll(`input[name="${prefix}youtube_mode"]`).forEach(radio => {
+          radio.addEventListener('change', renderYoutubeInput);
+        });
+        
+        renderYoutubeInput(); // 初期表示
       }
       break;
 
