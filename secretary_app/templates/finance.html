@@ -84,13 +84,18 @@
       
       <details open>
         <summary class="fd-collapsible-summary fd-list-summary">一覧</summary>
+        <div class="fd-table-actions">
+          <button id="finance-delete-mode-btn" class="fd-action-btn" type="button">削除モード</button>
+          <button id="finance-execute-delete-btn" class="fd-action-btn danger" type="button" style="display:none;">選択削除</button>
+        </div>
         <table id="financeTable">
           <thead>
             <tr>
+                  <th class="fd-check-col" style="display:none;"><input type="checkbox" id="finance-select-all"></th>
                   <th>日付</th>
                   <th>タイプ</th>
                   <th>カテゴリ</th>
-                  <th>内容</th>
+                  <th>メモ</th>
                   <th>金額</th>
               </tr>
           </thead>
@@ -166,6 +171,36 @@
     <div class="fd-wheel-actions">
       <button type="button" class="fd-wheel-cancel">キャンセル</button>
       <button type="button" class="fd-wheel-ok">決定</button>
+    </div>
+  </div>
+</div>
+
+<div id="finance-edit-overlay" class="fd-edit-overlay" hidden>
+  <div class="fd-edit-dialog" role="dialog" aria-modal="true" aria-labelledby="finance-edit-title">
+    <h3 id="finance-edit-title">収支を編集</h3>
+    <div class="fd-edit-grid">
+      <label>日時
+        <input id="finance-edit-date" type="datetime-local" class="fd-input">
+      </label>
+      <label>タイプ
+        <select id="finance-edit-type" class="fd-select">
+          <option value="expense">支出</option>
+          <option value="income">収入</option>
+        </select>
+      </label>
+      <label>カテゴリ
+        <input id="finance-edit-category" type="text" class="fd-input">
+      </label>
+      <label>金額
+        <input id="finance-edit-amount" type="number" min="0" class="fd-input">
+      </label>
+      <label>メモ
+        <input id="finance-edit-memo" type="text" class="fd-input">
+      </label>
+    </div>
+    <div class="fd-edit-actions">
+      <button id="finance-edit-cancel" type="button">キャンセル</button>
+      <button id="finance-edit-save" type="button">保存</button>
     </div>
   </div>
 </div>

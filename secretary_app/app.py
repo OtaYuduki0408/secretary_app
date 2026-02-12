@@ -32,7 +32,7 @@ from services.category_service import (
     get_all_categories, add_category, delete_category, clear_all_categories
 )
 from services.auth_service import register_user, login_user
-from services.expense_service import add_finance_record, delete_finance_record, delete_finance_records
+from services.expense_service import add_finance_record, delete_finance_record, delete_finance_records, update_finance_record
 from services.finance_service import (
     get_finance_summary,
     get_all_finance_records,
@@ -444,6 +444,13 @@ def bulk_delete_finance_records_route():
 def delete_finance_record_route(record_id):
     user_id = session.get('user', {}).get('id')
     return jsonify(delete_finance_record(record_id, user_id))
+
+@app.route('/api/finance/<string:record_id>', methods=['PUT'])
+@login_required
+def update_finance_record_route(record_id):
+    user_id = session.get('user', {}).get('id')
+    data = request.get_json() or {}
+    return jsonify(update_finance_record(record_id, data, user_id))
 
 @app.route('/api/finance/summary', methods=['GET'])
 @login_required

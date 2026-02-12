@@ -1,5 +1,4 @@
 document.addEventListener("DOMContentLoaded", () => {
-  // --- DOM Elements ---
   const balanceEl = document.getElementById("balance");
   const monthlyEl = document.getElementById("monthly");
   const dailyEl = document.getElementById("daily");
@@ -16,32 +15,59 @@ document.addEventListener("DOMContentLoaded", () => {
   const selectAllCheckbox = document.getElementById("select-all-checkbox");
   const recordsTable = document.getElementById("records");
 
-  // --- State ---
+  const editOverlay = document.getElementById("expense-edit-overlay");
+  const editDateEl = document.getElementById("edit-date");
+  const editTypeEl = document.getElementById("edit-type");
+  const editCategoryEl = document.getElementById("edit-category");
+  const editAmountEl = document.getElementById("edit-amount");
+  const editMemoEl = document.getElementById("edit-memo");
+  const editSaveBtn = document.getElementById("expense-edit-save");
+  const editCancelBtn = document.getElementById("expense-edit-cancel");
+
   const state = {
-    type: "expense", // 'income' or 'expense'
+    type: "expense",
     category: null,
     allCategories: [],
+    records: [],
     isDeleteMode: false,
+    editingRecordId: null,
   };
 
   const formatYen = (value) => Number(value || 0).toLocaleString();
 
-  // --- Toast Notification ---
+  function normalizeDateForDisplay(value) {
+    if (!value) return "";
+    const s = String(value).trim();
+    const m = s.match(/^(\d{4}-\d{2}-\d{2})[ T](\d{2}):(\d{2})/);
+    if (m) return `${m[1]} ${m[2]}:${m[3]}`;
+    return s;
+  }
+
+  function toDateTimeLocalValue(value) {
+    if (!value) return "";
+    const s = String(value).trim().replace(" ", "T");
+    const m = s.match(/^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2})/);
+    if (!m) return "";
+    return `${m[1]}T${m[2]}:${m[3]}`;
+  }
+
+  function fromDateTimeLocalValue(value) {
+    if (!value) return "";
+    return `${value.replace("T", " ")}:00`;
+  }
+
   function showToast(message, isError = false) {
     const toast = document.createElement("div");
     toast.className = `toast ${isError ? "error" : ""}`;
     toast.textContent = message;
     toastContainer.appendChild(toast);
-    setTimeout(() => {
-      toast.classList.add("show");
-    }, 10);
+    setTimeout(() => toast.classList.add("show"), 10);
     setTimeout(() => {
       toast.classList.remove("show");
       setTimeout(() => toast.remove(), 300);
     }, 3000);
   }
 
-  // --- API Functions ---
   async function fetchCategories() {
     try {
       const res = await fetch("/api/categories");
@@ -75,12 +101,15 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  // --- UI Rendering ---
+  function getCategoriesByType(type) {
+    if (!Array.isArray(state.allCategories)) return [];
+    const byType = state.allCategories.filter((c) => c && c.type === type);
+    return byType.length > 0 ? byType : state.allCategories;
+  }
+
   function renderCategoryButtons() {
     categoryButtons.innerHTML = "";
-    // Temporarily show all categories until type is associated with category
-    const filteredCategories = state.allCategories; 
-    // const filteredCategories = state.allCategories.filter(c => c.type === state.type);
+    const filteredCategories = getCategoriesByType(state.type);
 
     if (!filteredCategories || filteredCategories.length === 0) {
       categoryButtons.style.display = "none";
@@ -91,7 +120,7 @@ document.addEventListener("DOMContentLoaded", () => {
     categoryButtons.style.display = "flex";
     noCatEl.style.display = "none";
 
-    filteredCategories.forEach(c => {
+    filteredCategories.forEach((c) => {
       const btn = document.createElement("button");
       btn.className = "btn-category";
       btn.dataset.value = c.name;
@@ -107,44 +136,96 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
+  function syncModeUI() {
+    recordsTable.classList.toggle("delete-mode", state.isDeleteMode);
+    executeDeleteBtn.style.display = state.isDeleteMode ? "block" : "none";
+    deleteModeBtn.textContent = state.isDeleteMode ? "削除終了" : "削除モード";
+
+    document.querySelectorAll(".checkbox-col").forEach((col) => {
+      col.style.display = state.isDeleteMode ? "table-cell" : "none";
+    });
+    if (!state.isDeleteMode) {
+      selectAllCheckbox.checked = false;
+      document.querySelectorAll(".record-checkbox").forEach((cb) => (cb.checked = false));
+    }
+  }
+
+  function renderEditCategoryOptions(type, selectedCategory) {
+    const categories = getCategoriesByType(type);
+    editCategoryEl.innerHTML = "";
+    categories.forEach((c) => {
+      const option = document.createElement("option");
+      option.value = c.name;
+      option.textContent = c.name;
+      editCategoryEl.appendChild(option);
+    });
+    if (selectedCategory) {
+      editCategoryEl.value = selectedCategory;
+      if (editCategoryEl.value !== selectedCategory) {
+        const custom = document.createElement("option");
+        custom.value = selectedCategory;
+        custom.textContent = selectedCategory;
+        editCategoryEl.appendChild(custom);
+        editCategoryEl.value = selectedCategory;
+      }
+    }
+  }
+
+  function openEditOverlay(record) {
+    state.editingRecordId = record.id;
+    editDateEl.value = toDateTimeLocalValue(record.date);
+    editTypeEl.value = record.type || "expense";
+    renderEditCategoryOptions(editTypeEl.value, record.category || "");
+    editAmountEl.value = Number(record.amount || 0);
+    editMemoEl.value = record.memo || "";
+    editOverlay.hidden = false;
+  }
+
+  function closeEditOverlay() {
+    editOverlay.hidden = true;
+    state.editingRecordId = null;
+  }
+
   function renderRecords(records) {
     recordsTbody.innerHTML = "";
     if (!Array.isArray(records)) return;
 
-    records.forEach(r => {
+    records.forEach((r) => {
       const tr = document.createElement("tr");
       tr.classList.add(r.type === "income" ? "income-row" : "expense-row");
       tr.innerHTML = `
-        <td class="checkbox-col" style="display: ${state.isDeleteMode ? 'table-cell' : 'none'};">
+        <td class="checkbox-col" style="display: ${state.isDeleteMode ? "table-cell" : "none"};">
           <input type="checkbox" class="record-checkbox" data-id="${r.id}">
         </td>
-        <td>${r.date}</td>
+        <td>${normalizeDateForDisplay(r.date)}</td>
         <td>${r.type === "income" ? "収入" : "支出"}</td>
-        <td>${r.category}</td>
+        <td>${r.category || ""}</td>
         <td>${Number(r.amount).toLocaleString()}円</td>
         <td>${r.memo || ""}</td>
       `;
+      tr.addEventListener("click", (event) => {
+        if (state.isDeleteMode) return;
+        if (event.target.closest(".record-checkbox")) return;
+        openEditOverlay(r);
+      });
       recordsTbody.appendChild(tr);
     });
   }
 
-  // --- Event Handlers ---
   function handleTypeChange(e) {
     const selectedType = e.target.dataset.value;
-    if (selectedType) {
-      state.type = selectedType;
-      state.category = null; // Reset category selection
-      typeSelector.querySelectorAll(".btn-type").forEach(btn => {
-        btn.classList.toggle("active", btn.dataset.value === selectedType);
-      });
-      renderCategoryButtons();
-    }
+    if (!selectedType) return;
+    state.type = selectedType;
+    state.category = null;
+    typeSelector.querySelectorAll(".btn-type").forEach((btn) => {
+      btn.classList.toggle("active", btn.dataset.value === selectedType);
+    });
+    renderCategoryButtons();
   }
 
   async function handleSave() {
     const amount = Number(amountEl.value);
     const memo = memoEl.value.trim();
-
     if (!amount || !state.category) {
       showToast("金額と種類を選択してください。", true);
       return;
@@ -170,36 +251,28 @@ document.addEventListener("DOMContentLoaded", () => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
-
     const data = await res.json();
     if (data.error) {
       showToast(data.error, true);
-    } else {
-      showToast("登録しました！");
-      amountEl.value = "";
-      memoEl.value = "";
-      state.category = null;
-      renderCategoryButtons();
-      loadData();
+      return;
     }
+
+    showToast("登録しました！");
+    amountEl.value = "";
+    memoEl.value = "";
+    state.category = null;
+    renderCategoryButtons();
+    loadData();
   }
 
   function toggleDeleteMode() {
     state.isDeleteMode = !state.isDeleteMode;
-    recordsTable.classList.toggle("delete-mode", state.isDeleteMode);
-    executeDeleteBtn.style.display = state.isDeleteMode ? "block" : "none";
-    deleteModeBtn.textContent = state.isDeleteMode ? "完了" : "削除モード";
-    document.querySelectorAll(".checkbox-col").forEach(col => {
-      col.style.display = state.isDeleteMode ? "table-cell" : "none";
-    });
-    if (!state.isDeleteMode) {
-      selectAllCheckbox.checked = false;
-      document.querySelectorAll('.record-checkbox').forEach(cb => cb.checked = false);
-    }
+    syncModeUI();
+    renderRecords(state.records);
   }
 
   async function bulkDeleteRecords() {
-    const selectedIds = [...document.querySelectorAll(".record-checkbox:checked")].map(cb => cb.dataset.id);
+    const selectedIds = [...document.querySelectorAll(".record-checkbox:checked")].map((cb) => cb.dataset.id);
     if (selectedIds.length === 0) {
       showToast("削除する項目を選択してください。", true);
       return;
@@ -210,33 +283,73 @@ document.addEventListener("DOMContentLoaded", () => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ ids: selectedIds }),
     });
-
     const data = await res.json();
     if (data.error) {
       showToast(data.error, true);
-    } else {
-      showToast(`${selectedIds.length}件の記録を削除しました。`);
-      toggleDeleteMode(); // Exit delete mode
-      loadData();
+      return;
     }
+
+    showToast(`${selectedIds.length}件の記録を削除しました。`);
+    state.isDeleteMode = false;
+    syncModeUI();
+    loadData();
+  }
+
+  async function saveEditRecord() {
+    if (!state.editingRecordId) return;
+    const payload = {
+      date: fromDateTimeLocalValue(editDateEl.value),
+      type: editTypeEl.value,
+      category: editCategoryEl.value,
+      amount: Number(editAmountEl.value || 0),
+      memo: editMemoEl.value.trim(),
+    };
+    if (!payload.date || !payload.category || !payload.amount) {
+      showToast("日時・種類・金額を入力してください。", true);
+      return;
+    }
+
+    const res = await fetch(`/api/finance/${state.editingRecordId}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    if (data.error) {
+      showToast(data.error, true);
+      return;
+    }
+
+    showToast("更新しました。");
+    closeEditOverlay();
+    loadData();
   }
 
   function handleSelectAll(e) {
-    document.querySelectorAll('.record-checkbox').forEach(checkbox => {
+    document.querySelectorAll(".record-checkbox").forEach((checkbox) => {
       checkbox.checked = e.target.checked;
     });
   }
 
-  // --- Initial Load ---
   async function loadData() {
     const [categories, records] = await Promise.all([fetchCategories(), fetchRecords()]);
-    state.allCategories = categories;
+    state.allCategories = Array.isArray(categories) ? categories : [];
+    state.records = Array.isArray(records) ? records : [];
     renderCategoryButtons();
-    renderRecords(records);
-    fetchSummary(); // No need to wait for this one
+    syncModeUI();
+    renderRecords(state.records);
+    fetchSummary();
   }
 
-  // --- Event Listeners ---
+  editTypeEl?.addEventListener("change", () => {
+    renderEditCategoryOptions(editTypeEl.value, "");
+  });
+  editSaveBtn?.addEventListener("click", saveEditRecord);
+  editCancelBtn?.addEventListener("click", closeEditOverlay);
+  editOverlay?.addEventListener("click", (e) => {
+    if (e.target === editOverlay) closeEditOverlay();
+  });
+
   typeSelector.addEventListener("click", handleTypeChange);
   saveBtn.addEventListener("click", handleSave);
   deleteModeBtn.addEventListener("click", toggleDeleteMode);
@@ -245,4 +358,3 @@ document.addEventListener("DOMContentLoaded", () => {
 
   loadData();
 });
-

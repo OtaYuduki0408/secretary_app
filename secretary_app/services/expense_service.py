@@ -41,6 +41,32 @@ def add_finance_record(record: dict, user_id: str):
         print(f"[ERROR] add_finance_record: {e}")
         return {"error": str(e)}
 
+
+def update_finance_record(record_id: str, record: dict, user_id: str):
+    """
+    指定したIDの収支データを更新する。
+    """
+    try:
+        payload = {}
+        for key in ("date", "type", "category", "amount", "memo"):
+            if key in record:
+                payload[key] = record.get(key)
+
+        if not payload:
+            return {"error": "更新データがありません"}
+
+        response = (
+            supabase.table(TABLE_NAME)
+            .update(payload)
+            .eq("id", record_id)
+            .eq("user_id", user_id)
+            .execute()
+        )
+        return {"message": "Finance record updated", "data": response.data}
+    except (APIError, Exception) as e:
+        print(f"[ERROR] update_finance_record: {e}")
+        return {"error": str(e)}
+
 # --------------------------------------------------------------------------
 # レコード削除
 # --------------------------------------------------------------------------

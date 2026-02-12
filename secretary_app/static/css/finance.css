@@ -108,6 +108,27 @@ html,body{
   margin-bottom:16px;
 }
 
+.fd-table-actions{
+  display:flex;
+  gap:10px;
+  flex-wrap:wrap;
+  margin-bottom:12px;
+}
+
+.fd-action-btn{
+  border:none;
+  border-radius:12px;
+  padding:10px 14px;
+  background:rgba(var(--app-border-rgb, 148,163,184),.2);
+  color:var(--text);
+  cursor:pointer;
+}
+
+.fd-action-btn.danger{
+  background:var(--danger);
+  color:#fff;
+}
+
 .fd-input,
 .fd-select,
 .fd-radio-group input[type="radio"]{
@@ -207,6 +228,15 @@ summary{
 
 #financeTable tbody td{
   padding:14px 12px;
+}
+
+#financeTable.edit-mode tbody tr{
+  cursor:pointer;
+}
+
+.fd-check-col{
+  width: 1%;
+  white-space: nowrap;
 }
 
 #financeTable tbody td.amount{
@@ -375,6 +405,63 @@ summary{
 
 .fd-wheel-cancel{
   background:rgba(var(--app-border-rgb, 148,163,184),.15);
+}
+
+.fd-edit-overlay{
+  position:fixed;
+  inset:0;
+  background:rgba(0,0,0,.62);
+  display:grid;
+  place-items:center;
+  z-index:60;
+  padding:18px;
+}
+
+.fd-edit-overlay[hidden]{
+  display:none !important;
+}
+
+.fd-edit-dialog{
+  width:min(560px,96vw);
+  background:var(--panel);
+  border:1px solid rgba(var(--app-border-rgb, 148,163,184),.25);
+  border-radius:18px;
+  box-shadow:var(--shadow);
+  padding:18px;
+}
+
+.fd-edit-grid{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px 12px;
+}
+
+.fd-edit-grid label{
+  display:flex;
+  flex-direction:column;
+  gap:6px;
+  color:var(--muted);
+}
+
+.fd-edit-actions{
+  margin-top:12px;
+  display:flex;
+  justify-content:flex-end;
+  gap:10px;
+}
+
+.fd-edit-actions button{
+  border:none;
+  border-radius:12px;
+  padding:10px 14px;
+  cursor:pointer;
+  background:rgba(var(--app-border-rgb, 148,163,184),.2);
+  color:var(--text);
+}
+
+.fd-edit-actions #finance-edit-save{
+  background:linear-gradient(135deg,var(--accent),var(--accent-strong));
+  color:var(--app-button-text, #0f172a);
 }
 
 @media (max-width:720px){

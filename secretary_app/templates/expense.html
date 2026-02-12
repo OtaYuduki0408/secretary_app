@@ -58,7 +58,9 @@
     <section class="card">
       <div class="records-header">
         <h2>直近の記録</h2>
-        <button id="delete-mode-btn" class="btn btn-secondary">削除モード</button>
+        <div class="records-header-actions">
+          <button id="delete-mode-btn" class="btn btn-secondary">削除モード</button>
+        </div>
       </div>
       <table id="records">
         <thead>
@@ -77,6 +79,39 @@
         <button id="execute-delete-btn" class="btn btn-danger" style="display: none;">選択した項目を削除</button>
       </div>
     </section>
+  </div>
+
+  <div id="expense-edit-overlay" class="edit-overlay" hidden>
+    <div class="edit-dialog" role="dialog" aria-modal="true" aria-labelledby="expense-edit-title">
+      <h3 id="expense-edit-title">収支を編集</h3>
+      <div class="form-group">
+        <label for="edit-date">日時</label>
+        <input id="edit-date" class="input" type="datetime-local">
+      </div>
+      <div class="form-group">
+        <label for="edit-type">種別</label>
+        <select id="edit-type" class="input">
+          <option value="expense">支出</option>
+          <option value="income">収入</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="edit-category">種類</label>
+        <select id="edit-category" class="input"></select>
+      </div>
+      <div class="form-group">
+        <label for="edit-amount">金額</label>
+        <input id="edit-amount" class="input" type="number" min="0">
+      </div>
+      <div class="form-group">
+        <label for="edit-memo">メモ</label>
+        <input id="edit-memo" class="input" type="text">
+      </div>
+      <div class="edit-actions">
+        <button id="expense-edit-cancel" class="btn btn-secondary" type="button">キャンセル</button>
+        <button id="expense-edit-save" class="btn" type="button">保存</button>
+      </div>
+    </div>
   </div>
   <script src="{{ url_for('static', filename='js/expense.js') }}"></script>
   <script src="{{ url_for('static', filename='js/app_settings_apply.js') }}"></script>

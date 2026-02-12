@@ -23,7 +23,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const container = document.getElementById("finance-data");
 
   // ---------- データ取得 ----------
-  const rawFinanceRecords = JSON.parse(container?.dataset.allRecords || "[]");
+  let rawFinanceRecords = JSON.parse(container?.dataset.allRecords || "[]");
 
   // すべてのレコードへ dateKey を付与（内部比較用）
   rawFinanceRecords.forEach(r => {
@@ -38,35 +38,116 @@ document.addEventListener("DOMContentLoaded", () => {
   const filterType = document.getElementById("filterType");
   const startDateInput = document.getElementById("startDate");
   const endDateInput = document.getElementById("endDate");
+  const deleteModeBtn = document.getElementById("finance-delete-mode-btn");
+  const executeDeleteBtn = document.getElementById("finance-execute-delete-btn");
+  const selectAllCheckbox = document.getElementById("finance-select-all");
+  const financeTable = document.getElementById("financeTable");
+  const editOverlay = document.getElementById("finance-edit-overlay");
+  const editDate = document.getElementById("finance-edit-date");
+  const editType = document.getElementById("finance-edit-type");
+  const editCategory = document.getElementById("finance-edit-category");
+  const editAmount = document.getElementById("finance-edit-amount");
+  const editMemo = document.getElementById("finance-edit-memo");
+  const editSaveBtn = document.getElementById("finance-edit-save");
+  const editCancelBtn = document.getElementById("finance-edit-cancel");
 
   let incomeChart = null;
   let expenseChart = null;
+  let isDeleteMode = false;
+  let editingRecordId = null;
 
   // ---------- カテゴリオプション構築 ----------
-  const allCategories = [...new Set(rawFinanceRecords.map(r => r.category))].filter(Boolean);
-  // 既存の "all" 以外をクリア
-  filterCategory.querySelectorAll('option:not([value="all"])').forEach(opt => opt.remove());
-  allCategories.forEach(category => {
-    const option = document.createElement('option');
-    option.value = category;
-    option.textContent = category;
-    filterCategory.appendChild(option);
-  });
+  let allCategories = [];
+  function rebuildCategoryOptions() {
+    allCategories = [...new Set(rawFinanceRecords.map((r) => r.category))].filter(Boolean);
+    filterCategory.querySelectorAll('option:not([value="all"])').forEach((opt) => opt.remove());
+    allCategories.forEach((category) => {
+      const option = document.createElement("option");
+      option.value = category;
+      option.textContent = category;
+      filterCategory.appendChild(option);
+    });
+  }
+  rebuildCategoryOptions();
+
+  function formatDateTimeDisplay(value) {
+    if (!value) return "";
+    const s = String(value).trim();
+    const m = s.match(/^(\d{4}-\d{2}-\d{2})[ T](\d{2}):(\d{2})/);
+    if (m) return `${m[1]} ${m[2]}:${m[3]}`;
+    return s;
+  }
+
+  function toLocalInputValue(value) {
+    if (!value) return "";
+    const s = String(value).trim().replace(" ", "T");
+    const m = s.match(/^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2})/);
+    if (!m) return "";
+    return `${m[1]}T${m[2]}:${m[3]}`;
+  }
+
+  function fromLocalInputValue(value) {
+    if (!value) return "";
+    return `${value.replace("T", " ")}:00`;
+  }
+
+  async function refreshRecordsFromApi() {
+    const res = await fetch("/api/finance");
+    if (!res.ok) throw new Error("finance fetch failed");
+    rawFinanceRecords = await res.json();
+    rawFinanceRecords.forEach((r) => {
+      r.dateKey = normalizeDateToKey(r.date || "");
+    });
+    rebuildCategoryOptions();
+  }
+
+  function syncFinanceModeUi() {
+    financeTable.classList.toggle("delete-mode", isDeleteMode);
+    if (executeDeleteBtn) executeDeleteBtn.style.display = isDeleteMode ? "inline-flex" : "none";
+    if (deleteModeBtn) deleteModeBtn.textContent = isDeleteMode ? "削除終了" : "削除モード";
+    document.querySelectorAll(".fd-check-col").forEach((el) => {
+      el.style.display = isDeleteMode ? "table-cell" : "none";
+    });
+    if (!isDeleteMode && selectAllCheckbox) {
+      selectAllCheckbox.checked = false;
+    }
+  }
+
+  function openFinanceEditOverlay(record) {
+    editingRecordId = record.id;
+    editDate.value = toLocalInputValue(record.date);
+    editType.value = record.type || "expense";
+    editCategory.value = record.category || "";
+    editAmount.value = Number(record.amount || 0);
+    editMemo.value = record.memo || record.description || "";
+    editOverlay.hidden = false;
+  }
+
+  function closeFinanceEditOverlay() {
+    editOverlay.hidden = true;
+    editingRecordId = null;
+  }
 
   // ---------- テーブル描画 ----------
   function renderTable(data) {
     financeTableBody.innerHTML = "";
     if (data.length === 0) {
-      financeTableBody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding: 10px;">該当するデータがありません。</td></tr>';
+      financeTableBody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding: 10px;">該当するデータがありません。</td></tr>';
       return;
     }
 
     data.forEach(record => {
       const row = financeTableBody.insertRow();
       row.classList.add(`type-${record.type}`);
+      row.dataset.id = record.id;
+
+      const checkCell = row.insertCell();
+      checkCell.className = "fd-check-col";
+      checkCell.style.display = isDeleteMode ? "table-cell" : "none";
+      checkCell.innerHTML = `<input type="checkbox" class="finance-record-checkbox" data-id="${record.id}">`;
 
       // 表示は record.date があればそのまま、無ければ dateKey を / 表示
-      const displayDate = record.date || (record.dateKey ? record.dateKey.replaceAll("-", "/") : "");
+      const displayDate = formatDateTimeDisplay(record.date || (record.dateKey ? record.dateKey.replaceAll("-", "/") : ""));
       row.insertCell().textContent = displayDate;
 
       const typeCell = row.insertCell();
@@ -75,11 +156,17 @@ document.addEventListener("DOMContentLoaded", () => {
       typeCell.style.color = record.type === 'income' ? '#00bcd4' : '#e74c3c';
 
       row.insertCell().textContent = record.category ?? "";
-      row.insertCell().textContent = record.description ?? "";
+      row.insertCell().textContent = record.memo ?? record.description ?? "";
 
       const amountCell = row.insertCell();
       amountCell.textContent = `${Number(record.amount || 0).toLocaleString()} 円`;
       amountCell.classList.add('fd-amount-cell');
+
+      row.addEventListener("click", (event) => {
+        if (isDeleteMode) return;
+        if (event.target.closest(".finance-record-checkbox")) return;
+        openFinanceEditOverlay(record);
+      });
     });
   }
 
@@ -103,7 +190,8 @@ document.addEventListener("DOMContentLoaded", () => {
     const searchTerm = (searchInput.value || "").toLowerCase();
     if (searchTerm) {
       currentData = currentData.filter(r =>
-        (r.description || "").toLowerCase().includes(searchTerm) ||
+        (r.memo || "").toLowerCase().includes(searchTerm) ||
+        (r.description || "").toLowerCase().includes(searchTerm) ||
         (r.date || "").includes(searchTerm)
       );
     }
@@ -126,7 +214,9 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     renderTable(currentData);
+    syncFinanceModeUi();
     updateCharts(currentData);
+    updateSummary();
   };
 
   // ---------- グラフ ----------
@@ -420,7 +510,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // ---------- イベント ----------
+  // ---------- イベント ----------
   searchInput.addEventListener("input", applyFiltersAndSort);
   sortSelect.addEventListener("change", applyFiltersAndSort);
   filterCategory.addEventListener("change", applyFiltersAndSort);
@@ -428,6 +518,66 @@ document.addEventListener("DOMContentLoaded", () => {
   // ブラウザのピッカー/手入力どちらでも拾う
   startDateInput.addEventListener("input", applyFiltersAndSort);
   endDateInput.addEventListener("input", applyFiltersAndSort);
+  deleteModeBtn?.addEventListener("click", () => {
+    isDeleteMode = !isDeleteMode;
+    applyFiltersAndSort();
+  });
+  selectAllCheckbox?.addEventListener("change", (e) => {
+    document.querySelectorAll(".finance-record-checkbox").forEach((checkbox) => {
+      checkbox.checked = e.target.checked;
+    });
+  });
+  executeDeleteBtn?.addEventListener("click", async () => {
+    const ids = [...document.querySelectorAll(".finance-record-checkbox:checked")].map((cb) => cb.dataset.id);
+    if (ids.length === 0) {
+      alert("削除対象を選択してください。");
+      return;
+    }
+    const res = await fetch("/api/finance/bulk-delete", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ids }),
+    });
+    const data = await res.json();
+    if (data.error) {
+      alert(data.error);
+      return;
+    }
+    isDeleteMode = false;
+    await refreshRecordsFromApi();
+    applyFiltersAndSort();
+  });
+  editCancelBtn?.addEventListener("click", closeFinanceEditOverlay);
+  editOverlay?.addEventListener("click", (e) => {
+    if (e.target === editOverlay) closeFinanceEditOverlay();
+  });
+  editSaveBtn?.addEventListener("click", async () => {
+    if (!editingRecordId) return;
+    const payload = {
+      date: fromLocalInputValue(editDate.value),
+      type: editType.value,
+      category: editCategory.value.trim(),
+      amount: Number(editAmount.value || 0),
+      memo: editMemo.value.trim(),
+    };
+    if (!payload.date || !payload.category || !payload.amount) {
+      alert("日時・カテゴリ・金額を入力してください。");
+      return;
+    }
+    const res = await fetch(`/api/finance/${editingRecordId}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    if (data.error) {
+      alert(data.error);
+      return;
+    }
+    closeFinanceEditOverlay();
+    await refreshRecordsFromApi();
+    applyFiltersAndSort();
+  });
 
   fetchGoalAmount();
   // 初期描画

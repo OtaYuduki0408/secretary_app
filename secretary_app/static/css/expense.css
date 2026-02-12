@@ -430,6 +430,11 @@ tbody tr:hover{
 .records-header h2 {
   margin: 0;
 }
+.records-header-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
 .records-footer {
   margin-top: 16px;
   display: flex;
@@ -473,5 +478,43 @@ tbody tr:hover{
 .checkbox-col input {
   width: 18px;
   height: 18px;
+}
+
+#records.edit-mode tbody tr {
+  cursor: pointer;
+}
+
+.edit-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(2, 6, 23, 0.6);
+  display: grid;
+  place-items: center;
+  z-index: 1000;
+  padding: 18px;
+}
+
+.edit-overlay[hidden] {
+  display: none !important;
+}
+
+.edit-dialog {
+  width: min(520px, 96vw);
+  background: var(--panel);
+  border: 1px solid rgba(var(--app-border-rgb, 148,163,184),.35);
+  border-radius: 18px;
+  box-shadow: var(--shadow);
+  padding: 20px;
+}
+
+.edit-dialog h3 {
+  margin: 0 0 12px;
+}
+
+.edit-actions {
+  margin-top: 12px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
 }
 
