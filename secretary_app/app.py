@@ -50,6 +50,7 @@ from services.ScheduleManager import ScheduleManager
 from services.user_settings_service import get_user_settings, upsert_user_settings
 from services.custom_order_service import get_all_orders
 from services import pending_action_service
+from services.datetime_range_utils import build_range_from_detail as shared_build_range_from_detail
 from order.models import db
 from models.event import Event
 from order.custom_order_routes import custom_order_bp
@@ -794,37 +795,11 @@ def _date_range_to_utc_iso(start_dt, end_dt):
     end_utc = end_dt.astimezone(pytz.UTC).isoformat()
     return start_utc, end_utc
 
-def _safe_int(value):
-    if value is None: return None
-    if isinstance(value, int): return value
-    if isinstance(value, float): return int(value)
-    if isinstance(value, str):
-        raw = value.strip()
-        if not raw or "実行された" in raw: return None
-        if raw.isdigit(): return int(raw)
-    return None
-
 def _build_range_from_detail(detail, now_jst):
-    detail = detail or {}
-    start_year = _safe_int(detail.get('start_year')) or now_jst.year
-    start_month = _safe_int(detail.get('start_month')) or now_jst.month
-    start_day = _safe_int(detail.get('start_day')) or now_jst.day
-    end_year = _safe_int(detail.get('end_year')) or now_jst.year
-    end_month = _safe_int(detail.get('end_month')) or now_jst.month
-    end_day = _safe_int(detail.get('end_day')) or now_jst.day
-    
-    start_time_str = detail.get('start_time', '00:00') or '00:00'
-    end_time_str = detail.get('end_time', '23:59') or '23:59'
-
-    try:
-        start_hour, start_minute = map(int, start_time_str.split(':'))
-        end_hour, end_minute = map(int, end_time_str.split(':'))
-        start_dt = JST.localize(datetime(start_year, start_month, start_day, start_hour, start_minute))
-        end_dt = JST.localize(datetime(end_year, end_month, end_day, end_hour, end_minute, 59))
-        return start_dt, end_dt
-    except (ValueError, TypeError) as e:
-        app.logger.error(f"[DEBUG_BUILD_RANGE] Error building date range: {e}")
-        return None, None
+    start_dt, end_dt = shared_build_range_from_detail(detail, now_jst, JST)
+    if not start_dt or not end_dt:
+        app.logger.error("[DEBUG_BUILD_RANGE] Error building date range from detail.")
+    return start_dt, end_dt
 
 def _enrich_calendar_read(detail, user_id, now_jst, app_logger):
     app_logger.debug(f"[DEBUG_ENRICH] _enrich_calendar_read called for user {user_id} with detail: {detail}")

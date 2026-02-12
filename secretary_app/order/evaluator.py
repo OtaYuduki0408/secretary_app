@@ -14,6 +14,7 @@ from services.finance_service import (
     get_monthly_goal,
 )
 from services.memo_service import get_all_memos
+from services.datetime_range_utils import build_range_from_detail as shared_build_range_from_detail
 
 # タイムゾーン設定
 JST = pytz.timezone('Asia/Tokyo')
@@ -59,40 +60,12 @@ def _try_int_text(value):
     except (TypeError, ValueError):
         return None
 
-def _safe_int(value):
-    if value is None: return None
-    if isinstance(value, int): return value
-    if isinstance(value, float): return int(value)
-    if isinstance(value, str):
-        raw = value.strip()
-        if not raw or "実行された" in raw: return None
-        if raw.isdigit(): return int(raw)
-    return None
-
 def _normalize_jst(dt):
     if dt.tzinfo is None: return JST.localize(dt)
     return dt.astimezone(JST)
 
 def _build_range_from_detail(detail, now_jst):
-    detail = detail or {}
-    start_year = _safe_int(detail.get('start_year')) or now_jst.year
-    start_month = _safe_int(detail.get('start_month')) or now_jst.month
-    start_day = _safe_int(detail.get('start_day')) or now_jst.day
-    end_year = _safe_int(detail.get('end_year')) or now_jst.year
-    end_month = _safe_int(detail.get('end_month')) or now_jst.month
-    end_day = _safe_int(detail.get('end_day')) or now_jst.day
-    
-    start_time_str = detail.get('start_time', '00:00') or '00:00'
-    end_time_str = detail.get('end_time', '23:59') or '23:59'
-
-    try:
-        start_hour, start_minute = map(int, start_time_str.split(':'))
-        end_hour, end_minute = map(int, end_time_str.split(':'))
-        start_dt = JST.localize(datetime(start_year, start_month, start_day, start_hour, start_minute))
-        end_dt = JST.localize(datetime(end_year, end_month, end_day, end_hour, end_minute, 59))
-        return start_dt, end_dt
-    except (ValueError, TypeError):
-        return None, None
+    return shared_build_range_from_detail(detail, now_jst, JST)
 
 def enrich_single_action(action, user_id, now_jst, app_logger):
     if not isinstance(action, dict): return action

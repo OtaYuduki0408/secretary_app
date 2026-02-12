@@ -24,6 +24,7 @@ from services.finance_service import ( # finance_serviceから必要な関数を
     upsert_monthly_goal
 )
 from services.memo_service import get_all_memos # memo_serviceから必要な関数をインポート
+from services.datetime_range_utils import parse_time_param as shared_parse_time_param
 
 TABLE_NAME = "pending_user_actions"
 JST = pytz.timezone('Asia/Tokyo')
@@ -40,15 +41,6 @@ def _format_event_time(iso_time: str, tz=JST) -> str:
         return dt_local.strftime('%m月%d日%H時%M分')
     except ValueError:
         return iso_time # パースできない場合はそのまま返す
-
-def _parse_time_param(param_value, current_dt: datetime):
-    """'実行された年'などの特殊な値を実際の年月に変換するヘルパー関数"""
-    if param_value == '実行された年': return current_dt.year
-    if param_value == '実行された月': return current_dt.month
-    if param_value == '実行された日': return current_dt.day
-    if param_value == '実行された時刻': return f"{current_dt.hour:02d}:{current_dt.minute:02d}"
-    return param_value
-
 
 import services.local_calendar_service as local_calendar_service # local_calendar_serviceをインポート
 from supabase_client import supabase
@@ -90,15 +82,6 @@ def _format_event_time(iso_time: str, tz=JST) -> str:
     except ValueError:
         return iso_time # パースできない場合はそのまま返す
 
-def _parse_time_param(param_value, current_dt: datetime):
-    """'実行された年'などの特殊な値を実際の年月に変換するヘルパー関数"""
-    if param_value == '実行された年': return current_dt.year
-    if param_value == '実行された月': return current_dt.month
-    if param_value == '実行された日': return current_dt.day
-    if param_value == '実行された時刻': return f"{current_dt.hour:02d}:{current_dt.minute:02d}"
-    return param_value
-
-
 def _execute_calendar_read_aloud(user_id: str, detail_data: dict, triggered_at: datetime) -> dict:
     """
     カレンダーイベントを読み上げる。
@@ -118,15 +101,15 @@ def _execute_calendar_read_aloud(user_id: str, detail_data: dict, triggered_at: 
     # detail_dataから検索範囲を抽出
     current_dt_jst = triggered_at.astimezone(JST) # 基準はJST
 
-    start_year = _parse_time_param(detail_data.get('start_year'), current_dt_jst)
-    start_month = _parse_time_param(detail_data.get('start_month'), current_dt_jst)
-    start_day = _parse_time_param(detail_data.get('start_day'), current_dt_jst)
-    start_time_str = _parse_time_param(detail_data.get('start_time'), current_dt_jst)
+    start_year = shared_parse_time_param(detail_data.get('start_year'), current_dt_jst, 'year')
+    start_month = shared_parse_time_param(detail_data.get('start_month'), current_dt_jst, 'month')
+    start_day = shared_parse_time_param(detail_data.get('start_day'), current_dt_jst, 'day')
+    start_time_str = shared_parse_time_param(detail_data.get('start_time'), current_dt_jst, 'time')
 
-    end_year = _parse_time_param(detail_data.get('end_year'), current_dt_jst)
-    end_month = _parse_time_param(detail_data.get('end_month'), current_dt_jst)
-    end_day = _parse_time_param(detail_data.get('end_day'), current_dt_jst)
-    end_time_str = _parse_time_param(detail_data.get('end_time'), current_dt_jst)
+    end_year = shared_parse_time_param(detail_data.get('end_year'), current_dt_jst, 'year')
+    end_month = shared_parse_time_param(detail_data.get('end_month'), current_dt_jst, 'month')
+    end_day = shared_parse_time_param(detail_data.get('end_day'), current_dt_jst, 'day')
+    end_time_str = shared_parse_time_param(detail_data.get('end_time'), current_dt_jst, 'time')
 
     try:
         # 時刻文字列を安全に解析
@@ -286,15 +269,15 @@ def _execute_finance_read_aloud(user_id: str, detail_data: dict, triggered_at: d
     current_dt_jst = triggered_at.astimezone(JST)
 
     # 期間情報の解析
-    start_year = _parse_time_param(detail_data.get('start_year'), current_dt_jst)
-    start_month = _parse_time_param(detail_data.get('start_month'), current_dt_jst)
-    start_day = _parse_time_param(detail_data.get('start_day'), current_dt_jst)
-    start_time_str = _parse_time_param(detail_data.get('start_time'), current_dt_jst)
+    start_year = shared_parse_time_param(detail_data.get('start_year'), current_dt_jst, 'year')
+    start_month = shared_parse_time_param(detail_data.get('start_month'), current_dt_jst, 'month')
+    start_day = shared_parse_time_param(detail_data.get('start_day'), current_dt_jst, 'day')
+    start_time_str = shared_parse_time_param(detail_data.get('start_time'), current_dt_jst, 'time')
 
-    end_year = _parse_time_param(detail_data.get('end_year'), current_dt_jst)
-    end_month = _parse_time_param(detail_data.get('end_month'), current_dt_jst)
-    end_day = _parse_time_param(detail_data.get('end_day'), current_dt_jst)
-    end_time_str = _parse_time_param(detail_data.get('end_time'), current_dt_jst)
+    end_year = shared_parse_time_param(detail_data.get('end_year'), current_dt_jst, 'year')
+    end_month = shared_parse_time_param(detail_data.get('end_month'), current_dt_jst, 'month')
+    end_day = shared_parse_time_param(detail_data.get('end_day'), current_dt_jst, 'day')
+    end_time_str = shared_parse_time_param(detail_data.get('end_time'), current_dt_jst, 'time')
 
     has_period_filter = any(val for val in [start_year, start_month, start_day, start_time_str, end_year, end_month, end_day, end_time_str] if val and not str(val).startswith('実行された'))
 
@@ -440,15 +423,15 @@ def _execute_memo_read_aloud(user_id: str, detail_data: dict, triggered_at: date
     current_dt_jst = triggered_at.astimezone(JST)
 
     # 期間情報の解析
-    start_year = _parse_time_param(detail_data.get('start_year'), current_dt_jst)
-    start_month = _parse_time_param(detail_data.get('start_month'), current_dt_jst)
-    start_day = _parse_time_param(detail_data.get('start_day'), current_dt_jst)
-    start_time_str = _parse_time_param(detail_data.get('start_time'), current_dt_jst)
+    start_year = shared_parse_time_param(detail_data.get('start_year'), current_dt_jst, 'year')
+    start_month = shared_parse_time_param(detail_data.get('start_month'), current_dt_jst, 'month')
+    start_day = shared_parse_time_param(detail_data.get('start_day'), current_dt_jst, 'day')
+    start_time_str = shared_parse_time_param(detail_data.get('start_time'), current_dt_jst, 'time')
 
-    end_year = _parse_time_param(detail_data.get('end_year'), current_dt_jst)
-    end_month = _parse_time_param(detail_data.get('end_month'), current_dt_jst)
-    end_day = _parse_time_param(detail_data.get('end_day'), current_dt_jst)
-    end_time_str = _parse_time_param(detail_data.get('end_time'), current_dt_jst)
+    end_year = shared_parse_time_param(detail_data.get('end_year'), current_dt_jst, 'year')
+    end_month = shared_parse_time_param(detail_data.get('end_month'), current_dt_jst, 'month')
+    end_day = shared_parse_time_param(detail_data.get('end_day'), current_dt_jst, 'day')
+    end_time_str = shared_parse_time_param(detail_data.get('end_time'), current_dt_jst, 'time')
 
     start_datetime, end_datetime = None, None
     try:
