@@ -29,7 +29,10 @@
         </div>
 
         <div class="co-fieldset">
-          <label for="name">命令名</label>
+          <div class="co-inline-label">
+            <label for="name">命令名</label>
+            <button id="tag-help-open-btn" type="button" class="co-help-btn" aria-label="タグ説明を開く" title="タグ説明">?</button>
+          </div>
           <input type="text" id="name" class="co-input" placeholder="例：朝の通知">
         </div>
 
@@ -109,6 +112,22 @@
       </section>
     </main>
   </div>
+
+  <div id="tag-help-overlay" class="co-modal-overlay co-hidden" role="dialog" aria-modal="true" aria-labelledby="tag-help-title">
+    <div class="co-modal-card">
+      <div class="co-modal-header">
+        <h3 id="tag-help-title">タグについて</h3>
+        <button id="tag-help-close-btn" type="button" class="co-modal-close-btn" aria-label="閉じる">×</button>
+      </div>
+      <div class="co-modal-body">
+        <p>タグとは、<code>【】</code> で囲まれた文章です。</p>
+        <p>主に2つの種類があります。</p>
+        <p><strong>【公式命令】</strong><br>公式が事前に全ユーザー向けに設定してある、システムを高速化するための汎用的な命令です。<br>例：今何時？</p>
+        <p><strong>【特殊命令】</strong><br>公式が事前に登録してある、チャットスペースから干渉できる命令です。削除は推奨されません。<br>例：明日のタイマーを◯時にセットして</p>
+      </div>
+    </div>
+  </div>
+
 <script>
   window.gcp_api_key = "{{ gcp_api_key }}";
 </script>

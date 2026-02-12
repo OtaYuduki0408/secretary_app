@@ -17,6 +17,22 @@ document.addEventListener("DOMContentLoaded",()=>{
   document.getElementById("add-condition-top").addEventListener("click",(event)=>addConditionBlock(event.currentTarget));
   document.getElementById("add-action-top").addEventListener("click",(event)=>addAction(event.currentTarget));
   document.getElementById("register-btn").addEventListener("click",registerCommand);
+
+  const tagHelpOpenBtn = document.getElementById("tag-help-open-btn");
+  const tagHelpCloseBtn = document.getElementById("tag-help-close-btn");
+  const tagHelpOverlay = document.getElementById("tag-help-overlay");
+
+  const openTagHelp = () => tagHelpOverlay?.classList.remove("co-hidden");
+  const closeTagHelp = () => tagHelpOverlay?.classList.add("co-hidden");
+
+  tagHelpOpenBtn?.addEventListener("click", openTagHelp);
+  tagHelpCloseBtn?.addEventListener("click", closeTagHelp);
+  tagHelpOverlay?.addEventListener("click", (event) => {
+    if (event.target === tagHelpOverlay) closeTagHelp();
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") closeTagHelp();
+  });
   
   // JSON Import/Export
   const downloadBtn = document.getElementById('download-as-json-btn');

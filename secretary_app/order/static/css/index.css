@@ -157,6 +157,30 @@ body.co-body {
   gap: 6px;
 }
 
+.co-inline-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.co-help-btn {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 1px solid var(--co-border);
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--co-text);
+  font-weight: 700;
+  cursor: pointer;
+  transition: var(--co-transition);
+}
+
+.co-help-btn:hover {
+  border-color: var(--co-border-strong);
+  color: var(--co-accent);
+}
+
 .co-card label {
   font-weight: 600;
   font-size: 0.95rem;
@@ -589,6 +613,63 @@ body.co-body {
 /* Utility class for hiding elements */
 .co-hidden {
   display: none !important;
+}
+
+.co-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 3000;
+  background: rgba(0, 0, 0, 0.65);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.co-modal-card {
+  width: min(720px, 96vw);
+  max-height: 82vh;
+  overflow: auto;
+  border-radius: 16px;
+  border: 1px solid var(--co-border);
+  background: var(--co-card-bg);
+  box-shadow: var(--co-shadow);
+  padding: 18px 18px 20px;
+}
+
+.co-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.co-modal-header h3 {
+  margin: 0;
+}
+
+.co-modal-close-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  border: 1px solid var(--co-border);
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--co-text);
+  font-size: 1.1rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: var(--co-transition);
+}
+
+.co-modal-close-btn:hover {
+  border-color: var(--co-border-strong);
+  color: var(--co-accent);
+}
+
+.co-modal-body p {
+  margin: 0 0 12px;
+  line-height: 1.7;
 }
 
 /* ネストレベルに応じたインデント */

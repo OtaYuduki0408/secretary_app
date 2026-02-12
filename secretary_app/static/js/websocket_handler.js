@@ -298,23 +298,23 @@ async function executeAction(action) {
         const minutes = nowDate.getMinutes();
         const weekday = ["日", "月", "火", "水", "木", "金", "土"][nowDate.getDay()];
 
-        const selections = Array.isArray(detail.content) ? detail.content : (detail.content ? [detail.content] : []);
+        const rawSelections = Array.isArray(detail.content) ? detail.content : (detail.content ? [detail.content] : []);
+        const normalizedSelections = rawSelections.map((item) => {
+            if (item === "年月日") return "年";
+            if (item === "今日の日付") return "月日";
+            if (item === "今日の曜日") return "曜日";
+            if (item === "今の時間") return "時間";
+            return item;
+        });
+        const selections = normalizedSelections.length > 0 ? normalizedSelections : ["年", "月日", "曜日", "時間"];
         const parts = [];
 
-        if (selections.includes("今の時間") || selections.length === 0) {
-            parts.push(`${hours}時${minutes}分です。`);
-        }
-        if (selections.includes("今日の日付") || selections.includes("年月日") || selections.length === 0) {
-            parts.push(`今日の日付は${month}月${day}日です。`);
-        }
-        if (selections.includes("今日の曜日") || selections.length === 0) {
-            parts.push(`今日の曜日は${weekday}曜日です。`);
-        }
-        if (selections.includes("年月日") || selections.length === 0) {
-            parts.push(`今日は${year}年${month}月${day}日です。`);
-        }
+        if (selections.includes("年")) parts.push(`${year}年`);
+        if (selections.includes("月日")) parts.push(`${month}月${day}日`);
+        if (selections.includes("曜日")) parts.push(`${weekday}曜日`);
+        if (selections.includes("時間")) parts.push(`${hours}時${minutes}分`);
 
-        textToSpeak = parts.join(' ');
+        textToSpeak = parts.length > 0 ? `${parts.join('、')}です。` : `${year}年、${month}月${day}日、${weekday}曜日、${hours}時${minutes}分です。`;
     } else if (action.category === 'アラート') {
         overlayTitle = "アラート";
         playSound(detail.sound || 'default.mp3');

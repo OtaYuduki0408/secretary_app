@@ -1,6 +1,17 @@
 import { updateActionSummary } from './ui_helpers.js';
 import { fetchGenres } from './command_manager.js';
 
+function normalizeTimeReadSelections(raw) {
+  const list = Array.isArray(raw) ? raw : (raw ? [raw] : []);
+  const map = {
+    "年月日": "年",
+    "今日の日付": "月日",
+    "今日の曜日": "曜日",
+    "今の時間": "時間",
+  };
+  return list.map((item) => map[item] || item);
+}
+
 // --- Helper function for the new advanced date range component (Copied from trigger_ui.js) ---
 const createAdvancedDateRangeUI = (p, iv) => {
   const parentId = `${p}date-range-container`;
@@ -298,15 +309,16 @@ export function createActionUI(prefix = '', initialValue = {}) {
     case "時間読み上げ":
       if (sub === "読み上げ内容") {
         const subNotice = subSelect?.disabled ? `<div class="co-help-text">サブカテゴリ: ${sub}</div>` : "";
+        const normalizedSelections = normalizeTimeReadSelections(initialValue.content);
         detailContainer.innerHTML = `
           ${subNotice}
           <div class="co-fieldset">
-            <label>読み上げ内容</label>
+            <label>読み上げ内容 (複数選択可)</label>
             <div class="co-day-of-week-selector action-detail-time-read-content">
-              <button type="button" data-value="今の時間">今の時間</button>
-              <button type="button" data-value="今日の日付">今日の日付</button>
-              <button type="button" data-value="今日の曜日">今日の曜日</button>
-              <button type="button" data-value="年月日">年月日</button>
+              <button type="button" data-value="年">年</button>
+              <button type="button" data-value="月日">月日</button>
+              <button type="button" data-value="曜日">曜日</button>
+              <button type="button" data-value="時間">時間</button>
             </div>
           </div>
         `;
@@ -329,7 +341,7 @@ export function createActionUI(prefix = '', initialValue = {}) {
           }
         };
 
-        setupButtonSelector('.action-detail-time-read-content', initialValue.content);
+        setupButtonSelector('.action-detail-time-read-content', normalizedSelections);
       }
       break;
     case "アラート":
