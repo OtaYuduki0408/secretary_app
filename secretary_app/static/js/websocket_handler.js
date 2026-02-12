@@ -35,29 +35,65 @@ function playSound(filename, volume = 1.0) {
 }
 
 async function speak(text) {
-    // グローバルなAudioContextがsuspended状態であれば再開を試みる
     if (window.audioContext && window.audioContext.state === 'suspended') {
         await window.audioContext.resume().catch(e => console.error("AudioContextの再開に失敗:", e));
     }
 
-    return new Promise((resolve, reject) => {
+    // 音声リストがロードされるのを待つ Promise
+    const getVoicesAsync = () => {
+        return new Promise(resolve => {
+            let voices = speechSynthesis.getVoices();
+            if (voices.length) {
+                resolve(voices);
+                return;
+            }
+            speechSynthesis.onvoiceschanged = () => {
+                voices = speechSynthesis.getVoices();
+                resolve(voices);
+            };
+            // 安全のためのタイムアウト
+            setTimeout(() => resolve(speechSynthesis.getVoices()), 1000);
+        });
+    };
+
+    return new Promise(async (resolve, reject) => {
         if (!text || typeof SpeechSynthesisUtterance === 'undefined' || typeof speechSynthesis === 'undefined') {
             return resolve();
         }
+
         speechSynthesis.cancel();
         const utterance = new SpeechSynthesisUtterance(text);
+
+        const voices = await getVoicesAsync();
         const preferredVoiceName = getPreferredVoiceName();
-        const voiceSettings = getVoiceSettings();
-        if (preferredVoiceName) {
-            const voices = speechSynthesis.getVoices();
-            if (voices.length > 0) {
-                const selectedVoice = voices.find(voice => voice.name === preferredVoiceName);
-                if (selectedVoice) utterance.voice = selectedVoice;
+        let selectedVoice = null;
+
+        if (voices.length > 0) {
+            if (preferredVoiceName) {
+                selectedVoice = voices.find(voice => voice.name === preferredVoiceName);
             }
+            // 優先音声が見つからない、または設定されていない場合、日本語の音声を探す
+            if (!selectedVoice) {
+                selectedVoice = voices.find(voice => voice.lang === 'ja-JP');
+            }
+            // 日本語音声もなければ、リストの最初の音声を使う（フォールバック）
+            if (!selectedVoice) {
+                selectedVoice = voices[0];
+                console.warn('日本語(ja-JP)の音声が見つかりませんでした。利用可能な最初の音声を使用します。');
+            }
+        } else {
+            console.error('利用可能な音声がありません。');
         }
+        
+        if (selectedVoice) {
+            utterance.voice = selectedVoice;
+        }
+
+        const voiceSettings = getVoiceSettings();
         utterance.rate = voiceSettings.rate;
         utterance.pitch = voiceSettings.pitch;
         utterance.volume = voiceSettings.volume;
+
         utterance.onstart = () => document.dispatchEvent(new CustomEvent('voice:playstart'));
         utterance.onend = () => {
             document.dispatchEvent(new CustomEvent('voice:playend'));
@@ -68,6 +104,7 @@ async function speak(text) {
             document.dispatchEvent(new CustomEvent('voice:playend'));
             reject(event.error);
         };
+
         speechSynthesis.speak(utterance);
     });
 }

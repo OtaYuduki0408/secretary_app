@@ -1329,7 +1329,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
 
-    // オーバーレイがない場合は通常通り開始
+        // オーバーレイがない場合は通常通り開始
 
 
 
@@ -1337,7 +1337,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
 
-    if (!audioPermissionOverlay || audioPermissionOverlay.classList.contains('hidden')) {
+        if (!audioPermissionOverlay || audioPermissionOverlay.classList.contains('hidden')) {
 
 
 
@@ -1345,7 +1345,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
 
-        initializeVoiceRecognition();
+            initializeVoiceRecognition();
 
 
 
@@ -1353,7 +1353,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
 
-    } else {
+        } else {
 
 
 
@@ -1361,7 +1361,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
 
-        console.log("DEBUG: 音声許可オーバーレイが表示中のため、音声認識の自動開始をスキップしました。");
+            console.log("DEBUG: 音声許可オーバーレイが表示中のため、音声認識の自動開始をスキップしました。");
 
 
 
@@ -1369,7 +1369,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
 
-    }
+        }
 
 
 
@@ -1385,4 +1385,180 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
 
-    });
+        // --- オーバーレイの閉じるボタンの処理 ---
+
+
+
+
+
+
+
+        const readAloudOverlay = document.getElementById('read-aloud-overlay');
+
+
+
+
+
+
+
+    
+
+
+
+
+
+
+
+        const audioCloseBtn = audioPermissionOverlay ? audioPermissionOverlay.querySelector('.close-overlay-btn') : null;
+
+
+
+
+
+
+
+        const readAloudCloseBtn = readAloudOverlay ? readAloudOverlay.querySelector('.close-overlay-btn') : null;
+
+
+
+
+
+
+
+    
+
+
+
+
+
+
+
+        if (audioCloseBtn && audioPermissionOverlay) {
+
+
+
+
+
+
+
+            audioCloseBtn.addEventListener('click', () => {
+
+
+
+
+
+
+
+                audioPermissionOverlay.classList.add('hidden');
+
+
+
+
+
+
+
+            });
+
+
+
+
+
+
+
+        }
+
+
+
+
+
+
+
+    
+
+
+
+
+
+
+
+        if (readAloudCloseBtn && readAloudOverlay) {
+
+
+
+
+
+
+
+            readAloudCloseBtn.addEventListener('click', () => {
+
+
+
+
+
+
+
+                readAloudOverlay.classList.remove('visible');
+
+
+
+
+
+
+
+                // 読み上げ中であれば停止する
+
+
+
+
+
+
+
+                if (window.speechSynthesis && window.speechSynthesis.speaking) {
+
+
+
+
+
+
+
+                    window.speechSynthesis.cancel();
+
+
+
+
+
+
+
+                }
+
+
+
+
+
+
+
+            });
+
+
+
+
+
+
+
+        }
+
+
+
+
+
+
+
+        
+
+
+
+
+
+
+
+        });
