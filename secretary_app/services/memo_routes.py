@@ -13,7 +13,7 @@ def _require_user_id():
         abort(401, description='Authentication required')
     return user_id
 
-@memo_bp.route('/', methods=['POST'])
+@memo_bp.route('/api/memos', methods=['POST'])
 def add_memo_route():
     user_id = _require_user_id()
     data = request.get_json()
@@ -44,7 +44,7 @@ def add_memo_route():
     return jsonify({"message": "メモを追加しました", "memo": result}), 201
  
  
-@memo_bp.route('/', methods=['GET'])
+@memo_bp.route('/api/memos', methods=['GET'])
 def get_memos_route():
     user_id = _require_user_id()
     keyword = request.args.get('q', '')
@@ -64,7 +64,7 @@ def get_memos_route():
  
     return jsonify(memos_data)
 
-@memo_bp.route('/bulk', methods=['DELETE'])
+@memo_bp.route('/api/memos/bulk', methods=['DELETE'])
 def delete_memos_bulk_route():
     user_id = _require_user_id()
     data = request.get_json()
@@ -81,7 +81,7 @@ def delete_memos_bulk_route():
     return jsonify(result)
  
  
-@memo_bp.route('/<string:memo_id>', methods=['DELETE'])
+@memo_bp.route('/api/memos/<string:memo_id>', methods=['DELETE'])
 def delete_memo_route(memo_id):
     user_id = _require_user_id()
     result = delete_memo(user_id=user_id, memo_id=memo_id)
@@ -91,7 +91,7 @@ def delete_memo_route(memo_id):
         return jsonify(result), 404 
     return jsonify({"message": f"メモ(ID={memo_id})を削除しました"})
 
-@memo_bp.route('/<string:memo_id>', methods=['PUT'])
+@memo_bp.route('/api/memos/<string:memo_id>', methods=['PUT'])
 def update_memo_route(memo_id):
     user_id = _require_user_id()
     data = request.get_json()

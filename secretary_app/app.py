@@ -89,7 +89,7 @@ app.register_blueprint(command_bp, url_prefix='/api')
 app.register_blueprint(order_bp, url_prefix='/order')
 app.register_blueprint(calendar_bp)
 app.register_blueprint(switchbot_bp)
-app.register_blueprint(memo_bp, url_prefix='/api/memos')
+app.register_blueprint(memo_bp)
 
 custom_order_pages_bp = Blueprint('custom_order_pages', __name__, template_folder='order/static/html', static_folder='order/static')
 order_html_dir = os.path.join(os.path.dirname(__file__), 'order', 'static', 'html')
