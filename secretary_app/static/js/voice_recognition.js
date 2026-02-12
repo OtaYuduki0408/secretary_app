@@ -512,23 +512,46 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // --- Audio Unlock ---
         const unlockAudio = () => {
-            console.log("DEBUG: unlockAudio called. userInteracted:", userInteracted);
-
-            if (userInteracted) return;
-
+            if (userInteracted) {
+                // 2回目以降のインタラクションでも resume を試みる
+                if (window.audioContext && window.audioContext.state === 'suspended') {
+                    window.audioContext.resume();
+                }
+                return;
+            }
             userInteracted = true;
+            console.log("DEBUG: First user interaction. Initializing audio context.");
 
-            // グローバルなAudioContextを初期化
             if (!window.audioContext) {
                 window.audioContext = new (window.AudioContext || window.webkitAudioContext)();
             }
 
-            // AudioContextがsuspended状態であればresumeする
+            const setupSilentAudio = () => {
+                const buffer = window.audioContext.createBuffer(1, 1, 22050);
+                const source = window.audioContext.createBufferSource();
+                source.buffer = buffer;
+                source.connect(window.audioContext.destination);
+                source.start(0);
+                console.log("DEBUG: Silent audio played to unlock/resume context.");
+            };
+
             if (window.audioContext.state === 'suspended') {
                 window.audioContext.resume().then(() => {
                     console.log('DEBUG: Global AudioContext resumed successfully.');
+                    setupSilentAudio();
                 }).catch(e => console.error('DEBUG: Failed to resume Global AudioContext:', e));
+            } else {
+                setupSilentAudio();
             }
+
+            // グローバルで呼び出せるように関数を登録
+            window.playSilentAudio = () => {
+                if (!window.audioContext || window.audioContext.state !== 'running') return;
+                const source = window.audioContext.createBufferSource();
+                source.buffer = window.audioContext.createBuffer(1, 1, 22050);
+                source.connect(window.audioContext.destination);
+                source.start(0);
+            };
         };
         
         const urlParams = new URLSearchParams(window.location.search);

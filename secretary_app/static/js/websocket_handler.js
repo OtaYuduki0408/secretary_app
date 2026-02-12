@@ -35,8 +35,10 @@ function playSound(filename, volume = 1.0) {
 }
 
 async function speak(text) {
-    if (window.audioContext && window.audioContext.state === 'suspended') {
-        await window.audioContext.resume().catch(e => console.error("AudioContextの再開に失敗:", e));
+    // iOSの再生ポリシーを回避するため、読み上げ直前に無音再生を実行
+    if (window.playSilentAudio) {
+        window.playSilentAudio();
+        console.log("DEBUG: Executed silent audio playback trick.");
     }
 
     // 音声リストがロードされるのを待つ Promise
