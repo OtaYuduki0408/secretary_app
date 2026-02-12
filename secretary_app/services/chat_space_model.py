@@ -229,6 +229,7 @@ class ChatSpaceModel:
         self._cancel_flags = {}
         self._current_user_id = None
         self._logger = None
+        self._recent_finance_additions = {}
 
     class CancelledError(Exception):
         pass
@@ -485,9 +486,22 @@ class ChatSpaceModel:
             return f"{len(added_records)}件の収支を追加しました。"
         return f"{len(added_records)}件の収支を追加しました。追加内容は、" + "、".join(details) + "です。"
 
-    def _normalize_finance_datetime(self, raw_value: str | None) -> str:
+    def _user_input_has_explicit_time(self, user_input: str | None) -> bool:
+        if not user_input:
+            return False
+        text = str(user_input)
+        patterns = [
+            r"\b([01]?\d|2[0-3]):[0-5]\d\b",
+            r"([01]?\d|2[0-3])時([0-5]?\d分?)?",
+            r"(午前|午後|AM|PM|am|pm)",
+            r"(今朝|正午|昼|夕方|夜|深夜)",
+        ]
+        return any(re.search(p, text) for p in patterns)
+
+    def _normalize_finance_datetime(self, raw_value: str | None, user_input: str | None = None) -> str:
         """収支記録用の日時文字列を YYYY-MM-DD HH:MM:SS に正規化する"""
         now = datetime.now(JST).replace(second=0, microsecond=0)
+        has_explicit_time = self._user_input_has_explicit_time(user_input)
         if not raw_value:
             return now.strftime("%Y-%m-%d %H:%M:%S")
 
@@ -508,10 +522,38 @@ class ChatSpaceModel:
         if parsed.tzinfo is not None:
             parsed = parsed.astimezone(JST).replace(tzinfo=None)
 
-        if parsed.second is None:
+        # ユーザーが時刻を明示していない場合、LLMの00:00固定値は現在時刻(分)に補正
+        if not has_explicit_time and parsed.hour == 0 and parsed.minute == 0:
+            parsed = parsed.replace(hour=now.hour, minute=now.minute, second=0)
+        else:
             parsed = parsed.replace(second=0)
 
         return parsed.replace(microsecond=0).strftime("%Y-%m-%d %H:%M:%S")
+
+    def _finance_record_signature(self, record: dict) -> str:
+        payload = {
+            "type": str(record.get("type") or "").strip(),
+            "category": str(record.get("category") or "").strip(),
+            "amount": float(record.get("amount") or 0),
+            "date": str(record.get("date") or "").strip(),
+            "memo": str(record.get("memo") or "").strip(),
+        }
+        return json.dumps(payload, ensure_ascii=False, sort_keys=True)
+
+    def _is_recent_duplicate_finance_request(self, user_id: str, signatures: tuple[str, ...], window_seconds: int = 8) -> bool:
+        now = datetime.now()
+        last = self._recent_finance_additions.get(user_id)
+        if not last:
+            self._recent_finance_additions[user_id] = {"signatures": signatures, "at": now}
+            return False
+
+        last_signatures = last.get("signatures") or tuple()
+        last_at = last.get("at")
+        if isinstance(last_at, datetime) and (now - last_at).total_seconds() <= window_seconds and signatures == last_signatures:
+            return True
+
+        self._recent_finance_additions[user_id] = {"signatures": signatures, "at": now}
+        return False
 
     def _to_prompt_calendar_task_list(self, task_list: list[dict]) -> list[dict]:
         """Geminiに渡す予定一覧をJST文字列へ正規化する"""
@@ -1132,16 +1174,33 @@ class ChatSpaceModel:
         if not income_expenses_to_add:
             return None, "収支の追加に失敗しました。入力内容を確認してください。"
 
+        normalized_records: list[dict] = []
+        seen_signatures = set()
         for ie in income_expenses_to_add:
             try:
                 data = {
                     "type": "income" if ie['type'] == "収入" else "expense",
                     "category": ie['category'],
                     "amount": ie['amount'],
-                    "date": self._normalize_finance_datetime(ie.get('date')),
+                    "date": self._normalize_finance_datetime(ie.get('date'), text),
                     "memo": (ie.get('memo') or "").strip(),
                     "user_id": user_id
                 }
+                signature = self._finance_record_signature(data)
+                if signature in seen_signatures:
+                    continue
+                seen_signatures.add(signature)
+                normalized_records.append(data)
+            except Exception as e:
+                print(f"収支正規化エラー: {e}")
+
+        request_signatures = tuple(sorted(self._finance_record_signature(item) for item in normalized_records))
+        if request_signatures and self._is_recent_duplicate_finance_request(user_id, request_signatures):
+            # 音声認識の二重送信による重複記録を無言で防止
+            return [], ""
+
+        for data in normalized_records:
+            try:
                 created_record = add_finance_record(data, user_id)
                 created_rows = created_record.get("data") if isinstance(created_record, dict) else None
                 if isinstance(created_rows, list) and created_rows:

@@ -20,7 +20,7 @@ const isMobileDevice = (() => {
 })();
 let lastRestartAt = 0;
 const MOBILE_RESTART_COOLDOWN_MS = 3000;
-const DUPLICATE_SUPPRESS_MS = 2500;
+const DUPLICATE_SUPPRESS_MS = 5000;
 let lastDispatchedVoiceCommandKey = '';
 let lastDispatchedVoiceCommandAt = 0;
 
@@ -126,8 +126,15 @@ function stripLeadingWakeWords(text) {
 }
 
 function normalizeCommandForDuplicateCheck(text) {
-    const withoutWakeWord = stripLeadingWakeWords(text);
-    return withoutWakeWord.toLowerCase().replace(/\s+/g, ' ').trim();
+    let normalized = stripLeadingWakeWords(text || '');
+    END_WORDS.forEach(word => {
+        if (!word) return;
+        const regex = new RegExp(escapeRegExp(word), 'gi');
+        normalized = normalized.replace(regex, ' ');
+    });
+    // 句読点差異での重複判定漏れを減らす
+    normalized = normalized.replace(/[。、！？!?]/g, ' ');
+    return normalized.toLowerCase().replace(/\s+/g, ' ').trim();
 }
 
 function shouldSuppressDuplicateVoiceCommand(commandText) {
