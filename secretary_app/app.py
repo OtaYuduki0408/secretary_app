@@ -49,6 +49,7 @@ from services.memo_routes import memo_bp
 from services.ScheduleManager import ScheduleManager
 from services.user_settings_service import get_user_settings, upsert_user_settings
 from services.custom_order_service import get_all_orders
+from services import pending_action_service
 from order.models import db
 from models.event import Event
 from order.custom_order_routes import custom_order_bp
@@ -1036,7 +1037,21 @@ def enrich_action_api():
 def _dispatch_order_payload(user_id, order_payload):
     sid = connected_users.get(user_id)
     if not sid:
-        print(f"[INPUT_TRIGGER] User {user_id} is not connected. Command not dispatched.")
+        try:
+            queued = pending_action_service.add_pending_action(
+                user_id=user_id,
+                command_id=0,
+                action_data={
+                    "scheduled_at": datetime.now().isoformat(),
+                    "order_payload": order_payload
+                }
+            )
+            if isinstance(queued, dict) and queued.get("error"):
+                print(f"[INPUT_TRIGGER] User {user_id} is not connected. Queue failed: {queued.get('error')}")
+            else:
+                print(f"[INPUT_TRIGGER] User {user_id} is not connected. Queued command for later dispatch.")
+        except Exception as e:
+            print(f"[INPUT_TRIGGER] User {user_id} is not connected. Queue exception: {e}")
         return
     try:
         steps = order_payload.get("steps") or []
@@ -1216,7 +1231,22 @@ def _run_job_with_app_context(func):
                     app.logger.debug(f"[JOB_RUNNER] Dispatching raw order_data for user {user_id} to sid {sid}")
                     socketio.emit('dispatch_command', order_data, room=sid)
                 else:
-                    app.logger.warning(f"[JOB_RUNNER] User {user_id} is not connected. Command not dispatched.")
+                    queued = pending_action_service.add_pending_action(
+                        user_id=user_id,
+                        command_id=0,
+                        action_data={
+                            "scheduled_at": datetime.now().isoformat(),
+                            "order_payload": order_data
+                        }
+                    )
+                    if isinstance(queued, dict) and queued.get("error"):
+                        app.logger.warning(
+                            f"[JOB_RUNNER] User {user_id} is not connected. Queue failed: {queued.get('error')}"
+                        )
+                    else:
+                        app.logger.warning(
+                            f"[JOB_RUNNER] User {user_id} is not connected. Command queued for pending delivery."
+                        )
         app.logger.debug(f"--- [JOB_RUNNER] END: Job '{func.__name__}' finished. ---")
 
 def _acquire_scheduler_process_lock():

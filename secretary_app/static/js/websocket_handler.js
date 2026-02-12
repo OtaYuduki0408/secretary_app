@@ -471,10 +471,59 @@ function setupWebSocket() {
     });
 }
 
+let pendingActionPollTimer = null;
+let pendingActionPollBusy = false;
+
+async function pollPendingActions() {
+    if (pendingActionPollBusy) return;
+    const userId = document.body?.dataset?.userId;
+    if (!userId) return;
+
+    pendingActionPollBusy = true;
+    try {
+        const response = await fetch(`/order/api/pending_actions/${encodeURIComponent(userId)}`, {
+            method: 'GET',
+            credentials: 'same-origin',
+            headers: { 'Accept': 'application/json' },
+        });
+
+        if (response.status === 204) return;
+        if (!response.ok) {
+            console.warn(`pending_actions poll failed: HTTP ${response.status}`);
+            return;
+        }
+
+        const actions = await response.json();
+        if (!Array.isArray(actions) || actions.length === 0) return;
+
+        for (const action of actions) {
+            const payload = action?.action_data?.order_payload;
+            if (!payload) continue;
+            await executeOrderPayload(payload);
+        }
+    } catch (error) {
+        console.warn('pending_actions poll error:', error?.message || error);
+    } finally {
+        pendingActionPollBusy = false;
+    }
+}
+
+function startPendingActionPolling() {
+    if (pendingActionPollTimer) return;
+    pollPendingActions();
+    pendingActionPollTimer = setInterval(pollPendingActions, 3000);
+}
+
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', setupWebSocket);
 } else {
     setupWebSocket();
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', startPendingActionPolling);
+} else {
+    startPendingActionPolling();
 }
 
 // Keep-alive for Render
