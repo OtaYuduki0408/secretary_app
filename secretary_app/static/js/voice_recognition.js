@@ -540,10 +540,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
         let tempLogEntry = document.getElementById('interim-log');
 
+        const wakeWordDetectedInTranscript = WAKE_WORDS.some(word => transcript.toLowerCase().includes(word.toLowerCase()));
+
         // --- エンドワード検出ロジック ---
         let endWordDetected = false;
         let originalFinalCommand = '';
-        if (currentMode === 'listening' && END_WORD && transcript.includes(END_WORD)) {
+        const canDetectEndWord = currentMode === 'listening' || (currentMode === 'waiting' && wakeWordDetectedInTranscript);
+        if (canDetectEndWord && END_WORD && transcript.includes(END_WORD)) {
             console.log(`DEBUG: エンドワード "${END_WORD}" を検出しました。`);
             const endWordIndex = transcript.indexOf(END_WORD);
             originalFinalCommand = transcript.substring(0, endWordIndex).trim(); // エンドワード以前をコマンドとする
@@ -559,7 +562,6 @@ document.addEventListener('DOMContentLoaded', () => {
             shouldProcessDisplay = true; // 設定がtrueなら常に表示
         } else {
             // ウェイクワードが検出された場合、またはlisteningモードの場合のみ表示
-            const wakeWordDetectedInTranscript = WAKE_WORDS.some(word => transcript.toLowerCase().includes(word.toLowerCase()));
             if (wakeWordDetectedInTranscript || currentMode === 'listening') {
                 shouldProcessDisplay = true;
             }
