@@ -107,9 +107,17 @@
     <section class="fd-section">
       <details open>
         <summary class="fd-collapsible-summary fd-chart-summary">グラフ</summary>
-        <div class="fd-charts">
-          <canvas id="incomeChart" class="fd-chart"></canvas>
-          <canvas id="expenseChart" class="fd-chart"></canvas>
+        <div class="fd-pie-row">
+          <canvas id="incomeChart" class="fd-chart fd-chart-pie"></canvas>
+          <canvas id="expenseChart" class="fd-chart fd-chart-pie"></canvas>
+        </div>
+        <div class="fd-trend-controls">
+          <button id="trend-range-week" class="fd-action-btn" type="button" data-range="week">週</button>
+          <button id="trend-range-month" class="fd-action-btn active" type="button" data-range="month">月</button>
+          <button id="trend-range-year" class="fd-action-btn" type="button" data-range="year">年</button>
+        </div>
+        <div class="fd-trend-wrap">
+          <canvas id="trendChart" class="fd-chart fd-chart-trend"></canvas>
         </div>
         <div 
           id="finance-data"

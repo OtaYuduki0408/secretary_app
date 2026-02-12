@@ -54,11 +54,17 @@ document.addEventListener("DOMContentLoaded", () => {
   const editMemo = document.getElementById("finance-edit-memo");
   const editSaveBtn = document.getElementById("finance-edit-save");
   const editCancelBtn = document.getElementById("finance-edit-cancel");
+  const trendRangeWeekBtn = document.getElementById("trend-range-week");
+  const trendRangeMonthBtn = document.getElementById("trend-range-month");
+  const trendRangeYearBtn = document.getElementById("trend-range-year");
 
   let incomeChart = null;
   let expenseChart = null;
+  let trendChart = null;
   let isDeleteMode = false;
   let editingRecordId = null;
+  let trendRange = "month";
+  let selectedTrendIndex = null;
 
   // ---------- カテゴリオプション構築 ----------
   let allCategories = [];
@@ -258,178 +264,183 @@ document.addEventListener("DOMContentLoaded", () => {
   };
 
   // ---------- グラフ ----------
+  function parseRecordDate(record) {
+    if (!record) return null;
+    const raw = String(record.date || "").trim();
+    if (!raw) return null;
+    const parsed = new Date(raw.replace(" ", "T"));
+    if (!Number.isNaN(parsed.getTime())) return parsed;
+    if (record.dateKey) {
+      const fallback = new Date(`${record.dateKey}T00:00:00`);
+      if (!Number.isNaN(fallback.getTime())) return fallback;
+    }
+    return null;
+  }
+
+  function getWeekStartKey(dateObj) {
+    const d = new Date(dateObj);
+    d.setHours(0, 0, 0, 0);
+    const day = (d.getDay() + 6) % 7;
+    d.setDate(d.getDate() - day);
+    return d.toISOString().slice(0, 10);
+  }
+
+  function formatBucketLabel(range, key) {
+    if (range === "week") {
+      const dt = new Date(`${key}T00:00:00`);
+      const mm = String(dt.getMonth() + 1).padStart(2, "0");
+      const dd = String(dt.getDate()).padStart(2, "0");
+      return `${mm}/${dd}週`;
+    }
+    if (range === "month") {
+      const [y, m] = key.split("-");
+      return `${y}/${m}`;
+    }
+    return `${key}年`;
+  }
+
+  function buildTrendBuckets(records, range) {
+    const map = new Map();
+    records.forEach((record) => {
+      const dateObj = parseRecordDate(record);
+      if (!dateObj) return;
+      let key = "";
+      if (range === "week") {
+        key = getWeekStartKey(dateObj);
+      } else if (range === "month") {
+        key = `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, "0")}`;
+      } else {
+        key = `${dateObj.getFullYear()}`;
+      }
+      if (!map.has(key)) {
+        map.set(key, { key, label: formatBucketLabel(range, key), income: 0, expense: 0, records: [] });
+      }
+      const bucket = map.get(key);
+      const amount = Number(record.amount || 0);
+      if (record.type === "income") bucket.income += amount;
+      if (record.type === "expense") bucket.expense += amount;
+      bucket.records.push(record);
+    });
+    return [...map.values()].sort((a, b) => a.key.localeCompare(b.key));
+  }
+
+  function drawPieChart(targetId, title, records, tone) {
+    const ctx = document.getElementById(targetId).getContext("2d");
+    const categoryTotals = records.reduce((acc, r) => {
+      const category = r.category || "未分類";
+      acc[category] = (acc[category] || 0) + Number(r.amount || 0);
+      return acc;
+    }, {});
+    const labels = Object.keys(categoryTotals);
+    const values = labels.map((l) => categoryTotals[l]);
+    const fallbackColor = tone === "income" ? "rgba(0, 188, 212, 0.8)" : "rgba(239, 68, 68, 0.8)";
+    const palette = Object.values(generateCategoryColors(labels));
+    const colors = palette.length > 0 ? palette : [fallbackColor];
+
+    const chartConfig = {
+      type: "pie",
+      data: {
+        labels: labels.length > 0 ? labels : ["データなし"],
+        datasets: [{
+          data: values.length > 0 ? values : [1],
+          backgroundColor: colors,
+          borderWidth: 1,
+        }],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        radius: "58%",
+        plugins: {
+          legend: { position: "bottom" },
+          title: { display: true, text: title },
+          tooltip: {
+            callbacks: {
+              label: (context) => `${context.label}: ${Number(context.raw || 0).toLocaleString()} 円`,
+            },
+          },
+        },
+      },
+    };
+
+    if (targetId === "incomeChart") {
+      if (incomeChart) incomeChart.destroy();
+      incomeChart = new Chart(ctx, chartConfig);
+    } else {
+      if (expenseChart) expenseChart.destroy();
+      expenseChart = new Chart(ctx, chartConfig);
+    }
+  }
+
+  function drawTrendChart(buckets) {
+    const ctx = document.getElementById("trendChart").getContext("2d");
+    if (trendChart) trendChart.destroy();
+    const labels = buckets.map((b) => b.label);
+    const incomeData = buckets.map((b) => b.income);
+    const expenseData = buckets.map((b) => b.expense);
+
+    trendChart = new Chart(ctx, {
+      type: "line",
+      data: {
+        labels,
+        datasets: [
+          {
+            label: "収入",
+            data: incomeData,
+            borderColor: "rgba(0,188,212,1)",
+            backgroundColor: "rgba(0,188,212,0.15)",
+            tension: 0.28,
+            pointRadius: labels.map((_, i) => (i === selectedTrendIndex ? 6 : 4)),
+            pointHoverRadius: 7,
+          },
+          {
+            label: "支出",
+            data: expenseData,
+            borderColor: "rgba(239,68,68,1)",
+            backgroundColor: "rgba(239,68,68,0.15)",
+            tension: 0.28,
+            pointRadius: labels.map((_, i) => (i === selectedTrendIndex ? 6 : 4)),
+            pointHoverRadius: 7,
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          title: { display: true, text: "収入・支出の推移" },
+        },
+        scales: {
+          y: { beginAtZero: true },
+        },
+        onClick: (event, elements) => {
+          if (!elements || elements.length === 0) return;
+          selectedTrendIndex = elements[0].index;
+          updateCharts(lastChartSourceRecords);
+        },
+      },
+    });
+  }
+
+  let lastChartSourceRecords = [];
   function updateCharts(records) {
-    const currentIncomeRecords = records.filter(r => r.type === 'income');
-    const currentExpenseRecords = records.filter(r => r.type === 'expense');
-    drawIncomeChart(currentIncomeRecords);
-    drawExpenseChart(currentExpenseRecords);
+    lastChartSourceRecords = [...records];
+    const buckets = buildTrendBuckets(records, trendRange);
+    if (selectedTrendIndex !== null && selectedTrendIndex >= buckets.length) {
+      selectedTrendIndex = null;
+    }
+    const selectedBucket = selectedTrendIndex !== null ? buckets[selectedTrendIndex] : null;
+    const pieSourceRecords = selectedBucket ? selectedBucket.records : records;
+    const incomeRecords = pieSourceRecords.filter((r) => r.type === "income");
+    const expenseRecords = pieSourceRecords.filter((r) => r.type === "expense");
+
+    const suffix = selectedBucket ? `（${selectedBucket.label}）` : "（全体）";
+    drawPieChart("incomeChart", `カテゴリ別収入${suffix}`, incomeRecords, "income");
+    drawPieChart("expenseChart", `カテゴリ別支出${suffix}`, expenseRecords, "expense");
+    drawTrendChart(buckets);
   }
 
-            function drawIncomeChart(records) {
-
-              const ctx = document.getElementById('incomeChart').getContext('2d');
-
-              if (incomeChart) incomeChart.destroy();
-
-          
-
-              const categoryTotals = records.reduce((acc, r) => {
-
-                const cat = r.category || "未分類";
-
-                acc[cat] = (acc[cat] || 0) + Number(r.amount || 0);
-
-                return acc;
-
-              }, {});
-
-          
-
-              const labels = Object.keys(categoryTotals);
-
-              const data = labels.map(l => categoryTotals[l]);
-
-          
-
-              incomeChart = new Chart(ctx, {
-
-                type: 'bar',
-
-                data: {
-
-                  labels,
-
-                  datasets: [{
-
-                    label: '収入',
-
-                    data,
-
-                    backgroundColor: 'rgba(0, 188, 212, 0.8)',
-
-                    borderColor: 'rgba(0, 188, 212, 1)',
-
-                    borderWidth: 1
-
-                  }]
-
-                },
-
-                options: {
-
-                  responsive: true,
-
-                  scales: {
-
-                    y: {
-
-                      beginAtZero: true
-
-                    }
-
-                  },
-
-                  plugins: {
-
-                    legend: {
-
-                      display: false
-
-                    },
-
-                    title: {
-
-                      display: true,
-
-                      text: 'カテゴリ別収入'
-
-                    }
-
-                  }
-
-                }
-
-              });
-
-            }
-
-          
-
-            function drawExpenseChart(records) {
-
-              const ctx = document.getElementById('expenseChart').getContext('2d');
-
-              if (expenseChart) expenseChart.destroy();
-
-          
-
-              const categoryTotals = records.reduce((acc, r) => {
-
-                const cat = r.category || "未分類";
-
-                acc[cat] = (acc[cat] || 0) + Number(r.amount || 0);
-
-                return acc;
-
-              }, {});
-
-          
-
-              const labels = Object.keys(categoryTotals);
-
-              const data = labels.map(l => categoryTotals[l]);
-
-              const backgroundColors = generateCategoryColors(labels);
-
-          
-
-              expenseChart = new Chart(ctx, {
-
-                type: 'pie',
-
-                data: {
-
-                  labels: labels,
-
-                  datasets: [{
-
-                    data: data,
-
-                    backgroundColor: Object.values(backgroundColors)
-
-                  }]
-
-                },
-
-                options: {
-
-                  responsive: true,
-
-                  plugins: {
-
-                    legend: {
-
-                      position: 'top',
-
-                    },
-
-                    title: {
-
-                      display: true,
-
-                      text: 'カテゴリ別支出'
-
-                    }
-
-                  }
-
-                }
-
-              });
-
-            }
-
-  function generateCategoryColors(categories) {
+  function generateCategoryColors(categories) {
     const colors = {};
     const colorPalette = [
       'rgba(255, 99, 132, 0.8)', 'rgba(54, 162, 235, 0.8)', 'rgba(255, 159, 64, 0.8)',
@@ -504,6 +515,16 @@ document.addEventListener("DOMContentLoaded", () => {
     } catch (err) {
       console.warn("[finance] goal fetch failed", err);
     }
+  }
+
+  function setTrendRange(nextRange) {
+    trendRange = nextRange;
+    selectedTrendIndex = null;
+    [trendRangeWeekBtn, trendRangeMonthBtn, trendRangeYearBtn].forEach((btn) => {
+      if (!btn) return;
+      btn.classList.toggle("active", btn.dataset.range === trendRange);
+    });
+    updateCharts(lastChartSourceRecords.length > 0 ? lastChartSourceRecords : rawFinanceRecords);
   }
 
   async function saveGoalAmount(goalNum) {
@@ -617,6 +638,9 @@ document.addEventListener("DOMContentLoaded", () => {
     await refreshRecordsFromApi();
     applyFiltersAndSort();
   });
+  trendRangeWeekBtn?.addEventListener("click", () => setTrendRange("week"));
+  trendRangeMonthBtn?.addEventListener("click", () => setTrendRange("month"));
+  trendRangeYearBtn?.addEventListener("click", () => setTrendRange("year"));
 
   fetchGoalAmount();
   // 初期描画

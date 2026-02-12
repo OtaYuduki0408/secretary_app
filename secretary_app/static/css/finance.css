@@ -257,6 +257,40 @@ summary{
   border:1px solid rgba(var(--app-border-rgb, 148,163,184),.2);
 }
 
+.fd-pie-row{
+  display:flex;
+  flex-wrap:wrap;
+  justify-content:space-around;
+  gap:14px;
+  margin-bottom:14px;
+}
+
+.fd-chart-pie{
+  width:min(260px, 42vw);
+  height:min(260px, 42vw);
+  max-height:260px;
+}
+
+.fd-trend-controls{
+  display:flex;
+  gap:10px;
+  margin:6px 0 10px;
+}
+
+.fd-trend-controls .fd-action-btn.active{
+  background:linear-gradient(135deg,var(--accent),var(--accent-strong));
+  color:var(--app-button-text, #0f172a);
+  font-weight:700;
+}
+
+.fd-trend-wrap{
+  width:100%;
+}
+
+.fd-chart-trend{
+  min-height:280px;
+}
+
 .fd-form{
   display:flex;
   flex-wrap:wrap;
