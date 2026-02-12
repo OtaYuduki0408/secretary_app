@@ -2,6 +2,9 @@
 
 console.log("websocket_handler.js loaded.");
 let currentAudioSource = null; // 現在再生中のオーディオソースを追跡
+let lastPayloadSignature = '';
+let lastPayloadExecutedAt = 0;
+const DUPLICATE_PAYLOAD_SUPPRESS_MS = 8000;
 
 // =====================================================================
 // ヘルパー関数
@@ -129,6 +132,7 @@ function needsEnrichment(action) {
     if (category === 'カレンダー' && sub === '読み上げ') return true;
     if (category === '収支管理' && sub === '読み上げ') return true;
     if (category === 'メモ' && sub === '読み上げ') return true;
+    if (category === '特殊命令' && sub === '目覚まし') return true;
     return false;
 }
 
@@ -203,6 +207,25 @@ async function executeOrderPayload(orderData) {
     const steps = orderData.steps || [];
     const actions = orderData.actions || [];
     const actionPlan = steps.length > 0 ? flattenActionsFromSteps(steps) : actions;
+    const signature = JSON.stringify({
+        triggers: (orderData.triggers || []).map((t) => ({
+            category: t?.category || '',
+            sub: t?.sub || '',
+            value: t?.value || {},
+        })),
+        actions: (actionPlan || []).map((a) => ({
+            category: a?.category || '',
+            sub: a?.sub || '',
+        })),
+    });
+    const now = Date.now();
+    if (signature === lastPayloadSignature && (now - lastPayloadExecutedAt) < DUPLICATE_PAYLOAD_SUPPRESS_MS) {
+        console.log('[DEBUG_WS] 重複ペイロードを抑止しました。');
+        return;
+    }
+    lastPayloadSignature = signature;
+    lastPayloadExecutedAt = now;
+
     if (actionPlan.length > 0) {
         await executePlan(actionPlan);
     }
@@ -384,6 +407,11 @@ async function executeAction(action) {
         overlayCategoryClass = "overlay-speech";
         textToSpeak = detail.message || "天気予報の情報を取得できませんでした。";
         messageHtml = `<h3>${overlayTitle}</h3><p>${textToSpeak.replace(/。/g, '。<br>')}</p>`;
+    } else if (action.category === '特殊命令' && action.sub === '目覚まし') {
+        overlayTitle = "特殊命令";
+        overlayCategoryClass = "overlay-speech";
+        textToSpeak = detail.message || "明日の目覚まし時刻を取得できませんでした。";
+        messageHtml = `<h3>${overlayTitle}</h3><p>${textToSpeak}</p>`;
     } else if (action.category === 'Youtube' && action.sub === '再生') {
         overlayTitle = "Youtube 再生";
         const { mode, search_query, video_url } = detail;

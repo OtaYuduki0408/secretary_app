@@ -111,7 +111,13 @@ export function updateSubOptions(categoryId, subId, data) {
     }
   } else if (categoryId.includes('action')) {
     const subOptions = data[cat] || [];
-    if (subOptions.length <= 1) {
+    if (cat === "特殊命令") {
+      // 将来的な拡張を見据えて、特殊命令のサブカテゴリは常に表示する
+      sub.style.display = 'block';
+      if (subOptions.length === 1) {
+        sub.value = subOptions[0];
+      }
+    } else if (subOptions.length <= 1) {
       sub.style.display = 'none';
       if (subOptions.length === 1) {
         sub.value = subOptions[0];

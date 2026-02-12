@@ -927,6 +927,71 @@ def _enrich_memo_read(detail, user_id, now_jst, app_logger):
     app_logger.debug(f"[DEBUG_ENRICH] Finished _enrich_memo_read. Returning detail: {detail}")
     return detail
 
+def _normalize_alarm_time_text(raw_time):
+    if raw_time is None:
+        return None
+    text = str(raw_time).strip()
+    if not text:
+        return None
+    text = text.translate(str.maketrans("０１２３４５６７８９：", "0123456789:"))
+    text = re.sub(r"\s+", "", text)
+    m = re.fullmatch(r"(\d{1,2}):(\d{1,2})", text)
+    if not m:
+        return None
+    hour = int(m.group(1))
+    minute = int(m.group(2))
+    if hour < 0 or hour > 23 or minute < 0 or minute > 59:
+        return None
+    return f"{hour:02d}:{minute:02d}"
+
+def _build_special_alarm_read_detail(user_id, app_logger):
+    """
+    特殊命令「目覚まし」の時間トリガーを参照し、読み上げメッセージを構築する。
+    """
+    try:
+        orders = get_all_orders(user_id)
+        if isinstance(orders, dict) and orders.get('error'):
+            return {"error": "目覚まし命令の取得に失敗しました。"}
+        if not isinstance(orders, list) or not orders:
+            return {"error": "目覚まし命令が見つかりませんでした。"}
+
+        alarm_order = next((o for o in orders if str(o.get('name', '')).strip() == '目覚まし'), None)
+        if not alarm_order:
+            alarm_order = next((o for o in orders if '目覚まし' in str(o.get('name', ''))), None)
+        if not alarm_order:
+            return {"error": "目覚まし命令が見つかりませんでした。"}
+
+        triggers = alarm_order.get('triggers') or []
+        if not triggers or not isinstance(triggers[0], dict):
+            return {"error": "目覚まし命令のトリガー情報が不正です。"}
+
+        trigger0 = triggers[0]
+        if str(trigger0.get('category') or '').strip() != '時間':
+            return {"error": "目覚まし命令の先頭トリガーが時間ではありません。"}
+
+        raw_time = (trigger0.get('value') or {}).get('time')
+        normalized = _normalize_alarm_time_text(raw_time)
+        if not normalized:
+            return {"error": "目覚まし時刻が設定されていません。"}
+
+        hour_str, minute_str = normalized.split(':')
+        hour = int(hour_str)
+        minute = int(minute_str)
+        if minute == 0:
+            message = f"明日の目覚ましの時間は{hour}時です"
+        else:
+            message = f"明日の目覚ましの時間は{hour}時{minute}分です"
+
+        return {
+            "message": message,
+            "time": normalized,
+            "order_id": alarm_order.get('id'),
+            "order_name": alarm_order.get('name'),
+        }
+    except Exception as e:
+        app_logger.error(f"[DEBUG_ENRICH] Failed to build special alarm detail: {e}", exc_info=True)
+        return {"error": "目覚まし時刻の取得中にエラーが発生しました。"}
+
 def _enrich_actions_for_dispatch(order_payload, user_id, app_logger, source="Unknown"):
     app.logger.debug(f"[DEBUG_ENRICH] _enrich_actions_for_dispatch called from '{source}' for user {user_id}")
     app.logger.debug(f"[DEBUG_ENRICH] Payload before enrichment: {json.dumps(order_payload, indent=2, ensure_ascii=False)}")
@@ -965,6 +1030,10 @@ def _enrich_actions_for_dispatch(order_payload, user_id, app_logger, source="Unk
                 app_logger.debug(f"[DEBUG_ENRICH] get_weather_forecast_message returned: {weather_message}")
                 
                 detail['message'] = weather_message
+                action['detail'] = detail
+            elif category == '特殊命令' and sub == '目覚まし':
+                alarm_detail = _build_special_alarm_read_detail(user_id, app_logger)
+                detail.update(alarm_detail)
                 action['detail'] = detail
             # ... (other enrichments like email can be logged here too)
         except Exception as e:
@@ -1195,7 +1264,6 @@ def chat_api_web():
         for payload in voice_payloads:
             # ボイストリガー経由でもアクション内容を補強してから送信する
             enriched_payload = _enrich_actions_for_dispatch(payload, user_id, app.logger)
-            _dispatch_order_payload(user_id, enriched_payload)
             enriched_payloads.append(enriched_payload)
         
         response_data['suppress_tts'] = True

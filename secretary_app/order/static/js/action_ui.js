@@ -242,6 +242,15 @@ export function createActionUI(prefix = '', initialValue = {}) {
         dateRange.attachListeners(detailContainer);
       }
       break;
+    case "特殊命令":
+      if (sub === "目覚まし") {
+        detailContainer.innerHTML = `
+          <label>行動</label>
+          <div class="co-help-text">目覚ましの時間を読み上げる</div>
+          <small class="co-help-text">読み上げ例: 明日の目覚ましの時間は10時です</small>
+        `;
+      }
+      break;
     case "SwitchBot":
       if (sub === "デバイス操作") {
         detailContainer.innerHTML = `

@@ -588,6 +588,15 @@ def _execute_alert(detail_data: dict) -> dict:
     sound_type = detail_data.get('sound', 'default') # デフォルト値を設定
     return {"status": "success", "message": f"アラート音'{sound_type}'を再生します。", "action": "play_alert_sound", "sound_type": sound_type}
 
+def _execute_special_alarm_read(detail_data: dict) -> dict:
+    """
+    特殊命令「目覚まし」の読み上げを実行する。
+    """
+    message = detail_data.get('message')
+    if message:
+        return {"status": "success", "message": message}
+    return {"status": "error", "message": "目覚まし時刻の読み上げ情報が不足しています。"}
+
 
 
 from app import socketio, connected_users
@@ -664,6 +673,8 @@ def execute_action(user_id: str, action_data: dict) -> dict: # triggered_atをac
         return _execute_speak(detail)
     elif category == 'アラート' and sub == '実行':
         return _execute_alert(detail)
+    elif category == '特殊命令' and sub == '目覚まし':
+        return _execute_special_alarm_read(detail)
     # 他のアクションタイプもここに追加
     
     return {"status": "error", "message": f"不明なアクション: {category}:{sub}"}
