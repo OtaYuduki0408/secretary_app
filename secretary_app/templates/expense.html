@@ -85,8 +85,14 @@
     <div class="edit-dialog" role="dialog" aria-modal="true" aria-labelledby="expense-edit-title">
       <h3 id="expense-edit-title">収支を編集</h3>
       <div class="form-group">
-        <label for="edit-date">日時</label>
-        <input id="edit-date" class="input" type="datetime-local">
+        <label>日時</label>
+        <div class="edit-datetime-grid">
+          <input id="edit-year" class="input" type="number" min="2000" max="2100" placeholder="年">
+          <input id="edit-month" class="input" type="number" min="1" max="12" placeholder="月">
+          <input id="edit-day" class="input" type="number" min="1" max="31" placeholder="日">
+          <input id="edit-hour" class="input" type="number" min="0" max="23" placeholder="時">
+          <input id="edit-minute" class="input" type="number" min="0" max="59" placeholder="分">
+        </div>
       </div>
       <div class="form-group">
         <label for="edit-type">種別</label>

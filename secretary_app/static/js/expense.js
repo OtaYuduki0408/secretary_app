@@ -16,7 +16,11 @@ document.addEventListener("DOMContentLoaded", () => {
   const recordsTable = document.getElementById("records");
 
   const editOverlay = document.getElementById("expense-edit-overlay");
-  const editDateEl = document.getElementById("edit-date");
+  const editYearEl = document.getElementById("edit-year");
+  const editMonthEl = document.getElementById("edit-month");
+  const editDayEl = document.getElementById("edit-day");
+  const editHourEl = document.getElementById("edit-hour");
+  const editMinuteEl = document.getElementById("edit-minute");
   const editTypeEl = document.getElementById("edit-type");
   const editCategoryEl = document.getElementById("edit-category");
   const editAmountEl = document.getElementById("edit-amount");
@@ -40,20 +44,49 @@ document.addEventListener("DOMContentLoaded", () => {
     const s = String(value).trim();
     const m = s.match(/^(\d{4}-\d{2}-\d{2})[ T](\d{2}):(\d{2})/);
     if (m) return `${m[1]} ${m[2]}:${m[3]}`;
-    return s;
+    const d = s.match(/^(\d{4}-\d{2}-\d{2})$/);
+    if (d) return `${d[1]} 00:00`;
+    return s.replace("T", " ");
   }
 
-  function toDateTimeLocalValue(value) {
-    if (!value) return "";
-    const s = String(value).trim().replace(" ", "T");
-    const m = s.match(/^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2})/);
-    if (!m) return "";
-    return `${m[1]}T${m[2]}:${m[3]}`;
+  function parseDateParts(value) {
+    const now = new Date();
+    const fallback = {
+      year: now.getFullYear(),
+      month: now.getMonth() + 1,
+      day: now.getDate(),
+      hour: 0,
+      minute: 0,
+    };
+    if (!value) return fallback;
+    const s = String(value).trim().replace("T", " ");
+    const m = s.match(/^(\d{4})-(\d{2})-(\d{2})(?:\s+(\d{2}):(\d{2}))?/);
+    if (!m) return fallback;
+    return {
+      year: Number(m[1]),
+      month: Number(m[2]),
+      day: Number(m[3]),
+      hour: Number(m[4] || 0),
+      minute: Number(m[5] || 0),
+    };
   }
 
-  function fromDateTimeLocalValue(value) {
-    if (!value) return "";
-    return `${value.replace("T", " ")}:00`;
+  function pad2(value) {
+    return String(value).padStart(2, "0");
+  }
+
+  function buildDateTimeFromInputs() {
+    const year = Number(editYearEl.value);
+    const month = Number(editMonthEl.value);
+    const day = Number(editDayEl.value);
+    const hour = Number(editHourEl.value);
+    const minute = Number(editMinuteEl.value);
+    if (![year, month, day, hour, minute].every(Number.isFinite)) return "";
+    if (month < 1 || month > 12) return "";
+    if (day < 1 || day > 31) return "";
+    if (hour < 0 || hour > 23) return "";
+    if (minute < 0 || minute > 59) return "";
+    return `${year}-${pad2(month)}-${pad2(day)} ${pad2(hour)}:${pad2(minute)}:00`;
   }
 
   function showToast(message, isError = false) {
@@ -173,7 +206,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function openEditOverlay(record) {
     state.editingRecordId = record.id;
-    editDateEl.value = toDateTimeLocalValue(record.date);
+    const parts = parseDateParts(record.date);
+    editYearEl.value = parts.year;
+    editMonthEl.value = parts.month;
+    editDayEl.value = parts.day;
+    editHourEl.value = parts.hour;
+    editMinuteEl.value = parts.minute;
     editTypeEl.value = record.type || "expense";
     renderEditCategoryOptions(editTypeEl.value, record.category || "");
     editAmountEl.value = Number(record.amount || 0);
@@ -297,8 +335,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
   async function saveEditRecord() {
     if (!state.editingRecordId) return;
+    const dateValue = buildDateTimeFromInputs();
     const payload = {
-      date: fromDateTimeLocalValue(editDateEl.value),
+      date: dateValue,
       type: editTypeEl.value,
       category: editCategoryEl.value,
       amount: Number(editAmountEl.value || 0),

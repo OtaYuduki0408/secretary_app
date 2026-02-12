@@ -43,7 +43,11 @@ document.addEventListener("DOMContentLoaded", () => {
   const selectAllCheckbox = document.getElementById("finance-select-all");
   const financeTable = document.getElementById("financeTable");
   const editOverlay = document.getElementById("finance-edit-overlay");
-  const editDate = document.getElementById("finance-edit-date");
+  const editYear = document.getElementById("finance-edit-year");
+  const editMonth = document.getElementById("finance-edit-month");
+  const editDay = document.getElementById("finance-edit-day");
+  const editHour = document.getElementById("finance-edit-hour");
+  const editMinute = document.getElementById("finance-edit-minute");
   const editType = document.getElementById("finance-edit-type");
   const editCategory = document.getElementById("finance-edit-category");
   const editAmount = document.getElementById("finance-edit-amount");
@@ -75,20 +79,49 @@ document.addEventListener("DOMContentLoaded", () => {
     const s = String(value).trim();
     const m = s.match(/^(\d{4}-\d{2}-\d{2})[ T](\d{2}):(\d{2})/);
     if (m) return `${m[1]} ${m[2]}:${m[3]}`;
-    return s;
+    const d = s.match(/^(\d{4}-\d{2}-\d{2})$/);
+    if (d) return `${d[1]} 00:00`;
+    return s.replace("T", " ");
   }
 
-  function toLocalInputValue(value) {
-    if (!value) return "";
-    const s = String(value).trim().replace(" ", "T");
-    const m = s.match(/^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2})/);
-    if (!m) return "";
-    return `${m[1]}T${m[2]}:${m[3]}`;
+  function parseDateParts(value) {
+    const now = new Date();
+    const fallback = {
+      year: now.getFullYear(),
+      month: now.getMonth() + 1,
+      day: now.getDate(),
+      hour: 0,
+      minute: 0,
+    };
+    if (!value) return fallback;
+    const s = String(value).trim().replace("T", " ");
+    const m = s.match(/^(\d{4})-(\d{2})-(\d{2})(?:\s+(\d{2}):(\d{2}))?/);
+    if (!m) return fallback;
+    return {
+      year: Number(m[1]),
+      month: Number(m[2]),
+      day: Number(m[3]),
+      hour: Number(m[4] || 0),
+      minute: Number(m[5] || 0),
+    };
   }
 
-  function fromLocalInputValue(value) {
-    if (!value) return "";
-    return `${value.replace("T", " ")}:00`;
+  function pad2(value) {
+    return String(value).padStart(2, "0");
+  }
+
+  function buildDateTimeFromInputs() {
+    const year = Number(editYear.value);
+    const month = Number(editMonth.value);
+    const day = Number(editDay.value);
+    const hour = Number(editHour.value);
+    const minute = Number(editMinute.value);
+    if (![year, month, day, hour, minute].every(Number.isFinite)) return "";
+    if (month < 1 || month > 12) return "";
+    if (day < 1 || day > 31) return "";
+    if (hour < 0 || hour > 23) return "";
+    if (minute < 0 || minute > 59) return "";
+    return `${year}-${pad2(month)}-${pad2(day)} ${pad2(hour)}:${pad2(minute)}:00`;
   }
 
   async function refreshRecordsFromApi() {
@@ -115,7 +148,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function openFinanceEditOverlay(record) {
     editingRecordId = record.id;
-    editDate.value = toLocalInputValue(record.date);
+    const parts = parseDateParts(record.date);
+    editYear.value = parts.year;
+    editMonth.value = parts.month;
+    editDay.value = parts.day;
+    editHour.value = parts.hour;
+    editMinute.value = parts.minute;
     editType.value = record.type || "expense";
     editCategory.value = record.category || "";
     editAmount.value = Number(record.amount || 0);
@@ -553,8 +591,9 @@ document.addEventListener("DOMContentLoaded", () => {
   });
   editSaveBtn?.addEventListener("click", async () => {
     if (!editingRecordId) return;
+    const dateValue = buildDateTimeFromInputs();
     const payload = {
-      date: fromLocalInputValue(editDate.value),
+      date: dateValue,
       type: editType.value,
       category: editCategory.value.trim(),
       amount: Number(editAmount.value || 0),

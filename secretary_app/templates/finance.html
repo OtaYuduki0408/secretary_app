@@ -179,8 +179,20 @@
   <div class="fd-edit-dialog" role="dialog" aria-modal="true" aria-labelledby="finance-edit-title">
     <h3 id="finance-edit-title">収支を編集</h3>
     <div class="fd-edit-grid">
-      <label>日時
-        <input id="finance-edit-date" type="datetime-local" class="fd-input">
+      <label>年
+        <input id="finance-edit-year" type="number" min="2000" max="2100" class="fd-input">
+      </label>
+      <label>月
+        <input id="finance-edit-month" type="number" min="1" max="12" class="fd-input">
+      </label>
+      <label>日
+        <input id="finance-edit-day" type="number" min="1" max="31" class="fd-input">
+      </label>
+      <label>時
+        <input id="finance-edit-hour" type="number" min="0" max="23" class="fd-input">
+      </label>
+      <label>分
+        <input id="finance-edit-minute" type="number" min="0" max="59" class="fd-input">
       </label>
       <label>タイプ
         <select id="finance-edit-type" class="fd-select">
