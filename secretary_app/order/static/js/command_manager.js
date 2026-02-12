@@ -127,6 +127,14 @@ function parseActionItem(actionItem) {
         }
       }
       break;
+
+    // 新しく追加する case "画像提示":
+    case "画像提示":
+      if (sub === "発声") {
+        detail.imageBase64 = detailContainer.querySelector(".action-detail-image-base64")?.value;
+        detail.text = detailContainer.querySelector(".action-detail-speak-text")?.value;
+      }
+      break;
   }
 
   const actionData = { category, sub, detail };

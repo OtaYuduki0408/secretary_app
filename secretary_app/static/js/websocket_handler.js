@@ -269,7 +269,7 @@ async function executeAction(action) {
     }
 
     // オーバーレイのリセット
-    overlay.classList.remove('overlay-calendar', 'overlay-finance', 'overlay-memo', 'overlay-speech');
+    overlay.classList.remove('overlay-calendar', 'overlay-finance', 'overlay-memo', 'overlay-speech', 'overlay-image-display');
 
     // 時刻表示
     const now = new Date();
@@ -401,6 +401,29 @@ async function executeAction(action) {
             textToSpeak = "Youtubeの再生情報が正しく設定されていません。";
             console.error(textToSpeak, detail);
             messageHtml = `<h3>${overlayTitle}</h3><p>${textToSpeak}</p>`;
+        }
+    } else if (action.category === '画像提示' && action.sub === '発声') {
+        const imageOverlay = document.getElementById('image-display-overlay');
+        const displayedImage = document.getElementById('displayed-image');
+        
+        if (imageOverlay && displayedImage && detail.imageBase64) {
+            displayedImage.src = detail.imageBase64;
+            imageOverlay.classList.add('visible');
+
+            // テキストがあれば再生し、再生が終わるまで待つ
+            if (detail.text) {
+                await speak(detail.text);
+            } else {
+                // テキストがない場合は、最低でも少し待つか、クリックで閉じられるようにする
+                // ここでは、テキストがない場合は即座に閉じないように何もしない
+                // ユーザーが手動で閉じるのを待つ
+            }
+
+            imageOverlay.classList.remove('visible');
+            displayedImage.src = ''; // メモリ解放のためにクリア
+        } else {
+            console.error("画像表示に必要な要素、または画像データが不足しています。");
+            textToSpeak = "画像を表示できませんでした。";
         }
     }
 

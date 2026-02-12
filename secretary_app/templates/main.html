@@ -100,6 +100,29 @@
             background: rgba(255, 255, 255, 0.4);
         }
 
+        .image-display-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            display: none; /* Initially hidden */
+            justify-content: center;
+            align-items: center;
+            z-index: 16000;
+        }
+        .image-display-overlay.visible {
+            display: flex;
+        }
+        #displayed-image {
+            max-width: 80vw;
+            max-height: 80vh;
+            object-fit: contain;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+        }
+
         .modal-overlay {
           position: fixed;
           top: 0;
@@ -670,6 +693,12 @@
         <div id="overlay-time" class="overlay-time"></div>
         <div id="overlay-message" class="overlay-message"></div>
     </div>
+</div>
+
+<!-- 画像表示用オーバーレイ -->
+<div id="image-display-overlay" class="image-display-overlay">
+    <button type="button" class="close-overlay-btn" aria-label="閉じる">&times;</button>
+    <img id="displayed-image" src="" alt="表示画像">
 </div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.5/socket.io.min.js"></script>

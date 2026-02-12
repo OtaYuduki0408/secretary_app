@@ -482,6 +482,39 @@ export function createActionUI(prefix = '', initialValue = {}) {
       }
       break;
 
+    case "画像提示":
+      if (sub === "発声") {
+        const imagePreviewSrc = initialValue.imageBase64 || 'https://via.placeholder.com/300x150.png?text=No+Image';
+        detailContainer.innerHTML = `
+          <label>アップロード画像</label>
+          <div class="co-image-upload-container">
+            <img src="${imagePreviewSrc}" alt="画像プレビュー" class="action-detail-image-preview" style="max-width: 100%; height: auto; margin-bottom: 10px; border-radius: 8px;">
+            <input type="file" class="action-detail-image-input" accept="image/*">
+            <input type="hidden" class="action-detail-image-base64" value="${initialValue.imageBase64 || ''}">
+          </div>
+          <label style="margin-top: 10px;">発声する文章</label>
+          <textarea class="action-detail-speak-text" placeholder="画像表示中に発声させたい文章を入力">${initialValue.text || ''}</textarea>
+        `;
+
+        const fileInput = detailContainer.querySelector('.action-detail-image-input');
+        const preview = detailContainer.querySelector('.action-detail-image-preview');
+        const base64Input = detailContainer.querySelector('.action-detail-image-base64');
+
+        fileInput.addEventListener('change', (event) => {
+          const file = event.target.files[0];
+          if (!file) return;
+
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            const base64Data = e.target.result;
+            preview.src = base64Data;
+            base64Input.value = base64Data;
+          };
+          reader.readAsDataURL(file);
+        });
+      }
+      break;
+
     default:
       detailContainer.innerHTML = `<input type="text" class="action-detail-value" value="${initialValue.value || ''}" placeholder="追加情報">`;
       break;

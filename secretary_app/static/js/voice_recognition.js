@@ -1298,7 +1298,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
 
-        const readAloudCloseBtn = readAloudOverlay ? readAloudOverlay.querySelector('.close-overlay-btn') : null;
+                const readAloudCloseBtn = readAloudOverlay ? readAloudOverlay.querySelector('.close-overlay-btn') : null;
 
 
 
@@ -1306,7 +1306,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
 
-    
+                const imageDisplayOverlay = document.getElementById('image-display-overlay');
 
 
 
@@ -1314,7 +1314,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
 
-        if (audioCloseBtn && audioPermissionOverlay) {
+                const imageDisplayCloseBtn = imageDisplayOverlay ? imageDisplayOverlay.querySelector('.close-overlay-btn') : null;
 
 
 
@@ -1322,7 +1322,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
 
-            audioCloseBtn.addEventListener('click', () => {
+            
 
 
 
@@ -1330,7 +1330,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
 
-                audioPermissionOverlay.classList.add('hidden');
+                if (audioCloseBtn && audioPermissionOverlay) {
 
 
 
@@ -1338,7 +1338,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
 
-            });
+                    audioCloseBtn.addEventListener('click', () => {
 
 
 
@@ -1346,7 +1346,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
 
-        }
+                        audioPermissionOverlay.classList.add('hidden');
 
 
 
@@ -1354,55 +1354,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
 
-    
-
-
-
-
-
-
-
-        if (readAloudCloseBtn && readAloudOverlay) {
-
-
-
-
-
-
-
-            readAloudCloseBtn.addEventListener('click', () => {
-
-
-
-
-
-
-
-                readAloudOverlay.classList.remove('visible');
-
-
-
-
-
-
-
-                // 読み上げ中であれば停止する
-
-
-
-
-
-
-
-                if (window.speechSynthesis && window.speechSynthesis.speaking) {
-
-
-
-
-
-
-
-                    window.speechSynthesis.cancel();
+                    });
 
 
 
@@ -1418,7 +1370,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
 
-            });
+            
 
 
 
@@ -1426,7 +1378,135 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
 
-        }
+                if (readAloudCloseBtn && readAloudOverlay) {
+
+
+
+
+
+
+
+                    readAloudCloseBtn.addEventListener('click', () => {
+
+
+
+
+
+
+
+                        readAloudOverlay.classList.remove('visible');
+
+
+
+
+
+
+
+                        if (window.stopAllAudio) {
+
+
+
+
+
+
+
+                            window.stopAllAudio();
+
+
+
+
+
+
+
+                        }
+
+
+
+
+
+
+
+                    });
+
+
+
+
+
+
+
+                }
+
+
+
+
+
+
+
+        
+
+
+
+
+
+
+
+                if (imageDisplayCloseBtn && imageDisplayOverlay) {
+
+
+
+
+
+
+
+                    imageDisplayCloseBtn.addEventListener('click', () => {
+
+
+
+
+
+
+
+                        imageDisplayOverlay.classList.remove('visible');
+
+
+
+
+
+
+
+                        if (window.stopAllAudio) {
+
+
+
+
+
+
+
+                            window.stopAllAudio();
+
+
+
+
+
+
+
+                        }
+
+
+
+
+
+
+
+                    });
+
+
+
+
+
+
+
+                }
 
 
 
