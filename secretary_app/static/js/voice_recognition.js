@@ -78,6 +78,119 @@ document.addEventListener('app-settings:updated', loadAppSettings);
 // ============================================================================
 
 /**
+ * デバッグ用のログを画面に追加する
+ * @param {string} text - ログに表示するテキスト
+ * @param {string} level - 'log', 'warn', 'error', 'debug'
+ */
+function addDebugLogEntry(text, level = 'log') {
+    const voiceLogContainer = document.getElementById('voice-log-container');
+    if (!voiceLogContainer) return;
+
+    const logEntry = document.createElement('div');
+    logEntry.className = 'voice-log-entry';
+
+    let prefix = 'LOG>>';
+    let color = '#64748b'; // slate-500
+    switch (level) {
+        case 'warn':
+            prefix = 'WARN>>';
+            color = '#f59e0b'; // amber-500
+            break;
+        case 'error':
+            prefix = 'ERROR>>';
+            color = '#ef4444'; // red-500
+            break;
+        case 'debug':
+            prefix = 'DEBUG>>';
+            color = '#3b82f6'; // blue-500
+            break;
+    }
+
+    const prefixSpan = document.createElement('span');
+    prefixSpan.textContent = prefix + ' ';
+    prefixSpan.style.color = color;
+    prefixSpan.style.fontWeight = 'bold';
+    prefixSpan.style.marginRight = '8px';
+    
+    const contentSpan = document.createElement('span');
+    const formattedText = (typeof text === 'object') ? JSON.stringify(text, null, 2) : text;
+    contentSpan.textContent = formattedText;
+    contentSpan.style.color = color;
+    contentSpan.style.whiteSpace = 'pre-wrap'; // オブジェクトを見やすくするために改行を許可
+
+    logEntry.appendChild(prefixSpan);
+    logEntry.appendChild(contentSpan);
+
+    voiceLogContainer.appendChild(logEntry);
+    voiceLogContainer.scrollTop = voiceLogContainer.scrollHeight;
+}
+
+/**
+ * console.logなどをオーバーライドして画面にログを表示する
+ */
+function setupConsoleInterceptor() {
+    const originalConsole = {
+        log: console.log.bind(console),
+        error: console.error.bind(console),
+        warn: console.warn.bind(console),
+        debug: console.debug.bind(console),
+    };
+
+    const formatArgs = (args) => {
+        return args.map(arg => {
+            if (arg instanceof Error) {
+                return `Error: ${arg.message}\n${arg.stack}`;
+            }
+            if (typeof arg === 'object' && arg !== null) {
+                try {
+                    return JSON.stringify(arg, Object.getOwnPropertyNames(arg), 2);
+                } catch (e) {
+                    return 'Unserializable Object';
+                }
+            }
+            return String(arg);
+        }).join(' ');
+    };
+
+    console.log = function(...args) {
+        originalConsole.log(...args);
+        addDebugLogEntry(formatArgs(args), 'log');
+    };
+
+    console.warn = function(...args) {
+        originalConsole.warn(...args);
+        addDebugLogEntry(formatArgs(args), 'warn');
+    };
+
+    console.error = function(...args) {
+        originalConsole.error(...args);
+        addDebugLogEntry(formatArgs(args), 'error');
+    };
+    
+    console.debug = function(...args) {
+        originalConsole.debug(...args);
+        addDebugLogEntry(formatArgs(args), 'debug');
+    };
+
+    window.onerror = function(message, source, lineno, colno, error) {
+        const errorMessage = `[Uncaught Error] ${message} at ${source}:${lineno}:${colno}`;
+        originalConsole.error(errorMessage, error);
+        addDebugLogEntry(errorMessage, 'error');
+        return false;
+    };
+
+    window.addEventListener('unhandledrejection', function(event) {
+        const reason = event.reason || 'No reason provided';
+        const errorMessage = `[Unhandled Promise Rejection] Reason: ${formatArgs([reason])}`;
+        originalConsole.error(errorMessage, event);
+        addDebugLogEntry(errorMessage, 'error');
+    });
+
+    console.log("画面デバッグ用のコンソールインターセプターをセットアップしました。");
+}
+
+
+/**
  * カレンダーUIを生成するヘルパー関数
  * @param {object} data - バックエンドから受け取ったdisplay_data
  * @returns {HTMLElement} 生成されたDOM要素
@@ -385,6 +498,8 @@ async function sendCommandToBackend(command) {
 
 
 document.addEventListener('DOMContentLoaded', () => {
+        // 画面デバッグ用のコンソールインターセプターをセットアップ
+        setupConsoleInterceptor();
 
         console.log("DEBUG: DOMContentLoaded fired.");
         console.log("DEBUG: URL:", window.location.href);
