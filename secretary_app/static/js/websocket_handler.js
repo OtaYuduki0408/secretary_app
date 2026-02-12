@@ -444,10 +444,11 @@ async function executeAction(action) {
 
 function setupWebSocket() {
     const socket = io(window.location.origin, {
-        transports: ['websocket'], // WebSocketのみに限定
+        transports: ['websocket', 'polling'], // Render等でWebSocket不可時はpollingへフォールバック
         reconnection: true, // 再接続を有効にする
         reconnectionAttempts: 5, // 再接続試行回数
         reconnectionDelay: 2000, // 再接続の遅延時間(ms)
+        timeout: 20000,
     });
 
     socket.on('connect', () => {

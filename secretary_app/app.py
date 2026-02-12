@@ -5,6 +5,7 @@ monkey.patch_all()
 import os
 import sys
 import re
+import tempfile
 from datetime import datetime, timedelta
 from functools import wraps
 
@@ -82,6 +83,7 @@ jobstores = { 'default': SQLAlchemyJobStore(url=app.config['SQLALCHEMY_DATABASE_
 executors = { 'default': {'type': 'threadpool', 'max_workers': 20} }
 job_defaults = { 'coalesce': True, 'max_instances': 3 }
 scheduler = BackgroundScheduler(jobstores=jobstores, executors=executors, job_defaults=job_defaults)
+_scheduler_lock_handle = None
 
 # Blueprint登録
 app.register_blueprint(custom_order_bp, url_prefix='/api')
@@ -1034,7 +1036,7 @@ def enrich_action_api():
 def _dispatch_order_payload(user_id, order_payload):
     sid = connected_users.get(user_id)
     if not sid:
-        print(f"[INPUT_TRIGGER] User {{user_id}} is not connected. Command not dispatched.")
+        print(f"[INPUT_TRIGGER] User {user_id} is not connected. Command not dispatched.")
         return
     try:
         steps = order_payload.get("steps") or []
@@ -1043,11 +1045,11 @@ def _dispatch_order_payload(user_id, order_payload):
         action_summary = [
             f"{a.get('category')}:{a.get('sub')}" for a in actions if isinstance(a, dict)
         ]
-        print(f"[DISPATCH] user_id={{user_id}} steps={{len(steps)}} actions={{len(actions)}} step_kinds={{step_summary}} action_list={{action_summary}}")
+        print(f"[DISPATCH] user_id={user_id} steps={len(steps)} actions={len(actions)} step_kinds={step_summary} action_list={action_summary}")
     except Exception as e:
         print(f"[DISPATCH] summary log failed: {e}")
     socketio.emit('dispatch_command', order_payload, room=sid)
-    print(f"[INPUT_TRIGGER] Dispatched command to user {{user_id}}.")
+    print(f"[INPUT_TRIGGER] Dispatched command to user {user_id}.")
 
 
 def _handle_input_triggers(user_input, response_data, user_id):
@@ -1217,10 +1219,79 @@ def _run_job_with_app_context(func):
                     app.logger.warning(f"[JOB_RUNNER] User {user_id} is not connected. Command not dispatched.")
         app.logger.debug(f"--- [JOB_RUNNER] END: Job '{func.__name__}' finished. ---")
 
+def _acquire_scheduler_process_lock():
+    """
+    マルチワーカー時の重複実行を避けるため、1プロセスだけがスケジューラを起動する。
+    """
+    global _scheduler_lock_handle
+    if _scheduler_lock_handle is not None:
+        return True
+
+    lock_path = os.path.join(tempfile.gettempdir(), "secretary_app_scheduler.lock")
+    fh = open(lock_path, "a+")
+    try:
+        try:
+            import fcntl
+            fcntl.flock(fh.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except ImportError:
+            # Windows開発環境向け（RenderはLinux）
+            import msvcrt
+            msvcrt.locking(fh.fileno(), msvcrt.LK_NBLCK, 1)
+        _scheduler_lock_handle = fh
+        return True
+    except Exception:
+        fh.close()
+        return False
+
+def _safe_shutdown_scheduler():
+    try:
+        if scheduler.running:
+            scheduler.shutdown()
+    except Exception:
+        pass
+
+def _start_background_scheduler_if_needed():
+    """
+    gunicorn配下でも時間トリガー監視を起動する。
+    ENABLE_APP_SCHEDULER=0 で無効化可能。
+    """
+    enabled = os.getenv("ENABLE_APP_SCHEDULER", "1").lower() not in ("0", "false", "off")
+    if not enabled:
+        app.logger.info("Scheduler disabled by ENABLE_APP_SCHEDULER.")
+        return
+
+    if scheduler.running:
+        return
+
+    if not _acquire_scheduler_process_lock():
+        app.logger.info("Scheduler lock held by another process; skip scheduler startup in this worker.")
+        return
+
+    scheduler.add_job(
+        id='time_trigger_evaluator',
+        func=_run_job_with_app_context,
+        trigger='cron',
+        minute='*',
+        second=0,
+        replace_existing=True,
+        args=[evaluate_triggers]
+    )
+    scheduler.add_job(
+        id='switchbot_trigger_evaluator',
+        func=_run_job_with_app_context,
+        trigger='interval',
+        seconds=1,
+        replace_existing=True,
+        args=[evaluate_switchbot_triggers]
+    )
+    scheduler.start()
+    app.logger.info("APScheduler started in this process.")
+
 # ... (the rest of the file from the last known good state)
 with app.app_context():
     db.create_all()
-atexit.register(lambda: scheduler.shutdown())
+_start_background_scheduler_if_needed()
+atexit.register(_safe_shutdown_scheduler)
 
 
 
@@ -1292,8 +1363,5 @@ def diagnose_ip():
 
 if __name__ == '__main__':
     if os.environ.get('WERKZEUG_RUN_MAIN') != 'true':
-        scheduler.add_job(id='time_trigger_evaluator',func=_run_job_with_app_context,trigger='cron',minute='*',second=0,replace_existing=True,args=[evaluate_triggers])
-        print("DEBUG: APScheduler job registered: time_trigger_evaluator")
-        scheduler.add_job(id='switchbot_trigger_evaluator',func=_run_job_with_app_context,trigger='interval',seconds=1,replace_existing=True,args=[evaluate_switchbot_triggers])
-        scheduler.start()
+        _start_background_scheduler_if_needed()
     socketio.run(app, host='0.0.0.0', port=5000, debug=True, ssl_context='adhoc', use_reloader=False)
