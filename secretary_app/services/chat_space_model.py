@@ -15,6 +15,7 @@ from services.finance_service import (
     get_all_finance_records, get_finance_summary, get_current_balance,
     get_monthly_expense, get_daily_expense
 )
+from services.category_service import get_all_categories
 from services.memo_service import add_memo as add_memo_record
 from services.memo_service import get_all_memos as get_all_memo_records
 from services.memo_service import delete_memo as delete_memo_record
@@ -135,7 +136,7 @@ class ChatSpaceModel:
     - type (収入または支出)
     - category (カテゴリ、例: 食費、交通費、給与など。以下の利用可能なカテゴリから選択してください。もし適切なカテゴリがない場合は「その他支出」または「その他収入」を選択してください。)
     - amount (金額)
-    - date (日付、未指定時は当日/推測日付 YYYY-MM-DD)
+    - date (日時、未指定時は現在時刻。YYYY-MM-DD HH:MM:SS)
     - memo (使った内容)
     利用可能なカテゴリ: {available_categories}
     出力はJSON配列のみ、他テキスト禁止。単独でも複数あっても二次配列で返す。
@@ -465,6 +466,7 @@ class ChatSpaceModel:
             category = (record.get("category") or "未分類").strip()
             amount = record.get("amount")
             date = (record.get("date") or "").strip()
+            memo = (record.get("memo") or "").strip()
 
             try:
                 amount_text = f"{int(amount):,}円"
@@ -472,13 +474,44 @@ class ChatSpaceModel:
                 amount_text = f"{amount}円" if amount is not None else "金額不明"
 
             if date:
-                details.append(f"{date}の{record_type}として{category}を{amount_text}")
+                base = f"{date}の{record_type}として{category}を{amount_text}"
             else:
-                details.append(f"{record_type}として{category}を{amount_text}")
+                base = f"{record_type}として{category}を{amount_text}"
+            if memo:
+                base += f"（メモ: {memo}）"
+            details.append(base)
 
         if not details:
             return f"{len(added_records)}件の収支を追加しました。"
         return f"{len(added_records)}件の収支を追加しました。追加内容は、" + "、".join(details) + "です。"
+
+    def _normalize_finance_datetime(self, raw_value: str | None) -> str:
+        """収支記録用の日時文字列を YYYY-MM-DD HH:MM:SS に正規化する"""
+        now = datetime.now(JST).replace(second=0, microsecond=0)
+        if not raw_value:
+            return now.strftime("%Y-%m-%d %H:%M:%S")
+
+        candidate = str(raw_value).strip()
+        if not candidate:
+            return now.strftime("%Y-%m-%d %H:%M:%S")
+
+        # 日付のみの場合は現在時刻(分)を補完
+        if re.fullmatch(r"\d{4}-\d{2}-\d{2}", candidate):
+            return f"{candidate} {now.strftime('%H:%M')}:00"
+
+        candidate = candidate.replace("T", " ")
+        try:
+            parsed = datetime.fromisoformat(candidate)
+        except ValueError:
+            return now.strftime("%Y-%m-%d %H:%M:%S")
+
+        if parsed.tzinfo is not None:
+            parsed = parsed.astimezone(JST).replace(tzinfo=None)
+
+        if parsed.second is None:
+            parsed = parsed.replace(second=0)
+
+        return parsed.replace(microsecond=0).strftime("%Y-%m-%d %H:%M:%S")
 
     def _to_prompt_calendar_task_list(self, task_list: list[dict]) -> list[dict]:
         """Geminiに渡す予定一覧をJST文字列へ正規化する"""
@@ -1064,9 +1097,21 @@ class ChatSpaceModel:
             return None, "ユーザー未ログイン"
         current_time = self._current_time_for_prompt()
 
-        # expense_serviceからカテゴリ一覧を取得
+        # categoriesマスタからカテゴリ一覧を取得（UIと同一ソース）
         from services.expense_service import add_finance_record, get_unique_categories
-        available_categories = get_unique_categories(user_id)
+        available_categories: list[str] = []
+        categories_master = get_all_categories()
+        if isinstance(categories_master, list):
+            master_names = sorted({
+                (item.get("name") or "").strip()
+                for item in categories_master
+                if isinstance(item, dict) and (item.get("name") or "").strip()
+            })
+            available_categories.extend(master_names)
+
+        # マスタが空のときは、既存収支から推定
+        if not available_categories:
+            available_categories = get_unique_categories(user_id)
         
         # デフォルトカテゴリ
         if not available_categories:
@@ -1093,7 +1138,8 @@ class ChatSpaceModel:
                     "type": "income" if ie['type'] == "収入" else "expense",
                     "category": ie['category'],
                     "amount": ie['amount'],
-                    "date": ie['date'],
+                    "date": self._normalize_finance_datetime(ie.get('date')),
+                    "memo": (ie.get('memo') or "").strip(),
                     "user_id": user_id
                 }
                 created_record = add_finance_record(data, user_id)

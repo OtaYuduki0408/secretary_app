@@ -150,8 +150,15 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
+    const now = new Date();
+    const yyyy = now.getFullYear();
+    const mm = String(now.getMonth() + 1).padStart(2, "0");
+    const dd = String(now.getDate()).padStart(2, "0");
+    const hh = String(now.getHours()).padStart(2, "0");
+    const mi = String(now.getMinutes()).padStart(2, "0");
+
     const payload = {
-      date: new Date().toISOString().split("T")[0],
+      date: `${yyyy}-${mm}-${dd} ${hh}:${mi}:00`,
       type: state.type,
       category: state.category,
       amount,

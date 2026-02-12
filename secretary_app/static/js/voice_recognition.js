@@ -1169,9 +1169,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // ウェイクワードのみ、またはそれに非常に近い入力かを判定
         const isWakeWordOnly = WAKE_WORDS.some(word => trimmedInput === word);
+        const isEndWordOnly = END_WORDS.some(word => trimmedInput === word);
 
-        if (isWakeWordOnly || !trimmedInput) {
-            console.log("DEBUG: 空入力またはウェイクワードのみの入力を検知。音声再生を停止します。");
+        if (isWakeWordOnly || isEndWordOnly || !trimmedInput) {
+            console.log("DEBUG: 空入力/ウェイクワードのみ/エンドワードのみの入力を検知。音声再生を停止します。");
             if (window.stopAllAudio) {
                 window.stopAllAudio();
             }

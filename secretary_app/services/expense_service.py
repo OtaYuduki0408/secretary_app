@@ -30,9 +30,9 @@ def add_finance_record(record: dict, user_id: str):
     新しい収支レコードを登録する。
     """
     try:
-        # 日付がない場合は自動で今日の日付を設定
+        # 日時がない場合は自動で現在時刻(分)を設定
         if "date" not in record or not record["date"]:
-            record["date"] = datetime.now().strftime("%Y-%m-%d")
+            record["date"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         record["user_id"] = user_id
 
         response = supabase.table(TABLE_NAME).insert(record).execute()

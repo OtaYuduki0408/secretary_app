@@ -11,7 +11,7 @@ let applyFiltersAndSort;
 /* 日付を YYYY-MM-DD に正規化（2025/11/5, 2025-11-05 など許容） */
 function normalizeDateToKey(s) {
   if (!s) return "";
-  const m = String(s).trim().match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/);
+  const m = String(s).trim().match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})(?:[ T]\d{1,2}:\d{1,2}(?::\d{1,2})?)?$/);
   if (!m) return "";
   const y = m[1];
   const mo = String(m[2]).padStart(2, "0");
