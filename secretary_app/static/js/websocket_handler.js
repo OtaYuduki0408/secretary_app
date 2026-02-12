@@ -353,7 +353,10 @@ async function executeAction(action) {
 
 function setupWebSocket() {
     const socket = io(window.location.origin, {
-        transports: ['websocket', 'polling'],
+        transports: ['websocket'], // WebSocketのみに限定
+        reconnection: true, // 再接続を有効にする
+        reconnectionAttempts: 5, // 再接続試行回数
+        reconnectionDelay: 2000, // 再接続の遅延時間(ms)
     });
 
     socket.on('connect', () => {
