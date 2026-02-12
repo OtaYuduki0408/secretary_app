@@ -3,12 +3,9 @@
 // ===================================
 
 // 必要なモジュールをインポート
-import { TextToSpeechReader } from "/static/js/TextToSpeechReader.js";
 import { ScheduleManager } from "/static/js/ScheduleManager.js"; // Googleカレンダー操作クラス
 console.log("✅ ChatSpace.js ロード完了 (トースト機能付き)");
 
-const reader = new TextToSpeechReader(); // 音声読み上げ
-console.log(`DEBUG: TextToSpeechReader初期化。利用可能な音声数: ${reader.voices.length}`);
 // window.managerが存在しない場合のフォールバック（ChatSpace.jsのロジックを維持）
 const manager = window.manager || new ScheduleManager(); 
 
@@ -226,7 +223,7 @@ export async function check_chat_Space(inputValue) {
         } catch (e) {
             console.error(e);
             const errorMessage = await applyToneSetting("申し訳ございません。ローカルコマンドの実行に失敗しました。", 'error');
-            reader.speak(errorMessage);
+            window.speak(errorMessage);
         } finally {
             fire('analysis:end');
         }
@@ -283,7 +280,7 @@ export async function check_chat_Space(inputValue) {
     console.warn("入力確認設定の読み込みに失敗しました。", e);
   }
   if (inputConfirmText) {
-    reader.speak(inputConfirmText);
+    window.speak(inputConfirmText);
   }
 
   // 読み込み中の動的表示を追加
@@ -335,7 +332,7 @@ export async function check_chat_Space(inputValue) {
         } else {
             console.error("YouTube player function (playYoutubeVideo) is not available.");
             // フォールバックとしてメッセージを読み上げる
-            reader.speak("YouTubeプレーヤーを読み込めませんでした。");
+            window.speak("YouTubeプレーヤーを読み込めませんでした。");
         }
         // YouTube再生がトリガーされた場合、以降のメッセージ読み上げなどはスキップ
         return;
@@ -396,7 +393,7 @@ export async function check_chat_Space(inputValue) {
       if (window.addResponseLogEntry) {
         window.addResponseLogEntry(finalMessage);
       }
-      reader.speak(finalMessage);
+      window.speak(finalMessage);
     }
 
     // 高速実行へのフォールバック処理
@@ -468,7 +465,7 @@ export async function check_chat_Space(inputValue) {
   } catch (error) {
     console.error("ChatSpace API呼び出しエラー:", error);
     const errorMessage = await applyToneSetting("申し訳ございません。処理中にエラーが発生しました。", 'error');
-    reader.speak(errorMessage);
+    window.speak(errorMessage);
   } finally {
     if (loadingIndicator) {
       loadingIndicator.stop();

@@ -198,6 +198,8 @@ async function executeOrderPayload(orderData) {
 }
 
 window.executeOrderPayload = executeOrderPayload;
+window.speak = speak; // speak関数をグローバルに公開
+window.speak = speak; // speak関数をグローバルに公開
 
 async function executePlan(plan) {
     const enrichedDataCache = new Map();
