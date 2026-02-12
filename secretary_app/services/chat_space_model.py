@@ -70,7 +70,7 @@ class ChatSpaceModel:
     質問: {input_value}
     """
     FN_FALLBACK_PROMPT_TEMPLATE = """
-    100文字以内で{tone}風に次の質問に回答してください:
+    300文字以内で{tone}風に次の質問に回答してください:
     {input_value}
     """
     ADD_CALENDAR_PROMPT_TEMPLATE = """
