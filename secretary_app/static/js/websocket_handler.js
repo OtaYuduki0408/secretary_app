@@ -475,3 +475,23 @@ if (document.readyState === 'loading') {
 } else {
     setupWebSocket();
 }
+
+// Keep-alive for Render
+setInterval(function() {
+    fetch('/keep-alive', {
+        method: 'GET',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+    })
+    .then(response => {
+        if (response.ok) {
+            console.log('Keep-alive request sent successfully.');
+        } else {
+            console.error('Failed to send keep-alive request.');
+        }
+    })
+    .catch(error => {
+        console.error('Error sending keep-alive request:', error);
+    });
+}, 300000); // 5分ごと

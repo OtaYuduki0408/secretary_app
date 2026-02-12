@@ -1216,6 +1216,13 @@ with app.app_context():
 atexit.register(lambda: scheduler.shutdown())
 
 
+
+# ============== Keep-alive ==============
+@app.route('/keep-alive')
+def keep_alive():
+    return '', 204
+
+
 # ============== 診断用エンドポイント ==============
 @app.route('/diagnose_ip')
 def diagnose_ip():
