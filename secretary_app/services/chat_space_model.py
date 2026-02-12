@@ -101,7 +101,8 @@ class ChatSpaceModel:
     - start_time (予定一覧から正確なYYYY-MM-DD HH:MM:SS形式の値を引用)
     - end_time (予定一覧から正確なYYYY-MM-DD HH:MM:SS形式の値を引用)
     出力はJSON配列のみ、他テキスト禁止。単一項目があろうが無かろうと二次配列で返す。
-    現在時刻は{current_time}
+    予定一覧の時刻は日本時間(JST)です。
+    現在時刻は{current_time}(JST)
     予定一覧:{task_list_json}
     ユーザー入力: {input_value}
     """
@@ -115,7 +116,8 @@ class ChatSpaceModel:
     - after_start_time (変更後の開始時刻 YYYY-MM-DD HH:MM:SS)
     - after_end_time (変更後の終了時刻 YYYY-MM-DD HH:MM:SS)
     出力はJSON配列のみ、他テキスト禁止。単独でも複数あっても２次配列で返す
-    現在時刻は{current_time}
+    予定一覧の時刻は日本時間(JST)です。
+    現在時刻は{current_time}(JST)
     予定一覧:{task_list_json}
     ユーザー入力: {input_value}
     """
@@ -395,6 +397,35 @@ class ChatSpaceModel:
             return f"{len(added_events)}件の予定をカレンダーに追加しました。"
 
         return f"{len(added_events)}件の予定をカレンダーに追加しました。追加内容は、" + "、".join(details) + "です。"
+
+    def _to_prompt_calendar_task_list(self, task_list: list[dict]) -> list[dict]:
+        """Geminiに渡す予定一覧をJST文字列へ正規化する"""
+        prompt_list: list[dict] = []
+        for task in task_list or []:
+            if not isinstance(task, dict):
+                continue
+            title = (task.get("title") or task.get("name") or "").strip()
+            def normalize_for_prompt(raw_value: str | None) -> str:
+                if not raw_value:
+                    return ""
+                candidate = str(raw_value).strip().replace(" ", "T")
+                if candidate.endswith("Z"):
+                    candidate = candidate[:-1] + "+00:00"
+                try:
+                    dt = datetime.fromisoformat(candidate)
+                except ValueError:
+                    return str(raw_value)
+                if dt.tzinfo is None:
+                    dt = JST.localize(dt)
+                return dt.astimezone(JST).strftime("%Y-%m-%d %H:%M:%S")
+
+            prompt_list.append({
+                "id": task.get("id"),
+                "name": title,
+                "start_time": normalize_for_prompt(task.get("start_time")),
+                "end_time": normalize_for_prompt(task.get("end_time")),
+            })
+        return prompt_list
 
     def _parse_datetime(self, time_str: str) -> datetime | None:
         if not time_str: return None
@@ -739,7 +770,8 @@ class ChatSpaceModel:
         if not task_list:
             return None, "カレンダーに該当する予定がありません。削除は実行されません。"
 
-        task_list_json = json.dumps(task_list)
+        prompt_task_list = self._to_prompt_calendar_task_list(task_list)
+        task_list_json = json.dumps(prompt_task_list, ensure_ascii=False)
         current_time = datetime.now(JST).strftime('%Y-%m-%d %H:%M:%S')
         prompt = self.REMOVE_CALENDAR_PROMPT_TEMPLATE.format(current_time=current_time, task_list_json=task_list_json, input_value=text)
         raw = self._gemini_request(prompt)
@@ -749,27 +781,41 @@ class ChatSpaceModel:
             return None, "削除対象の予定を特定できませんでした。"
 
         deleted_count = 0
+        remaining_tasks = list(task_list)
         for event_data in events_to_delete:
-            target_id = None
-            for task in task_list:
-                # 名前と時間で照合（DB側はtitleキー）
-                task_name = task.get("title") or task.get("name")
-                task_start = (task.get("start_time") or "").replace("T", " ").split(".")[0]
-                task_end = (task.get("end_time") or "").replace("T", " ").split(".")[0]
-                target_name = (event_data.get("name") or "").strip()
-                target_start = (event_data.get("start_time") or "").replace("T", " ").split(".")[0]
-                target_end = (event_data.get("end_time") or "").replace("T", " ").split(".")[0]
+            target_name = (event_data.get("name") or event_data.get("title") or "").strip()
+            target_start_keys = self._build_time_compare_keys(event_data.get("start_time"))
+            target_end_keys = self._build_time_compare_keys(event_data.get("end_time"))
 
-                if task_name == target_name and task_start == target_start and task_end == target_end:
-                    target_id = task.get("id")
+            matched_index = None
+            matched_task = None
+            for idx, task in enumerate(remaining_tasks):
+                # 名前と時間で照合（DB側はtitleキー）
+                task_name = ((task.get("title") or task.get("name") or "")).strip()
+                task_start_keys = self._build_time_compare_keys(task.get("start_time"))
+                task_end_keys = self._build_time_compare_keys(task.get("end_time"))
+
+                name_matches = (task_name == target_name) if target_name else True
+                start_matches = bool(task_start_keys & target_start_keys) if target_start_keys else True
+                end_matches = bool(task_end_keys & target_end_keys) if target_end_keys else True
+
+                if name_matches and start_matches and end_matches:
+                    matched_index = idx
+                    matched_task = task
                     break
-            
-            if target_id:
-                try:
-                    local_calendar_service.delete_event(target_id, user_id)
-                    deleted_count += 1
-                except Exception as e:
-                    print(f"ローカルイベント削除エラー: {e}")
+
+            if matched_task is None:
+                continue
+
+            target_id = matched_task.get("id")
+            try:
+                local_calendar_service.delete_event(target_id, user_id)
+                deleted_count += 1
+                # 同一データの重複削除を正しく処理するため、マッチ済みタスクを除外
+                if matched_index is not None:
+                    remaining_tasks.pop(matched_index)
+            except Exception as e:
+                print(f"ローカルイベント削除エラー: {e}")
         
         if deleted_count > 0:
             return {"deleted_count": deleted_count}, f"{deleted_count}件の予定を削除しました。"
@@ -784,7 +830,8 @@ class ChatSpaceModel:
         if not task_list:
             return None, "カレンダーに該当する予定がありません。変更は実行されません。"
 
-        task_list_json = json.dumps(task_list)
+        prompt_task_list = self._to_prompt_calendar_task_list(task_list)
+        task_list_json = json.dumps(prompt_task_list, ensure_ascii=False)
         current_time = datetime.now(JST).strftime('%Y-%m-%d %H:%M:%S')
         prompt = self.CHANGE_CALENDAR_PROMPT_TEMPLATE.format(current_time=current_time, task_list_json=task_list_json, input_value=text)
         raw = self._gemini_request(prompt)
@@ -850,6 +897,39 @@ class ChatSpaceModel:
         if dt.tzinfo is None:
             dt = JST.localize(dt)
         return dt.astimezone(pytz.UTC).isoformat(timespec="seconds")
+
+    def _build_time_compare_keys(self, value: str | None) -> set[str]:
+        """時刻比較用キーを複数生成（タイムゾーン有無の差分に耐性を持たせる）"""
+        if not value:
+            return set()
+        candidate = value.strip().replace(" ", "T")
+        if not candidate:
+            return set()
+        if candidate.endswith("Z"):
+            candidate = candidate[:-1] + "+00:00"
+
+        keys: set[str] = set()
+        try:
+            dt = datetime.fromisoformat(candidate)
+        except ValueError:
+            # 最低限、文字列比較用キーだけ残す
+            return {candidate.replace("T", " ").split(".")[0]}
+
+        # 文字列表現の差を吸収するベースキー
+        keys.add(dt.strftime("%Y-%m-%d %H:%M:%S"))
+
+        if dt.tzinfo is not None:
+            keys.add(dt.astimezone(pytz.UTC).strftime("%Y-%m-%d %H:%M:%S"))
+            keys.add(dt.astimezone(JST).strftime("%Y-%m-%d %H:%M:%S"))
+            return keys
+
+        # tzなしは「JST解釈」と「UTC解釈」の両方をキー化して取りこぼしを防ぐ
+        dt_as_jst = JST.localize(dt)
+        dt_as_utc = pytz.UTC.localize(dt)
+        keys.add(dt_as_jst.astimezone(pytz.UTC).strftime("%Y-%m-%d %H:%M:%S"))
+        keys.add(dt_as_utc.astimezone(pytz.UTC).strftime("%Y-%m-%d %H:%M:%S"))
+        keys.add(dt_as_utc.astimezone(JST).strftime("%Y-%m-%d %H:%M:%S"))
+        return keys
     def _date_range_to_utc_iso(self, start_date: str, end_date: str) -> tuple[str, str]:
         """JST??????UTC?ISO??????"""
         start_dt = datetime.strptime(start_date, "%Y-%m-%d")
