@@ -4,6 +4,29 @@ import { createTriggerUI, saveAddressToDB } from './trigger_ui.js';
 import { createActionUI } from './action_ui.js'; // createActionUI も必要
 import { TRIGGER_CATEGORIES, TRIGGER_CATEGORIES_MAIN, ACTION_CATEGORIES } from './constants.js';
 
+let isRegisteringCommand = false;
+let lastSubmittedPayloadSignature = '';
+let lastSubmittedAt = 0;
+const DUPLICATE_SUBMIT_SUPPRESS_MS = 8000;
+
+function setRegisterButtonLoadingState(isLoading) {
+  const registerBtn = document.getElementById("register-btn");
+  if (!registerBtn) return;
+  registerBtn.disabled = isLoading;
+  registerBtn.dataset.loading = isLoading ? "1" : "0";
+  registerBtn.textContent = isLoading ? "保存中..." : "💾 保存する";
+}
+
+function buildPayloadSignature(id, payload) {
+  const normalized = {
+    id: id || null,
+    name: payload?.name || "",
+    triggers: payload?.triggers || [],
+    steps: payload?.steps || [],
+  };
+  return JSON.stringify(normalized);
+}
+
 function getAdvancedDateRangeValues(container) {
     if (!container) return {};
     const getVal = (selector) => container.querySelector(selector)?.value || '';
@@ -438,13 +461,29 @@ export async function getCommandPayloadFromForm() {
 
 export async function registerCommand(){
   console.log("--- [DEBUG] registerCommand called ---");
+  if (isRegisteringCommand) {
+    console.log("--- [DEBUG] registerCommand skipped: already registering.");
+    return;
+  }
+
   const id=document.getElementById("command-id")?.value||null;
   
   const payload = await getCommandPayloadFromForm();
   if (!payload) return;
 
+  const signature = buildPayloadSignature(id, payload);
+  const now = Date.now();
+  if (!id && signature === lastSubmittedPayloadSignature && (now - lastSubmittedAt) < DUPLICATE_SUBMIT_SUPPRESS_MS) {
+    console.log("--- [DEBUG] registerCommand skipped: duplicate payload in suppress window.");
+    document.getElementById("message").innerText = "同じ内容の保存要求を抑止しました。";
+    setTimeout(() => document.getElementById("message").innerText = "", 3000);
+    return;
+  }
+
   console.log("--- [DEBUG] Payload to be sent:", JSON.stringify(payload, null, 2));
 
+  isRegisteringCommand = true;
+  setRegisterButtonLoadingState(true);
   try {
     const res = await fetch(id ? `/api/custom_orders/${id}` : "/api/custom_orders", {
       method: id ? "PUT" : "POST",
@@ -459,10 +498,15 @@ export async function registerCommand(){
     document.getElementById("message").innerText = data.message || "保存しました";
     setTimeout(() => document.getElementById("message").innerText = "", 3000);
     document.getElementById("command-id")?.remove();
+    lastSubmittedPayloadSignature = signature;
+    lastSubmittedAt = Date.now();
     loadCommands();
   } catch (error) {
     console.error("--- [ERROR] Fetch failed:", error);
     document.getElementById("message").innerText = "エラーが発生しました。コンソールを確認してください。";
+  } finally {
+    isRegisteringCommand = false;
+    setRegisterButtonLoadingState(false);
   }
 }
 

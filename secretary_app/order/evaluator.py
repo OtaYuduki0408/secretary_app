@@ -18,6 +18,47 @@ from services.memo_service import get_all_memos
 # タイムゾーン設定
 JST = pytz.timezone('Asia/Tokyo')
 
+def _to_ascii(text):
+    if text is None:
+        return ""
+    return str(text).strip().translate(str.maketrans("０１２３４５６７８９：", "0123456789:"))
+
+def _normalize_time_hhmm(value):
+    """
+    時刻入力を HH:MM に正規化する。
+    例: 9:0 / 09:00:00 / ９：００ -> 09:00
+    """
+    raw = _to_ascii(value)
+    if not raw:
+        return ""
+    if raw in ("毎時", "x", "*"):
+        return "毎時"
+    parts = raw.split(":")
+    if len(parts) < 2:
+        return raw
+    try:
+        hour = int(parts[0])
+        minute = int(parts[1])
+    except ValueError:
+        return raw
+    if hour < 0 or hour > 23 or minute < 0 or minute > 59:
+        return raw
+    return f"{hour:02d}:{minute:02d}"
+
+def _normalize_repeat_token(value, every_token):
+    raw = _to_ascii(value)
+    if not raw:
+        return ""
+    if raw in ("x", "*", every_token):
+        return every_token
+    return raw
+
+def _try_int_text(value):
+    try:
+        return int(str(value))
+    except (TypeError, ValueError):
+        return None
+
 def _safe_int(value):
     if value is None: return None
     if isinstance(value, int): return value
@@ -97,39 +138,57 @@ def _evaluate_time_trigger(trigger, now_jst, current_time_str, current_day_of_we
     if not trigger_value:
         return False
 
-    app_logger.debug(f"[DEBUG_EVAL] _evaluate_time_trigger called. Current time: {current_time_str}, Day: {current_day_of_week_jp}. Trigger value: {trigger_value}")
+    if app_logger:
+        app_logger.debug(f"[DEBUG_EVAL] _evaluate_time_trigger called. Current time: {current_time_str}, Day: {current_day_of_week_jp}. Trigger value: {trigger_value}")
 
     # 1. 時刻のチェック
-    trigger_time = trigger_value.get('time')
-    if trigger_time != '毎時' and trigger_time != current_time_str:
-        app_logger.debug(f"[DEBUG_EVAL] Time mismatch. Trigger: '{trigger_time}', Current: '{current_time_str}'.")
+    trigger_time = _normalize_time_hhmm(trigger_value.get('time'))
+    current_time = _normalize_time_hhmm(current_time_str)
+    if trigger_time and trigger_time != '毎時' and trigger_time != current_time:
+        if app_logger:
+            app_logger.debug(f"[DEBUG_EVAL] Time mismatch. Trigger: '{trigger_time}', Current: '{current_time}'.")
         return False
 
     # 2. 曜日のチェック
     trigger_dow = trigger_value.get('day_of_week')
-    if trigger_dow and current_day_of_week_jp not in trigger_dow:
-        app_logger.debug(f"[DEBUG_EVAL] Day of week mismatch. Trigger: {trigger_dow}, Current: '{current_day_of_week_jp}'.")
-        return False
+    if isinstance(trigger_dow, str):
+        trigger_dow = [d.strip() for d in trigger_dow.split(',') if d.strip()]
+    if trigger_dow:
+        normalized_dow = [str(d).strip() for d in trigger_dow if str(d).strip()]
+        if '毎日' not in normalized_dow and current_day_of_week_jp not in normalized_dow:
+            if app_logger:
+                app_logger.debug(f"[DEBUG_EVAL] Day of week mismatch. Trigger: {normalized_dow}, Current: '{current_day_of_week_jp}'.")
+            return False
 
     # 3. 日のチェック
-    trigger_day = trigger_value.get('day')
-    if trigger_day and str(trigger_day) not in ['毎日', 'x'] and str(now_jst.day) != str(trigger_day):
-        app_logger.debug(f"[DEBUG_EVAL] Day mismatch. Trigger: '{trigger_day}', Current: '{now_jst.day}'.")
-        return False
+    trigger_day = _normalize_repeat_token(trigger_value.get('day'), '毎日')
+    if trigger_day and trigger_day != '毎日':
+        trigger_day_int = _try_int_text(trigger_day)
+        if trigger_day_int is None or now_jst.day != trigger_day_int:
+            if app_logger:
+                app_logger.debug(f"[DEBUG_EVAL] Day mismatch. Trigger: '{trigger_day}', Current: '{now_jst.day}'.")
+            return False
 
     # 4. 月のチェック
-    trigger_month = trigger_value.get('month')
-    if trigger_month and str(trigger_month) not in ['毎月', 'x'] and str(now_jst.month) != str(trigger_month):
-        app_logger.debug(f"[DEBUG_EVAL] Month mismatch. Trigger: '{trigger_month}', Current: '{now_jst.month}'.")
-        return False
+    trigger_month = _normalize_repeat_token(trigger_value.get('month'), '毎月')
+    if trigger_month and trigger_month != '毎月':
+        trigger_month_int = _try_int_text(trigger_month)
+        if trigger_month_int is None or now_jst.month != trigger_month_int:
+            if app_logger:
+                app_logger.debug(f"[DEBUG_EVAL] Month mismatch. Trigger: '{trigger_month}', Current: '{now_jst.month}'.")
+            return False
 
     # 5. 年のチェック
-    trigger_year = trigger_value.get('year')
-    if trigger_year and str(trigger_year) not in ['毎年', 'x'] and str(now_jst.year) != str(trigger_year):
-        app_logger.debug(f"[DEBUG_EVAL] Year mismatch. Trigger: '{trigger_year}', Current: '{now_jst.year}'.")
-        return False
+    trigger_year = _normalize_repeat_token(trigger_value.get('year'), '毎年')
+    if trigger_year and trigger_year != '毎年':
+        trigger_year_int = _try_int_text(trigger_year)
+        if trigger_year_int is None or now_jst.year != trigger_year_int:
+            if app_logger:
+                app_logger.debug(f"[DEBUG_EVAL] Year mismatch. Trigger: '{trigger_year}', Current: '{now_jst.year}'.")
+            return False
 
-    app_logger.debug(f"[DEBUG_EVAL] SUCCESS: Time trigger matched for value: {trigger_value}")
+    if app_logger:
+        app_logger.debug(f"[DEBUG_EVAL] SUCCESS: Time trigger matched for value: {trigger_value}")
     return True
 
 def evaluate_triggers(app_logger):
@@ -149,8 +208,8 @@ def evaluate_triggers(app_logger):
 
     now_jst = datetime.now(JST)
     current_time_str = now_jst.strftime('%H:%M')
-    day_mapping = {'Mon': '月', 'Tue': '火', 'Wed': '水', 'Thu': '木', 'Fri': '金', 'Sat': '土', 'Sun': '日'}
-    current_day_of_week_jp = day_mapping.get(now_jst.strftime('%a'), '')
+    # ロケール依存のstrftime('%a')を使わず、曜日を安定して算出する
+    current_day_of_week_jp = ['月', '火', '水', '木', '金', '土', '日'][now_jst.weekday()]
 
     for order in orders:
         user_id, order_data, order_id = order.get('user_id'), order.get('order_data'), order.get('id')
