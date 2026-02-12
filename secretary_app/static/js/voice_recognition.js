@@ -11,18 +11,18 @@ let recognition; // SpeechRecognitionインスタンス
 let currentMode = 'waiting'; // 'waiting' or 'listening'
 let recognitionTimeoutId; // 音声入力タイムアウトのID
 let shouldDisplayAllSpeech = false; // 全ての音声をログに表示するかどうかの設定
-let END_WORD = '命令完了'; // 音声入力の強制終了ワード
+let END_WORDS = ['命令完了']; // 音声入力の強制終了ワード（カンマ区切りOR）
 
 // モバイル環境のみの制御
 const isMobileDevice = (() => {
     const ua = navigator.userAgent || '';
     return /Android|iPhone|iPad|iPod|Mobile/i.test(ua) || 'ontouchstart' in window;
 })();
-let lastFinalCommand = '';
-let lastFinalCommandAt = 0;
 let lastRestartAt = 0;
-const MOBILE_DUPLICATE_SUPPRESS_MS = 2500;
 const MOBILE_RESTART_COOLDOWN_MS = 3000;
+const DUPLICATE_SUPPRESS_MS = 2500;
+let lastDispatchedVoiceCommandKey = '';
+let lastDispatchedVoiceCommandAt = 0;
 
 // TTS (Text-to-Speech) 設定
 const speechSynth = window.speechSynthesis;
@@ -61,17 +61,88 @@ function loadAppSettings() {
 
         // ログ表示設定を読み込む
         shouldDisplayAllSpeech = settings?.main?.displayAllSpeech ?? false;
-        END_WORD = settings?.main?.endWord || '命令完了'; // エンドワードを読み込む
+        END_WORDS = parseEndWords(settings?.main?.endWord || '命令完了'); // エンドワードを読み込む
 
     } catch (e) {
         console.warn('アプリ設定の読み込みに失敗しました。', e);
         shouldDisplayAllSpeech = false; // エラー時はデフォルトOff
-        END_WORD = '命令完了'; // エラー時はデフォルト値を設定
+        END_WORDS = ['命令完了']; // エラー時はデフォルト値を設定
     }
 }
 
 loadAppSettings();
 document.addEventListener('app-settings:updated', loadAppSettings);
+
+function parseEndWords(rawEndWords) {
+    if (typeof rawEndWords !== 'string') {
+        return ['命令完了'];
+    }
+    const parsed = rawEndWords
+        .split(',')
+        .map(word => word.trim())
+        .filter(Boolean);
+    return parsed.length > 0 ? parsed : ['命令完了'];
+}
+
+function escapeRegExp(text) {
+    return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function findEndWordMatch(text) {
+    if (!text || !Array.isArray(END_WORDS) || END_WORDS.length === 0) {
+        return null;
+    }
+    const lowerText = text.toLowerCase();
+    let bestMatch = null;
+    END_WORDS.forEach(word => {
+        const lowerWord = word.toLowerCase();
+        const index = lowerText.indexOf(lowerWord);
+        if (index === -1) return;
+        if (!bestMatch || index < bestMatch.index || (index === bestMatch.index && word.length > bestMatch.word.length)) {
+            bestMatch = { word, index, endIndex: index + word.length };
+        }
+    });
+    return bestMatch;
+}
+
+function stripLeadingWakeWords(text) {
+    let normalized = (text || '').trim();
+    if (!normalized) return normalized;
+    const wakeWordsByLength = [...WAKE_WORDS].sort((a, b) => b.length - a.length);
+    let changed = true;
+    while (changed) {
+        changed = false;
+        const lowered = normalized.toLowerCase();
+        for (const wakeWord of wakeWordsByLength) {
+            const loweredWakeWord = wakeWord.toLowerCase();
+            if (lowered.startsWith(loweredWakeWord)) {
+                normalized = normalized.slice(wakeWord.length).trim();
+                changed = true;
+                break;
+            }
+        }
+    }
+    return normalized;
+}
+
+function normalizeCommandForDuplicateCheck(text) {
+    const withoutWakeWord = stripLeadingWakeWords(text);
+    return withoutWakeWord.toLowerCase().replace(/\s+/g, ' ').trim();
+}
+
+function shouldSuppressDuplicateVoiceCommand(commandText) {
+    const key = normalizeCommandForDuplicateCheck(commandText);
+    if (!key) {
+        return false;
+    }
+    const now = Date.now();
+    const isDuplicate = key === lastDispatchedVoiceCommandKey && (now - lastDispatchedVoiceCommandAt) < DUPLICATE_SUPPRESS_MS;
+    if (!isDuplicate) {
+        lastDispatchedVoiceCommandKey = key;
+        lastDispatchedVoiceCommandAt = now;
+    }
+    return isDuplicate;
+}
 
 // ============================================================================
 // ヘルパー関数
@@ -545,11 +616,14 @@ document.addEventListener('DOMContentLoaded', () => {
         // --- エンドワード検出ロジック ---
         let endWordDetected = false;
         let originalFinalCommand = '';
+        let detectedEndWord = '';
         const canDetectEndWord = currentMode === 'listening' || (currentMode === 'waiting' && wakeWordDetectedInTranscript);
-        if (canDetectEndWord && END_WORD && transcript.includes(END_WORD)) {
-            console.log(`DEBUG: エンドワード "${END_WORD}" を検出しました。`);
-            const endWordIndex = transcript.indexOf(END_WORD);
-            originalFinalCommand = transcript.substring(0, endWordIndex).trim(); // エンドワード以前をコマンドとする
+        const endWordMatch = canDetectEndWord ? findEndWordMatch(transcript) : null;
+        if (endWordMatch) {
+            detectedEndWord = endWordMatch.word;
+            console.log(`DEBUG: エンドワード "${detectedEndWord}" を検出しました。`);
+            // エンドワードを含めて確定し、それ以降のみ切り捨てる
+            originalFinalCommand = transcript.substring(0, endWordMatch.endIndex).trim();
             endWordDetected = true;
             isFinal = true; // 強制的に最終結果とする
             // 以降の処理のためにtranscriptを切り詰める
@@ -601,8 +675,14 @@ document.addEventListener('DOMContentLoaded', () => {
             entry.innerHTML = '';
             if (!text) return;
             const span = document.createElement('span');
-            span.innerHTML = highlightWakeWords(text);
+            span.innerHTML = highlightEndWords(highlightWakeWords(text));
             entry.appendChild(span);
+            if (endWordDetected && detectedEndWord) {
+                const badge = document.createElement('span');
+                badge.className = 'highlight-end-word-badge';
+                badge.textContent = ` [エンドワード確定: ${detectedEndWord}]`;
+                entry.appendChild(badge);
+            }
         };
 
         const wakeIndexInTranscript = findWakeWordIndex(transcript);
@@ -652,7 +732,12 @@ document.addEventListener('DOMContentLoaded', () => {
             // 差分内のウェイクワードをハイライト
             WAKE_WORDS.forEach(word => {
                 if (diff.toLowerCase().includes(word.toLowerCase())) {
-                     diffSpan.innerHTML = highlightWakeWords(diff);
+                     diffSpan.innerHTML = highlightEndWords(highlightWakeWords(diff));
+                }
+            });
+            END_WORDS.forEach(word => {
+                if (diff.toLowerCase().includes(word.toLowerCase())) {
+                    diffSpan.innerHTML = highlightEndWords(highlightWakeWords(diff));
                 }
             });
 
@@ -667,7 +752,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (isFinal) {
             finalCommand = originalFinalCommand || (shouldDisplayAllSpeech ? transcript.trim() : (displayOffset > 0 ? transcript.slice(displayOffset).trim() : transcript.trim()));
 
-            if (currentMode === 'listening' && finalCommand) {
+            if (finalCommand && (currentMode === 'listening' || endWordDetected)) {
                 setEntryContent(tempLogEntry, finalCommand);
             }
 
@@ -681,6 +766,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 console.log("DEBUG: エンドワード検出により音声認識を停止します。");
                 recognition.stop();
                 setMode('waiting'); // 待機モードに戻す
+                if (shouldSuppressDuplicateVoiceCommand(finalCommand)) {
+                    console.log('DEBUG: 重複音声コマンドを抑制');
+                    return;
+                }
                 processInput(finalCommand, 'voice'); // 強制的にコマンドを処理
                 return; // 以降の処理をスキップ
             }
@@ -694,16 +783,9 @@ document.addEventListener('DOMContentLoaded', () => {
         } 
         
         if (currentMode === 'listening' && isFinal && finalCommand) {
-            const now = Date.now();
-            if (isMobileDevice) {
-                const normalized = finalCommand.trim();
-                const isDuplicate = normalized === lastFinalCommand && (now - lastFinalCommandAt) < MOBILE_DUPLICATE_SUPPRESS_MS;
-                if (isDuplicate) {
-                    console.log('DEBUG: モバイルの重複認識を抑制');
-                    return;
-                }
-                lastFinalCommand = normalized;
-                lastFinalCommandAt = now;
+            if (shouldSuppressDuplicateVoiceCommand(finalCommand)) {
+                console.log('DEBUG: 重複音声コマンドを抑制');
+                return;
             }
 
             console.log(`DEBUG: 音声入力確定: "${transcript.trim()}"`);
@@ -834,7 +916,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
 
-            const regex = new RegExp(word, 'gi');
+            const regex = new RegExp(escapeRegExp(word), 'gi');
 
 
 
@@ -859,13 +941,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
     /**
+     * テキスト内のエンドワードをハイライトするHTMLを生成する
+     */
+    function highlightEndWords(text) {
+        let highlightedText = text;
 
+        END_WORDS.forEach(word => {
+            const regex = new RegExp(escapeRegExp(word), 'gi');
+            highlightedText = highlightedText.replace(regex, `<span class="highlight-end-word">${word}</span>`);
+        });
 
+        return highlightedText;
+    }
 
+    /**
      * テキスト入力をログパネルに追加する
-
-
-
      */
 
 
