@@ -426,6 +426,33 @@ class ChatSpaceModel:
             return f"{len(deleted_events)}件の予定を削除しました。"
         return f"{len(deleted_events)}件の予定を削除しました。削除内容は、" + "、".join(details) + "です。"
 
+    def _build_changed_calendar_message(self, changed_events: list[dict]) -> str:
+        if not changed_events:
+            return "変更対象の予定が見つかりませんでした。"
+
+        details = []
+        for item in changed_events:
+            if not isinstance(item, dict):
+                continue
+            before = item.get("before") or {}
+            after = item.get("after") or {}
+
+            before_name = (before.get("title") or before.get("name") or "無題").strip()
+            before_start = self._format_event_time(before.get("start_time"))
+            before_end = self._format_event_time(before.get("end_time"))
+
+            after_name = (after.get("title") or after.get("name") or before_name or "無題").strip()
+            after_start = self._format_event_time(after.get("start_time"))
+            after_end = self._format_event_time(after.get("end_time"))
+
+            before_text = f"{before_start}から{before_end}の「{before_name}」" if before_start and before_end else f"「{before_name}」"
+            after_text = f"{after_start}から{after_end}の「{after_name}」" if after_start and after_end else f"「{after_name}」"
+            details.append(f"{before_text}を{after_text}に変更")
+
+        if not details:
+            return f"{len(changed_events)}件の予定を変更しました。"
+        return f"{len(changed_events)}件の予定を変更しました。変更内容は、" + "、".join(details) + "です。"
+
     def _to_prompt_calendar_task_list(self, task_list: list[dict]) -> list[dict]:
         """Geminiに渡す予定一覧をJST文字列へ正規化する"""
         prompt_list: list[dict] = []
@@ -871,6 +898,7 @@ class ChatSpaceModel:
             return None, "変更対象の予定を特定できませんでした。"
 
         changed_count = 0
+        changed_events: list[dict] = []
         remaining_tasks = list(task_list)
         for event_data in events_to_change:
             before_name = (event_data.get("before_name") or "").strip()
@@ -907,15 +935,28 @@ class ChatSpaceModel:
                 update_payload = {k: v for k, v in update_payload.items() if v}
 
                 if update_payload:
+                    before_snapshot = {
+                        "title": matched_task.get("title") or matched_task.get("name"),
+                        "start_time": matched_task.get("start_time"),
+                        "end_time": matched_task.get("end_time"),
+                    }
                     local_calendar_service.update_event(target_id, user_id, **update_payload)
                     changed_count += 1
+                    changed_events.append({
+                        "before": before_snapshot,
+                        "after": {
+                            "title": update_payload.get("title") or before_snapshot.get("title"),
+                            "start_time": update_payload.get("start_time") or before_snapshot.get("start_time"),
+                            "end_time": update_payload.get("end_time") or before_snapshot.get("end_time"),
+                        }
+                    })
                     if matched_index is not None:
                         remaining_tasks.pop(matched_index)
             except Exception as e:
                 print(f"ローカルイベント更新エラー: {e}")
         
         if changed_count > 0:
-            return {"changed_count": changed_count}, f"{changed_count}件の予定を変更しました。"
+            return {"changed_count": changed_count}, self._build_changed_calendar_message(changed_events)
 
         return None, "変更対象の予定が見つかりませんでした。"
 
