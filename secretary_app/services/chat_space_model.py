@@ -1,4 +1,4 @@
-import os
+﻿import os
 import re
 import json
 from datetime import datetime, timedelta
@@ -374,6 +374,12 @@ class ChatSpaceModel:
         except ValueError:
             return iso_time
 
+    def _current_time_for_prompt(self) -> str:
+        """プロンプトへ渡す現在時刻（曜日付き）を返す"""
+        now = datetime.now(JST)
+        weekday_en = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"][now.weekday()]
+        return f"{now.strftime('%Y-%m-%d %H:%M:%S')} ({weekday_en})"
+
     def _build_added_calendar_message(self, added_events: list[dict]) -> str:
         if not added_events:
             return "予定を追加できませんでした。"
@@ -397,6 +403,28 @@ class ChatSpaceModel:
             return f"{len(added_events)}件の予定をカレンダーに追加しました。"
 
         return f"{len(added_events)}件の予定をカレンダーに追加しました。追加内容は、" + "、".join(details) + "です。"
+
+    def _build_deleted_calendar_message(self, deleted_events: list[dict]) -> str:
+        if not deleted_events:
+            return "削除対象の予定が見つかりませんでした。"
+
+        details = []
+        for event in deleted_events:
+            if not isinstance(event, dict):
+                continue
+            title = (event.get("title") or event.get("name") or "無題").strip()
+            start_text = self._format_event_time(event.get("start_time"))
+            end_text = self._format_event_time(event.get("end_time"))
+            if start_text and end_text:
+                details.append(f"{start_text}から{end_text}の「{title}」")
+            elif start_text:
+                details.append(f"{start_text}の「{title}」")
+            else:
+                details.append(f"「{title}」")
+
+        if not details:
+            return f"{len(deleted_events)}件の予定を削除しました。"
+        return f"{len(deleted_events)}件の予定を削除しました。削除内容は、" + "、".join(details) + "です。"
 
     def _to_prompt_calendar_task_list(self, task_list: list[dict]) -> list[dict]:
         """Geminiに渡す予定一覧をJST文字列へ正規化する"""
@@ -589,7 +617,7 @@ class ChatSpaceModel:
         print("--- [DEBUG] check_chat_space: Starting ---")
         # 起動コマンドを除外してGeminiへ渡す
         cleaned_input = (input_value or "").replace("サイレントメイト", "").strip()
-        current_time = datetime.now(JST).strftime('%Y-%m-%d %H:%M:%S')
+        current_time = self._current_time_for_prompt()
         if self._is_cancelled(user_id):
             return {
                 "status": "success",
@@ -695,7 +723,7 @@ class ChatSpaceModel:
         if not user_id:
             return None, "ユーザーがログインしていません。"
         
-        current_time = datetime.now(JST).strftime('%Y-%m-%d %H:%M:%S')
+        current_time = self._current_time_for_prompt()
         prompt = self.ADD_CALENDAR_PROMPT_TEMPLATE.format(current_time=current_time, input_value=text)
         raw = self._gemini_request(prompt)
         list_to_add = self._parse_calendar_list(raw)
@@ -740,7 +768,7 @@ class ChatSpaceModel:
             if is_silent: return [], ""
             return None, "ユーザーがログインしていません。"
 
-        current_time = datetime.now(JST).strftime('%Y-%m-%d %H:%M:%S')
+        current_time = self._current_time_for_prompt()
         prompt = self.GET_CALENDAR_PROMPT_TEMPLATE.format(current_time=current_time, input_value=text)
         raw = self._gemini_request(prompt)
         range_info = self._parse_calendar_list(raw)
@@ -772,7 +800,7 @@ class ChatSpaceModel:
 
         prompt_task_list = self._to_prompt_calendar_task_list(task_list)
         task_list_json = json.dumps(prompt_task_list, ensure_ascii=False)
-        current_time = datetime.now(JST).strftime('%Y-%m-%d %H:%M:%S')
+        current_time = self._current_time_for_prompt()
         prompt = self.REMOVE_CALENDAR_PROMPT_TEMPLATE.format(current_time=current_time, task_list_json=task_list_json, input_value=text)
         raw = self._gemini_request(prompt)
         events_to_delete = self._parse_calendar_list(raw)
@@ -781,6 +809,7 @@ class ChatSpaceModel:
             return None, "削除対象の予定を特定できませんでした。"
 
         deleted_count = 0
+        deleted_events: list[dict] = []
         remaining_tasks = list(task_list)
         for event_data in events_to_delete:
             target_name = (event_data.get("name") or event_data.get("title") or "").strip()
@@ -811,6 +840,7 @@ class ChatSpaceModel:
             try:
                 local_calendar_service.delete_event(target_id, user_id)
                 deleted_count += 1
+                deleted_events.append(matched_task)
                 # 同一データの重複削除を正しく処理するため、マッチ済みタスクを除外
                 if matched_index is not None:
                     remaining_tasks.pop(matched_index)
@@ -818,7 +848,7 @@ class ChatSpaceModel:
                 print(f"ローカルイベント削除エラー: {e}")
         
         if deleted_count > 0:
-            return {"deleted_count": deleted_count}, f"{deleted_count}件の予定を削除しました。"
+            return {"deleted_count": deleted_count}, self._build_deleted_calendar_message(deleted_events)
         
         return None, "削除対象の予定が見つかりませんでした。"
 
@@ -832,7 +862,7 @@ class ChatSpaceModel:
 
         prompt_task_list = self._to_prompt_calendar_task_list(task_list)
         task_list_json = json.dumps(prompt_task_list, ensure_ascii=False)
-        current_time = datetime.now(JST).strftime('%Y-%m-%d %H:%M:%S')
+        current_time = self._current_time_for_prompt()
         prompt = self.CHANGE_CALENDAR_PROMPT_TEMPLATE.format(current_time=current_time, task_list_json=task_list_json, input_value=text)
         raw = self._gemini_request(prompt)
         events_to_change = self._parse_calendar_list(raw)
@@ -841,29 +871,48 @@ class ChatSpaceModel:
             return None, "変更対象の予定を特定できませんでした。"
 
         changed_count = 0
+        remaining_tasks = list(task_list)
         for event_data in events_to_change:
-            target_id = None
-            for task in task_list:
-                 # A simple match by name and time for now.
-                if task.get("name") == event_data.get("before_name"):
-                    target_id = task.get("id")
+            before_name = (event_data.get("before_name") or "").strip()
+            before_start_keys = self._build_time_compare_keys(event_data.get("before_start_time"))
+            before_end_keys = self._build_time_compare_keys(event_data.get("before_end_time"))
+
+            matched_index = None
+            matched_task = None
+            for idx, task in enumerate(remaining_tasks):
+                task_name = (task.get("title") or task.get("name") or "").strip()
+                task_start_keys = self._build_time_compare_keys(task.get("start_time"))
+                task_end_keys = self._build_time_compare_keys(task.get("end_time"))
+
+                name_matches = (task_name == before_name) if before_name else True
+                start_matches = bool(task_start_keys & before_start_keys) if before_start_keys else True
+                end_matches = bool(task_end_keys & before_end_keys) if before_end_keys else True
+
+                if name_matches and start_matches and end_matches:
+                    matched_index = idx
+                    matched_task = task
                     break
 
-            if target_id:
-                try:
-                    update_payload = {
-                        "title": event_data.get("after_name"),
-                        "start_time": event_data.get("after_start_time"),
-                        "end_time": event_data.get("after_end_time"),
-                    }
-                    # Remove None or empty values so we don't overwrite with nulls
-                    update_payload = {k: v for k, v in update_payload.items() if v}
-                    
-                    if update_payload:
-                        local_calendar_service.update_event(target_id, user_id, **update_payload)
-                        changed_count += 1
-                except Exception as e:
-                    print(f"ローカルイベント更新エラー: {e}")
+            if matched_task is None:
+                continue
+
+            target_id = matched_task.get("id")
+            try:
+                update_payload = {
+                    "title": event_data.get("after_name"),
+                    "start_time": event_data.get("after_start_time"),
+                    "end_time": event_data.get("after_end_time"),
+                }
+                # Remove None or empty values so we don't overwrite with nulls
+                update_payload = {k: v for k, v in update_payload.items() if v}
+
+                if update_payload:
+                    local_calendar_service.update_event(target_id, user_id, **update_payload)
+                    changed_count += 1
+                    if matched_index is not None:
+                        remaining_tasks.pop(matched_index)
+            except Exception as e:
+                print(f"ローカルイベント更新エラー: {e}")
         
         if changed_count > 0:
             return {"changed_count": changed_count}, f"{changed_count}件の予定を変更しました。"
@@ -945,7 +994,7 @@ class ChatSpaceModel:
         """収支の追加"""
         if not user_id:
             return None, "ユーザー未ログイン"
-        current_time = datetime.now(JST).strftime('%Y-%m-%d %H:%M:%S')
+        current_time = self._current_time_for_prompt()
 
         # expense_serviceからカテゴリ一覧を取得
         from services.expense_service import add_finance_record, get_unique_categories
@@ -994,7 +1043,7 @@ class ChatSpaceModel:
         """収支の取得"""
         if not user_id:
             return None, "ユーザー未ログイン"
-        current_time = datetime.now(JST).strftime('%Y-%m-%d %H:%M:%S')
+        current_time = self._current_time_for_prompt()
 
         # ユーザーの入力から特定の情報を取得する意図を判定
         if "所持金" in text or "残高" in text:
@@ -1070,7 +1119,7 @@ class ChatSpaceModel:
         """Add memo"""
         if not user_id:
             return None, "User is not logged in."
-        current_time = datetime.now(JST).strftime('%Y-%m-%d %H:%M:%S')
+        current_time = self._current_time_for_prompt()
         prompt = self.ADD_MEMO_PROMPT_TEMPLATE.format(
             current_time=current_time,
             input_value=text
@@ -1108,7 +1157,7 @@ class ChatSpaceModel:
         if not user_id:
             return None, "User is not logged in."
 
-        current_time = datetime.now(JST).strftime('%Y-%m-%d %H:%M:%S')
+        current_time = self._current_time_for_prompt()
         kind_prompt = self.MEMO_SEARCH_KIND_PROMPT_TEMPLATE.format(
             current_time=current_time,
             input_value=text
@@ -1196,7 +1245,7 @@ class ChatSpaceModel:
         """Delete memos"""
         if not user_id:
             return None, "User is not logged in."
-        current_time = datetime.now(JST).strftime('%Y-%m-%d %H:%M:%S')
+        current_time = self._current_time_for_prompt()
         prompt = self.DELETE_MEMO_PROMPT_TEMPLATE.format(
             current_time=current_time,
             input_value=text
@@ -1314,7 +1363,7 @@ class ChatSpaceModel:
                 available_devices_json = json.dumps(formatted_devices, ensure_ascii=False)
 
                 # LLMに操作意図を特定させるプロンプトを生成
-                current_time = datetime.now(JST).strftime('%Y-%m-%d %H:%M:%S')
+                current_time = self._current_time_for_prompt()
                 operation_prompt = self.SWITCHBOT_OPERATION_PROMPT_TEMPLATE.format(
                     available_devices_json=available_devices_json,
                     current_time=current_time,
@@ -1366,3 +1415,4 @@ class ChatSpaceModel:
         except Exception as e:
             print(f"SwitchBot操作エラー: {e}")
             return None, "SwitchBotの操作中にエラーが発生しました。"
+
