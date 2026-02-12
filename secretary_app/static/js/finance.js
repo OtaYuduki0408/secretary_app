@@ -277,6 +277,20 @@ document.addEventListener("DOMContentLoaded", () => {
     return null;
   }
 
+  function toLocalDateKey(dateObj) {
+    if (!(dateObj instanceof Date) || Number.isNaN(dateObj.getTime())) return "";
+    const y = dateObj.getFullYear();
+    const m = String(dateObj.getMonth() + 1).padStart(2, "0");
+    const d = String(dateObj.getDate()).padStart(2, "0");
+    return `${y}-${m}-${d}`;
+  }
+
+  function getRecordLocalDateKey(record) {
+    const parsed = parseRecordDate(record);
+    if (parsed) return toLocalDateKey(parsed);
+    return normalizeDateToKey(record?.dateKey || record?.date || "");
+  }
+
   function getWeekStartKey(dateObj) {
     const d = new Date(dateObj);
     d.setHours(0, 0, 0, 0);
@@ -452,29 +466,32 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   // ---------- サマリー ----------
-  function updateSummary() {
+  function updateSummary() {
     const totalIncome  = rawFinanceRecords.filter(r => r.type === 'income')
       .reduce((s, d) => s + Number(d.amount || 0), 0);
     const totalExpense = rawFinanceRecords.filter(r => r.type === 'expense')
       .reduce((s, d) => s + Number(d.amount || 0), 0);
 
-    const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
-    const currentMonth = today.slice(0, 7);              // YYYY-MM
+    const today = toLocalDateKey(new Date()); // YYYY-MM-DD (ローカル)
+    const currentMonth = today.slice(0, 7);   // YYYY-MM
 
     const monthlyExpense = rawFinanceRecords
-      .filter(r => r.type === 'expense' && (r.dateKey || "").startsWith(currentMonth))
+      .filter(r => r.type === 'expense' && getRecordLocalDateKey(r).startsWith(currentMonth))
       .reduce((s, d) => s + Number(d.amount || 0), 0);
 
     const monthlyIncome = rawFinanceRecords
-      .filter(r => r.type === 'income' && (r.dateKey || "").startsWith(currentMonth))
+      .filter(r => r.type === 'income' && getRecordLocalDateKey(r).startsWith(currentMonth))
       .reduce((s, d) => s + Number(d.amount || 0), 0);
 
     const dailyExpense = rawFinanceRecords
-      .filter(r => r.type === 'expense' && (r.dateKey || "") === today)
+      .filter(r => r.type === 'expense' && getRecordLocalDateKey(r) === today)
       .reduce((s, d) => s + Number(d.amount || 0), 0);
 
     const dailyExpenseNoNecessities = rawFinanceRecords
-      .filter(r => r.type === 'expense' && (r.dateKey || "") === today && r.category !== '必需品')
+      .filter(r => {
+        const category = String(r.category || "").trim();
+        return r.type === 'expense' && getRecordLocalDateKey(r) === today && category !== '必需品';
+      })
       .reduce((s, d) => s + Number(d.amount || 0), 0);
 
     document.getElementById("current-balance").textContent = `${(totalIncome - totalExpense).toLocaleString()} 円`;

@@ -531,11 +531,20 @@ class ChatSpaceModel:
         return parsed.replace(microsecond=0).strftime("%Y-%m-%d %H:%M:%S")
 
     def _finance_record_signature(self, record: dict) -> str:
+        date_text = str(record.get("date") or "").strip()
+        # 重複判定は秒単位差分を無視して、分単位で比較する
+        date_minute = date_text
+        if date_text:
+            try:
+                parsed = datetime.strptime(date_text, "%Y-%m-%d %H:%M:%S")
+                date_minute = parsed.strftime("%Y-%m-%d %H:%M")
+            except ValueError:
+                date_minute = date_text[:16]
         payload = {
             "type": str(record.get("type") or "").strip(),
             "category": str(record.get("category") or "").strip(),
             "amount": float(record.get("amount") or 0),
-            "date": str(record.get("date") or "").strip(),
+            "date_minute": date_minute,
             "memo": str(record.get("memo") or "").strip(),
         }
         return json.dumps(payload, ensure_ascii=False, sort_keys=True)

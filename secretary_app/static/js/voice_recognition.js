@@ -23,6 +23,7 @@ const MOBILE_RESTART_COOLDOWN_MS = 3000;
 const DUPLICATE_SUPPRESS_MS = 5000;
 let lastDispatchedVoiceCommandKey = '';
 let lastDispatchedVoiceCommandAt = 0;
+let isRecognitionActive = false;
 
 // TTS (Text-to-Speech) 設定
 const speechSynth = window.speechSynthesis;
@@ -549,13 +550,15 @@ document.addEventListener('DOMContentLoaded', () => {
             shouldSkipOverlay = false;
         }
 
+        let pendingRecognitionStart = false;
+
         if (shouldSkipOverlay) {
             console.log("DEBUG: shouldSkipOverlayがtrueのため、オーバーレイを非表示にし、音声認識を開始します。");
             if (audioPermissionOverlay) audioPermissionOverlay.classList.add('hidden');
             else console.error("DEBUG: audioPermissionOverlayが見つかりません。オーバーレイを隠せませんでした。");
             unlockAudio();
-            initializeVoiceRecognition();
-            console.log("DEBUG: initializeVoiceRecognition called via shouldSkipOverlay.");
+            pendingRecognitionStart = true;
+            console.log("DEBUG: 音声認識の自動開始を予約しました。");
         } else if (activateAudioButton) { // オーバーレイをスキップしない場合は、アクティベーションボタンの有無で処理を分岐
             console.log("DEBUG: shouldSkipOverlayがfalseまたはactivateAudioButtonが存在するため、アクティベーションボタンイベントリスナーを設定します。");
             activateAudioButton.addEventListener('click', () => {
@@ -563,8 +566,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (audioPermissionOverlay) audioPermissionOverlay.classList.add('hidden'); // オーバーレイを非表示にする
                 else console.error("DEBUG: audioPermissionOverlayが見つかりません。オーバーレイを隠せませんでした。");
                 unlockAudio(); // オーディオコンテキストを再開
-                initializeVoiceRecognition(); // 音声認識の初期化を開始
-                console.log("DEBUG: initializeVoiceRecognition called via button click.");
+                if (recognition) {
+                    initializeVoiceRecognition(); // 音声認識の初期化を開始
+                    console.log("DEBUG: initializeVoiceRecognition called via button click.");
+                } else {
+                    pendingRecognitionStart = true;
+                    console.log("DEBUG: recognition未初期化のため、音声認識開始を予約しました。");
+                }
             });
         } else { // ボタンがない場合や、その他の状況で音声認識を自動開始しない
             console.log("DEBUG: オーバーレイが表示中のため、音声認識の自動開始をスキップしました。ユーザーのアクションを待ちます。");
@@ -610,6 +618,10 @@ document.addEventListener('DOMContentLoaded', () => {
     // ------------------------------------------------------------------------
 
 
+
+    recognition.onstart = () => {
+        isRecognitionActive = true;
+    };
 
     recognition.onresult = (event) => {
         const last = event.results.length - 1;
@@ -810,6 +822,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
 
+        isRecognitionActive = false;
         console.log("DEBUG: recognition.onend fired.");
 
 
@@ -870,6 +883,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
 
+        isRecognitionActive = false;
         console.error('DEBUG: 音声認識エラー:', event.error);
 
 
@@ -1231,45 +1245,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
     function initializeVoiceRecognition() {
-
-
-
-
-
-
-
+        if (!recognition) {
+            console.warn("DEBUG: recognitionが未初期化のため開始をスキップしました。");
+            return;
+        }
+        if (isRecognitionActive) {
+            return;
+        }
         setMode('waiting');
-
-
-
-
-
-
-
         try {
-
-
-
-
-
-
-
             recognition.start();
-
-
-
-
-
-
-
         } catch(e) {
-
-
-
-
-
-
-
             console.error("初期認識開始に失敗", e);
 
 
@@ -1318,7 +1304,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
 
-        if (!audioPermissionOverlay || audioPermissionOverlay.classList.contains('hidden')) {
+        if (pendingRecognitionStart || !audioPermissionOverlay || audioPermissionOverlay.classList.contains('hidden')) {
 
 
 
