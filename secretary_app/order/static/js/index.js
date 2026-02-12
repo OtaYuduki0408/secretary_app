@@ -2,7 +2,7 @@ import { TRIGGER_CATEGORIES_MAIN } from './constants.js';
 import { populateSelect, updateSubOptions } from './ui_helpers.js';
 import { createTriggerUI, updateTriggerInputFields } from './trigger_ui.js';
 import { addConditionBlock, addAction } from './block_operations.js';
-import { registerCommand, loadCommands, pollPendingActions } from './command_manager.js';
+import { registerCommand, loadCommands, pollPendingActions, getCommandPayloadFromForm, loadCommandToForm } from './command_manager.js';
 
 document.addEventListener("DOMContentLoaded",()=>{
   console.log("DOMContentLoaded event fired.");
@@ -18,6 +18,50 @@ document.addEventListener("DOMContentLoaded",()=>{
   document.getElementById("add-action-top").addEventListener("click",(event)=>addAction(event.currentTarget));
   document.getElementById("register-btn").addEventListener("click",registerCommand);
   
+  // JSON Import/Export
+  const downloadBtn = document.getElementById('download-as-json-btn');
+  const loadBtn = document.getElementById('load-from-json-btn');
+  const jsonArea = document.getElementById('json-input-area');
+
+  if (downloadBtn) {
+    downloadBtn.addEventListener('click', async () => {
+      const payload = await getCommandPayloadFromForm();
+      if (!payload) return;
+
+      const commandName = payload.name.trim().replace(/\s+/g, '_') || 'command';
+      const jsonString = JSON.stringify(payload, null, 2);
+      const blob = new Blob([jsonString], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${commandName}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    });
+  }
+
+  if (loadBtn && jsonArea) {
+    loadBtn.addEventListener('click', () => {
+      const jsonString = jsonArea.value.trim();
+      if (!jsonString) {
+        alert('JSONデータを入力してください。');
+        return;
+      }
+      try {
+        const commandData = JSON.parse(jsonString);
+        loadCommandToForm(commandData);
+        jsonArea.value = ''; // 読み込み後にクリア
+        alert('JSONから設定を読み込みました。');
+      } catch (error) {
+        console.error("JSONのパースに失敗しました:", error);
+        alert(`無効なJSONデータです: ${error.message}`);
+      }
+    });
+  }
+
   loadCommands();
   console.log("--- DEBUG: Setting up pollPendingActions interval (5000ms). ---"); // 追加
   setInterval(pollPendingActions, 5000); // 5秒ごとにポーリングを追加

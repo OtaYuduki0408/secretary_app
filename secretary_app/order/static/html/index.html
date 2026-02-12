@@ -69,6 +69,20 @@
           <button class="co-btn primary save-button" id="register-btn" type="button">💾 保存する</button>
           <p id="message" class="co-inline-message" role="status"></p>
         </div>
+
+        <div class="co-fieldset" style="margin-top: 24px; border-top: 1px solid var(--co-border); padding-top: 24px;">
+            <div class="co-fieldset-head">
+                <h3>JSONでのインポート/エクスポート</h3>
+                <p>命令のバックアップや共有のために、JSONデータを利用できます。</p>
+            </div>
+            <div class="co-json-io-container">
+                <textarea id="json-input-area" class="co-textarea" rows="8" placeholder="ここにJSONデータを貼り付けて「読み込み」を押してください..."></textarea>
+                <div class="co-actions" style="margin-top: 12px; justify-content: flex-end;">
+                    <button id="load-from-json-btn" type="button" class="co-btn ghost">JSONから読み込む</button>
+                    <button id="download-as-json-btn" type="button" class="co-btn ghost">現在の設定をJSONでダウンロード</button>
+                </div>
+            </div>
+        </div>
       </section>
 
       <section class="co-card co-list-card">

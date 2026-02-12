@@ -319,18 +319,13 @@ export function addConditionBlockFromData(data,parent){
   if(data.actions?.length) data.actions.forEach(a=>addAction(b.querySelector(".nested-actions"),a));
 }
 
-export async function registerCommand(){
-  console.log("--- [DEBUG] registerCommand called ---");
-  const id=document.getElementById("command-id")?.value||null;
-  
-  // バリデーション: 命令名が空の場合はアラートを出して処理を中断
+export async function getCommandPayloadFromForm() {
   const commandName = document.getElementById("name").value;
   if (!commandName || !commandName.trim()) {
     alert("命令名を入力してください。");
-    return;
+    return null;
   }
 
-  // Trigger
   const triggerCategory = document.getElementById("trigger_category").value;
   let triggerSub = document.getElementById("trigger_sub").value;
   if (!triggerSub && TRIGGER_CATEGORIES_MAIN[triggerCategory]?.length) {
@@ -343,15 +338,12 @@ export async function registerCommand(){
   let triggerValue = {};
   const triggerContainer = document.getElementById("trigger_value_container");
 
-  // Triggerのデータ収集ロジック
   switch (triggerCategory) {
     case "場所":
       triggerValue.address = triggerContainer.querySelector("#trigger_value_address")?.value;
       triggerValue.latitude = triggerContainer.querySelector("#trigger_value_latitude")?.value;
       triggerValue.longitude = triggerContainer.querySelector("#trigger_value_longitude")?.value;
       triggerValue.range = triggerContainer.querySelector("#trigger_value_range")?.value;
-
-      // 住所が入力されている場合、DBに保存
       if (triggerValue.address) {
         await saveAddressToDB(triggerValue.address);
       }
@@ -365,7 +357,6 @@ export async function registerCommand(){
         }));
       } else if (triggerSub === "予定の時間になったら") {
         triggerValue.title = triggerContainer.querySelector("#trigger_value_cal_title")?.value;
-        // 以下はIDを修正する必要がある可能性があります。元のcreateTriggerUIのid生成ロジックを確認してください。
         triggerValue.start_year = triggerContainer.querySelector("#trigger_value_cal_start_year")?.value;
         triggerValue.start_month = triggerContainer.querySelector("#trigger_value_cal_start_month")?.value;
         triggerValue.start_day = triggerContainer.querySelector("#trigger_value_cal_start_day")?.value;
@@ -400,7 +391,6 @@ export async function registerCommand(){
       }
       break;
     case "時間":
-      // `prefix` がない場合はメインのトリガー設定なので、特定時間UIから値を取得
       triggerValue.year = triggerContainer.querySelector("#trigger_value_year")?.value;
       triggerValue.month = triggerContainer.querySelector("#trigger_value_month")?.value;
       triggerValue.day = triggerContainer.querySelector("#trigger_value_day")?.value;
@@ -413,14 +403,12 @@ export async function registerCommand(){
       keywordInputs.forEach(input => {
         const value = input.value.trim();
         if (value) {
-          // カンマで区切ってAND条件の配列を作成
           const andKeywords = value.split(',').map(k => k.trim()).filter(k => k);
           if (andKeywords.length > 0) {
             keywords.push(andKeywords);
           }
         }
       });
-      // 最終的に [['keyword1', 'keyword2'], ['keyword3']] のような形式になる
       triggerValue.keywords = keywords;
       break;
     case "SwitchBot":
@@ -435,17 +423,26 @@ export async function registerCommand(){
 
   const topLevelBlocks = document.getElementById("condition_blocks");
 
-  const payload={
-    name:document.getElementById("name").value,
+  return {
+    name: commandName,
     triggers:[{
       category: triggerCategory,
       sub: triggerSub,
       value: triggerValue
     }],
     steps: parseSteps(topLevelBlocks),
-    conditions: parseConditions(topLevelBlocks),
-    actions: parseActionArray(topLevelBlocks)
+    conditions: parseConditions(topLevelBlocks), // Legacy support
+    actions: parseActionArray(topLevelBlocks) // Legacy support
   };
+}
+
+export async function registerCommand(){
+  console.log("--- [DEBUG] registerCommand called ---");
+  const id=document.getElementById("command-id")?.value||null;
+  
+  const payload = await getCommandPayloadFromForm();
+  if (!payload) return;
+
   console.log("--- [DEBUG] Payload to be sent:", JSON.stringify(payload, null, 2));
 
   try {
