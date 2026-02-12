@@ -95,7 +95,7 @@
   </div>
 
   <script>
-    const API_URL_BASE = '/api/memos';
+    const API_URL_BASE = window.location.protocol + '//' + window.location.host + '/api/memos';
     let isBulkDeleteMode = false;
 
     const focusRestoreState = {
