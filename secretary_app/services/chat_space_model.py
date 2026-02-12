@@ -21,6 +21,7 @@ from services.memo_service import get_all_memos as get_all_memo_records
 from services.memo_service import delete_memo as delete_memo_record
 from services.memo_service import delete_memos_bulk as delete_memos_bulk_records
 from services import switchbot_service
+from services import custom_order_service
 
 
 # キャッシュを適用する関数をクラスの外に定義
@@ -50,7 +51,7 @@ class ChatSpaceModel:
     I:収支管理 (例: 所持金、残高、今月の使用額、今日の使用額、収支の記録、支出の記録、収入の記録)
     M:メモ帳
     T:時刻、年月日、曜日確認(行動はn)
-    R:過去の命令の修正(行動はn)
+    R:過去の命令の修正(行動はn)。特殊命令「目覚まし」の時刻変更もここに含む
     S:SwitchBot iot等。例:電気を消す、エアコンを付ける、鍵を掛ける)(行動はn)
     Y:YouTubeの音楽を再生する(行動はp)
     Re:強制終了コマンド(処理を停止して等)
@@ -218,6 +219,22 @@ class ChatSpaceModel:
     出力はJSON形式で、'query'キーに文字列を入れてください。
     例: {{ "query": "米津玄師 Lemon" }}
     ユーザー入力: {input_value}
+    """
+    ALARM_TRIGGER_CHANGE_PROMPT_TEMPLATE = """
+    目的: ユーザー入力が「特殊命令 目覚まし」の時間トリガー変更要求かどうか判定し、変更後時刻を抽出する。
+    必ずJSONのみで出力すること。
+    Keys:
+    - is_alarm_update: boolean
+    - time: string (24時間 HH:MM。取得できない場合は空文字)
+    - reason: string (任意。簡潔に)
+    判定ルール:
+    - 「目覚まし」または「アラーム」に関する変更要求であれば is_alarm_update=true
+    - 変更/セット/時刻指定の意図がなければ false
+    例:
+    {{"is_alarm_update": true, "time": "10:00", "reason": "目覚まし時刻の変更要求"}}
+    {{"is_alarm_update": false, "time": "", "reason": "目覚まし時刻変更ではない"}}
+    現在時刻:{current_time}
+    ユーザー入力:{input_value}
     """
 
     def __init__(self, gemini_api_key: str, calendar_manager=None):
@@ -750,6 +767,164 @@ class ChatSpaceModel:
                  
         return parsed_list
 
+    def _parse_alarm_trigger_change(self, text: str) -> dict:
+        if not text:
+            return {"is_alarm_update": False, "time": "", "reason": ""}
+        match = re.search(r"```json\s*([\s\S]*?)\s*```", text, re.I)
+        s = match.group(1) if match else text
+        try:
+            data = json.loads(s)
+        except json.JSONDecodeError:
+            return {"is_alarm_update": False, "time": "", "reason": "json_parse_error"}
+        if not isinstance(data, dict):
+            return {"is_alarm_update": False, "time": "", "reason": "not_dict"}
+        return {
+            "is_alarm_update": bool(data.get("is_alarm_update")),
+            "time": str(data.get("time") or "").strip(),
+            "reason": str(data.get("reason") or "").strip(),
+        }
+
+    def _normalize_alarm_time(self, raw_time: str | None) -> str | None:
+        if not raw_time:
+            return None
+        text = str(raw_time).strip()
+        if not text:
+            return None
+        text = text.translate(str.maketrans("０１２３４５６７８９：", "0123456789:"))
+        text = text.replace("午前", "AM").replace("午後", "PM")
+        text = re.sub(r"\s+", "", text)
+
+        ampm = None
+        if text.startswith("AM"):
+            ampm = "AM"
+            text = text[2:]
+        elif text.startswith("PM"):
+            ampm = "PM"
+            text = text[2:]
+
+        m = re.fullmatch(r"(\d{1,2}):(\d{1,2})", text)
+        if m:
+            hour = int(m.group(1))
+            minute = int(m.group(2))
+        else:
+            m = re.fullmatch(r"(\d{1,2})時(?:(\d{1,2})分?)?", text)
+            if m:
+                hour = int(m.group(1))
+                minute = int(m.group(2) or 0)
+            else:
+                m = re.fullmatch(r"(\d{3,4})", text)
+                if m:
+                    digits = m.group(1)
+                    if len(digits) == 3:
+                        hour = int(digits[0])
+                        minute = int(digits[1:])
+                    else:
+                        hour = int(digits[:2])
+                        minute = int(digits[2:])
+                else:
+                    m = re.fullmatch(r"(\d{1,2})", text)
+                    if not m:
+                        return None
+                    hour = int(m.group(1))
+                    minute = 0
+
+        if ampm == "AM" and hour == 12:
+            hour = 0
+        elif ampm == "PM" and hour < 12:
+            hour += 12
+
+        if hour < 0 or hour > 23 or minute < 0 or minute > 59:
+            return None
+        return f"{hour:02d}:{minute:02d}"
+
+    def _is_alarm_change_candidate(self, text: str) -> bool:
+        if not text:
+            return False
+        has_alarm_word = ("目覚まし" in text) or ("アラーム" in text)
+        if not has_alarm_word:
+            return False
+        intent_words = ("変更", "変えて", "にして", "セット", "直して", "時", "分")
+        return any(word in text for word in intent_words)
+
+    def _find_alarm_order(self, orders: list[dict]) -> dict | None:
+        if not isinstance(orders, list) or not orders:
+            return None
+        exact = next((o for o in orders if str(o.get("name", "")).strip() == "目覚まし"), None)
+        if exact:
+            return exact
+        special = next((
+            o for o in orders
+            if "目覚まし" in str(o.get("name", "")) and "【特殊命令】" in str(o.get("name", ""))
+        ), None)
+        if special:
+            return special
+        return next((o for o in orders if "目覚まし" in str(o.get("name", ""))), None)
+
+    def _update_special_alarm_trigger_time(self, text: str, user_id: str | None):
+        if not user_id:
+            return None, "ユーザーがログインしていません。"
+
+        current_time = self._current_time_for_prompt()
+        prompt = self.ALARM_TRIGGER_CHANGE_PROMPT_TEMPLATE.format(
+            current_time=current_time,
+            input_value=text
+        )
+        raw = self._gemini_request(prompt)
+        parsed = self._parse_alarm_trigger_change(raw)
+        if not parsed.get("is_alarm_update"):
+            return None, ""
+
+        normalized_time = self._normalize_alarm_time(parsed.get("time"))
+        if not normalized_time:
+            return None, "目覚ましの変更時刻を特定できませんでした。"
+
+        orders = custom_order_service.get_all_orders(user_id)
+        if isinstance(orders, dict) and orders.get("error"):
+            return None, "目覚まし命令の取得に失敗しました。"
+
+        alarm_order = self._find_alarm_order(orders if isinstance(orders, list) else [])
+        if not alarm_order:
+            return None, "特殊命令「目覚まし」が見つかりませんでした。"
+
+        triggers = alarm_order.get("triggers")
+        if not isinstance(triggers, list) or not triggers:
+            return None, "目覚まし命令のトリガー情報が不正です。"
+
+        trigger0 = triggers[0] if isinstance(triggers[0], dict) else {}
+        if str(trigger0.get("category") or "").strip() != "時間":
+            return None, "目覚まし命令の先頭トリガーが時間トリガーではありません。"
+
+        trigger_value = trigger0.get("value")
+        if not isinstance(trigger_value, dict):
+            trigger_value = {}
+            trigger0["value"] = trigger_value
+
+        before_time = self._normalize_alarm_time(trigger_value.get("time")) or str(trigger_value.get("time") or "")
+        trigger_value["time"] = normalized_time
+
+        updated_triggers = list(triggers)
+        updated_triggers[0] = trigger0
+
+        update_payload = {
+            "name": alarm_order.get("name", "目覚まし"),
+            "triggers": updated_triggers,
+            "steps": alarm_order.get("steps") or [],
+            "conditions": alarm_order.get("conditions") or [],
+            "actions": alarm_order.get("actions") or [],
+        }
+
+        updated = custom_order_service.update_order(user_id, alarm_order.get("id"), update_payload)
+        if isinstance(updated, dict) and updated.get("error"):
+            return None, "目覚まし時刻の更新に失敗しました。"
+
+        result_data = {
+            "order_id": alarm_order.get("id"),
+            "name": alarm_order.get("name"),
+            "before_time": before_time,
+            "after_time": normalized_time,
+        }
+        return result_data, f"目覚ましの時刻を{normalized_time}に変更しました。"
+
 
     def check_chat_space(self, input_value: str, user_id: str | None = None, tone_response: str = "") -> dict:
         print("--- [DEBUG] check_chat_space: Starting ---")
@@ -775,6 +950,7 @@ class ChatSpaceModel:
         try:
             purpose_prompt = self.PURPOSE_PROMPT_TEMPLATE.format(current_time=current_time, input_value=cleaned_input)
             purpose = self._gemini_request(purpose_prompt)
+            purpose = (purpose or "").strip()
             print(f"--- [DEBUG] check_chat_space: Received purpose: {purpose} ---")
             result = {"status": "success", "purpose": purpose, "data": None, "message": ""}
 
@@ -788,6 +964,22 @@ class ChatSpaceModel:
                     "suppress_tts": True,
                     "cancelled": True
                 }
+
+            # 通常はカスタム命令編集不可だが、特殊命令「目覚まし」の時間トリガー変更のみ許可
+            if (purpose.startswith("R") and purpose != "Re") or self._is_alarm_change_candidate(cleaned_input):
+                alarm_data, alarm_message = self._update_special_alarm_trigger_time(cleaned_input, user_id)
+                if alarm_data is not None:
+                    result["purpose"] = "Rn"
+                    result["data"] = alarm_data
+                    result["message"] = alarm_message
+                    result["skip_tone"] = True
+                    return result
+                if alarm_message:
+                    result["purpose"] = "Rn"
+                    result["message"] = alarm_message
+                    result["skip_tone"] = True
+                    return result
+
             if purpose == "Fn":
                 result["message"] = self._fallback_with_gemini(cleaned_input, tone_response)
                 result["skip_tone"] = True
