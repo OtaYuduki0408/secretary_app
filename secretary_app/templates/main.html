@@ -377,6 +377,41 @@
       color: var(--main-btn-text, #ffffff);
     }
 
+    .fab-label {
+      display: none;
+    }
+
+    @media (min-width: 1200px) {
+      .fab-group {
+        right: clamp(16px, 2vw, 32px);
+      }
+
+      .fab-group .fab {
+        width: 210px;
+        height: 68px;
+        border-radius: 16px;
+        display: grid;
+        grid-template-columns: 52px 1fr;
+        align-items: center;
+        justify-items: start;
+        padding: 0 16px 0 8px;
+      }
+
+      .fab-group .fab svg {
+        width: 30px;
+        height: 30px;
+        justify-self: center;
+      }
+
+      .fab-group .fab .fab-label {
+        display: block;
+        font-size: 0.96rem;
+        font-weight: 700;
+        color: var(--main-btn-text, #ffffff);
+        white-space: nowrap;
+      }
+    }
+
     #ai-indicator .ai-indicator-card {
       min-width: 240px;
       background: var(--main-log-bg, #0f172a);
@@ -565,6 +600,7 @@
           <path d="M7 12h7" stroke="var(--main-text-color, #dbe6ff)" stroke-width="1.4" stroke-linecap="round"/>
           <path d="M12 9l4 3-4 3" stroke="var(--stripe-color, #a8b6c6)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
+        <span class="fab-label">ログアウト</span>
       </a>
       <a class="finance-btn fab" href="/expense" aria-label="収支管理を開く" title="収支管理">
         <svg width="34" height="34" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -572,6 +608,7 @@
           <path d="M8 6l4 5 4-5" stroke="var(--stripe-color, #a8b6c6)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
           <path d="M9 13h6M9 15h6M12 11v6" stroke="var(--main-btn-color, #7aa8ff)" stroke-width="1.4" stroke-linecap="round"/>
         </svg>
+        <span class="fab-label">収支登録</span>
       </a>
       
       <a class="stats-btn fab" href="{{ url_for('finance') }}" aria-label="統計ダッシュボードを開く" title="統計">
@@ -582,6 +619,7 @@
           <path d="M16 16v-5" stroke="var(--main-btn-color, #7aa8ff)" stroke-width="1.6" stroke-linecap="round"/>
           <path d="M7 17.5h10" stroke="var(--stripe-color, #a8b6c6)" stroke-width="1.2" stroke-linecap="round"/>
         </svg>
+        <span class="fab-label">収支統計</span>
       </a>
  
       <!-- ✅ 変更後 -->
@@ -594,6 +632,7 @@
     <rect x="12" y="12" width="3" height="3" rx="0.8" fill="var(--main-btn-color, #7aa8ff)" opacity=".85"/>
     <rect x="7" y="16" width="3" height="3" rx="0.8" fill="var(--main-btn-color, #7aa8ff)" opacity=".7"/>
   </svg>
+  <span class="fab-label">カレンダー</span>
 </a>
 
 
@@ -603,6 +642,7 @@
           <path d="M8 8h8M8 11.5h8M8 15h5" stroke="var(--main-btn-color, #7aa8ff)" stroke-width="1.3" stroke-linecap="round"/>
           <path d="M14.5 15l2.5 2.5" stroke="var(--stripe-color, #a8b6c6)" stroke-width="1.2" stroke-linecap="round"/>
         </svg>
+        <span class="fab-label">メモ</span>
       </a>
       <a class="custom-order-btn fab" href="{{ url_for('custom_order_pages.custom_order_index') }}" aria-label="カスタム命令を開く" title="カスタム命令">
         <svg width="34" height="34" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -617,12 +657,14 @@
           <path d="M17.6,17.6 l-1.4,-1.4" stroke="var(--stripe-color, #a8b6c6)" stroke-width="1.2" stroke-linecap="round"/>
           <path d="M7.8,7.8 l-1.4,-1.4" stroke="var(--stripe-color, #a8b6c6)" stroke-width="1.2" stroke-linecap="round"/>
         </svg>
+        <span class="fab-label">カスタム命令</span>
       </a>
       <a class="custom-order-btn fab" href="{{ url_for('settings_page') }}" aria-label="設定を開く" title="設定">
         <svg width="34" height="34" viewBox="0 0 24 24" fill="none" aria-hidden="true">
           <path d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.004.827c-.292.24-.437.613-.43.992a6.759 6.759 0 010 1.25c.007.379.138.752.43.992l1.005.827c.524.43.685 1.17-.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 01-.22.128c-.333.183-.582.495-.644.869l-.213 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.02-.398-1.11-.94l-.213-1.281c-.063-.374-.313-.686-.645-.87a6.52 6.52 0 01-.22-.127c-.324-.196-.72-.257-1.075-.124l-1.217.456a1.125 1.125 0 01-1.37-.49l-1.296-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437.613.43-.992a6.759 6.759 0 010-1.25c-.007-.379-.138-.752-.430-.992l-1.005-.827c-.524-.43-.685-1.17-.26-1.43l1.298-2.247a1.125 1.125 0 011.369-.491l1.217.456c.355.133.75.072 1.076-.124.072-.044.146-.087.22-.128.333-.183.582.495.644-.869l.213-1.28z" stroke="var(--stripe-color, #a8b6c6)" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
           <circle cx="12" cy="12" r="3" fill="var(--main-btn-color, #7aa8ff)" />
         </svg>
+        <span class="fab-label">設定</span>
       </a>
     </div>  </main>
 
