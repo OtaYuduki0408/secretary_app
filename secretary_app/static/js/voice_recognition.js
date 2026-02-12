@@ -33,6 +33,7 @@ speechUtterance.rate = 1;
 speechUtterance.pitch = 1;
 
 let userInteracted = false; // ユーザーがページとインタラクトしたかどうかのフラグ
+window.audioContext = null; // ★ グローバルなAudioContextを追加
 
 // 設定からアプリ関連の値を読み込む (呼びかけワード、ログ表示設定など)
 function loadAppSettings() {
@@ -402,10 +403,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
             userInteracted = true;
 
-            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            // グローバルなAudioContextを初期化
+            if (!window.audioContext) {
+                window.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            }
 
-            if (audioContext.state === 'suspended') {
-                audioContext.resume().then(() => console.log('DEBUG: AudioContext resumed successfully.')).catch(e => console.error('DEBUG: Failed to resume AudioContext:', e));
+            // AudioContextがsuspended状態であればresumeする
+            if (window.audioContext.state === 'suspended') {
+                window.audioContext.resume().then(() => {
+                    console.log('DEBUG: Global AudioContext resumed successfully.');
+                }).catch(e => console.error('DEBUG: Failed to resume Global AudioContext:', e));
             }
         };
         

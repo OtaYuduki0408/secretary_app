@@ -34,7 +34,12 @@ function playSound(filename, volume = 1.0) {
     audio.play().catch(e => console.error(`音声ファイル ${filename} の再生に失敗しました:`, e));
 }
 
-function speak(text) {
+async function speak(text) {
+    // グローバルなAudioContextがsuspended状態であれば再開を試みる
+    if (window.audioContext && window.audioContext.state === 'suspended') {
+        await window.audioContext.resume().catch(e => console.error("AudioContextの再開に失敗:", e));
+    }
+
     return new Promise((resolve, reject) => {
         if (!text || typeof SpeechSynthesisUtterance === 'undefined' || typeof speechSynthesis === 'undefined') {
             return resolve();
