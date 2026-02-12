@@ -372,6 +372,30 @@ class ChatSpaceModel:
         except ValueError:
             return iso_time
 
+    def _build_added_calendar_message(self, added_events: list[dict]) -> str:
+        if not added_events:
+            return "予定を追加できませんでした。"
+
+        details = []
+        for event in added_events:
+            if not isinstance(event, dict):
+                continue
+            title = (event.get("title") or "無題").strip()
+            start_text = self._format_event_time(event.get("start_time"))
+            end_text = self._format_event_time(event.get("end_time"))
+
+            if start_text and end_text:
+                details.append(f"{start_text}から{end_text}に「{title}」")
+            elif start_text:
+                details.append(f"{start_text}に「{title}」")
+            else:
+                details.append(f"「{title}」")
+
+        if not details:
+            return f"{len(added_events)}件の予定をカレンダーに追加しました。"
+
+        return f"{len(added_events)}件の予定をカレンダーに追加しました。追加内容は、" + "、".join(details) + "です。"
+
     def _parse_datetime(self, time_str: str) -> datetime | None:
         if not time_str: return None
         try:
@@ -674,7 +698,7 @@ class ChatSpaceModel:
                 print(f"ローカルカレンダーへのイベント追加エラー: {e}")
         
         if added_events:
-            message = f"{len(added_events)}件の予定をカレンダーに追加しました。"
+            message = self._build_added_calendar_message(added_events)
             return added_events, message
         
         return None, "予定を追加できませんでした。もう一度お試しください。"
