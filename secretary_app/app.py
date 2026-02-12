@@ -23,6 +23,8 @@ from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
 import atexit
 
 import json
+import base64
+from google.cloud import texttospeech
 from services.user_service import (
     get_all_users, get_user_by_email, add_user, update_user, delete_user
 )
@@ -500,6 +502,48 @@ def upsert_user_settings_route():
     if isinstance(result, dict) and result.get('error'):
         return jsonify(result), 500
     return jsonify(result)
+
+# ============== Server-side TTS ==============
+def text_to_speech_base64(text: str) -> str:
+    """Google Cloud TTSを使用してテキストを音声に変換し、Base64エンコードされたMP3を返す"""
+    try:
+        client = texttospeech.TextToSpeechClient()
+        synthesis_input = texttospeech.SynthesisInput(text=text)
+        voice = texttospeech.VoiceSelectionParams(
+            language_code="ja-JP", 
+            name="ja-JP-Wavenet-B", # より自然な声 (標準のAより)
+            ssml_gender=texttospeech.SsmlVoiceGender.FEMALE
+        )
+        audio_config = texttospeech.AudioConfig(
+            audio_encoding=texttospeech.AudioEncoding.MP3,
+            speaking_rate=1.1 # 少し早口に
+        )
+        
+        response = client.synthesize_speech(
+            input=synthesis_input, 
+            voice=voice, 
+            audio_config=audio_config
+        )
+        
+        return base64.b64encode(response.audio_content).decode('utf-8')
+    except Exception as e:
+        print(f"!!! [TTS_ERROR] Google Cloud TTS API failed: {e}", file=sys.stderr)
+        return None
+
+@app.route('/api/tts', methods=['POST'])
+@login_required
+def tts_route():
+    data = request.get_json()
+    text = data.get('text')
+    if not text:
+        return jsonify({"error": "Text is required"}), 400
+    
+    audio_content = text_to_speech_base64(text)
+    
+    if audio_content:
+        return jsonify({"audioContent": audio_content})
+    else:
+        return jsonify({"error": "Failed to generate audio"}), 500
 
 @app.route('/users', methods=['GET'])
 def get_users_route():

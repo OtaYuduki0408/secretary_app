@@ -35,79 +35,76 @@ function playSound(filename, volume = 1.0) {
 }
 
 async function speak(text) {
-    // iOSの再生ポリシーを回避するため、読み上げ直前に無音再生を実行
-    if (window.playSilentAudio) {
-        window.playSilentAudio();
-        console.log("DEBUG: Executed silent audio playback trick.");
-    }
-
-    // 音声リストがロードされるのを待つ Promise
-    const getVoicesAsync = () => {
-        return new Promise(resolve => {
-            let voices = speechSynthesis.getVoices();
-            if (voices.length) {
-                resolve(voices);
-                return;
-            }
-            speechSynthesis.onvoiceschanged = () => {
-                voices = speechSynthesis.getVoices();
-                resolve(voices);
-            };
-            // 安全のためのタイムアウト
-            setTimeout(() => resolve(speechSynthesis.getVoices()), 1000);
-        });
-    };
-
     return new Promise(async (resolve, reject) => {
-        if (!text || typeof SpeechSynthesisUtterance === 'undefined' || typeof speechSynthesis === 'undefined') {
+        if (!text || !text.trim()) {
+            console.log("DEBUG: speak関数に空のテキストが渡されたため、処理をスキップします。");
             return resolve();
         }
 
-        speechSynthesis.cancel();
-        const utterance = new SpeechSynthesisUtterance(text);
-
-        const voices = await getVoicesAsync();
-        const preferredVoiceName = getPreferredVoiceName();
-        let selectedVoice = null;
-
-        if (voices.length > 0) {
-            if (preferredVoiceName) {
-                selectedVoice = voices.find(voice => voice.name === preferredVoiceName);
-            }
-            // 優先音声が見つからない、または設定されていない場合、日本語の音声を探す
-            if (!selectedVoice) {
-                selectedVoice = voices.find(voice => voice.lang === 'ja-JP');
-            }
-            // 日本語音声もなければ、リストの最初の音声を使う（フォールバック）
-            if (!selectedVoice) {
-                selectedVoice = voices[0];
-                console.warn('日本語(ja-JP)の音声が見つかりませんでした。利用可能な最初の音声を使用します。');
-            }
+        // iOSの再生ポリシーを回避するため、再生直前に無音再生を実行
+        if (window.playSilentAudio) {
+            window.playSilentAudio();
+            console.log("DEBUG: Executed silent audio playback trick for server-side TTS.");
         } else {
-            console.error('利用可能な音声がありません。');
-        }
-        
-        if (selectedVoice) {
-            utterance.voice = selectedVoice;
+            console.warn("DEBUG: playSilentAudio function not found.");
         }
 
-        const voiceSettings = getVoiceSettings();
-        utterance.rate = voiceSettings.rate;
-        utterance.pitch = voiceSettings.pitch;
-        utterance.volume = voiceSettings.volume;
+        try {
+            console.log(`DEBUG: Server-side TTSをリクエストします: "${text}"`);
+            const response = await fetch('/api/tts', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ text: text }),
+            });
 
-        utterance.onstart = () => document.dispatchEvent(new CustomEvent('voice:playstart'));
-        utterance.onend = () => {
-            document.dispatchEvent(new CustomEvent('voice:playend'));
-            resolve();
-        };
-        utterance.onerror = (event) => {
-            console.error(`音声合成エラー: ${event.error}`);
-            document.dispatchEvent(new CustomEvent('voice:playend'));
-            reject(event.error);
-        };
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({ error: "サーバーから不明なエラー応答。" }));
+                throw new Error(`TTS API request failed: ${errorData.error || response.statusText}`);
+            }
 
-        speechSynthesis.speak(utterance);
+            const data = await response.json();
+            const audioContent = data.audioContent;
+
+            if (!audioContent) {
+                throw new Error("APIから音声データが返されませんでした。");
+            }
+
+            // Base64からArrayBufferにデコード
+            const binaryString = window.atob(audioContent);
+            const len = binaryString.length;
+            const bytes = new Uint8Array(len);
+            for (let i = 0; i < len; i++) {
+                bytes[i] = binaryString.charCodeAt(i);
+            }
+            const arrayBuffer = bytes.buffer;
+
+            // AudioContextで再生
+            if (!window.audioContext) {
+                throw new Error("AudioContextが初期化されていません。");
+            }
+            
+            const audioBuffer = await window.audioContext.decodeAudioData(arrayBuffer);
+            const source = window.audioContext.createBufferSource();
+            source.buffer = audioBuffer;
+            source.connect(window.audioContext.destination);
+            
+            document.dispatchEvent(new CustomEvent('voice:playstart'));
+            
+            source.onended = () => {
+                console.log("DEBUG: Server-side TTSの再生が完了しました。");
+                document.dispatchEvent(new CustomEvent('voice:playend'));
+                resolve();
+            };
+            
+            source.start(0);
+
+        } catch (error) {
+            console.error("!!! [TTS_ERROR] Server-side TTSの再生に失敗しました:", error);
+            document.dispatchEvent(new CustomEvent('voice:playend')); // エラー時もオーバーレイを閉じるためにイベントを発火
+            reject(error);
+        }
     });
 }
 
