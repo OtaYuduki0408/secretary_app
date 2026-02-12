@@ -1073,57 +1073,31 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
     function processInput(input, inputType) {
+        const trimmedInput = input.trim();
 
+        // ウェイクワードのみ、またはそれに非常に近い入力かを判定
+        const isWakeWordOnly = WAKE_WORDS.some(word => trimmedInput === word);
 
-
-        if (!input.trim()) {
-
-
-
-            console.log("DEBUG: 空の入力のため却下。");
-
-
-
+        if (isWakeWordOnly || !trimmedInput) {
+            console.log("DEBUG: 空入力またはウェイクワードのみの入力を検知。音声再生を停止します。");
+            if (window.stopAllAudio) {
+                window.stopAllAudio();
+            }
+            if (inputType === 'voice') {
+                setMode('waiting');
+            }
             return;
-
-
-
         }
-
-
 
         if (window.check_chat_Space) {
-
-
-
             window.check_chat_Space(input);
-
-
-
         } else {
-
-
-
             console.error("check_chat_Space is not available on window.");
-
-
-
         }
-
-
 
         if (inputType === 'voice') {
-
-
-
             setMode('waiting');
-
-
-
         }
-
-
-
     }
 
 

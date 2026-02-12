@@ -1,6 +1,7 @@
 ﻿// static/js/websocket_handler.js
 
 console.log("websocket_handler.js loaded.");
+let currentAudioSource = null; // 現在再生中のオーディオソースを追跡
 
 // =====================================================================
 // ヘルパー関数
@@ -41,6 +42,14 @@ async function speak(text) {
             return resolve();
         }
 
+        // 既存の音声が再生中であれば停止する
+        if (currentAudioSource) {
+            console.log("DEBUG: 既存の音声を中断して、新しい音声を再生します。");
+            currentAudioSource.onended = null; // 古いonendedイベントをクリア
+            currentAudioSource.stop();
+            currentAudioSource = null;
+        }
+
         // iOSの再生ポリシーを回避するため、再生直前に無音再生を実行
         if (window.playSilentAudio) {
             window.playSilentAudio();
@@ -71,7 +80,6 @@ async function speak(text) {
                 throw new Error("APIから音声データが返されませんでした。");
             }
 
-            // Base64からArrayBufferにデコード
             const binaryString = window.atob(audioContent);
             const len = binaryString.length;
             const bytes = new Uint8Array(len);
@@ -80,7 +88,6 @@ async function speak(text) {
             }
             const arrayBuffer = bytes.buffer;
 
-            // AudioContextで再生
             if (!window.audioContext) {
                 throw new Error("AudioContextが初期化されていません。");
             }
@@ -90,10 +97,13 @@ async function speak(text) {
             source.buffer = audioBuffer;
             source.connect(window.audioContext.destination);
             
+            currentAudioSource = source; // 現在の再生ソースとして設定
+            
             document.dispatchEvent(new CustomEvent('voice:playstart'));
             
             source.onended = () => {
                 console.log("DEBUG: Server-side TTSの再生が完了しました。");
+                currentAudioSource = null; // 再生完了時にクリア
                 document.dispatchEvent(new CustomEvent('voice:playend'));
                 resolve();
             };
@@ -102,7 +112,8 @@ async function speak(text) {
 
         } catch (error) {
             console.error("!!! [TTS_ERROR] Server-side TTSの再生に失敗しました:", error);
-            document.dispatchEvent(new CustomEvent('voice:playend')); // エラー時もオーバーレイを閉じるためにイベントを発火
+            currentAudioSource = null; // エラー時もクリア
+            document.dispatchEvent(new CustomEvent('voice:playend'));
             reject(error);
         }
     });
@@ -199,7 +210,21 @@ async function executeOrderPayload(orderData) {
 
 window.executeOrderPayload = executeOrderPayload;
 window.speak = speak; // speak関数をグローバルに公開
-window.speak = speak; // speak関数をグローバルに公開
+
+function stopAllAudio() {
+    if (currentAudioSource) {
+        console.log("DEBUG: グローバルな停止要求により、音声再生を停止します。");
+        currentAudioSource.onended = null;
+        currentAudioSource.stop();
+        currentAudioSource = null;
+        document.dispatchEvent(new CustomEvent('voice:playend')); // キャラクターのアニメーションなども止める
+    }
+    // ブラウザのspeechSynthesisも念のため停止
+    if (window.speechSynthesis && window.speechSynthesis.speaking) {
+        window.speechSynthesis.cancel();
+    }
+}
+window.stopAllAudio = stopAllAudio;
 
 async function executePlan(plan) {
     const enrichedDataCache = new Map();
