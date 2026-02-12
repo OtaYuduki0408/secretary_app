@@ -316,6 +316,26 @@ async function executeAction(action) {
         overlayCategoryClass = "overlay-speech";
         textToSpeak = detail.message || "天気予報の情報を取得できませんでした。";
         messageHtml = `<h3>${overlayTitle}</h3><p>${textToSpeak.replace(/。/g, '。<br>')}</p>`;
+    } else if (action.category === 'Youtube' && action.sub === '再生') {
+        overlayTitle = "Youtube 再生";
+        const searchQuery = detail.search_query;
+        
+        if (searchQuery && typeof window.playYoutubeVideo === 'function') {
+            textToSpeak = `${searchQuery}を再生します。`;
+            
+            // 先に「再生します」と喋ってから再生を開始する
+            await speak(textToSpeak); 
+            window.playYoutubeVideo(searchQuery);
+
+            // playYoutubeVideoが呼ばれたらこの関数の役目は終わるので、
+            // オーバーレイ表示や後続のspeakは行わない
+            return; 
+
+        } else {
+            textToSpeak = "Youtubeの再生機能が見つからないか、検索キーワードが指定されていません。";
+            console.error(textToSpeak);
+            messageHtml = `<h3>${overlayTitle}</h3><p>${textToSpeak}</p>`;
+        }
     }
 
     if (textToSpeak) {

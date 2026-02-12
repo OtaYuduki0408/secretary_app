@@ -46,7 +46,8 @@ function parseActionItem(actionItem) {
   const fixedSubByCategory = {
     '収支管理': '読み上げ',
     'メモ': '読み上げ',
-    '時間読み上げ': '読み上げ内容'
+    '時間読み上げ': '読み上げ内容',
+    'Youtube': '再生'
   };
 
   if (fixedSubByCategory[category] && (!sub || subSelect.disabled)) {
@@ -111,6 +112,13 @@ function parseActionItem(actionItem) {
         detail.content = [...detailContainer.querySelectorAll('.action-detail-weather-content button.selected')].map(btn => btn.dataset.value);
         detail.range = detailContainer.querySelector('.action-detail-weather-range button.selected')?.dataset.value;
         detail.granularity = detailContainer.querySelector('.action-detail-weather-granularity button.selected')?.dataset.value;
+      }
+      break;
+
+    // 新しく追加する case "Youtube":
+    case "Youtube":
+      if (sub === "再生") {
+        detail.search_query = detailContainer.querySelector(".action-detail-youtube-query")?.value;
       }
       break;
   }

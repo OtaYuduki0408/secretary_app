@@ -150,7 +150,8 @@ export function createActionUI(prefix = '', initialValue = {}) {
   const fixedSubByCategory = {
     '収支管理': '読み上げ',
     'メモ': '読み上げ',
-    '時間読み上げ': '読み上げ内容'
+    '時間読み上げ': '読み上げ内容',
+    'Youtube': '再生'
   };
   if (fixedSubByCategory[category] && subSelect) {
     sub = fixedSubByCategory[category];
@@ -434,6 +435,18 @@ export function createActionUI(prefix = '', initialValue = {}) {
         // 詳しさは単一選択
         setupButtonSelector('.action-detail-weather-granularity', initialValue.granularity, true);
 
+      }
+      break;
+
+    // 新しく追加する case "Youtube":
+    case "Youtube":
+      if (sub === "再生") {
+        const subNotice = subSelect?.disabled ? `<div class="co-help-text">サブカテゴリ: ${sub}</div>` : "";
+        detailContainer.innerHTML = `
+          ${subNotice}
+          <label>検索キーワード</label>
+          <input type="text" class="action-detail-youtube-query" placeholder="再生したい動画のキーワード" value="${initialValue.search_query || ''}">
+        `;
       }
       break;
 
