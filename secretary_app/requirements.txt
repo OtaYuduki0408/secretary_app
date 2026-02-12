@@ -30,6 +30,7 @@ grpcio-status==1.71.2
 gunicorn==23.0.0
 gevent
 gevent-websocket
+google_auth_oauthlib
 h11==0.16.0
 h2==4.3.0
 hpack==4.1.0
