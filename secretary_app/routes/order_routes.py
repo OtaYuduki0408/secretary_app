@@ -74,7 +74,7 @@ def get_pending_actions_route(user_id):
             return jsonify(actions), 500 # エラーハンドリング
         if not actions:
             # アクションがない場合は、空のリストと204 No Contentを返す
-            return jsonify([]), 204
+            return jsonify([]), 200
         return jsonify(actions)
     except Exception as e:
         # 予期せぬ例外をキャッチし、ログに出力

@@ -27,6 +27,24 @@ function buildPayloadSignature(id, payload) {
   return JSON.stringify(normalized);
 }
 
+function normalizeCommandId(rawId) {
+  if (rawId === null || rawId === undefined) return null;
+  const idText = String(rawId).trim();
+  if (!idText || idText.toLowerCase() === "undefined" || idText.toLowerCase() === "null") return null;
+  if (!/^\d+$/.test(idText)) return null;
+  return idText;
+}
+
+async function parseFetchBodySafely(res) {
+  const text = await res.text();
+  if (!text) return {};
+  try {
+    return JSON.parse(text);
+  } catch (_e) {
+    return { message: text };
+  }
+}
+
 function getAdvancedDateRangeValues(container) {
     if (!container) return {};
     const getVal = (selector) => container.querySelector(selector)?.value || '';
@@ -338,9 +356,15 @@ export function loadCommandToForm(cmd){
   }
 
 
+  const normalizedId = normalizeCommandId(cmd?.id);
   document.getElementById("command-id")?.remove();
-  const hid=document.createElement("input"); hid.type="hidden"; hid.id="command-id"; hid.value=cmd.id;
-  document.getElementById("register-btn").parentNode.appendChild(hid);
+  if (normalizedId) {
+    const hid = document.createElement("input");
+    hid.type = "hidden";
+    hid.id = "command-id";
+    hid.value = normalizedId;
+    document.getElementById("register-btn").parentNode.appendChild(hid);
+  }
 }
 
 export function addConditionBlockFromData(data,parent){
@@ -474,7 +498,7 @@ export async function registerCommand(){
     return;
   }
 
-  const id=document.getElementById("command-id")?.value||null;
+  const id = normalizeCommandId(document.getElementById("command-id")?.value || null);
   
   const payload = await getCommandPayloadFromForm();
   if (!payload) return;
@@ -500,8 +524,12 @@ export async function registerCommand(){
     });
 
     console.log("--- [DEBUG] Fetch response status:", res.status);
-    const data = await res.json();
+    const data = await parseFetchBodySafely(res);
     console.log("--- [DEBUG] Fetch response data:", data);
+
+    if (!res.ok) {
+      throw new Error(data?.error || data?.message || `HTTP ${res.status}`);
+    }
 
     document.getElementById("message").innerText = data.message || "保存しました";
     setTimeout(() => document.getElementById("message").innerText = "", 3000);
@@ -649,6 +677,10 @@ export async function pollPendingActions() {
     console.log("--- DEBUG: pollPendingActions fetch response status:", response.status); // 追加
     if (!response.ok) {
       console.error("Failed to poll pending actions: " + response.status + " " + response.statusText);
+      return;
+    }
+    if (response.status === 204) {
+      console.log("--- DEBUG: pollPendingActions received no actions (204).");
       return;
     }
     const actions = await response.json();

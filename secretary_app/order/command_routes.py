@@ -40,6 +40,8 @@ def api_execute_switchbot_action():
 
         device_id = detail.get('deviceId')
         command = detail.get('action')
+        command_type = detail.get('commandType') or 'command'
+        parameter = detail.get('parameter') or 'default'
 
         if not device_id or not command:
             print(f"[EXECUTE_SWITCHBOT] FAILED: deviceId or action is missing in detail. deviceId: {device_id is not None}, action: {command is not None}")
@@ -50,7 +52,7 @@ def api_execute_switchbot_action():
         api_command = command
         result = switchbot_service.send_device_command(
             api_token=token, api_secret=secret, device_id=device_id,
-            command_type='command', command=api_command, parameter='default'
+            command_type=command_type, command=api_command, parameter=parameter
         )
         
         return jsonify(result)

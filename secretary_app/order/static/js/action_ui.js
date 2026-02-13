@@ -261,14 +261,31 @@ export function createActionUI(prefix = '', initialValue = {}) {
           </select>
           <label>アクション</label>
           <select class="action-detail-switchbot-action" style="margin-bottom: 10px;">
-            <option value="turnOn" ${initialValue.action === 'turnOn' ? 'selected' : ''}>オンにする</option>
-            <option value="turnOff" ${initialValue.action === 'turnOff' ? 'selected' : ''}>オフにする</option>
-            <option value="press" ${initialValue.action === 'press' ? 'selected' : ''}>スイッチを押す</option>
+            <option value="">デバイスを選択してください</option>
           </select>
-          <small class="co-help-text">スイッチのオン,オフが反転している場合、設定→switchbotより変更してください</small>
+          <small class="co-help-text">Hub Mini配下の赤外線リモコン（照明など）も選択できます。</small>
         `;
 
         const deviceSelect = detailContainer.querySelector('.action-detail-switchbot-device');
+        const actionSelect = detailContainer.querySelector('.action-detail-switchbot-action');
+
+        const defaultActionLabels = {
+          turnOn: 'オンにする',
+          turnOff: 'オフにする',
+          press: 'スイッチを押す',
+        };
+
+        const renderActionOptions = (actions, selectedAction) => {
+          const list = Array.isArray(actions) && actions.length > 0 ? actions : ['turnOn', 'turnOff'];
+          actionSelect.innerHTML = '';
+          list.forEach((action) => {
+            const opt = document.createElement('option');
+            opt.value = action;
+            opt.textContent = defaultActionLabels[action] || action;
+            if (selectedAction && selectedAction === action) opt.selected = true;
+            actionSelect.appendChild(opt);
+          });
+        };
 
         // APIからデバイスリストを取得してselectを更新
         fetch('/api/switchbot/devices')
@@ -293,18 +310,38 @@ export function createActionUI(prefix = '', initialValue = {}) {
             }
             devices.forEach(device => {
               const option = document.createElement('option');
-              // バックエンドが返すキーは "deviceId" と "deviceName"
               option.value = device.deviceId;
-              option.textContent = device.deviceName;
+              const typeText = device.deviceType ? ` (${device.deviceType})` : '';
+              option.textContent = `${device.deviceName}${typeText}`;
+              option.dataset.commandType = device.commandType || 'command';
+              option.dataset.parameter = device.parameter || 'default';
+              option.dataset.supportedActions = JSON.stringify(device.supportedActions || []);
               if (initialValue.deviceId === device.deviceId) {
                 option.selected = true;
               }
               deviceSelect.appendChild(option);
             });
+
+            const selectedOption = deviceSelect.selectedOptions[0];
+            if (selectedOption) {
+              let supported = [];
+              try { supported = JSON.parse(selectedOption.dataset.supportedActions || '[]'); } catch (e) { supported = []; }
+              renderActionOptions(supported, initialValue.action);
+            } else {
+              renderActionOptions(['turnOn', 'turnOff'], initialValue.action);
+            }
+
+            deviceSelect.addEventListener('change', () => {
+              const selected = deviceSelect.selectedOptions[0];
+              let supported = [];
+              try { supported = JSON.parse(selected?.dataset?.supportedActions || '[]'); } catch (e) { supported = []; }
+              renderActionOptions(supported, null);
+            });
           })
           .catch(error => {
             console.error('Error fetching SwitchBot devices:', error);
             deviceSelect.innerHTML = `<option value="">${error.message}</option>`;
+            actionSelect.innerHTML = '<option value="">アクションを取得できません</option>';
           });
       }
       break;
