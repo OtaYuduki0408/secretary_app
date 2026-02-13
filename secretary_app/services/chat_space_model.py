@@ -77,8 +77,7 @@ class ChatSpaceModel:
     T:時刻、年月日、曜日確認(行動はn)
     R:過去の命令の修正(行動はn)
     S:SwitchBot iot等(行動はn)
-    Y:YouTubeの音楽を再生する(行動はp)
-    Yc:YouTube再生中の動画操作(行動はc)
+    Y:YouTubeの音楽を再生/操作する(行動はp)
     Re:強制終了コマンド
     K:計算(行動はn)
     -行動-
@@ -90,7 +89,9 @@ class ChatSpaceModel:
     p:再生
     n:通常
     -補足-
-    現在はYouTube再生中です。次/前/一時停止/再開/停止/閉じる/保存/除外/ランダム再生などはYcを優先してください。
+    現在はYouTube再生中です。次/前/再開/保存/除外などのYouTube操作もYpで返してください。
+    YouTube状態:
+    {youtube_state}
     ただし、明らかにカレンダー・メモ・収支などの通常命令は従来機能を優先してください。
     -入力-
     ユーザーの入力: {input_value}
@@ -274,6 +275,39 @@ class ChatSpaceModel:
     {{"intent":"search_in_results","query":"ライブ版","reason":"検索結果内の絞り込み"}}
     ユーザー入力: {input_value}
     """
+    YOUTUBE_CONTROL_DETECT_PROMPT_TEMPLATE = """
+    目的: ユーザー入力が「YouTube再生中の操作」かを判定し、該当する場合は意図を返してください。
+    必ずJSONのみで出力してください。
+    Keys:
+    - is_youtube_control: boolean
+    - intent: string (next/prev/pause/resume/stop/close/save_current/reject_current/random/replay/search_in_results/unknown)
+    - query: string (必要時のみ。なければ空文字)
+    - reason: string (短く)
+    判定ルール:
+    - 現在YouTubeが active=true のとき、音楽再生継続に関する命令は優先してtrue
+    - 特に paused=true で「音楽を再生して」「再生して」「流して」は resume
+    - カレンダー/メモ/収支など別ドメインが明確なら false
+    YouTube状態:
+    {youtube_state}
+    ユーザー入力: {input_value}
+    """
+    YOUTUBE_OPERATION_WORD_PROMPT_TEMPLATE = """
+    貴方は命令解析のプロです。
+    ユーザーはYoutubeでの動画再生や操作を行うのが目的です。
+    以下の命令を解析し、ユーザーがどの操作を行いたいかを特定してください。
+    解答は、対応する英単語のみを返してください。
+
+    New:新しい曲を流してほしい。(曲名や動画名が取得できる場合はNew)
+    Restart:動画を再開して欲しい。(曲名が特定できない”再生して”など)
+    Stop:動画を停止して欲しい。
+    Next:次の動画を再生して欲しい。
+    Previous:前の動画を再生して欲しい。
+    Save:動画を保存して欲しい。動画の組み合わせを記録して欲しい
+    Rejection:動画の組み合わせがおかしい、この動画を流さないようにしてほしい。
+
+    ユーザー命令:
+    {input_value}
+    """
     ALARM_TRIGGER_CHANGE_PROMPT_TEMPLATE = """
     目的: ユーザー入力が「特殊命令 目覚まし」の時間トリガー変更要求かどうか判定し、変更後時刻を抽出する。
     必ずJSONのみで出力すること。
@@ -360,6 +394,84 @@ class ChatSpaceModel:
         tone = (tone_response or "").strip() or "標準"
         prompt = self.FN_FALLBACK_PROMPT_TEMPLATE.format(tone=tone, input_value=text)
         return self._gemini_request(prompt)
+
+    def _build_youtube_state_text(self, youtube_context: dict | None) -> str:
+        ctx = youtube_context or {}
+        return (
+            f"active={bool(ctx.get('active'))}, "
+            f"paused={bool(ctx.get('paused'))}, "
+            f"playing={bool(ctx.get('playing'))}, "
+            f"overlay_visible={bool(ctx.get('overlay_visible'))}, "
+            f"has_queue={bool(ctx.get('has_queue'))}, "
+            f"queue_length={int(ctx.get('queue_length') or 0)}, "
+            f"current_index={int(ctx.get('current_index') or 0)}, "
+            f"current_title={str(ctx.get('current_title') or '')}"
+        )
+
+    def _detect_youtube_control_intent(self, text: str, youtube_context: dict | None = None) -> tuple[str, str] | None:
+        """
+        YouTube再生中の操作をGeminiで先行判定する。
+        返り値: (intent, query)
+        """
+        cleaned = (text or "").strip()
+        if not cleaned:
+            return None
+
+        youtube_state = self._build_youtube_state_text(youtube_context)
+        detect_prompt = self.YOUTUBE_CONTROL_DETECT_PROMPT_TEMPLATE.format(
+            youtube_state=youtube_state,
+            input_value=cleaned
+        )
+        raw = self._gemini_request(detect_prompt)
+        data = self._extract_json_payload(raw) or {}
+        if not bool(data.get("is_youtube_control")):
+            return None
+        intent = str(data.get("intent") or "").strip().lower()
+        query = str(data.get("query") or "").strip()
+        allowed = {
+            "next", "prev", "pause", "resume", "stop", "close",
+            "save_current", "reject_current", "random", "replay",
+            "search_in_results"
+        }
+        if intent in allowed:
+            return (intent, query)
+        return None
+
+    def _is_play_or_resume_request(self, text: str) -> bool:
+        t = (text or "").strip().lower()
+        if not t:
+            return False
+        return (
+            "再生" in text or
+            "再開" in text or
+            "流して" in text or
+            "かけて" in text or
+            t in ("流して", "再生して", "再開して")
+        )
+
+    def _is_meaningful_youtube_query(self, query: str) -> bool:
+        q = (query or "").strip()
+        if len(q) < 2:
+            return False
+        generic = {
+            "音楽", "曲", "動画", "youtube", "ユーチューブ", "再生", "再開"
+        }
+        return q.lower() not in generic
+
+    def _extract_youtube_query_from_input(self, text: str) -> str:
+        prompt = self.YOUTUBE_PLAY_PROMPT_TEMPLATE.format(input_value=text)
+        raw_json = self._gemini_request(prompt)
+        data = self._extract_json_payload(raw_json) or {}
+        query = str(data.get("query") or "").strip()
+        return query
+
+    def _classify_youtube_operation_word(self, text: str) -> str:
+        prompt = self.YOUTUBE_OPERATION_WORD_PROMPT_TEMPLATE.format(input_value=text)
+        raw = self._gemini_request(prompt)
+        word = (raw or "").strip()
+        # 余計な記号・改行を除去して先頭トークンのみ採用
+        token = re.split(r"[\s\n\r:：,，。.!?]+", word)[0].strip()
+        return token
 
     def _extract_json_payload(self, raw_text: str):
         text = (raw_text or "").strip()
@@ -1000,7 +1112,12 @@ class ChatSpaceModel:
     ) -> dict:
         print("--- [DEBUG] check_chat_space: Starting ---")
         # 起動コマンドを除外してGeminiへ渡す
-        cleaned_input = (input_value or "").replace("サイレントメイト", "").strip()
+        cleaned_input = (
+            (input_value or "")
+            .replace("サイレントメイト", "")
+            .replace("ボイスメイト", "")
+            .strip()
+        )
         current_time = self._current_time_for_prompt()
         if self._is_cancelled(user_id):
             return {
@@ -1021,7 +1138,11 @@ class ChatSpaceModel:
         try:
             yt_active = bool((youtube_context or {}).get("active"))
             purpose_template = self.PURPOSE_PROMPT_TEMPLATE_WITH_YT_CONTROL if yt_active else self.PURPOSE_PROMPT_TEMPLATE
-            purpose_prompt = purpose_template.format(current_time=current_time, input_value=cleaned_input)
+            purpose_prompt = purpose_template.format(
+                current_time=current_time,
+                input_value=cleaned_input,
+                youtube_state=self._build_youtube_state_text(youtube_context)
+            )
             purpose = self._gemini_request(purpose_prompt)
             purpose = (purpose or "").strip()
             print(f"--- [DEBUG] check_chat_space: Received purpose: {purpose} ---")
@@ -1085,21 +1206,68 @@ class ChatSpaceModel:
             elif purpose == "Sn":
                 result["data"], result["message"] = self._get_switchbot_devices(cleaned_input, user_id)
             elif purpose == "Yp":
-                prompt = self.YOUTUBE_PLAY_PROMPT_TEMPLATE.format(input_value=cleaned_input)
-                raw_json = self._gemini_request(prompt)
-                print(f"--- [DEBUG] raw_json from Gemini for Yp: {raw_json} ---") # ★追加
-                try:
-                    data = self._extract_json_payload(raw_json) or {}
-                    print(f"--- [DEBUG] Parsed data for Yp: {data} (type: {type(data)}) ---") # ★追加
-                    extracted_query = data.get("query")
-                    if extracted_query:
-                        result["purpose"] = "Yp" # 目的を明示的に設定
+                op_word = self._classify_youtube_operation_word(cleaned_input)
+                op = (op_word or "").strip().lower()
+                print(f"--- [DEBUG] Yp operation word: {op_word} ---")
+                if op == "new":
+                    extracted_query = self._extract_youtube_query_from_input(cleaned_input)
+                    if self._is_meaningful_youtube_query(extracted_query):
+                        result["purpose"] = "Yp"
                         result["data"] = {"search_query": extracted_query}
                         result["message"] = f"「{extracted_query}」をYouTubeで検索します。"
+                        result["suppress_tts"] = True
+                    else:
+                        result["purpose"] = "Yc"
+                        result["action"] = "youtube_control"
+                        result["data"] = {"intent": "resume", "query": ""}
+                        result["message"] = ""
+                        result["suppress_tts"] = True
+                elif op == "restart":
+                    result["purpose"] = "Yc"
+                    result["action"] = "youtube_control"
+                    result["data"] = {"intent": "resume", "query": ""}
+                    result["message"] = ""
+                    result["suppress_tts"] = True
+                elif op == "stop":
+                    result["purpose"] = "Yc"
+                    result["action"] = "youtube_control"
+                    result["data"] = {"intent": "stop", "query": ""}
+                    result["message"] = ""
+                    result["suppress_tts"] = True
+                elif op == "next":
+                    result["purpose"] = "Yc"
+                    result["action"] = "youtube_control"
+                    result["data"] = {"intent": "next", "query": ""}
+                    result["message"] = ""
+                    result["suppress_tts"] = True
+                elif op == "previous":
+                    result["purpose"] = "Yc"
+                    result["action"] = "youtube_control"
+                    result["data"] = {"intent": "prev", "query": ""}
+                    result["message"] = ""
+                    result["suppress_tts"] = True
+                elif op == "save":
+                    result["purpose"] = "Yc"
+                    result["action"] = "youtube_control"
+                    result["data"] = {"intent": "save_current", "query": ""}
+                    result["message"] = ""
+                    result["suppress_tts"] = True
+                elif op == "rejection":
+                    result["purpose"] = "Yc"
+                    result["action"] = "youtube_control"
+                    result["data"] = {"intent": "reject_current", "query": ""}
+                    result["message"] = ""
+                    result["suppress_tts"] = True
+                else:
+                    # 判定不能時は従来の検索語抽出へフォールバック
+                    extracted_query = self._extract_youtube_query_from_input(cleaned_input)
+                    if self._is_meaningful_youtube_query(extracted_query):
+                        result["purpose"] = "Yp"
+                        result["data"] = {"search_query": extracted_query}
+                        result["message"] = f"「{extracted_query}」をYouTubeで検索します。"
+                        result["suppress_tts"] = True
                     else:
                         result["message"] = "再生したい曲名を特定できませんでした。"
-                except (json.JSONDecodeError, AttributeError):
-                    result["message"] = "キーワードの抽出に失敗しました。"
             elif purpose == "Yc":
                 control_prompt = self.YOUTUBE_CONTROL_PROMPT_TEMPLATE.format(input_value=cleaned_input)
                 raw_json = self._gemini_request(control_prompt)

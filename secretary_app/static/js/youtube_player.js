@@ -6,6 +6,9 @@ let pendingVideoId = null;
 let apiReadyWatcherId = null;
 let lastSearchQuery = '';
 let lastPlaySource = '';
+let hasPlayableInCurrentSearch = false;
+let lastPlayerState = -1;
+let resumeCheckpointSec = 0;
 let errorCount = 0;
 const MAX_ERRORS = 5; // 連続エラーの最大許容回数
 
@@ -117,12 +120,23 @@ function initializePlayer(videoId) {
 function onPlayerReady(event) {
     console.log("DEBUG: YouTubeプレーヤーの準備ができました。");
     errorCount = 0; // 準備ができたらエラーカウントをリセット
+    if (resumeCheckpointSec > 0 && typeof event.target.seekTo === 'function') {
+        try {
+            event.target.seekTo(resumeCheckpointSec, true);
+        } catch (e) {
+            console.warn("DEBUG: resume checkpoint seek failed:", e);
+        }
+    }
     event.target.playVideo(); // 再生を開始
 }
 
 function onPlayerStateChange(event) {
     console.log("DEBUG: プレーヤーの状態が変更されました:", event.data);
+    lastPlayerState = event.data;
     if (event.data === YT.PlayerState.PLAYING) {
+        if (lastPlaySource === 'search') {
+            hasPlayableInCurrentSearch = true;
+        }
         errorCount = 0; // 再生に成功したらエラーカウントをリセット
     }
     if (event.data === YT.PlayerState.ENDED) {
@@ -130,19 +144,39 @@ function onPlayerStateChange(event) {
     }
 }
 
+function showSearchUnplayableNotice() {
+    showOverlay();
+    updateControls();
+    const errorMessageEl = document.getElementById('youtube-error-message');
+    if (errorMessageEl) {
+        errorMessageEl.textContent = "この検索結果は再生できませんでした";
+        errorMessageEl.style.display = 'block';
+    }
+    if (typeof window.speak === 'function') {
+        window.speak("この検索結果は再生できませんでした。");
+    }
+}
+
 function onPlayerError(event) {
     console.error("DEBUG: YouTubeプレーヤーでエラーが発生しました:", event.data);
-    const errorMessageEl = document.getElementById('youtube-error-message');
-    if (event.data === 150) {
-        if (errorMessageEl) {
-            errorMessageEl.textContent = "この動画は投稿者の設定により埋め込みでの再生が出来ません";
-            errorMessageEl.style.display = 'block';
+    // 埋め込み不可(150/101)は無言で次の候補へ進む
+    if (event.data === 150 || event.data === 101) {
+        if (currentVideoIndex < currentPlaylist.length - 1) {
+            playNextVideo();
+            return;
         }
-        if (player) {
-            player.stopVideo(); // エラー発生時は再生を停止
+
+        // 検索結果が全滅したときのみ通知する
+        if (lastPlaySource === 'search' && !hasPlayableInCurrentSearch && currentPlaylist.length > 0) {
+            currentVideoIndex = 0;
+            showSearchUnplayableNotice();
+            return;
         }
-        return; // エラー150の場合は次の動画に進まず、メッセージを表示したままにする
+
+        hideOverlay();
+        return;
     }
+
     errorCount++;
     if (errorCount >= MAX_ERRORS) {
         console.error("DEBUG: エラーが多発したため、再生を停止します。");
@@ -169,6 +203,7 @@ function hideOverlay() {
         player.destroy();
         player = null; // player オブジェクトをnullにする
     }
+    resumeCheckpointSec = 0;
     overlay.classList.add('youtube-overlay-hidden');
     // オーバーレイ非表示時にエラーメッセージもクリア
     const errorMessageEl = document.getElementById('youtube-error-message');
@@ -225,6 +260,12 @@ function playPrevVideo() {
 
 function pauseCurrentVideo() {
     if (player && typeof player.pauseVideo === 'function') {
+        if (typeof player.getCurrentTime === 'function') {
+            const t = player.getCurrentTime();
+            if (typeof t === 'number' && !Number.isNaN(t) && t >= 0) {
+                resumeCheckpointSec = t;
+            }
+        }
         player.pauseVideo();
         return true;
     }
@@ -233,7 +274,24 @@ function pauseCurrentVideo() {
 
 function resumeCurrentVideo() {
     if (player && typeof player.playVideo === 'function') {
+        if (resumeCheckpointSec > 0 && typeof player.seekTo === 'function') {
+            try {
+                player.seekTo(resumeCheckpointSec, true);
+            } catch (e) {
+                console.warn("DEBUG: resume seek failed:", e);
+            }
+        }
         player.playVideo();
+        return true;
+    }
+    const current = currentPlaylist[currentVideoIndex];
+    if (current && current.id) {
+        if (youtubeApiReady) {
+            initializePlayer(current.id);
+        } else {
+            pendingVideoId = current.id;
+            startApiReadyWatcher();
+        }
         return true;
     }
     return false;
@@ -326,8 +384,8 @@ function executeYoutubeIntent(payload = {}) {
             updateControls();
             return resumeCurrentVideo();
         case 'stop':
-            hideOverlay();
-            return true;
+            hideOverlayOnly();
+            return pauseCurrentVideo();
         case 'close':
             hideOverlayOnly();
             return true;
@@ -359,9 +417,13 @@ function executeYoutubeIntent(payload = {}) {
 }
 
 function getYoutubeContextState() {
+    const isPaused = !!(window.YT && lastPlayerState === YT.PlayerState.PAUSED);
+    const isPlaying = !!(window.YT && lastPlayerState === YT.PlayerState.PLAYING);
     return {
         active: Boolean((player && typeof player.playVideo === 'function') || pendingVideoId || (currentPlaylist && currentPlaylist.length > 0)),
         overlay_visible: isOverlayVisible(),
+        paused: isPaused,
+        playing: isPlaying,
         has_queue: hasSearchQueue(),
         queue_length: Array.isArray(currentPlaylist) ? currentPlaylist.length : 0,
         current_index: currentVideoIndex,
@@ -381,6 +443,7 @@ export function playYoutubeVideo(queryOrUrl) {
     if (videoId) {
         lastPlaySource = 'url';
         lastSearchQuery = '';
+        hasPlayableInCurrentSearch = false;
         // URLから直接再生
         console.log("DEBUG: URLから動画IDを抽出しました:", videoId);
         currentPlaylist = [{ id: videoId, title: '指定されたURLの動画' }];
@@ -397,6 +460,7 @@ export function playYoutubeVideo(queryOrUrl) {
     } else {
         lastPlaySource = 'search';
         lastSearchQuery = String(queryOrUrl || '').trim();
+        hasPlayableInCurrentSearch = false;
         // キーワードで検索
         fetch(`/api/youtube_search?q=${encodeURIComponent(queryOrUrl)}`)
             .then(response => response.json())
