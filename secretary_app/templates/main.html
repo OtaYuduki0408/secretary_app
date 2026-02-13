@@ -4,7 +4,6 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Voice Secretary — Main</title>
-  <script src="https://www.youtube.com/iframe_api"></script> <!-- YouTube IFrame Player API -->
   <script>
     window.onYouTubeIframeAPIReady = function() {
         if (typeof window.setYoutubeApiReady === 'function') {
@@ -16,6 +15,7 @@
         console.log("DEBUG: main.htmlからonYouTubeIframeAPIReadyが呼び出されました。");
     };
   </script>
+  <script src="https://www.youtube.com/iframe_api"></script> <!-- YouTube IFrame Player API -->
   <script src="https://apis.google.com/js/api.js"></script>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
       <style>

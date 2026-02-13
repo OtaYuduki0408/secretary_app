@@ -3,6 +3,7 @@ let currentPlaylist = [];
 let currentVideoIndex = 0;
 let youtubeApiReady = false;
 let pendingVideoId = null;
+let apiReadyWatcherId = null;
 let errorCount = 0;
 const MAX_ERRORS = 5; // 連続エラーの最大許容回数
 
@@ -12,6 +13,33 @@ const videoTitle = document.getElementById('youtube-video-title');
 const closeBtn = document.getElementById('youtube-close-btn');
 const prevBtn = document.getElementById('youtube-prev-btn');
 const nextBtn = document.getElementById('youtube-next-btn');
+
+function canUseYoutubePlayer() {
+    return !!(window.YT && typeof window.YT.Player === 'function');
+}
+
+function syncYoutubeApiReady() {
+    if (youtubeApiReady) return true;
+    if (canUseYoutubePlayer()) {
+        if (typeof window.setYoutubeApiReady === 'function') {
+            window.setYoutubeApiReady(true);
+        } else {
+            youtubeApiReady = true;
+        }
+        return true;
+    }
+    return false;
+}
+
+function startApiReadyWatcher() {
+    if (apiReadyWatcherId) return;
+    apiReadyWatcherId = window.setInterval(() => {
+        if (syncYoutubeApiReady()) {
+            clearInterval(apiReadyWatcherId);
+            apiReadyWatcherId = null;
+        }
+    }, 200);
+}
 
 function extractVideoId(url) {
     if (!url) return null;
@@ -25,6 +53,10 @@ window.setYoutubeApiReady = function(isReady) {
     if (isReady) {
         youtubeApiReady = true;
         console.log("DEBUG: setYoutubeApiReadyが呼ばれ、APIが準備完了になりました。");
+        if (apiReadyWatcherId) {
+            clearInterval(apiReadyWatcherId);
+            apiReadyWatcherId = null;
+        }
         if (pendingVideoId) {
             initializePlayer(pendingVideoId);
             pendingVideoId = null;
@@ -38,9 +70,17 @@ if (window._youtubeApiReadyGlobal) {
         window.setYoutubeApiReady(true);
     }
 }
+startApiReadyWatcher();
 
 
 function initializePlayer(videoId) {
+    if (!canUseYoutubePlayer()) {
+        pendingVideoId = videoId;
+        startApiReadyWatcher();
+        console.warn("DEBUG: YouTube APIの準備待ちです。player初期化を保留します。");
+        return;
+    }
+
     if (player) {
         player.loadVideoById(videoId);
         console.log("DEBUG: 既存のプレーヤーに動画をロードしました:", videoId);
@@ -173,6 +213,7 @@ export function playYoutubeVideo(queryOrUrl) {
     if (!queryOrUrl) return;
     
     errorCount = 0;
+    syncYoutubeApiReady();
 
     const videoId = extractVideoId(queryOrUrl);
 
