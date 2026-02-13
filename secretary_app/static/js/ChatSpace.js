@@ -356,6 +356,80 @@ export async function check_chat_Space(inputValue) {
       return;
     }
 
+    if (result.action === 'playlist_play_request' && result.data) {
+      try {
+        const response = await fetch('/api/playlist/playplan', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(result.data),
+        });
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const plan = await response.json();
+        const videos = Array.isArray(plan?.videos) ? plan.videos : [];
+        if (videos.length === 0) {
+          if (window.speak) window.speak("プレイリストに該当する曲がありません。");
+          return;
+        }
+        if (typeof window.playYoutubeTrackList === 'function') {
+          const started = window.playYoutubeTrackList(videos, { random: result.data.order === 'random' });
+          if (!started && window.speak) {
+            window.speak("プレイリスト再生を開始できませんでした。");
+          }
+        } else if (window.speak) {
+          window.speak("プレイリスト再生機能を読み込めませんでした。");
+        }
+      } catch (error) {
+        console.error("Playlist playplan request failed:", error);
+        if (window.speak) window.speak("プレイリストの再生準備に失敗しました。");
+      }
+      return;
+    }
+
+    if (result.action === 'playlist_add_current' && result.data) {
+      try {
+        const payload = {
+          video_id: result.data.video_id,
+          title: result.data.title || '',
+          artist: result.data.artist || '',
+          url: `https://www.youtube.com/watch?v=${result.data.video_id}`,
+        };
+        const response = await fetch('/api/playlist/tracks', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok || data?.error) {
+          throw new Error(data?.error || `HTTP ${response.status}`);
+        }
+        if (window.speak) window.speak(data?.status === 'exists' ? 'その曲はすでにプレイリストにあります。' : 'プレイリストに追加しました。');
+      } catch (error) {
+        console.error("Playlist add current failed:", error);
+        if (window.speak) window.speak("プレイリストへの追加に失敗しました。");
+      }
+      return;
+    }
+
+    if (result.action === 'playlist_delete_current' && result.data) {
+      try {
+        const videoId = result.data.video_id;
+        const response = await fetch(`/api/playlist/tracks/${encodeURIComponent(videoId)}`, {
+          method: 'DELETE',
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok || data?.error) {
+          throw new Error(data?.error || `HTTP ${response.status}`);
+        }
+        if (window.speak) window.speak((data?.removed || 0) > 0 ? 'プレイリストから削除しました。' : 'プレイリストに見つかりませんでした。');
+      } catch (error) {
+        console.error("Playlist delete current failed:", error);
+        if (window.speak) window.speak("プレイリストからの削除に失敗しました。");
+      }
+      return;
+    }
+
     if (result.abort_command) {
       setAbortCooldown();
       stopStandardTts();

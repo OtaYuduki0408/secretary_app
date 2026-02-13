@@ -48,6 +48,12 @@ from services.chat_space_model import ChatSpaceModel
 from services.memo_routes import memo_bp
 from services.ScheduleManager import ScheduleManager
 from services.user_settings_service import get_user_settings, upsert_user_settings
+from services.playlist_service import (
+    get_playlist,
+    add_playlist_track,
+    remove_playlist_track,
+    build_playlist_play_plan,
+)
 from services.custom_order_service import get_all_orders
 from services import pending_action_service
 from services.datetime_range_utils import build_range_from_detail as shared_build_range_from_detail
@@ -269,6 +275,11 @@ def memo():
 @login_required
 def settings_page():
     return render_template('settings.html')
+
+@app.route('/playlist')
+@login_required
+def playlist_page():
+    return render_template('playlist.html')
 
 @app.route('/calender')
 @login_required
@@ -514,6 +525,43 @@ def upsert_user_settings_route():
         return jsonify(result), 500
     return jsonify(result)
 
+@app.route('/api/playlist', methods=['GET'])
+@login_required
+def get_playlist_route():
+    user_id = session.get('user', {}).get('id')
+    playlist = get_playlist(user_id)
+    return jsonify(playlist)
+
+@app.route('/api/playlist/tracks', methods=['POST'])
+@login_required
+def add_playlist_track_route():
+    user_id = session.get('user', {}).get('id')
+    data = request.get_json() or {}
+    if not isinstance(data, dict):
+        return jsonify({"error": "Invalid payload"}), 400
+    result = add_playlist_track(user_id, data)
+    if isinstance(result, dict) and result.get("error"):
+        return jsonify(result), 400
+    return jsonify(result)
+
+@app.route('/api/playlist/tracks/<string:video_id>', methods=['DELETE'])
+@login_required
+def remove_playlist_track_route(video_id):
+    user_id = session.get('user', {}).get('id')
+    result = remove_playlist_track(user_id, video_id)
+    return jsonify(result)
+
+@app.route('/api/playlist/playplan', methods=['POST'])
+@login_required
+def build_playlist_playplan_route():
+    user_id = session.get('user', {}).get('id')
+    data = request.get_json() or {}
+    scope = str(data.get("scope") or "all")
+    order = str(data.get("order") or "sequential")
+    artist = str(data.get("artist") or "")
+    plan = build_playlist_play_plan(user_id, scope=scope, order=order, artist=artist, recent_days=30)
+    return jsonify(plan)
+
 @app.route('/api/youtube/preferences', methods=['POST'])
 @login_required
 def upsert_youtube_preferences_route():
@@ -671,7 +719,7 @@ def youtube_search():
     if not query:
         return jsonify({'error': 'Query parameter is required'}), 400
 
-    api_key = os.getenv('GEMINI_API_KEY')
+    api_key = os.getenv('YOUTUBE_API_KEY') or os.getenv('GEMINI_API_KEY')
     if not api_key:
         return jsonify({'error': 'API key is not configured on the server'}), 500
 
@@ -682,26 +730,93 @@ def youtube_search():
         print("--- [ERROR] The 'requests' library is not installed. Please run 'pip install requests'. ---")
         return jsonify({'error': 'The "requests" library is not installed on the server.'}), 500
 
-    search_url = 'https://www.googleapis.com/youtube/v3/search'
-    params = {
-        'part': 'snippet',
-        'q': query,
-        'type': 'video',
-        'maxResults': 10, # Get 10 results to allow for "next" functionality
-        'key': api_key
-    }
     try:
-        response = requests.get(search_url, params=params)
-        response.raise_for_status() # Raise an exception for bad status codes
-        search_results = response.json()
+        search_url = 'https://www.googleapis.com/youtube/v3/search'
+        search_params = {
+            'part': 'snippet',
+            'q': query,
+            'type': 'video',
+            'maxResults': 25,
+            'key': api_key
+        }
+        search_response = requests.get(search_url, params=search_params, timeout=12)
+        search_response.raise_for_status()
+        search_results = search_response.json()
 
-        videos = []
+        raw_items = []
+        video_ids = []
         for item in search_results.get('items', []):
             video_id = item.get('id', {}).get('videoId')
-            title = item.get('snippet', {}).get('title')
-            if video_id and title:
-                videos.append({'id': video_id, 'title': title})
-        
+            snippet = item.get('snippet', {}) or {}
+            if not video_id:
+                continue
+            raw_items.append({
+                'id': video_id,
+                'title': snippet.get('title') or '',
+                'channel_title': snippet.get('channelTitle') or '',
+                'thumbnail_url': (
+                    (snippet.get('thumbnails', {}).get('medium', {}) or {}).get('url')
+                    or (snippet.get('thumbnails', {}).get('default', {}) or {}).get('url')
+                    or ''
+                ),
+            })
+            video_ids.append(video_id)
+
+        details_map = {}
+        if video_ids:
+            videos_url = 'https://www.googleapis.com/youtube/v3/videos'
+            videos_params = {
+                'part': 'status,snippet',
+                'id': ','.join(video_ids),
+                'key': api_key
+            }
+            videos_response = requests.get(videos_url, params=videos_params, timeout=12)
+            videos_response.raise_for_status()
+            details_json = videos_response.json()
+            for item in details_json.get('items', []):
+                vid = item.get('id')
+                if not vid:
+                    continue
+                status = item.get('status', {}) or {}
+                snippet = item.get('snippet', {}) or {}
+                embeddable = bool(status.get('embeddable', False))
+                privacy_status = str(status.get('privacyStatus') or '')
+                upload_status = str(status.get('uploadStatus') or '')
+                playback_ok = embeddable and privacy_status == 'public' and upload_status == 'processed'
+                fail_reason = ''
+                if not playback_ok:
+                    if not embeddable:
+                        fail_reason = '埋め込み再生が許可されていません'
+                    elif privacy_status != 'public':
+                        fail_reason = f'公開状態が {privacy_status} のため再生できません'
+                    elif upload_status != 'processed':
+                        fail_reason = f'動画状態が {upload_status} のため再生できません'
+                    else:
+                        fail_reason = '再生条件を満たしていません'
+                details_map[vid] = {
+                    'embeddable': embeddable,
+                    'privacy_status': privacy_status,
+                    'upload_status': upload_status,
+                    'playback_ok': playback_ok,
+                    'fail_reason': fail_reason,
+                    'channel_title': snippet.get('channelTitle') or '',
+                }
+
+        videos = []
+        for item in raw_items:
+            detail = details_map.get(item['id'], {})
+            videos.append({
+                'id': item['id'],
+                'title': item['title'],
+                'artist': detail.get('channel_title') or item.get('channel_title') or '',
+                'thumbnail_url': item.get('thumbnail_url') or '',
+                'embeddable': bool(detail.get('embeddable', False)),
+                'privacy_status': detail.get('privacy_status') or '',
+                'upload_status': detail.get('upload_status') or '',
+                'playback_ok': bool(detail.get('playback_ok', False)),
+                'fail_reason': detail.get('fail_reason') or ''
+            })
+
         return jsonify({'videos': videos})
 
     except requests.exceptions.RequestException as e:

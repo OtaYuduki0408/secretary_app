@@ -666,6 +666,14 @@
         </svg>
         <span class="fab-label">設定</span>
       </a>
+      <a class="custom-order-btn fab" href="{{ url_for('playlist_page') }}" aria-label="プレイリスト管理を開く" title="プレイリスト管理">
+        <svg width="34" height="34" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <rect x="4" y="4" width="16" height="16" rx="4" fill="var(--main-bg-color, #1f2a33)" stroke="var(--stripe-color, #a8b6c6)" stroke-width="1.2"/>
+          <path d="M8 8h8M8 11h8M8 14h5" stroke="var(--main-btn-color, #7aa8ff)" stroke-width="1.4" stroke-linecap="round"/>
+          <circle cx="16.5" cy="14.5" r="1.8" fill="var(--main-btn-color, #7aa8ff)" opacity="0.9"/>
+        </svg>
+        <span class="fab-label">プレイリスト</span>
+      </a>
     </div>  </main>
 
   <a href="{{ url_for('register') }}">ユーザー登録</a>

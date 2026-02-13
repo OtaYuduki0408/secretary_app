@@ -362,6 +362,24 @@ async function persistYoutubePreference(action, payload = {}) {
         }
         const saved = await response.json();
         console.log('YouTube preference saved:', saved);
+
+        if (action === 'save_current') {
+            const titleGuess = String(current.title || '').trim();
+            let artistGuess = '';
+            if (titleGuess.includes(' - ')) {
+                artistGuess = titleGuess.split(' - ')[0].trim();
+            }
+            await fetch('/api/playlist/tracks', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    video_id: current.id,
+                    title: titleGuess,
+                    artist: artistGuess,
+                    url: `https://www.youtube.com/watch?v=${current.id}`,
+                })
+            });
+        }
     } catch (error) {
         console.warn('YouTube preference save error:', error);
     }
@@ -432,6 +450,49 @@ function getYoutubeContextState() {
     };
 }
 
+function playYoutubeTrackList(trackList, options = {}) {
+    const list = Array.isArray(trackList) ? trackList : [];
+    if (list.length === 0) return false;
+
+    const normalized = list
+        .map((v) => ({
+            id: String(v?.id || "").trim(),
+            title: String(v?.title || "プレイリストの曲").trim()
+        }))
+        .filter((v) => v.id.length > 0);
+
+    if (normalized.length === 0) return false;
+
+    const useRandom = !!options.random;
+    if (useRandom) {
+        for (let i = normalized.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            const tmp = normalized[i];
+            normalized[i] = normalized[j];
+            normalized[j] = tmp;
+        }
+    }
+
+    lastPlaySource = 'playlist';
+    lastSearchQuery = '';
+    hasPlayableInCurrentSearch = false;
+    currentPlaylist = normalized;
+    currentVideoIndex = 0;
+    resumeCheckpointSec = 0;
+
+    showOverlay();
+    updateControls();
+
+    const firstId = currentPlaylist[0].id;
+    if (youtubeApiReady) {
+        initializePlayer(firstId);
+    } else {
+        pendingVideoId = firstId;
+        startApiReadyWatcher();
+    }
+    return true;
+}
+
 export function playYoutubeVideo(queryOrUrl) {
     if (!queryOrUrl) return;
     
@@ -500,6 +561,7 @@ nextBtn.addEventListener('click', playNextVideo);
 window.playYoutubeVideo = playYoutubeVideo;
 window.executeYoutubeIntent = executeYoutubeIntent;
 window.getYoutubeContextState = getYoutubeContextState;
+window.playYoutubeTrackList = playYoutubeTrackList;
 
 document.addEventListener('youtube:control', (event) => {
     const detail = event?.detail || {};

@@ -54,6 +54,7 @@ class ChatSpaceModel:
     R:過去の命令の修正(行動はn)。特殊命令「目覚まし」の時刻変更もここに含む
     S:SwitchBot iot等。例:電気を消す、エアコンを付ける、鍵を掛ける)(行動はn)
     Y:YouTubeの音楽を再生する(行動はp)
+    P:プレイリスト操作(行動はp)
     Re:強制終了コマンド(処理を停止して等)
     K:計算(行動はn)
     -行動-
@@ -62,6 +63,7 @@ class ChatSpaceModel:
     c:変更
     g:取得
     s:検索
+    p:再生
     例：カレンダーへの追加がユーザーの目的から、Caを返す。
     -入力-
     ユーザーの入力: {input_value}
@@ -78,6 +80,7 @@ class ChatSpaceModel:
     R:過去の命令の修正(行動はn)
     S:SwitchBot iot等(行動はn)
     Y:YouTubeの音楽を再生/操作する(行動はp)
+    P:プレイリスト操作(行動はp)
     Re:強制終了コマンド
     K:計算(行動はn)
     -行動-
@@ -308,6 +311,44 @@ class ChatSpaceModel:
     ユーザー命令:
     {input_value}
     """
+    PLAYLIST_PLAY_MODE_PROMPT_TEMPLATE = """
+    あなたはプレイリスト再生の命令分類器です。
+    ユーザー命令から再生対象と再生順を抽出し、JSONのみで返してください。
+    Keys:
+    - scope: "artist" | "all" | "recent"
+    - artist: string (scopeがartistの時のみ必須。なければ空文字)
+    - order: "sequential" | "random"
+    ルール:
+    - 「アーティスト名で再生」なら scope=artist
+    - 「全曲再生」なら scope=all
+    - 「直近再生」「最近追加した曲」なら scope=recent
+    - 「ランダム」「シャッフル」があれば order=random。なければ sequential
+    例:
+    {{"scope":"artist","artist":"米津玄師","order":"sequential"}}
+    {{"scope":"all","artist":"","order":"random"}}
+    {{"scope":"recent","artist":"","order":"sequential"}}
+    ユーザー命令: {input_value}
+    """
+    PLAYLIST_OPERATION_PROMPT_TEMPLATE = """
+    あなたはプレイリスト操作の意図分類器です。
+    ユーザー命令を解析し、以下のいずれか1語だけを返してください。
+    - Add: 現在再生中の曲をプレイリストへ追加
+    - Delete: 現在再生中の曲をプレイリストから削除
+    - Play: プレイリスト再生方法の指定
+    出力ルール:
+    - 返答は Add / Delete / Play のどれか1語のみ
+    - 句読点や説明は不要
+    判定ルール:
+    - 「この曲をプレイリストに追加」「今の曲を保存」等は Add
+    - 「この曲をプレイリストから削除」「今の曲を消して」等は Delete
+    - 「プレイリストを再生」「全曲ランダム」等は Play
+    現在再生中の曲:
+    - title: {current_title}
+    - video_id: {current_video_id}
+    - active: {active}
+    - paused: {paused}
+    ユーザー命令: {input_value}
+    """
     ALARM_TRIGGER_CHANGE_PROMPT_TEMPLATE = """
     目的: ユーザー入力が「特殊命令 目覚まし」の時間トリガー変更要求かどうか判定し、変更後時刻を抽出する。
     必ずJSONのみで出力すること。
@@ -472,6 +513,37 @@ class ChatSpaceModel:
         # 余計な記号・改行を除去して先頭トークンのみ採用
         token = re.split(r"[\s\n\r:：,，。.!?]+", word)[0].strip()
         return token
+
+    def _classify_playlist_play_mode(self, text: str) -> dict:
+        prompt = self.PLAYLIST_PLAY_MODE_PROMPT_TEMPLATE.format(input_value=text)
+        raw = self._gemini_request(prompt)
+        data = self._extract_json_payload(raw) or {}
+        scope = str(data.get("scope") or "all").strip().lower()
+        order = str(data.get("order") or "sequential").strip().lower()
+        artist = str(data.get("artist") or "").strip()
+
+        if scope not in ("artist", "all", "recent"):
+            scope = "all"
+        if order not in ("sequential", "random"):
+            order = "sequential"
+        if scope != "artist":
+            artist = ""
+        return {"scope": scope, "artist": artist, "order": order}
+
+    def _classify_playlist_operation(self, text: str, youtube_context: dict | None = None) -> str:
+        ctx = youtube_context or {}
+        prompt = self.PLAYLIST_OPERATION_PROMPT_TEMPLATE.format(
+            current_title=str(ctx.get("current_title") or ""),
+            current_video_id=str(ctx.get("current_video_id") or ""),
+            active=bool(ctx.get("active")),
+            paused=bool(ctx.get("paused")),
+            input_value=text,
+        )
+        raw = self._gemini_request(prompt)
+        token = re.split(r"[\s\n\r:：,，。.!?]+", str(raw or "").strip())[0].strip().lower()
+        if token in ("add", "delete", "play"):
+            return token
+        return "play"
 
     def _extract_json_payload(self, raw_text: str):
         text = (raw_text or "").strip()
@@ -1288,6 +1360,38 @@ class ChatSpaceModel:
                     result["suppress_tts"] = True
                 else:
                     result["message"] = "YouTube操作の意図を特定できませんでした。"
+            elif purpose == "Pp" or purpose.startswith("P"):
+                op = self._classify_playlist_operation(cleaned_input, youtube_context)
+                result["purpose"] = "Pp"
+                if op == "add":
+                    current_video_id = str((youtube_context or {}).get("current_video_id") or "").strip()
+                    current_title = str((youtube_context or {}).get("current_title") or "").strip()
+                    if not current_video_id:
+                        result["message"] = "現在再生中の曲が見つかりません。"
+                    else:
+                        result["action"] = "playlist_add_current"
+                        result["data"] = {
+                            "video_id": current_video_id,
+                            "title": current_title,
+                            "artist": ""
+                        }
+                        result["message"] = ""
+                        result["suppress_tts"] = True
+                elif op == "delete":
+                    current_video_id = str((youtube_context or {}).get("current_video_id") or "").strip()
+                    if not current_video_id:
+                        result["message"] = "現在再生中の曲が見つかりません。"
+                    else:
+                        result["action"] = "playlist_delete_current"
+                        result["data"] = {"video_id": current_video_id}
+                        result["message"] = ""
+                        result["suppress_tts"] = True
+                else:
+                    play_mode = self._classify_playlist_play_mode(cleaned_input)
+                    result["action"] = "playlist_play_request"
+                    result["data"] = play_mode
+                    result["message"] = ""
+                    result["suppress_tts"] = True
             elif purpose in ("Kn", "K"):
                 result["message"] = self._calculate_expression(cleaned_input)
             else:

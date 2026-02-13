@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Voice Secretary - プレイリスト管理</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <style>
+    :root {
+      --bg: #07141f;
+      --bg-soft: #0b2131;
+      --line: rgba(138, 180, 214, 0.35);
+      --txt: #e9f2f9;
+      --sub: #95b0c5;
+      --ok: #2dd4bf;
+      --danger: #fda4af;
+      --primary: #38bdf8;
+      --primary-soft: rgba(56, 189, 248, 0.18);
+      --active: #1e40af;
+    }
+    body { background: radial-gradient(circle at 10% 0%, #123149 0%, var(--bg) 55%); color: var(--txt); }
+    .shell { max-width: 1160px; margin: 24px auto; padding: 0 16px; }
+    .card { background: rgba(8, 23, 35, 0.86); border: 1px solid var(--line); border-radius: 18px; padding: 18px; }
+    .head { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 12px; }
+    .title { font-size: 1.3rem; font-weight: 700; }
+    .head a { color: var(--txt); text-decoration: none; border: 1px solid var(--line); border-radius: 999px; padding: 8px 14px; }
+    .hint { color: var(--sub); font-size: 0.9rem; margin: 8px 0 14px; }
+    .notice { color: #fcd34d; font-size: 0.86rem; margin-top: 6px; }
+    .search-row { display: grid; grid-template-columns: 1fr auto auto; gap: 10px; margin-bottom: 12px; }
+    .search-row input {
+      padding: 11px 12px; border-radius: 10px; border: 1px solid var(--line);
+      background: rgba(12, 27, 40, 0.8); color: var(--txt);
+    }
+    .btn {
+      border: none; border-radius: 999px; padding: 10px 16px; font-weight: 700; cursor: pointer;
+      background: var(--primary); color: #032032;
+    }
+    .btn.secondary { background: transparent; color: var(--txt); border: 1px solid var(--line); }
+    .results { display: grid; grid-template-columns: repeat(auto-fill, minmax(310px, 1fr)); gap: 12px; margin: 14px 0; }
+    .video-card {
+      border: 1px solid rgba(125, 211, 252, 0.24);
+      border-radius: 14px;
+      background: rgba(10, 28, 42, 0.82);
+      overflow: hidden;
+      cursor: pointer;
+      transition: transform .12s ease, border-color .12s ease, box-shadow .12s ease;
+    }
+    .video-card:hover { transform: translateY(-2px); border-color: rgba(125, 211, 252, 0.52); }
+    .video-card.pending { box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.5) inset; }
+    .video-card.added {
+      border-color: rgba(59, 130, 246, 0.9);
+      box-shadow: 0 0 0 3px rgba(30, 64, 175, 0.5), 0 0 20px rgba(59, 130, 246, 0.35);
+      background: linear-gradient(180deg, rgba(30, 64, 175, 0.25), rgba(10, 28, 42, 0.88));
+    }
+    .video-card.unplayable { border-color: rgba(253, 164, 175, 0.45); }
+    .thumb-wrap { position: relative; aspect-ratio: 16 / 9; background: #0a1b29; }
+    .thumb-wrap img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .badge {
+      position: absolute; left: 8px; top: 8px; font-size: 0.78rem;
+      border-radius: 999px; padding: 4px 9px; font-weight: 700;
+      background: rgba(45, 212, 191, 0.2); color: #7af1dc; border: 1px solid rgba(45, 212, 191, 0.5);
+    }
+    .badge.bad { background: rgba(244, 63, 94, 0.18); color: #fecdd3; border-color: rgba(251, 113, 133, 0.5); }
+    .card-body { padding: 10px; display: grid; gap: 8px; }
+    .yt-title { font-size: 0.92rem; line-height: 1.4; color: #d6e7f6; min-height: 2.6em; }
+    .edit-grid { display: grid; gap: 8px; }
+    .edit-grid input {
+      width: 100%; padding: 8px 9px; border-radius: 8px; border: 1px solid var(--line);
+      background: rgba(13, 30, 44, 0.85); color: var(--txt);
+    }
+    .card-actions { display: flex; justify-content: space-between; gap: 8px; }
+    .card-actions button {
+      flex: 1; border-radius: 8px; border: 1px solid var(--line); background: rgba(13, 30, 44, 0.65);
+      color: var(--txt); padding: 8px 10px; cursor: pointer;
+    }
+    .card-actions button.primary { background: var(--primary-soft); border-color: rgba(56, 189, 248, 0.6); color: #c3efff; }
+    .table-wrap { overflow-x: auto; margin-top: 10px; }
+    .playlist-table { width: 100%; border-collapse: collapse; min-width: 640px; }
+    .playlist-table th, .playlist-table td { text-align: left; padding: 10px; border-bottom: 1px solid rgba(148,163,184,0.2); font-size: 0.92rem; }
+    .playlist-table th { color: #cbd5e1; }
+    .playlist-table td a { color: #7dd3fc; text-decoration: none; }
+    .playlist-table button { border: 1px solid rgba(248,113,113,0.55); color: #fecaca; background: transparent; border-radius: 999px; padding: 6px 10px; cursor: pointer; }
+    .empty { color: var(--sub); padding: 10px 0; }
+    @media (max-width: 900px) {
+      .search-row { grid-template-columns: 1fr; }
+      .card-actions { flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <section class="card">
+      <div class="head">
+        <div class="title">プレイリスト管理</div>
+        <a href="{{ url_for('main', internal_nav=true) }}">メインに戻る</a>
+      </div>
+
+      <p class="hint">検索結果からクリックで追加できます。カードが青く光れば登録完了です。</p>
+      <p class="notice">再生不可動画は登録前に表示します。再生不可の場合は、音源を `m4a` でアップロードして管理する運用を検討してください。</p>
+
+      <div class="search-row">
+        <input id="playlist-search-query" type="text" placeholder="アーティスト名や曲名で検索（例: 米津玄師 Lemon）" />
+        <button id="playlist-search-button" class="btn" type="button">検索</button>
+        <button id="playlist-add-all-button" class="btn secondary" type="button">表示中を一括追加</button>
+      </div>
+
+      <div id="playlist-message" class="hint"></div>
+      <div id="playlist-search-results" class="results"></div>
+
+      <hr style="border-color: rgba(148,163,184,0.2); margin: 16px 0;">
+      <div class="hint">登録済みプレイリスト</div>
+      <div class="table-wrap">
+        <table class="playlist-table">
+          <thead>
+            <tr>
+              <th>曲名</th>
+              <th>アーティスト</th>
+              <th>URL</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody id="playlist-table-body"></tbody>
+        </table>
+      </div>
+      <div id="playlist-empty" class="empty" style="display:none;">まだ曲が登録されていません。</div>
+    </section>
+  </main>
+  <script src="{{ url_for('static', filename='js/playlist.js') }}"></script>
+</body>
+</html>
