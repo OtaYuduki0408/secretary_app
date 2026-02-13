@@ -309,12 +309,16 @@ export async function check_chat_Space(inputValue) {
   })();
 
   try {
+    const youtubeContext = (typeof window.getYoutubeContextState === 'function')
+      ? window.getYoutubeContextState()
+      : { active: false };
+
     const response = await fetch('/web_api/chat', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ inputValue: cleanedInput }),
+      body: JSON.stringify({ inputValue: cleanedInput, youtubeContext }),
     });
 
     if (!response.ok) {
@@ -336,6 +340,20 @@ export async function check_chat_Space(inputValue) {
         }
         // YouTube再生がトリガーされた場合、以降のメッセージ読み上げなどはスキップ
         return;
+    }
+
+    if (result.purpose === 'Yc' && result.action === 'youtube_control' && result.data) {
+      if (typeof window.executeYoutubeIntent === 'function') {
+        const handled = window.executeYoutubeIntent(result.data);
+        if (!handled) {
+          console.warn("YouTube control intent was not handled:", result.data);
+          if (window.speak) window.speak("YouTube操作を実行できませんでした。");
+        }
+      } else {
+        console.warn("executeYoutubeIntent is not available on window.");
+        if (window.speak) window.speak("YouTube操作機能を読み込めませんでした。");
+      }
+      return;
     }
 
     if (result.abort_command) {

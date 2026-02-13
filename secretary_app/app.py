@@ -514,6 +514,90 @@ def upsert_user_settings_route():
         return jsonify(result), 500
     return jsonify(result)
 
+@app.route('/api/youtube/preferences', methods=['POST'])
+@login_required
+def upsert_youtube_preferences_route():
+    user_id = session.get('user', {}).get('id')
+    data = request.get_json() or {}
+    if not isinstance(data, dict):
+        return jsonify({'error': 'Invalid payload'}), 400
+
+    action = str(data.get('action') or '').strip()
+    video = data.get('video') or {}
+    query = str(data.get('query') or '').strip()
+    reason = str(data.get('reason') or '').strip()
+    if action not in ('save_current', 'reject_current'):
+        return jsonify({'error': 'Unsupported action'}), 400
+    if not isinstance(video, dict):
+        return jsonify({'error': 'Invalid video payload'}), 400
+
+    video_id = str(video.get('id') or video.get('video_id') or '').strip()
+    title = str(video.get('title') or '').strip()
+    if not video_id:
+        return jsonify({'error': 'video.id is required'}), 400
+
+    now_iso = datetime.now(JST).isoformat()
+    video_url = f"https://www.youtube.com/watch?v={video_id}"
+    settings = get_user_settings(user_id) or {}
+    yt = settings.get('youtube_preferences') or {}
+
+    saved_videos = yt.get('saved_videos') if isinstance(yt.get('saved_videos'), list) else []
+    query_map = yt.get('query_map') if isinstance(yt.get('query_map'), dict) else {}
+    blacklist = yt.get('blacklist') if isinstance(yt.get('blacklist'), list) else []
+
+    if action == 'save_current':
+        exists = any(str(v.get('video_id') or '') == video_id for v in saved_videos if isinstance(v, dict))
+        if not exists:
+            saved_videos.append({
+                'video_id': video_id,
+                'title': title,
+                'url': video_url,
+                'saved_at': now_iso,
+            })
+        if query:
+            query_map[query.lower()] = {
+                'video_id': video_id,
+                'title': title,
+                'url': video_url,
+                'updated_at': now_iso,
+            }
+    elif action == 'reject_current':
+        entry_exists = any(
+            isinstance(e, dict) and
+            str(e.get('video_id') or '') == video_id and
+            str(e.get('query') or '').lower() == query.lower()
+            for e in blacklist
+        )
+        if not entry_exists:
+            blacklist.append({
+                'query': query,
+                'video_id': video_id,
+                'title': title,
+                'url': video_url,
+                'reason': reason,
+                'created_at': now_iso,
+            })
+        if query:
+            mapped = query_map.get(query.lower())
+            if isinstance(mapped, dict) and str(mapped.get('video_id') or '') == video_id:
+                query_map.pop(query.lower(), None)
+
+    yt['saved_videos'] = saved_videos
+    yt['query_map'] = query_map
+    yt['blacklist'] = blacklist
+    settings['youtube_preferences'] = yt
+
+    result = upsert_user_settings(user_id, settings)
+    if isinstance(result, dict) and result.get('error'):
+        return jsonify(result), 500
+
+    return jsonify({
+        'status': 'success',
+        'action': action,
+        'saved_videos_count': len(saved_videos),
+        'blacklist_count': len(blacklist),
+    })
+
 # ============== Server-side TTS ==============
 def text_to_speech_base64(text: str) -> str:
     """Google Cloud TTSを使用してテキストを音声に変換し、Base64エンコードされたMP3を返す"""
@@ -1238,6 +1322,7 @@ def _handle_voice_triggers(user_input, user_id, app_logger):
 def chat_api_web():
     data = request.get_json() or {}
     user_input = data.get('inputValue', '')
+    youtube_context = data.get('youtubeContext') or {}
     user_id = session.get('user', {}).get('id') # セッションからuser_idを取得
     response_data = {"status": "success", "message": ""}
 
@@ -1270,7 +1355,8 @@ def chat_api_web():
     response_data = chat_space_model.check_chat_space(
         user_input,
         user_id=user_id,
-        tone_response=tone_response
+        tone_response=tone_response,
+        youtube_context=youtube_context
     )
     return jsonify(response_data)
 

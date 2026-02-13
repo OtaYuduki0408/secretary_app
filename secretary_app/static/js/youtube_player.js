@@ -4,6 +4,8 @@ let currentVideoIndex = 0;
 let youtubeApiReady = false;
 let pendingVideoId = null;
 let apiReadyWatcherId = null;
+let lastSearchQuery = '';
+let lastPlaySource = '';
 let errorCount = 0;
 const MAX_ERRORS = 5; // 連続エラーの最大許容回数
 
@@ -13,6 +15,14 @@ const videoTitle = document.getElementById('youtube-video-title');
 const closeBtn = document.getElementById('youtube-close-btn');
 const prevBtn = document.getElementById('youtube-prev-btn');
 const nextBtn = document.getElementById('youtube-next-btn');
+
+function isOverlayVisible() {
+    return overlay && !overlay.classList.contains('youtube-overlay-hidden');
+}
+
+function hasSearchQueue() {
+    return Array.isArray(currentPlaylist) && currentPlaylist.length > 1;
+}
 
 function canUseYoutubePlayer() {
     return !!(window.YT && typeof window.YT.Player === 'function');
@@ -168,6 +178,10 @@ function hideOverlay() {
     }
 }
 
+function hideOverlayOnly() {
+    overlay.classList.add('youtube-overlay-hidden');
+}
+
 function updateControls() {
     const isPlaylist = currentPlaylist.length > 1;
     prevBtn.style.display = isPlaylist ? 'inline-block' : 'none';
@@ -209,6 +223,153 @@ function playPrevVideo() {
     }
 }
 
+function pauseCurrentVideo() {
+    if (player && typeof player.pauseVideo === 'function') {
+        player.pauseVideo();
+        return true;
+    }
+    return false;
+}
+
+function resumeCurrentVideo() {
+    if (player && typeof player.playVideo === 'function') {
+        player.playVideo();
+        return true;
+    }
+    return false;
+}
+
+function replayCurrentVideo() {
+    if (player && typeof player.seekTo === 'function' && typeof player.playVideo === 'function') {
+        player.seekTo(0, true);
+        player.playVideo();
+        return true;
+    }
+    return false;
+}
+
+function playRandomFromCurrentQueue() {
+    if (!Array.isArray(currentPlaylist) || currentPlaylist.length === 0) return false;
+    if (currentPlaylist.length === 1) {
+        return resumeCurrentVideo() || replayCurrentVideo();
+    }
+    let randomIndex = currentVideoIndex;
+    while (randomIndex === currentVideoIndex && currentPlaylist.length > 1) {
+        randomIndex = Math.floor(Math.random() * currentPlaylist.length);
+    }
+    currentVideoIndex = randomIndex;
+    showOverlay();
+    updateControls();
+    initializePlayer(currentPlaylist[currentVideoIndex].id);
+    return true;
+}
+
+function searchInCurrentQueue(query) {
+    const q = String(query || '').trim().toLowerCase();
+    if (!q || !Array.isArray(currentPlaylist) || currentPlaylist.length === 0) return false;
+    const idx = currentPlaylist.findIndex((v) => String(v?.title || '').toLowerCase().includes(q));
+    if (idx < 0) return false;
+    currentVideoIndex = idx;
+    showOverlay();
+    updateControls();
+    initializePlayer(currentPlaylist[currentVideoIndex].id);
+    return true;
+}
+
+function emitYoutubeControlEvent(type, detail = {}) {
+    document.dispatchEvent(new CustomEvent('youtube:control', { detail: { type, ...detail } }));
+}
+
+async function persistYoutubePreference(action, payload = {}) {
+    const current = payload.current || {};
+    if (!current || !current.id) return;
+    try {
+        const response = await fetch('/api/youtube/preferences', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                action,
+                video: {
+                    id: current.id,
+                    title: current.title || ''
+                },
+                query: payload.query || '',
+                reason: payload.reason || ''
+            })
+        });
+        if (!response.ok) {
+            const text = await response.text();
+            console.warn('YouTube preference save failed:', response.status, text);
+            return;
+        }
+        const saved = await response.json();
+        console.log('YouTube preference saved:', saved);
+    } catch (error) {
+        console.warn('YouTube preference save error:', error);
+    }
+}
+
+function executeYoutubeIntent(payload = {}) {
+    const intent = String(payload.intent || '').trim().toLowerCase();
+    const query = String(payload.query || '').trim();
+    switch (intent) {
+        case 'next':
+            playNextVideo();
+            return true;
+        case 'prev':
+            playPrevVideo();
+            return true;
+        case 'pause':
+            return pauseCurrentVideo();
+        case 'resume':
+            showOverlay();
+            updateControls();
+            return resumeCurrentVideo();
+        case 'stop':
+            hideOverlay();
+            return true;
+        case 'close':
+            hideOverlayOnly();
+            return true;
+        case 'replay':
+            showOverlay();
+            return replayCurrentVideo();
+        case 'random':
+            return playRandomFromCurrentQueue();
+        case 'search_in_results':
+            return searchInCurrentQueue(query);
+        case 'save_current':
+            emitYoutubeControlEvent('save_current', {
+                current: currentPlaylist[currentVideoIndex] || null,
+                index: currentVideoIndex,
+                query: lastPlaySource === 'search' ? lastSearchQuery : ''
+            });
+            return true;
+        case 'reject_current':
+            emitYoutubeControlEvent('reject_current', {
+                current: currentPlaylist[currentVideoIndex] || null,
+                index: currentVideoIndex,
+                query: lastPlaySource === 'search' ? lastSearchQuery : ''
+            });
+            playNextVideo();
+            return true;
+        default:
+            return false;
+    }
+}
+
+function getYoutubeContextState() {
+    return {
+        active: Boolean((player && typeof player.playVideo === 'function') || pendingVideoId || (currentPlaylist && currentPlaylist.length > 0)),
+        overlay_visible: isOverlayVisible(),
+        has_queue: hasSearchQueue(),
+        queue_length: Array.isArray(currentPlaylist) ? currentPlaylist.length : 0,
+        current_index: currentVideoIndex,
+        current_title: currentPlaylist[currentVideoIndex]?.title || '',
+        current_video_id: currentPlaylist[currentVideoIndex]?.id || ''
+    };
+}
+
 export function playYoutubeVideo(queryOrUrl) {
     if (!queryOrUrl) return;
     
@@ -218,6 +379,8 @@ export function playYoutubeVideo(queryOrUrl) {
     const videoId = extractVideoId(queryOrUrl);
 
     if (videoId) {
+        lastPlaySource = 'url';
+        lastSearchQuery = '';
         // URLから直接再生
         console.log("DEBUG: URLから動画IDを抽出しました:", videoId);
         currentPlaylist = [{ id: videoId, title: '指定されたURLの動画' }];
@@ -232,6 +395,8 @@ export function playYoutubeVideo(queryOrUrl) {
             pendingVideoId = videoId;
         }
     } else {
+        lastPlaySource = 'search';
+        lastSearchQuery = String(queryOrUrl || '').trim();
         // キーワードで検索
         fetch(`/api/youtube_search?q=${encodeURIComponent(queryOrUrl)}`)
             .then(response => response.json())
@@ -269,3 +434,14 @@ nextBtn.addEventListener('click', playNextVideo);
 
 // Make the function globally accessible to be called from non-module scripts
 window.playYoutubeVideo = playYoutubeVideo;
+window.executeYoutubeIntent = executeYoutubeIntent;
+window.getYoutubeContextState = getYoutubeContextState;
+
+document.addEventListener('youtube:control', (event) => {
+    const detail = event?.detail || {};
+    if (detail.type === 'save_current') {
+        persistYoutubePreference('save_current', detail);
+    } else if (detail.type === 'reject_current') {
+        persistYoutubePreference('reject_current', detail);
+    }
+});

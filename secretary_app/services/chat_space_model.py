@@ -66,6 +66,35 @@ class ChatSpaceModel:
     -入力-
     ユーザーの入力: {input_value}
     """
+    PURPOSE_PROMPT_TEMPLATE_WITH_YT_CONTROL = """
+    以下のリストの目的と照合し、対応する機能を大文字、対応する行動を小文字で返してください。
+    命令を確実に実現できる機能がない場合、Fnを返す。
+    30文字以内となるべく少なくしてください。
+    -機能-
+    C:カレンダー
+    I:収支管理
+    M:メモ帳
+    T:時刻、年月日、曜日確認(行動はn)
+    R:過去の命令の修正(行動はn)
+    S:SwitchBot iot等(行動はn)
+    Y:YouTubeの音楽を再生する(行動はp)
+    Yc:YouTube再生中の動画操作(行動はc)
+    Re:強制終了コマンド
+    K:計算(行動はn)
+    -行動-
+    a:追加
+    d:削除
+    c:変更/操作
+    g:取得
+    s:検索
+    p:再生
+    n:通常
+    -補足-
+    現在はYouTube再生中です。次/前/一時停止/再開/停止/閉じる/保存/除外/ランダム再生などはYcを優先してください。
+    ただし、明らかにカレンダー・メモ・収支などの通常命令は従来機能を優先してください。
+    -入力-
+    ユーザーの入力: {input_value}
+    """
     CALC_PROMPT_TEMPLATE = """
     以下の質問は計算に関する質問です。pythonのeval関数で計算できるように計算式を作成してください。
     出力は計算式のみ。余計な説明は禁止。
@@ -220,6 +249,31 @@ class ChatSpaceModel:
     例: {{ "query": "米津玄師 Lemon" }}
     ユーザー入力: {input_value}
     """
+    YOUTUBE_CONTROL_PROMPT_TEMPLATE = """
+    目的: YouTube再生中の操作意図を分類してください。
+    必ずJSONのみで出力してください。
+    Keys:
+    - intent: string
+    - query: string (必要な場合のみ。なければ空文字)
+    - reason: string (任意。短く)
+    intent 値:
+    - next: 次の曲/次の動画
+    - prev: 前の曲/前の動画
+    - pause: 一時停止
+    - resume: 再開
+    - stop: 再生停止
+    - close: オーバーレイを閉じる
+    - save_current: 今の動画を保存
+    - reject_current: 今の動画を除外
+    - random: 検索結果キュー内ランダム再生
+    - replay: 先頭から再生し直し
+    - search_in_results: 現在の検索結果キュー内検索
+    - unknown: 判別不能
+    例:
+    {{"intent":"next","query":"","reason":"次の曲の要求"}}
+    {{"intent":"search_in_results","query":"ライブ版","reason":"検索結果内の絞り込み"}}
+    ユーザー入力: {input_value}
+    """
     ALARM_TRIGGER_CHANGE_PROMPT_TEMPLATE = """
     目的: ユーザー入力が「特殊命令 目覚まし」の時間トリガー変更要求かどうか判定し、変更後時刻を抽出する。
     必ずJSONのみで出力すること。
@@ -306,6 +360,17 @@ class ChatSpaceModel:
         tone = (tone_response or "").strip() or "標準"
         prompt = self.FN_FALLBACK_PROMPT_TEMPLATE.format(tone=tone, input_value=text)
         return self._gemini_request(prompt)
+
+    def _extract_json_payload(self, raw_text: str):
+        text = (raw_text or "").strip()
+        if not text:
+            return None
+        try:
+            match = re.search(r"```json\s*([\s\S]*?)\s*```", text, re.I)
+            body = match.group(1) if match else text
+            return json.loads(body)
+        except Exception:
+            return None
 
     def _extract_calc_expression(self, raw: str) -> str:
         if not raw:
@@ -926,7 +991,13 @@ class ChatSpaceModel:
         return result_data, f"目覚ましの時刻を{normalized_time}に変更しました。"
 
 
-    def check_chat_space(self, input_value: str, user_id: str | None = None, tone_response: str = "") -> dict:
+    def check_chat_space(
+        self,
+        input_value: str,
+        user_id: str | None = None,
+        tone_response: str = "",
+        youtube_context: dict | None = None
+    ) -> dict:
         print("--- [DEBUG] check_chat_space: Starting ---")
         # 起動コマンドを除外してGeminiへ渡す
         cleaned_input = (input_value or "").replace("サイレントメイト", "").strip()
@@ -948,7 +1019,9 @@ class ChatSpaceModel:
             }
         self._current_user_id = user_id
         try:
-            purpose_prompt = self.PURPOSE_PROMPT_TEMPLATE.format(current_time=current_time, input_value=cleaned_input)
+            yt_active = bool((youtube_context or {}).get("active"))
+            purpose_template = self.PURPOSE_PROMPT_TEMPLATE_WITH_YT_CONTROL if yt_active else self.PURPOSE_PROMPT_TEMPLATE
+            purpose_prompt = purpose_template.format(current_time=current_time, input_value=cleaned_input)
             purpose = self._gemini_request(purpose_prompt)
             purpose = (purpose or "").strip()
             print(f"--- [DEBUG] check_chat_space: Received purpose: {purpose} ---")
@@ -1016,10 +1089,7 @@ class ChatSpaceModel:
                 raw_json = self._gemini_request(prompt)
                 print(f"--- [DEBUG] raw_json from Gemini for Yp: {raw_json} ---") # ★追加
                 try:
-                    # '```json' と '```' で囲まれた部分を抽出
-                    match = re.search(r"```json\s*([\s\S]*?)\s*```", raw_json, re.I)
-                    s = match.group(1) if match else raw_json
-                    data = json.loads(s)
+                    data = self._extract_json_payload(raw_json) or {}
                     print(f"--- [DEBUG] Parsed data for Yp: {data} (type: {type(data)}) ---") # ★追加
                     extracted_query = data.get("query")
                     if extracted_query:
@@ -1030,6 +1100,26 @@ class ChatSpaceModel:
                         result["message"] = "再生したい曲名を特定できませんでした。"
                 except (json.JSONDecodeError, AttributeError):
                     result["message"] = "キーワードの抽出に失敗しました。"
+            elif purpose == "Yc":
+                control_prompt = self.YOUTUBE_CONTROL_PROMPT_TEMPLATE.format(input_value=cleaned_input)
+                raw_json = self._gemini_request(control_prompt)
+                print(f"--- [DEBUG] raw_json from Gemini for Yc: {raw_json} ---")
+                data = self._extract_json_payload(raw_json) or {}
+                intent = str(data.get("intent") or "").strip().lower()
+                query = str(data.get("query") or "").strip()
+                allowed = {
+                    "next", "prev", "pause", "resume", "stop", "close",
+                    "save_current", "reject_current", "random", "replay",
+                    "search_in_results", "unknown"
+                }
+                if intent in allowed and intent != "unknown":
+                    result["purpose"] = "Yc"
+                    result["action"] = "youtube_control"
+                    result["data"] = {"intent": intent, "query": query}
+                    result["message"] = ""
+                    result["suppress_tts"] = True
+                else:
+                    result["message"] = "YouTube操作の意図を特定できませんでした。"
             elif purpose in ("Kn", "K"):
                 result["message"] = self._calculate_expression(cleaned_input)
             else:
