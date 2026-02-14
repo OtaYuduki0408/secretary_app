@@ -15,6 +15,7 @@ const DEFAULT_END_WORDS = ['命令完了'];
 let END_WORDS = [...DEFAULT_END_WORDS]; // 音声入力の強制終了ワード（カンマ区切りOR）
 let settingsEndWords = [...DEFAULT_END_WORDS];
 let customTriggerEndWords = [];
+let customTriggerAndWordGroups = [];
 
 // モバイル環境のみの制御
 const isMobileDevice = (() => {
@@ -116,6 +117,23 @@ function uniqueNormalizedWords(words) {
     return result;
 }
 
+function uniqueNormalizedWordGroups(groups) {
+    const seen = new Set();
+    const result = [];
+    (Array.isArray(groups) ? groups : []).forEach((group) => {
+        if (!Array.isArray(group)) return;
+        const normalized = group
+            .map((v) => String(v || '').trim())
+            .filter(Boolean);
+        if (normalized.length < 2) return;
+        const key = normalized.map((v) => v.toLowerCase()).sort().join('&&');
+        if (seen.has(key)) return;
+        seen.add(key);
+        result.push(normalized);
+    });
+    return result;
+}
+
 function rebuildEffectiveEndWords() {
     END_WORDS = uniqueNormalizedWords([
         ...DEFAULT_END_WORDS,
@@ -126,7 +144,8 @@ function rebuildEffectiveEndWords() {
 
 function extractVoiceTriggerEndWordsFromOrder(order) {
     const words = [];
-    if (!order || typeof order !== 'object') return words;
+    const andGroups = [];
+    if (!order || typeof order !== 'object') return { words, andGroups };
 
     const triggers = Array.isArray(order.triggers) ? order.triggers : [];
     const voiceTriggers = triggers.filter((trigger) => {
@@ -143,31 +162,56 @@ function extractVoiceTriggerEndWordsFromOrder(order) {
                     const normalizedGroup = group
                         .map((v) => String(v || '').trim())
                         .filter(Boolean);
-                    words.push(...normalizedGroup);
+                    if (normalizedGroup.length === 1) {
+                        words.push(normalizedGroup[0]);
+                        return;
+                    }
+                    if (normalizedGroup.length > 1) {
+                        andGroups.push(normalizedGroup);
+                        return;
+                    }
                     return;
                 }
 
                 const single = String(group || '').trim();
                 if (single) {
-                    words.push(single);
+                    const parts = single.split(',').map((v) => v.trim()).filter(Boolean);
+                    if (parts.length <= 1) {
+                        words.push(single);
+                    } else {
+                        andGroups.push(parts);
+                    }
                 }
             });
         }
 
         const legacyKeyword = value.keyword;
         if (typeof legacyKeyword === 'string') {
-            const normalized = legacyKeyword.trim();
-            if (normalized) words.push(normalized);
+            const parts = legacyKeyword.split(',').map((v) => v.trim()).filter(Boolean);
+            if (parts.length <= 1) {
+                const normalized = legacyKeyword.trim();
+                if (normalized) words.push(normalized);
+            } else {
+                andGroups.push(parts);
+            }
         }
 
         const legacyValue = value.value;
         if (typeof legacyValue === 'string') {
-            const normalized = legacyValue.trim();
-            if (normalized) words.push(normalized);
+            const parts = legacyValue.split(',').map((v) => v.trim()).filter(Boolean);
+            if (parts.length <= 1) {
+                const normalized = legacyValue.trim();
+                if (normalized) words.push(normalized);
+            } else {
+                andGroups.push(parts);
+            }
         }
     });
 
-    return uniqueNormalizedWords(words);
+    return {
+        words: uniqueNormalizedWords(words),
+        andGroups: uniqueNormalizedWordGroups(andGroups),
+    };
 }
 
 async function loadCustomVoiceTriggerEndWords() {
@@ -185,14 +229,21 @@ async function loadCustomVoiceTriggerEndWords() {
         const orders = await response.json();
         if (!Array.isArray(orders)) return;
 
-        const collected = [];
+        const collectedWords = [];
+        const collectedAndGroups = [];
         orders.forEach((order) => {
-            collected.push(...extractVoiceTriggerEndWordsFromOrder(order));
+            const extracted = extractVoiceTriggerEndWordsFromOrder(order);
+            collectedWords.push(...(extracted.words || []));
+            collectedAndGroups.push(...(extracted.andGroups || []));
         });
 
-        customTriggerEndWords = uniqueNormalizedWords(collected);
+        customTriggerEndWords = uniqueNormalizedWords(collectedWords);
+        customTriggerAndWordGroups = uniqueNormalizedWordGroups(collectedAndGroups);
         rebuildEffectiveEndWords();
-        console.log('[VOICE] カスタム命令ボイストリガーをエンドワードへ反映しました:', customTriggerEndWords);
+        console.log('[VOICE] カスタム命令ボイストリガーをエンドワードへ反映しました:', {
+            single: customTriggerEndWords,
+            and: customTriggerAndWordGroups,
+        });
     } catch (error) {
         console.warn('カスタム命令ボイストリガーの反映に失敗しました:', error);
     }
@@ -212,15 +263,30 @@ function findEndWordMatch(text) {
     const commandOnly = stripLeadingWakeWords(originalText).trim();
     if (!commandOnly) return null;
 
+    for (const group of customTriggerAndWordGroups) {
+        const normalizedGroup = (Array.isArray(group) ? group : [])
+            .map((v) => String(v || '').trim())
+            .filter(Boolean);
+        if (normalizedGroup.length < 2) continue;
+        const matched = normalizedGroup.every((token) => commandOnly.includes(token));
+        if (matched) {
+            return {
+                word: normalizedGroup.join(','),
+                index: 0,
+                endIndex: originalText.length,
+            };
+        }
+    }
+
     for (const rawWord of END_WORDS) {
         const word = String(rawWord || '').trim();
         if (!word) continue;
-        if (commandOnly === word) {
-            const index = originalText.lastIndexOf(word);
+        if (commandOnly.includes(word)) {
+            const index = commandOnly.indexOf(word);
             return {
                 word,
                 index: index >= 0 ? index : 0,
-                endIndex: index >= 0 ? index + word.length : word.length,
+                endIndex: originalText.length,
             };
         }
     }
