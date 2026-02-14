@@ -25,8 +25,8 @@ const isMobileDevice = (() => {
 let lastRestartAt = 0;
 const MOBILE_RESTART_COOLDOWN_MS = 3000;
 const DUPLICATE_SUPPRESS_MS = 5000;
-// エンドワード未検出の最終認識は、誤確定を避けるため長めに待って送信する。
-const FINAL_COMMAND_DEBOUNCE_MS = 5000;
+const FINAL_SEGMENT_WAIT_MS = 800; // ぶつ切り回避のための短い追記待ち
+const DISPATCH_COOLDOWN_MS = 2000; // 多重送信防止
 const ENDWORD_DETECTION_SUPPRESS_MS = 3000;
 const ENDWORD_INPUT_BLOCK_MS = 3000;
 let lastDispatchedVoiceCommandKey = '';
@@ -37,6 +37,9 @@ let pendingFinalDispatchTimerId = null;
 let lastDetectedEndWordKey = '';
 let lastDetectedEndWordAt = 0;
 let endWordInputBlockedUntil = 0;
+let voiceSessionActive = false;
+let voiceSessionTranscript = '';
+let lastVoiceDispatchAt = 0;
 
 // TTS (Text-to-Speech) 設定
 const speechSynth = window.speechSynthesis;
@@ -360,6 +363,56 @@ function clearPendingFinalDispatch() {
     pendingFinalCommand = '';
 }
 
+function sanitizeVoiceCommandForDispatch(commandText) {
+    let normalized = stripLeadingWakeWords(String(commandText || '')).trim();
+    if (!normalized) return '';
+
+    // 設定エンドワードのみ除去する（ボイストリガー由来は除去しない）
+    (settingsEndWords || []).forEach((word) => {
+        const endWord = String(word || '').trim();
+        if (!endWord) return;
+        const regex = new RegExp(escapeRegExp(endWord), 'gi');
+        normalized = normalized.replace(regex, ' ');
+    });
+
+    return normalized.replace(/[、。！？!?\s]+$/g, '').replace(/\s+/g, ' ').trim();
+}
+
+function resetVoiceSession() {
+    voiceSessionActive = false;
+    voiceSessionTranscript = '';
+    clearPendingFinalDispatch();
+    setMode('waiting');
+}
+
+function dispatchVoiceCommand(commandText) {
+    const sanitized = sanitizeVoiceCommandForDispatch(commandText);
+    if (!sanitized) {
+        // ウェイクワードのみ等は既存仕様どおりTTS停止へ流す
+        processInput('', 'voice');
+        resetVoiceSession();
+        return;
+    }
+
+    const now = Date.now();
+    if ((now - lastVoiceDispatchAt) < DISPATCH_COOLDOWN_MS) {
+        console.log('DEBUG: 2秒クールダウン中のため送信を拒否しました。');
+        resetVoiceSession();
+        return;
+    }
+
+    if (shouldSuppressDuplicateVoiceCommand(sanitized)) {
+        console.log('DEBUG: 重複音声コマンドを抑止');
+        resetVoiceSession();
+        return;
+    }
+
+    lastVoiceDispatchAt = now;
+    console.log(`DEBUG: 音声入力送信: "${sanitized}"`);
+    processInput(sanitized, 'voice');
+    resetVoiceSession();
+}
+
 function queuePendingFinalDispatch(commandText) {
     pendingFinalCommand = mergeRecognizedCommandSegments(pendingFinalCommand, commandText);
 
@@ -372,15 +425,8 @@ function queuePendingFinalDispatch(commandText) {
         pendingFinalDispatchTimerId = null;
         pendingFinalCommand = '';
         if (!commandToProcess) return;
-
-        if (shouldSuppressDuplicateVoiceCommand(commandToProcess)) {
-            console.log('DEBUG: 重複音声コマンドを抑止');
-            return;
-        }
-
-        console.log(`DEBUG: 音声入力確定(非エンドワード・遅延送信): "${commandToProcess}"`);
-        processInput(commandToProcess, 'voice');
-    }, FINAL_COMMAND_DEBOUNCE_MS);
+        dispatchVoiceCommand(commandToProcess);
+    }, FINAL_SEGMENT_WAIT_MS);
 }
 
 function ensureWakeWordInDisplay(commandText, transcriptText) {
@@ -887,233 +933,78 @@ document.addEventListener('DOMContentLoaded', () => {
     recognition.onresult = (event) => {
         const nowAtResult = Date.now();
         if (nowAtResult < endWordInputBlockedUntil) {
-            console.log("DEBUG: エンドワード確定後の入力ブロック中のため、認識結果を破棄しました。");
+            console.log("DEBUG: エンドワード確定直後の入力をブロックしました。");
             return;
         }
 
         const last = event.results.length - 1;
-        let transcript = event.results[last][0].transcript; // Make transcript mutable
-        let isFinal = event.results[last].isFinal; // Make isFinal mutable
+        const rawTranscript = String(event.results[last][0].transcript || '').trim();
+        const isFinal = !!event.results[last].isFinal;
+        if (!rawTranscript) return;
 
+        const wakeWordDetected = WAKE_WORDS.some((word) =>
+            rawTranscript.toLowerCase().includes(String(word || '').toLowerCase())
+        );
+        if (wakeWordDetected && !voiceSessionActive) {
+            voiceSessionActive = true;
+            voiceSessionTranscript = rawTranscript;
+            playWakeWordSound();
+            setMode('listening');
+        } else if (voiceSessionActive) {
+            voiceSessionTranscript = mergeRecognizedCommandSegments(voiceSessionTranscript, rawTranscript);
+        } else if (shouldDisplayAllSpeech) {
+            voiceSessionTranscript = mergeRecognizedCommandSegments(voiceSessionTranscript, rawTranscript);
+        }
+
+        const shouldShowLog = shouldDisplayAllSpeech || voiceSessionActive || wakeWordDetected;
         let tempLogEntry = document.getElementById('interim-log');
-
-        const wakeWordDetectedInTranscript = WAKE_WORDS.some(word => transcript.toLowerCase().includes(word.toLowerCase()));
-
-        // --- エンドワード検出ロジック ---
-        let endWordDetected = false;
-        let originalFinalCommand = '';
-        let detectedEndWord = '';
-        let detectedEndWordSource = '';
-        const canDetectEndWord = currentMode === 'listening' || (currentMode === 'waiting' && wakeWordDetectedInTranscript);
-        const endWordMatch = canDetectEndWord ? findEndWordMatch(transcript) : null;
-        if (endWordMatch) {
-            const now = Date.now();
-            const detectedKey = String(endWordMatch.word || '').trim().toLowerCase();
-            if (
-                detectedKey &&
-                detectedKey === lastDetectedEndWordKey &&
-                (now - lastDetectedEndWordAt) < ENDWORD_DETECTION_SUPPRESS_MS
-            ) {
-                console.log(`DEBUG: エンドワード重複検知を抑止しました: "${endWordMatch.word}"`);
-                return;
-            }
-            lastDetectedEndWordKey = detectedKey;
-            lastDetectedEndWordAt = now;
-
-            detectedEndWord = endWordMatch.word;
-            detectedEndWordSource = String(endWordMatch.source || 'settings');
-            console.log(`DEBUG: エンドワード "${detectedEndWord}" を検出しました。`);
-            // エンドワードを含めて確定し、それ以降のみ切り捨てる
-            originalFinalCommand = transcript.substring(0, endWordMatch.endIndex).trim();
-            endWordDetected = true;
-            isFinal = true; // 強制的に最終結果とする
-            // 以降の処理のためにtranscriptを切り詰める
-            transcript = originalFinalCommand;
+        if (!shouldShowLog) {
+            if (tempLogEntry) tempLogEntry.remove();
+            return;
         }
-
-        // --- ログ表示の制御ロジック ---
-        let shouldProcessDisplay = false;
-        if (shouldDisplayAllSpeech) {
-            shouldProcessDisplay = true; // 設定がtrueなら常に表示
-        } else {
-            // ウェイクワードが検出された場合、またはlisteningモードの場合のみ表示
-            if (wakeWordDetectedInTranscript || currentMode === 'listening') {
-                shouldProcessDisplay = true;
-            }
-        }
-
-        if (!shouldProcessDisplay) {
-            if (tempLogEntry) {
-                tempLogEntry.remove(); // 表示対象外なら中間ログを削除
-            }
-            lastTranscript = ''; // リセット
-            displayOffset = 0; // リセット
-            return; // 処理を終了
-        }
-
         if (!tempLogEntry) {
             tempLogEntry = document.createElement('div');
             tempLogEntry.id = 'interim-log';
             tempLogEntry.className = 'voice-log-entry log-interim';
             voiceLogContainer.appendChild(tempLogEntry);
-            lastTranscript = ''; // 新しい行の開始、履歴をリセット
-            displayOffset = 0;
         }
 
-        let displayTranscript = transcript;
-        const findWakeWordIndex = (text) => {
-            let earliestIndex = -1;
-            WAKE_WORDS.forEach(word => {
-                const idx = text.toLowerCase().indexOf(word.toLowerCase());
-                if (idx !== -1 && (earliestIndex === -1 || idx < earliestIndex)) {
-                    earliestIndex = idx;
-                }
-            });
-            return earliestIndex;
-        };
-
-        const setEntryContent = (entry, text) => {
-            entry.innerHTML = '';
-            if (!text) return;
-            const span = document.createElement('span');
-            span.innerHTML = highlightEndWords(highlightWakeWords(text));
-            entry.appendChild(span);
-            if (endWordDetected && detectedEndWord) {
-                const badge = document.createElement('span');
-                badge.className = 'highlight-end-word-badge';
-                badge.textContent = ` [エンドワード確定: ${detectedEndWord}]`;
-                entry.appendChild(badge);
-            }
-        };
-
-        const wakeIndexInTranscript = findWakeWordIndex(transcript);
-
-        if (!shouldDisplayAllSpeech) { // 全ての音声をデフォルトで表示しない場合
-            if (currentMode === 'waiting') {
-                const wakeIndex = wakeIndexInTranscript;
-                if (wakeIndex !== -1) {
-                    // ウェイクワードが検出された場合のみ、その時点から表示
-                    // 以前の中間ログがあればクリア
-                    if (tempLogEntry && tempLogEntry.id === 'interim-log' && lastTranscript.length > 0) {
-                        tempLogEntry.innerHTML = '';
-                    }
-                    displayOffset = wakeIndex;
-                    displayTranscript = transcript.slice(displayOffset);
-                    lastTranscript = ''; // 新しいセグメントのためにリセット
-                } else {
-                    // ウェイクワードが検出されず、waitingモードの場合は表示しない（shouldProcessDisplayで処理済みだが念のため）
-                    if (tempLogEntry) {
-                        tempLogEntry.remove();
-                    }
-                    lastTranscript = '';
-                    displayOffset = 0;
-                    return;
-                }
-            } else if (currentMode === 'listening') {
-                // listeningモードでは、ウェイクワード検出位置（もしあれば）から全て表示
-                if (wakeIndexInTranscript !== -1) {
-                    displayOffset = wakeIndexInTranscript;
-                } else if (displayOffset === 0 && lastTranscript === '') {
-                    // ウェイクワードなしでlisteningモードが開始された場合（例：手動切り替え）は、最初から表示
-                    displayOffset = 0;
-                }
-                displayTranscript = transcript.slice(displayOffset);
-            }
-        } else { // shouldDisplayAllSpeechがtrueの場合、全て表示
-            displayOffset = 0;
-            displayTranscript = transcript;
-        }
-
-        // 差分を計算して追加
-        if (displayTranscript.length > lastTranscript.length) {
-            const diff = displayTranscript.substring(lastTranscript.length);
-            const diffSpan = document.createElement('span');
-            diffSpan.textContent = diff;
-            
-            // 差分内のウェイクワードをハイライト
-            WAKE_WORDS.forEach(word => {
-                if (diff.toLowerCase().includes(word.toLowerCase())) {
-                     diffSpan.innerHTML = highlightEndWords(highlightWakeWords(diff));
-                }
-            });
-            END_WORDS.forEach(word => {
-                if (diff.toLowerCase().includes(word.toLowerCase())) {
-                    diffSpan.innerHTML = highlightEndWords(highlightWakeWords(diff));
-                }
-            });
-
-            tempLogEntry.appendChild(diffSpan);
-            lastTranscript = displayTranscript;
-        }
-        
+        const displayText = voiceSessionTranscript || rawTranscript;
+        tempLogEntry.innerHTML = highlightEndWords(highlightWakeWords(displayText));
         voiceLogContainer.scrollTop = voiceLogContainer.scrollHeight;
 
-        let finalCommand = '';
+        if (!voiceSessionActive) return;
 
-        if (isFinal) {
-            finalCommand = originalFinalCommand || (shouldDisplayAllSpeech ? transcript.trim() : (displayOffset > 0 ? transcript.slice(displayOffset).trim() : transcript.trim()));
-            let shouldStopTtsOnly = false;
-            let displayCommand = finalCommand;
-            if (endWordDetected && detectedEndWord) {
-                if (detectedEndWordSource === 'settings') {
-                    // 設定エンドワードは語尾トリガーとして扱い、本文のみ送信する。
-                    finalCommand = buildCommandByRemovingSettingEndWord(originalFinalCommand || transcript, detectedEndWord);
-                    const strippedOriginal = stripLeadingWakeWords(originalFinalCommand || transcript)
-                        .replace(/[、。！？!?\s]+$/g, '')
-                        .trim();
-                    const normalizedEndWord = String(detectedEndWord || '')
-                        .replace(/[、。！？!?\s]+$/g, '')
-                        .trim();
-                    shouldStopTtsOnly = !finalCommand && strippedOriginal === normalizedEndWord;
-                } else {
-                    // ボイストリガー由来は、検出した語をそのまま送信する。
-                    finalCommand = detectedEndWord.trim();
-                }
-                // 表示はユーザー発話に寄せ、ウェイクワードを含んだ確定文を維持する。
-                displayCommand = ensureWakeWordInDisplay(originalFinalCommand || transcript.trim(), transcript);
+        const endWordMatch = findEndWordMatch(voiceSessionTranscript);
+        if (endWordMatch) {
+            const detectedKey = String(endWordMatch.word || '').trim().toLowerCase();
+            const now = Date.now();
+            if (
+                detectedKey &&
+                detectedKey === lastDetectedEndWordKey &&
+                (now - lastDetectedEndWordAt) < ENDWORD_DETECTION_SUPPRESS_MS
+            ) {
+                return;
             }
-
-            if (displayCommand && (currentMode === 'listening' || endWordDetected)) {
-                setEntryContent(tempLogEntry, displayCommand);
-            }
+            lastDetectedEndWordKey = detectedKey;
+            lastDetectedEndWordAt = now;
+            endWordInputBlockedUntil = now + ENDWORD_INPUT_BLOCK_MS;
 
             tempLogEntry.classList.remove('log-interim');
             tempLogEntry.removeAttribute('id');
-            lastTranscript = ''; // 次の発話のためにリセット
-            displayOffset = 0; // 次の発話のためにリセット
-            
-            // エンドワードが検出された場合、ここで認識を停止する
-            if (endWordDetected) {
-                console.log("DEBUG: エンドワード検出により音声認識を停止します。");
-                recognition.stop();
-                setMode('waiting'); // 待機モードに戻す
-                endWordInputBlockedUntil = Date.now() + ENDWORD_INPUT_BLOCK_MS;
-                clearPendingFinalDispatch();
-                if (shouldStopTtsOnly) {
-                    if (window.stopAllAudio) {
-                        window.stopAllAudio();
-                    }
-                    console.log('DEBUG: ウェイクワード+設定エンドワードのみを検出。TTS停止のみ実行しました。');
-                    return;
-                }
-                if (shouldSuppressDuplicateVoiceCommand(finalCommand)) {
-                    console.log('DEBUG: 重複音声コマンドを抑制');
-                    return;
-                }
-                processInput(finalCommand, 'voice', { forceDispatch: true }); // エンドワード確定時は強制送信
-                return; // 以降の処理をスキップ
+
+            let commandToDispatch = voiceSessionTranscript;
+            if (String(endWordMatch.source || 'settings') === 'settings') {
+                commandToDispatch = buildCommandByRemovingSettingEndWord(commandToDispatch, endWordMatch.word);
             }
+            dispatchVoiceCommand(commandToDispatch);
+            return;
         }
-        
-        // --- モードとコマンドロジック ---
-        if (currentMode === 'waiting' && WAKE_WORDS.some(word => transcript.toLowerCase().includes(word.toLowerCase()))) {
-            console.log("DEBUG: ウェイクワードを検出");
-            playWakeWordSound();
-            setMode('listening');
-        } 
-        
-        if (currentMode === 'listening' && isFinal && finalCommand) {
-            queuePendingFinalDispatch(finalCommand);
+
+        if (isFinal) {
+            queuePendingFinalDispatch(voiceSessionTranscript);
+            tempLogEntry.classList.remove('log-interim');
+            tempLogEntry.removeAttribute('id');
         }
     };
 

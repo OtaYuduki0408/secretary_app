@@ -196,7 +196,9 @@ export async function check_chat_Space(inputValue) {
     return;
   }
 
-  const cleanedInput = stripWakeWords(inputValue);
+  const rawInput = String(inputValue || '').trim();
+  if (!rawInput) return;
+  const cleanedInput = stripWakeWords(rawInput);
 
   // --- 高速応答ロジック ---
   if (isLocalTriggersLoaded) {
@@ -234,7 +236,7 @@ export async function check_chat_Space(inputValue) {
 
   fire('analysis:start', { steps: ['処理開始'] });
   console.time("チャット解析 総所要時間");
-  console.log("入力検知:", inputValue);
+  console.log("入力検知:", rawInput);
 
   async function applyToneSetting(message, applyTarget) {
     try {
@@ -318,7 +320,7 @@ export async function check_chat_Space(inputValue) {
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ inputValue: cleanedInput, youtubeContext }),
+      body: JSON.stringify({ inputValue: rawInput, youtubeContext }),
     });
 
     if (!response.ok) {
