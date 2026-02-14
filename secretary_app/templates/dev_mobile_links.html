@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>開発者モバイルリンク</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/dev_mobile.css') }}">
+</head>
+<body class="dev-mobile-shell">
+  <main class="dev-mobile-panel">
+    <h1>開発者用モバイルリンク</h1>
+    <p>このURLをブックマークするとログイン工程を省略できます。</p>
+    <ul class="dev-link-list">
+      <li><a href="{{ links.expense }}">{{ links.expense }}</a></li>
+      <li><a href="{{ links.calendar }}">{{ links.calendar }}</a></li>
+      <li><a href="{{ links.voice }}">{{ links.voice }}</a></li>
+    </ul>
+  </main>
+</body>
+</html>

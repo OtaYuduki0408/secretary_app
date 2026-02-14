@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>モバイル収支管理</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/expense.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/dev_mobile.css') }}">
+</head>
+<body class="mobile-page">
+  <div class="container mobile-container">
+    <div id="toast-container"></div>
+    <header class="mobile-header">
+      <h1>収支管理</h1>
+      <a href="/dev/mobile/direct/voice" class="link-btn">音声入力へ</a>
+    </header>
+
+    <section class="card status-card">
+      <h2>現在の状況</h2>
+      <div class="status-grid">
+        <p>残高: <b id="balance">{{ '{:,.0f}'.format(balance or 0) }}</b> 円</p>
+        <p>今月支出: <b id="monthly">{{ '{:,.0f}'.format(monthly_expense or 0) }}</b> 円</p>
+        <p>今日支出: <b id="daily">{{ '{:,.0f}'.format(daily_expense or 0) }}</b> 円</p>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>記録</h2>
+      <div class="form-group">
+        <label>種類</label>
+        <div id="type-selector" class="type-selector">
+          <button data-value="expense" class="btn-type active">支出</button>
+          <button data-value="income" class="btn-type">収入</button>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>金額</label>
+        <input id="amount" type="number" class="input" min="0" placeholder="金額を入力">
+      </div>
+      <div class="form-group">
+        <label>カテゴリ</label>
+        <div id="category-buttons" class="category-buttons"></div>
+        <p id="no-cat" class="empty" style="display:none;">
+          カテゴリ未登録です。<a href="{{ url_for('categories') }}">カテゴリ追加</a>
+        </p>
+      </div>
+      <div class="form-group">
+        <label>メモ</label>
+        <input id="memo" class="input" placeholder="メモを入力">
+      </div>
+      <button id="save" class="btn">保存</button>
+    </section>
+
+    <section class="card">
+      <div class="records-header">
+        <h2>履歴</h2>
+        <button id="delete-mode-btn" class="btn btn-secondary">削除モード</button>
+      </div>
+      <table id="records" class="mobile-records">
+        <thead>
+          <tr>
+            <th class="checkbox-col" style="display:none;"><input type="checkbox" id="select-all-checkbox"></th>
+            <th>日時</th>
+            <th>種類</th>
+            <th>カテゴリ</th>
+            <th>金額</th>
+            <th>メモ</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+      <div class="records-footer">
+        <button id="execute-delete-btn" class="btn btn-danger" style="display:none;">選択削除</button>
+      </div>
+    </section>
+  </div>
+
+  <div id="expense-edit-overlay" class="edit-overlay" hidden>
+    <div class="edit-dialog" role="dialog" aria-modal="true" aria-labelledby="expense-edit-title">
+      <h3 id="expense-edit-title">記録を編集</h3>
+      <div class="form-group">
+        <label>日付</label>
+        <div class="edit-datetime-grid">
+          <input id="edit-year" class="input" type="number" min="2000" max="2100" placeholder="年">
+          <input id="edit-month" class="input" type="number" min="1" max="12" placeholder="月">
+          <input id="edit-day" class="input" type="number" min="1" max="31" placeholder="日">
+          <input id="edit-hour" class="input" type="number" min="0" max="23" placeholder="時">
+          <input id="edit-minute" class="input" type="number" min="0" max="59" placeholder="分">
+        </div>
+      </div>
+      <div class="form-group">
+        <label for="edit-type">種類</label>
+        <select id="edit-type" class="input">
+          <option value="expense">支出</option>
+          <option value="income">収入</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="edit-category">カテゴリ</label>
+        <select id="edit-category" class="input"></select>
+      </div>
+      <div class="form-group">
+        <label for="edit-amount">金額</label>
+        <input id="edit-amount" class="input" type="number" min="0">
+      </div>
+      <div class="form-group">
+        <label for="edit-memo">メモ</label>
+        <input id="edit-memo" class="input" type="text">
+      </div>
+      <div class="edit-actions">
+        <button id="expense-edit-cancel" class="btn btn-secondary" type="button">キャンセル</button>
+        <button id="expense-edit-save" class="btn" type="button">更新</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    window.__DEV_MOBILE_CREDENTIALS__ = {{ forced_credentials | tojson }};
+    (async () => {
+      const creds = window.__DEV_MOBILE_CREDENTIALS__ || {};
+      const res = await fetch('/dev/mobile/bootstrap_login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(creds),
+      });
+      if (!res.ok) {
+        alert('開発者ログインに失敗しました。');
+        return;
+      }
+      const script = document.createElement('script');
+      script.src = "{{ url_for('static', filename='js/expense.js') }}";
+      document.body.appendChild(script);
+    })();
+  </script>
+  <script src="{{ url_for('static', filename='js/app_settings_apply.js') }}"></script>
+</body>
+</html>

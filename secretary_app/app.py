@@ -6,6 +6,7 @@ import os
 import sys
 import re
 import tempfile
+import hashlib
 from datetime import datetime, timedelta
 from functools import wraps
 
@@ -25,6 +26,7 @@ import atexit
 
 import json
 import base64
+from cryptography.fernet import Fernet, InvalidToken
 from google.cloud import texttospeech
 from services.user_service import (
     get_all_users, get_user_by_email, add_user, update_user, delete_user
@@ -228,6 +230,62 @@ def api_login_required(view_func):
     return wrapper
 
 
+def _is_dev_fastlane_enabled() -> bool:
+    return os.getenv('DEV_FASTLANE_ENABLED', '').lower() in {'1', 'true', 'yes', 'on'}
+
+
+DEV_MOBILE_FORCED_EMAIL = os.getenv('DEV_MOBILE_FORCED_EMAIL', 'zelco054@gmail.com')
+DEV_MOBILE_FORCED_PASSWORD = os.getenv('DEV_MOBILE_FORCED_PASSWORD', 'Orenz025')
+
+
+def _build_fastlane_cipher() -> Fernet:
+    secret = os.getenv('DEV_FASTLANE_SECRET', '')
+    if not secret:
+        raise RuntimeError('DEV_FASTLANE_SECRET is not set')
+    digest = hashlib.sha256(secret.encode('utf-8')).digest()
+    key = base64.urlsafe_b64encode(digest)
+    return Fernet(key)
+
+
+def _create_fastlane_token(user: dict, target: str) -> str:
+    email = (user.get('email') or '').strip().lower()
+    cipher = _build_fastlane_cipher()
+    payload = {
+        'target': target,
+        'user': {
+            'id': user.get('id'),
+            'email': email or user.get('email'),
+            'name': user.get('name'),
+        },
+    }
+    raw = json.dumps(payload, ensure_ascii=False).encode('utf-8')
+    return cipher.encrypt(raw).decode('utf-8')
+
+
+def _resolve_fastlane_user(token: str, target: str, ttl_seconds: int = 60 * 60 * 24 * 30):
+    if not _is_dev_fastlane_enabled():
+        abort(404)
+    try:
+        cipher = _build_fastlane_cipher()
+    except RuntimeError:
+        abort(404)
+    try:
+        raw = cipher.decrypt(token.encode('utf-8'), ttl=ttl_seconds)
+        payload = json.loads(raw.decode('utf-8'))
+    except (InvalidToken, ValueError, json.JSONDecodeError):
+        abort(403)
+
+    token_target = payload.get('target')
+    token_user = payload.get('user') or {}
+    token_email = (token_user.get('email') or '').strip().lower()
+    if token_target != target:
+        abort(403)
+    if not token_user.get('id'):
+        abort(403)
+    token_user['email'] = token_email
+    return token_user
+
+
 # ============== トップページ ============== (print statements are kept as they are)
 @app.route('/')
 @login_required
@@ -285,6 +343,135 @@ def playlist_page():
 @login_required
 def calender_page():
     return render_template('calender.html')
+
+@app.route('/dev/mobile/links')
+def dev_mobile_links():
+    if not _is_dev_fastlane_enabled():
+        abort(404)
+    base_url = request.host_url.rstrip('/')
+    links = {
+        'expense': f'{base_url}/dev/mobile/direct/expense',
+        'calendar': f'{base_url}/dev/mobile/direct/calendar',
+        'voice': f'{base_url}/dev/mobile/direct/voice',
+    }
+    return render_template('dev_mobile_links.html', links=links)
+
+
+@app.route('/dev/mobile/bootstrap_login', methods=['POST'])
+def dev_mobile_bootstrap_login():
+    if not _is_dev_fastlane_enabled():
+        abort(404)
+    data = request.get_json(silent=True) or {}
+    email = (data.get('email') or '').strip()
+    password = data.get('password') or ''
+    if not email or not password:
+        return jsonify({'error': 'email and password are required'}), 400
+    result = login_user(email, password)
+    if 'error' in result:
+        return jsonify({'error': result['error']}), 401
+    session.permanent = True
+    session['user'] = result['user']
+    return jsonify({'ok': True, 'user': result['user']})
+
+
+@app.route('/dev/mobile/direct/expense')
+def dev_mobile_direct_expense():
+    if not _is_dev_fastlane_enabled():
+        abort(404)
+    return render_template(
+        'mobile_expense.html',
+        user={},
+        balance=0,
+        monthly_expense=0,
+        daily_expense=0,
+        forced_credentials={
+            'email': DEV_MOBILE_FORCED_EMAIL,
+            'password': DEV_MOBILE_FORCED_PASSWORD,
+        },
+    )
+
+
+@app.route('/dev/mobile/direct/calendar')
+def dev_mobile_direct_calendar():
+    if not _is_dev_fastlane_enabled():
+        abort(404)
+    return render_template(
+        'mobile_calendar.html',
+        user={},
+        forced_credentials={
+            'email': DEV_MOBILE_FORCED_EMAIL,
+            'password': DEV_MOBILE_FORCED_PASSWORD,
+        },
+    )
+
+
+@app.route('/dev/mobile/direct/voice')
+def dev_mobile_direct_voice():
+    if not _is_dev_fastlane_enabled():
+        abort(404)
+    return render_template(
+        'mobile_voice.html',
+        user={},
+        user_name='Developer',
+        forced_credentials={
+            'email': DEV_MOBILE_FORCED_EMAIL,
+            'password': DEV_MOBILE_FORCED_PASSWORD,
+        },
+    )
+
+
+@app.route('/dev/mobile/expense/<string:token>')
+def dev_mobile_expense(token):
+    user = _resolve_fastlane_user(token, 'expense')
+    session.permanent = True
+    session['user'] = user
+    user_id = user.get('id')
+    balance = get_current_balance(user_id)
+    monthly_expense = get_monthly_expense(user_id)
+    daily_expense = get_daily_expense(user_id)
+    return render_template(
+        'mobile_expense.html',
+        user=user,
+        balance=balance,
+        monthly_expense=monthly_expense,
+        daily_expense=daily_expense,
+        forced_credentials={
+            'email': DEV_MOBILE_FORCED_EMAIL,
+            'password': DEV_MOBILE_FORCED_PASSWORD,
+        },
+    )
+
+
+@app.route('/dev/mobile/calendar/<string:token>')
+def dev_mobile_calendar(token):
+    user = _resolve_fastlane_user(token, 'calendar')
+    session.permanent = True
+    session['user'] = user
+    return render_template(
+        'mobile_calendar.html',
+        user=user,
+        forced_credentials={
+            'email': DEV_MOBILE_FORCED_EMAIL,
+            'password': DEV_MOBILE_FORCED_PASSWORD,
+        },
+    )
+
+
+@app.route('/dev/mobile/voice/<string:token>')
+def dev_mobile_voice(token):
+    user = _resolve_fastlane_user(token, 'voice')
+    session.permanent = True
+    session['user'] = user
+    user_name = user.get('name') or user.get('email') or 'ユーザー'
+    return render_template(
+        'mobile_voice.html',
+        user=user,
+        user_name=user_name,
+        forced_credentials={
+            'email': DEV_MOBILE_FORCED_EMAIL,
+            'password': DEV_MOBILE_FORCED_PASSWORD,
+        },
+    )
 
 
 # ============== Google OAuth ログイン (無効化) ==============

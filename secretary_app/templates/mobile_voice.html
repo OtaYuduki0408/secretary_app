@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>モバイル音声入力</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/dev_mobile.css') }}">
+  <script src="https://www.youtube.com/iframe_api"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.5/socket.io.min.js"></script>
+</head>
+<body class="mobile-page" data-user-id="{{ user.id or '' }}">
+  <div id="audio-permission-overlay" class="mobile-overlay">
+    <button type="button" class="close-overlay-btn" aria-label="閉じる">&times;</button>
+    <h2>音声入力を有効化</h2>
+    <p>最初に一度だけ有効化してください。</p>
+    <button id="activate-audio-button" class="btn primary">開始する</button>
+  </div>
+
+  <main class="mobile-voice-shell">
+    <header class="mobile-header">
+      <h1>音声入力</h1>
+      <a href="/dev/mobile/direct/expense" class="link-btn">収支管理へ</a>
+      <a href="/dev/mobile/direct/calendar" class="link-btn">カレンダーへ</a>
+    </header>
+
+    <section class="card mobile-voice-card">
+      <div class="mic-wrap">
+        <button class="mic-btn glass" aria-label="音声入力を開始">
+          <div class="mic-surface" aria-hidden="true">🎙</div>
+        </button>
+      </div>
+      <div id="voice-log-container" class="voice-log-panel"></div>
+      <div class="abort-row">
+        <button id="force-abort-btn" class="abort-btn" type="button" aria-label="強制終了" disabled>強制終了</button>
+      </div>
+      <form id="search-form" class="search" role="search" aria-label="テキスト入力">
+        <input id="searchbox" type="text" inputmode="search" name="search" placeholder="入力または音声でコマンド">
+      </form>
+    </section>
+  </main>
+
+  <div id="read-aloud-overlay" class="mobile-overlay hidden">
+    <button type="button" class="close-overlay-btn" aria-label="閉じる">&times;</button>
+  </div>
+  <div id="image-display-overlay" class="image-display-overlay">
+    <button type="button" class="close-overlay-btn" aria-label="閉じる">&times;</button>
+    <img id="displayed-image" alt="">
+  </div>
+
+  <div id="youtube-overlay" class="youtube-overlay-hidden">
+    <div id="youtube-player-wrapper">
+      <div id="youtube-player-header">
+        <span id="youtube-video-title"></span>
+        <button id="youtube-close-btn">&times;</button>
+      </div>
+      <div id="youtube-error-message" style="display:none;"></div>
+      <div id="youtube-player"></div>
+      <div id="youtube-controls">
+        <button id="youtube-prev-btn">前へ</button>
+        <button id="youtube-next-btn">次へ</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    window.__DEV_MOBILE_CREDENTIALS__ = {{ forced_credentials | tojson }};
+    window.onYouTubeIframeAPIReady = function() {
+      if (typeof window.setYoutubeApiReady === 'function') {
+        window.setYoutubeApiReady(true);
+      } else {
+        window._youtubeApiReadyGlobal = true;
+      }
+    };
+  </script>
+  <script type="module">
+    import { ScheduleManager } from '/static/js/ScheduleManager.js';
+
+    async function ensureLogin() {
+      const res = await fetch('/dev/mobile/bootstrap_login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(window.__DEV_MOBILE_CREDENTIALS__ || {}),
+      });
+      if (!res.ok) throw new Error('login failed');
+      const body = await res.json();
+      if (body?.user?.id) {
+        document.body.dataset.userId = body.user.id;
+      }
+    }
+
+    function loadScript(src, type = null, defer = false) {
+      return new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = src;
+        if (type) script.type = type;
+        script.defer = defer;
+        script.onload = resolve;
+        script.onerror = reject;
+        document.body.appendChild(script);
+      });
+    }
+
+    try {
+      await ensureLogin();
+      window.manager = new ScheduleManager();
+      await loadScript("{{ url_for('static', filename='js/websocket_handler.js', _t=config['VERSION_TIMESTAMP']) }}", 'module', true);
+      await loadScript("{{ url_for('static', filename='js/voice_recognition.js', _t=config['VERSION_TIMESTAMP']) }}");
+      await loadScript("{{ url_for('static', filename='js/Parallax_and_Theme_rotation.js', _t=config['VERSION_TIMESTAMP']) }}", 'module');
+      await loadScript("{{ url_for('static', filename='js/youtube_player.js', _t=config['VERSION_TIMESTAMP']) }}", 'module', true);
+    } catch (e) {
+      console.error(e);
+      alert('開発者ログインまたは初期化に失敗しました。');
+    }
+  </script>
+</body>
+</html>
