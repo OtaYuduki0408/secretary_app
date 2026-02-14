@@ -274,6 +274,7 @@ function findEndWordMatch(text) {
                 word: normalizedGroup.join(','),
                 index: 0,
                 endIndex: originalText.length,
+                source: 'custom',
             };
         }
     }
@@ -283,10 +284,12 @@ function findEndWordMatch(text) {
         if (!word) continue;
         if (commandOnly.includes(word)) {
             const index = commandOnly.indexOf(word);
+            const isCustomSingle = customTriggerEndWords.some((w) => String(w || '').trim() === word);
             return {
                 word,
                 index: index >= 0 ? index : 0,
                 endIndex: originalText.length,
+                source: isCustomSingle ? 'custom' : 'settings',
             };
         }
     }
@@ -391,6 +394,23 @@ function ensureWakeWordInDisplay(commandText, transcriptText) {
     const wakeWord = (detectedWakeWord || WAKE_WORDS[0] || '').trim();
     if (!wakeWord) return text;
     return `${wakeWord} ${text}`.trim();
+}
+
+function buildCommandByRemovingSettingEndWord(commandText, endWord) {
+    const normalizedEndWord = String(endWord || '').trim();
+    let commandOnly = stripLeadingWakeWords(String(commandText || '')).trim();
+    if (!commandOnly || !normalizedEndWord) {
+        return commandOnly;
+    }
+
+    const lastIndex = commandOnly.lastIndexOf(normalizedEndWord);
+    if (lastIndex !== -1) {
+        commandOnly = `${commandOnly.slice(0, lastIndex)}${commandOnly.slice(lastIndex + normalizedEndWord.length)}`;
+    }
+    return commandOnly
+        .replace(/[、。！？!?\s]+$/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
 }
 
 // ============================================================================
@@ -883,6 +903,7 @@ document.addEventListener('DOMContentLoaded', () => {
         let endWordDetected = false;
         let originalFinalCommand = '';
         let detectedEndWord = '';
+        let detectedEndWordSource = '';
         const canDetectEndWord = currentMode === 'listening' || (currentMode === 'waiting' && wakeWordDetectedInTranscript);
         const endWordMatch = canDetectEndWord ? findEndWordMatch(transcript) : null;
         if (endWordMatch) {
@@ -900,6 +921,7 @@ document.addEventListener('DOMContentLoaded', () => {
             lastDetectedEndWordAt = now;
 
             detectedEndWord = endWordMatch.word;
+            detectedEndWordSource = String(endWordMatch.source || 'settings');
             console.log(`DEBUG: エンドワード "${detectedEndWord}" を検出しました。`);
             // エンドワードを含めて確定し、それ以降のみ切り捨てる
             originalFinalCommand = transcript.substring(0, endWordMatch.endIndex).trim();
@@ -1032,8 +1054,13 @@ document.addEventListener('DOMContentLoaded', () => {
             finalCommand = originalFinalCommand || (shouldDisplayAllSpeech ? transcript.trim() : (displayOffset > 0 ? transcript.slice(displayOffset).trim() : transcript.trim()));
             let displayCommand = finalCommand;
             if (endWordDetected && detectedEndWord) {
-                // エンドワード確定時は、音声認識の揺れではなく検出した語を優先して送信する。
-                finalCommand = detectedEndWord.trim();
+                if (detectedEndWordSource === 'settings') {
+                    // 設定エンドワードは語尾トリガーとして扱い、本文のみ送信する。
+                    finalCommand = buildCommandByRemovingSettingEndWord(originalFinalCommand || transcript, detectedEndWord);
+                } else {
+                    // ボイストリガー由来は、検出した語をそのまま送信する。
+                    finalCommand = detectedEndWord.trim();
+                }
                 // 表示はユーザー発話に寄せ、ウェイクワードを含んだ確定文を維持する。
                 displayCommand = ensureWakeWordInDisplay(originalFinalCommand || transcript.trim(), transcript);
             }
