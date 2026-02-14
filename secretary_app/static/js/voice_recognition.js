@@ -927,6 +927,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (isFinal) {
             finalCommand = originalFinalCommand || (shouldDisplayAllSpeech ? transcript.trim() : (displayOffset > 0 ? transcript.slice(displayOffset).trim() : transcript.trim()));
+            if (endWordDetected && detectedEndWord) {
+                // エンドワード確定時は、音声認識の揺れではなく検出した語を優先して送信する。
+                finalCommand = detectedEndWord.trim();
+            }
 
             if (finalCommand && (currentMode === 'listening' || endWordDetected)) {
                 setEntryContent(tempLogEntry, finalCommand);
