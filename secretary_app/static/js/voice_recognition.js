@@ -24,9 +24,13 @@ const isMobileDevice = (() => {
 let lastRestartAt = 0;
 const MOBILE_RESTART_COOLDOWN_MS = 3000;
 const DUPLICATE_SUPPRESS_MS = 5000;
+// エンドワード未検出の最終認識は、誤確定を避けるため長めに待って送信する。
+const FINAL_COMMAND_DEBOUNCE_MS = 5000;
 let lastDispatchedVoiceCommandKey = '';
 let lastDispatchedVoiceCommandAt = 0;
 let isRecognitionActive = false;
+let pendingFinalCommand = '';
+let pendingFinalDispatchTimerId = null;
 
 // TTS (Text-to-Speech) 設定
 const speechSynth = window.speechSynthesis;
@@ -135,23 +139,11 @@ function extractVoiceTriggerEndWordsFromOrder(order) {
                         .map((v) => String(v || '').trim())
                         .filter(Boolean);
                     words.push(...normalizedGroup);
-                    if (normalizedGroup.length > 1) {
-                        words.push(normalizedGroup.join(''));
-                        words.push(normalizedGroup.join(' '));
-                    }
                     return;
                 }
 
                 const single = String(group || '').trim();
-                if (!single) return;
-                if (single.includes(',')) {
-                    const parts = single.split(',').map((v) => v.trim()).filter(Boolean);
-                    words.push(...parts);
-                    if (parts.length > 1) {
-                        words.push(parts.join(''));
-                        words.push(parts.join(' '));
-                    }
-                } else {
+                if (single) {
                     words.push(single);
                 }
             });
@@ -159,12 +151,14 @@ function extractVoiceTriggerEndWordsFromOrder(order) {
 
         const legacyKeyword = value.keyword;
         if (typeof legacyKeyword === 'string') {
-            words.push(...legacyKeyword.split(',').map((v) => v.trim()).filter(Boolean));
+            const normalized = legacyKeyword.trim();
+            if (normalized) words.push(normalized);
         }
 
         const legacyValue = value.value;
         if (typeof legacyValue === 'string') {
-            words.push(...legacyValue.split(',').map((v) => v.trim()).filter(Boolean));
+            const normalized = legacyValue.trim();
+            if (normalized) words.push(normalized);
         }
     });
 
@@ -207,17 +201,25 @@ function findEndWordMatch(text) {
     if (!text || !Array.isArray(END_WORDS) || END_WORDS.length === 0) {
         return null;
     }
-    const lowerText = text.toLowerCase();
-    let bestMatch = null;
-    END_WORDS.forEach(word => {
-        const lowerWord = word.toLowerCase();
-        const index = lowerText.indexOf(lowerWord);
-        if (index === -1) return;
-        if (!bestMatch || index < bestMatch.index || (index === bestMatch.index && word.length > bestMatch.word.length)) {
-            bestMatch = { word, index, endIndex: index + word.length };
+    const originalText = String(text || '').trim();
+    if (!originalText) return null;
+
+    const commandOnly = stripLeadingWakeWords(originalText).trim();
+    if (!commandOnly) return null;
+
+    for (const rawWord of END_WORDS) {
+        const word = String(rawWord || '').trim();
+        if (!word) continue;
+        if (commandOnly === word) {
+            const index = originalText.lastIndexOf(word);
+            return {
+                word,
+                index: index >= 0 ? index : 0,
+                endIndex: index >= 0 ? index + word.length : word.length,
+            };
         }
-    });
-    return bestMatch;
+    }
+    return null;
 }
 
 function stripLeadingWakeWords(text) {
@@ -264,6 +266,47 @@ function shouldSuppressDuplicateVoiceCommand(commandText) {
         lastDispatchedVoiceCommandAt = now;
     }
     return isDuplicate;
+}
+
+function mergeRecognizedCommandSegments(previousText, newText) {
+    const prev = String(previousText || '').trim();
+    const next = String(newText || '').trim();
+    if (!prev) return next;
+    if (!next) return prev;
+    if (next.includes(prev)) return next;
+    if (prev.includes(next)) return prev;
+    return `${prev} ${next}`.replace(/\s+/g, ' ').trim();
+}
+
+function clearPendingFinalDispatch() {
+    if (pendingFinalDispatchTimerId) {
+        clearTimeout(pendingFinalDispatchTimerId);
+        pendingFinalDispatchTimerId = null;
+    }
+    pendingFinalCommand = '';
+}
+
+function queuePendingFinalDispatch(commandText) {
+    pendingFinalCommand = mergeRecognizedCommandSegments(pendingFinalCommand, commandText);
+
+    if (pendingFinalDispatchTimerId) {
+        clearTimeout(pendingFinalDispatchTimerId);
+    }
+
+    pendingFinalDispatchTimerId = setTimeout(() => {
+        const commandToProcess = String(pendingFinalCommand || '').trim();
+        pendingFinalDispatchTimerId = null;
+        pendingFinalCommand = '';
+        if (!commandToProcess) return;
+
+        if (shouldSuppressDuplicateVoiceCommand(commandToProcess)) {
+            console.log('DEBUG: 重複音声コマンドを抑止');
+            return;
+        }
+
+        console.log(`DEBUG: 音声入力確定(非エンドワード・遅延送信): "${commandToProcess}"`);
+        processInput(commandToProcess, 'voice');
+    }, FINAL_COMMAND_DEBOUNCE_MS);
 }
 
 // ============================================================================
@@ -899,6 +942,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 console.log("DEBUG: エンドワード検出により音声認識を停止します。");
                 recognition.stop();
                 setMode('waiting'); // 待機モードに戻す
+                clearPendingFinalDispatch();
                 if (shouldSuppressDuplicateVoiceCommand(finalCommand)) {
                     console.log('DEBUG: 重複音声コマンドを抑制');
                     return;
@@ -916,13 +960,7 @@ document.addEventListener('DOMContentLoaded', () => {
         } 
         
         if (currentMode === 'listening' && isFinal && finalCommand) {
-            if (shouldSuppressDuplicateVoiceCommand(finalCommand)) {
-                console.log('DEBUG: 重複音声コマンドを抑制');
-                return;
-            }
-
-            console.log(`DEBUG: 音声入力確定: "${transcript.trim()}"`);
-            processInput(finalCommand, 'voice');
+            queuePendingFinalDispatch(finalCommand);
         }
     };
 
@@ -1723,3 +1761,4 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
         });
+
