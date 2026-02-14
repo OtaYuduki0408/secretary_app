@@ -26,11 +26,16 @@ const MOBILE_RESTART_COOLDOWN_MS = 3000;
 const DUPLICATE_SUPPRESS_MS = 5000;
 // エンドワード未検出の最終認識は、誤確定を避けるため長めに待って送信する。
 const FINAL_COMMAND_DEBOUNCE_MS = 5000;
+const ENDWORD_DETECTION_SUPPRESS_MS = 3000;
+const ENDWORD_INPUT_BLOCK_MS = 3000;
 let lastDispatchedVoiceCommandKey = '';
 let lastDispatchedVoiceCommandAt = 0;
 let isRecognitionActive = false;
 let pendingFinalCommand = '';
 let pendingFinalDispatchTimerId = null;
+let lastDetectedEndWordKey = '';
+let lastDetectedEndWordAt = 0;
+let endWordInputBlockedUntil = 0;
 
 // TTS (Text-to-Speech) 設定
 const speechSynth = window.speechSynthesis;
@@ -307,6 +312,19 @@ function queuePendingFinalDispatch(commandText) {
         console.log(`DEBUG: 音声入力確定(非エンドワード・遅延送信): "${commandToProcess}"`);
         processInput(commandToProcess, 'voice');
     }, FINAL_COMMAND_DEBOUNCE_MS);
+}
+
+function ensureWakeWordInDisplay(commandText, transcriptText) {
+    const text = String(commandText || '').trim();
+    if (!text) return text;
+    const hasWakeWord = WAKE_WORDS.some((word) => text.includes(word));
+    if (hasWakeWord) return text;
+
+    const transcript = String(transcriptText || '');
+    const detectedWakeWord = WAKE_WORDS.find((word) => transcript.toLowerCase().includes(String(word).toLowerCase()));
+    const wakeWord = (detectedWakeWord || WAKE_WORDS[0] || '').trim();
+    if (!wakeWord) return text;
+    return `${wakeWord} ${text}`.trim();
 }
 
 // ============================================================================
@@ -781,6 +799,12 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     recognition.onresult = (event) => {
+        const nowAtResult = Date.now();
+        if (nowAtResult < endWordInputBlockedUntil) {
+            console.log("DEBUG: エンドワード確定後の入力ブロック中のため、認識結果を破棄しました。");
+            return;
+        }
+
         const last = event.results.length - 1;
         let transcript = event.results[last][0].transcript; // Make transcript mutable
         let isFinal = event.results[last].isFinal; // Make isFinal mutable
@@ -796,6 +820,19 @@ document.addEventListener('DOMContentLoaded', () => {
         const canDetectEndWord = currentMode === 'listening' || (currentMode === 'waiting' && wakeWordDetectedInTranscript);
         const endWordMatch = canDetectEndWord ? findEndWordMatch(transcript) : null;
         if (endWordMatch) {
+            const now = Date.now();
+            const detectedKey = String(endWordMatch.word || '').trim().toLowerCase();
+            if (
+                detectedKey &&
+                detectedKey === lastDetectedEndWordKey &&
+                (now - lastDetectedEndWordAt) < ENDWORD_DETECTION_SUPPRESS_MS
+            ) {
+                console.log(`DEBUG: エンドワード重複検知を抑止しました: "${endWordMatch.word}"`);
+                return;
+            }
+            lastDetectedEndWordKey = detectedKey;
+            lastDetectedEndWordAt = now;
+
             detectedEndWord = endWordMatch.word;
             console.log(`DEBUG: エンドワード "${detectedEndWord}" を検出しました。`);
             // エンドワードを含めて確定し、それ以降のみ切り捨てる
@@ -927,13 +964,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (isFinal) {
             finalCommand = originalFinalCommand || (shouldDisplayAllSpeech ? transcript.trim() : (displayOffset > 0 ? transcript.slice(displayOffset).trim() : transcript.trim()));
+            let displayCommand = finalCommand;
             if (endWordDetected && detectedEndWord) {
                 // エンドワード確定時は、音声認識の揺れではなく検出した語を優先して送信する。
                 finalCommand = detectedEndWord.trim();
+                // 表示はユーザー発話に寄せ、ウェイクワードを含んだ確定文を維持する。
+                displayCommand = ensureWakeWordInDisplay(originalFinalCommand || transcript.trim(), transcript);
             }
 
-            if (finalCommand && (currentMode === 'listening' || endWordDetected)) {
-                setEntryContent(tempLogEntry, finalCommand);
+            if (displayCommand && (currentMode === 'listening' || endWordDetected)) {
+                setEntryContent(tempLogEntry, displayCommand);
             }
 
             tempLogEntry.classList.remove('log-interim');
@@ -946,6 +986,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 console.log("DEBUG: エンドワード検出により音声認識を停止します。");
                 recognition.stop();
                 setMode('waiting'); // 待機モードに戻す
+                endWordInputBlockedUntil = Date.now() + ENDWORD_INPUT_BLOCK_MS;
                 clearPendingFinalDispatch();
                 if (shouldSuppressDuplicateVoiceCommand(finalCommand)) {
                     console.log('DEBUG: 重複音声コマンドを抑制');
