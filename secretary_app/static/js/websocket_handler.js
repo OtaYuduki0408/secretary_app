@@ -453,6 +453,10 @@ async function executeAction(action) {
                 let intentPayload = null;
                 let successMessage = "";
                 switch (action.sub) {
+                    case '再開':
+                        intentPayload = { intent: 'resume', query: '' };
+                        successMessage = "YouTubeを再開します。";
+                        break;
                     case '一時停止':
                         intentPayload = { intent: 'pause', query: '' };
                         successMessage = "YouTubeを一時停止します。";

@@ -437,7 +437,12 @@ function executeYoutubeIntent(payload = {}) {
             playPrevVideo();
             return true;
         case 'pause':
-            return pauseCurrentVideo();
+            {
+                const wasVisible = isOverlayVisible();
+                const paused = pauseCurrentVideo();
+                hideOverlayOnly();
+                return paused || wasVisible;
+            }
         case 'resume':
             showOverlay();
             updateControls();
