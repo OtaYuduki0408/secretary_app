@@ -265,6 +265,10 @@ class ChatSpaceModel:
     - prev: 前の曲/前の動画
     - pause: 一時停止
     - resume: 再開
+    - seek_forward: 動画を指定秒数進める
+    - seek_backward: 動画を指定秒数戻す
+    - volume_up: YouTubeプレーヤー音量を上げる
+    - volume_down: YouTubeプレーヤー音量を下げる
     - stop: 再生停止
     - close: オーバーレイを閉じる
     - save_current: 今の動画を保存
@@ -275,6 +279,8 @@ class ChatSpaceModel:
     - unknown: 判別不能
     例:
     {{"intent":"next","query":"","reason":"次の曲の要求"}}
+    {{"intent":"volume_up","query":"","reason":"音量を上げたい"}}
+    {{"intent":"seek_forward","query":"","reason":"少し先に進めたい"}}
     {{"intent":"search_in_results","query":"ライブ版","reason":"検索結果内の絞り込み"}}
     ユーザー入力: {input_value}
     """
@@ -283,7 +289,7 @@ class ChatSpaceModel:
     必ずJSONのみで出力してください。
     Keys:
     - is_youtube_control: boolean
-    - intent: string (next/prev/pause/resume/stop/close/save_current/reject_current/random/replay/search_in_results/unknown)
+    - intent: string (next/prev/pause/resume/seek_forward/seek_backward/volume_up/volume_down/stop/close/save_current/reject_current/random/replay/search_in_results/unknown)
     - query: string (必要時のみ。なければ空文字)
     - reason: string (短く)
     判定ルール:
@@ -446,7 +452,8 @@ class ChatSpaceModel:
             f"has_queue={bool(ctx.get('has_queue'))}, "
             f"queue_length={int(ctx.get('queue_length') or 0)}, "
             f"current_index={int(ctx.get('current_index') or 0)}, "
-            f"current_title={str(ctx.get('current_title') or '')}"
+            f"current_title={str(ctx.get('current_title') or '')}, "
+            f"volume={ctx.get('volume')}"
         )
 
     def _detect_youtube_control_intent(self, text: str, youtube_context: dict | None = None) -> tuple[str, str] | None:
@@ -470,7 +477,9 @@ class ChatSpaceModel:
         intent = str(data.get("intent") or "").strip().lower()
         query = str(data.get("query") or "").strip()
         allowed = {
-            "next", "prev", "pause", "resume", "stop", "close",
+            "next", "prev", "pause", "resume",
+            "seek_forward", "seek_backward", "volume_up", "volume_down",
+            "stop", "close",
             "save_current", "reject_current", "random", "replay",
             "search_in_results"
         }
@@ -1348,7 +1357,9 @@ class ChatSpaceModel:
                 intent = str(data.get("intent") or "").strip().lower()
                 query = str(data.get("query") or "").strip()
                 allowed = {
-                    "next", "prev", "pause", "resume", "stop", "close",
+                    "next", "prev", "pause", "resume",
+                    "seek_forward", "seek_backward", "volume_up", "volume_down",
+                    "stop", "close",
                     "save_current", "reject_current", "random", "replay",
                     "search_in_results", "unknown"
                 }

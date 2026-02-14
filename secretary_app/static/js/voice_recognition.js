@@ -1052,11 +1052,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (isFinal) {
             finalCommand = originalFinalCommand || (shouldDisplayAllSpeech ? transcript.trim() : (displayOffset > 0 ? transcript.slice(displayOffset).trim() : transcript.trim()));
+            let shouldStopTtsOnly = false;
             let displayCommand = finalCommand;
             if (endWordDetected && detectedEndWord) {
                 if (detectedEndWordSource === 'settings') {
                     // 設定エンドワードは語尾トリガーとして扱い、本文のみ送信する。
                     finalCommand = buildCommandByRemovingSettingEndWord(originalFinalCommand || transcript, detectedEndWord);
+                    const strippedOriginal = stripLeadingWakeWords(originalFinalCommand || transcript)
+                        .replace(/[、。！？!?\s]+$/g, '')
+                        .trim();
+                    const normalizedEndWord = String(detectedEndWord || '')
+                        .replace(/[、。！？!?\s]+$/g, '')
+                        .trim();
+                    shouldStopTtsOnly = !finalCommand && strippedOriginal === normalizedEndWord;
                 } else {
                     // ボイストリガー由来は、検出した語をそのまま送信する。
                     finalCommand = detectedEndWord.trim();
@@ -1081,6 +1089,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 setMode('waiting'); // 待機モードに戻す
                 endWordInputBlockedUntil = Date.now() + ENDWORD_INPUT_BLOCK_MS;
                 clearPendingFinalDispatch();
+                if (shouldStopTtsOnly) {
+                    if (window.stopAllAudio) {
+                        window.stopAllAudio();
+                    }
+                    console.log('DEBUG: ウェイクワード+設定エンドワードのみを検出。TTS停止のみ実行しました。');
+                    return;
+                }
                 if (shouldSuppressDuplicateVoiceCommand(finalCommand)) {
                     console.log('DEBUG: 重複音声コマンドを抑制');
                     return;

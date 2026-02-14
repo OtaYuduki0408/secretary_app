@@ -87,8 +87,7 @@ function parseActionItem(actionItem) {
   const fixedSubByCategory = {
     '収支管理': '読み上げ',
     'メモ': '読み上げ',
-    '時間読み上げ': '読み上げ内容',
-    'Youtube': '再生'
+    '時間読み上げ': '読み上げ内容'
   };
 
   if (fixedSubByCategory[category] && (!sub || subSelect.disabled)) {
@@ -174,6 +173,14 @@ function parseActionItem(actionItem) {
         } else if (mode === 'url') {
           detail.video_url = detailContainer.querySelector(".action-detail-youtube-url")?.value;
         }
+      } else if (sub === "動画を進める" || sub === "動画を戻す") {
+        const secondsRaw = Number(detailContainer.querySelector(".action-detail-youtube-seconds")?.value);
+        const seconds = Number.isFinite(secondsRaw) ? Math.max(1, Math.min(600, Math.round(secondsRaw))) : 10;
+        detail.seconds = seconds;
+      } else if (sub === "音量を上げる" || sub === "音量を下げる") {
+        const volumeStepRaw = Number(detailContainer.querySelector(".action-detail-youtube-volume-step")?.value);
+        const volumeStep = Number.isFinite(volumeStepRaw) ? Math.max(1, Math.min(100, Math.round(volumeStepRaw))) : 10;
+        detail.volume_step = volumeStep;
       }
       break;
 

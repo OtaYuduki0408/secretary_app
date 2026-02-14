@@ -414,23 +414,81 @@ async function executeAction(action) {
         overlayCategoryClass = "overlay-speech";
         textToSpeak = detail.message || "明日の目覚まし時刻を取得できませんでした。";
         messageHtml = `<h3>${overlayTitle}</h3><p>${textToSpeak}</p>`;
-    } else if (action.category === 'Youtube' && action.sub === '再生') {
-        overlayTitle = "Youtube 再生";
-        const { mode, search_query, video_url } = detail;
-        const queryOrUrl = mode === 'url' ? video_url : search_query;
+    } else if (action.category === 'Youtube') {
+        overlayTitle = "Youtube 操作";
 
-        if (queryOrUrl && typeof window.playYoutubeVideo === 'function') {
-            textToSpeak = `${mode === 'url' ? 'URLの動画' : search_query}を再生します。`;
-            
-            await speak(textToSpeak); 
-            window.playYoutubeVideo(queryOrUrl);
+        if (action.sub === '再生') {
+            const { mode, search_query, video_url } = detail;
+            const queryOrUrl = mode === 'url' ? video_url : search_query;
 
-            return; 
+            if (queryOrUrl && typeof window.playYoutubeVideo === 'function') {
+                textToSpeak = `${mode === 'url' ? 'URLの動画' : search_query}を再生します。`;
+                await speak(textToSpeak);
+                window.playYoutubeVideo(queryOrUrl);
+                return;
+            }
 
-        } else {
+            if (typeof window.executeYoutubeIntent === 'function') {
+                const resumed = window.executeYoutubeIntent({ intent: 'resume', query: '' });
+                if (resumed) {
+                    textToSpeak = "YouTubeを再生します。";
+                    await speak(textToSpeak);
+                    return;
+                }
+            }
+
             textToSpeak = "Youtubeの再生情報が正しく設定されていません。";
             console.error(textToSpeak, detail);
             messageHtml = `<h3>${overlayTitle}</h3><p>${textToSpeak}</p>`;
+        } else {
+            if (typeof window.executeYoutubeIntent !== 'function') {
+                textToSpeak = "YouTube操作機能を読み込めませんでした。";
+                messageHtml = `<h3>${overlayTitle}</h3><p>${textToSpeak}</p>`;
+            } else {
+                const secondsRaw = Number(detail.seconds);
+                const volumeStepRaw = Number(detail.volume_step);
+                const seconds = Number.isFinite(secondsRaw) ? Math.max(1, Math.min(600, Math.round(secondsRaw))) : 10;
+                const volumeStep = Number.isFinite(volumeStepRaw) ? Math.max(1, Math.min(100, Math.round(volumeStepRaw))) : 10;
+
+                let intentPayload = null;
+                let successMessage = "";
+                switch (action.sub) {
+                    case '一時停止':
+                        intentPayload = { intent: 'pause', query: '' };
+                        successMessage = "YouTubeを一時停止します。";
+                        break;
+                    case '動画を進める':
+                        intentPayload = { intent: 'seek_forward', query: '', amount: seconds };
+                        successMessage = `${seconds}秒進めます。`;
+                        break;
+                    case '動画を戻す':
+                        intentPayload = { intent: 'seek_backward', query: '', amount: seconds };
+                        successMessage = `${seconds}秒戻します。`;
+                        break;
+                    case '音量を上げる':
+                        intentPayload = { intent: 'volume_up', query: '', amount: volumeStep };
+                        successMessage = `音量を${volumeStep}上げます。`;
+                        break;
+                    case '音量を下げる':
+                        intentPayload = { intent: 'volume_down', query: '', amount: volumeStep };
+                        successMessage = `音量を${volumeStep}下げます。`;
+                        break;
+                    default:
+                        break;
+                }
+
+                if (!intentPayload) {
+                    textToSpeak = `未対応のYouTube操作です: ${action.sub}`;
+                    messageHtml = `<h3>${overlayTitle}</h3><p>${textToSpeak}</p>`;
+                } else {
+                    const handled = window.executeYoutubeIntent(intentPayload);
+                    if (handled) {
+                        textToSpeak = successMessage;
+                    } else {
+                        textToSpeak = "YouTube操作を実行できませんでした。";
+                    }
+                }
+            }
         }
     } else if (action.category === '画像提示' && action.sub === '発声') {
         const imageOverlay = document.getElementById('image-display-overlay');

@@ -162,8 +162,7 @@ export function createActionUI(prefix = '', initialValue = {}) {
   const fixedSubByCategory = {
     '収支管理': '読み上げ',
     'メモ': '読み上げ',
-    '時間読み上げ': '読み上げ内容',
-    'Youtube': '再生'
+    '時間読み上げ': '読み上げ内容'
   };
   if (fixedSubByCategory[category] && subSelect) {
     sub = fixedSubByCategory[category];
@@ -588,7 +587,7 @@ export function createActionUI(prefix = '', initialValue = {}) {
       if (sub === "再生") {
         const subNotice = subSelect?.disabled ? `<div class="co-help-text">サブカテゴリ: ${sub}</div>` : "";
         const mode = initialValue.mode || 'search';
-        
+
         detailContainer.innerHTML = `
           ${subNotice}
           <div class="co-fieldset" style="margin-top: 10px;">
@@ -622,8 +621,22 @@ export function createActionUI(prefix = '', initialValue = {}) {
         detailContainer.querySelectorAll(`input[name="${prefix}youtube_mode"]`).forEach(radio => {
           radio.addEventListener('change', renderYoutubeInput);
         });
-        
-        renderYoutubeInput(); // 初期表示
+
+        renderYoutubeInput();
+      } else if (sub === "動画を進める" || sub === "動画を戻す") {
+        const defaultSeconds = Number.isFinite(Number(initialValue.seconds)) ? Number(initialValue.seconds) : 10;
+        detailContainer.innerHTML = `
+          <label>移動秒数</label>
+          <input type="number" class="action-detail-youtube-seconds" min="1" max="600" step="1" value="${defaultSeconds}">
+        `;
+      } else if (sub === "音量を上げる" || sub === "音量を下げる") {
+        const defaultStep = Number.isFinite(Number(initialValue.volume_step)) ? Number(initialValue.volume_step) : 10;
+        detailContainer.innerHTML = `
+          <label>音量変化量 (1-100)</label>
+          <input type="number" class="action-detail-youtube-volume-step" min="1" max="100" step="1" value="${defaultStep}">
+        `;
+      } else {
+        detailContainer.innerHTML = `<div class="co-help-text">この操作に追加設定はありません。</div>`;
       }
       break;
 

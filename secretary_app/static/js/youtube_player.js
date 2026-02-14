@@ -306,6 +306,45 @@ function replayCurrentVideo() {
     return false;
 }
 
+function seekCurrentVideoBy(deltaSec) {
+    if (!player || typeof player.seekTo !== 'function' || typeof player.getCurrentTime !== 'function') {
+        return false;
+    }
+    const delta = Number(deltaSec);
+    if (!Number.isFinite(delta) || delta === 0) return false;
+    const current = Number(player.getCurrentTime());
+    if (!Number.isFinite(current)) return false;
+
+    let target = current + delta;
+    if (typeof player.getDuration === 'function') {
+        const duration = Number(player.getDuration());
+        if (Number.isFinite(duration) && duration > 0) {
+            target = Math.min(Math.max(0, target), duration);
+        } else {
+            target = Math.max(0, target);
+        }
+    } else {
+        target = Math.max(0, target);
+    }
+    player.seekTo(target, true);
+    return true;
+}
+
+function adjustCurrentVideoVolume(deltaAmount) {
+    if (!player || typeof player.getVolume !== 'function' || typeof player.setVolume !== 'function') {
+        return false;
+    }
+    const delta = Number(deltaAmount);
+    if (!Number.isFinite(delta) || delta === 0) return false;
+
+    const current = Number(player.getVolume());
+    if (!Number.isFinite(current)) return false;
+
+    const next = Math.min(100, Math.max(0, Math.round(current + delta)));
+    player.setVolume(next);
+    return true;
+}
+
 function playRandomFromCurrentQueue() {
     if (!Array.isArray(currentPlaylist) || currentPlaylist.length === 0) return false;
     if (currentPlaylist.length === 1) {
@@ -388,6 +427,8 @@ async function persistYoutubePreference(action, payload = {}) {
 function executeYoutubeIntent(payload = {}) {
     const intent = String(payload.intent || '').trim().toLowerCase();
     const query = String(payload.query || '').trim();
+    const amountRaw = Number(payload.amount);
+    const amount = Number.isFinite(amountRaw) ? amountRaw : 0;
     switch (intent) {
         case 'next':
             playNextVideo();
@@ -414,6 +455,14 @@ function executeYoutubeIntent(payload = {}) {
             return playRandomFromCurrentQueue();
         case 'search_in_results':
             return searchInCurrentQueue(query);
+        case 'seek_forward':
+            return seekCurrentVideoBy(Math.max(1, Math.abs(amount || 10)));
+        case 'seek_backward':
+            return seekCurrentVideoBy(-Math.max(1, Math.abs(amount || 10)));
+        case 'volume_up':
+            return adjustCurrentVideoVolume(Math.max(1, Math.abs(amount || 10)));
+        case 'volume_down':
+            return adjustCurrentVideoVolume(-Math.max(1, Math.abs(amount || 10)));
         case 'save_current':
             emitYoutubeControlEvent('save_current', {
                 current: currentPlaylist[currentVideoIndex] || null,
@@ -437,6 +486,7 @@ function executeYoutubeIntent(payload = {}) {
 function getYoutubeContextState() {
     const isPaused = !!(window.YT && lastPlayerState === YT.PlayerState.PAUSED);
     const isPlaying = !!(window.YT && lastPlayerState === YT.PlayerState.PLAYING);
+    const currentVolume = (player && typeof player.getVolume === 'function') ? Number(player.getVolume()) : null;
     return {
         active: Boolean((player && typeof player.playVideo === 'function') || pendingVideoId || (currentPlaylist && currentPlaylist.length > 0)),
         overlay_visible: isOverlayVisible(),
@@ -446,7 +496,8 @@ function getYoutubeContextState() {
         queue_length: Array.isArray(currentPlaylist) ? currentPlaylist.length : 0,
         current_index: currentVideoIndex,
         current_title: currentPlaylist[currentVideoIndex]?.title || '',
-        current_video_id: currentPlaylist[currentVideoIndex]?.id || ''
+        current_video_id: currentPlaylist[currentVideoIndex]?.id || '',
+        volume: Number.isFinite(currentVolume) ? currentVolume : null
     };
 }
 
