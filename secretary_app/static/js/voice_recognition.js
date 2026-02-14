@@ -11,7 +11,10 @@ let recognition; // SpeechRecognitionインスタンス
 let currentMode = 'waiting'; // 'waiting' or 'listening'
 let recognitionTimeoutId; // 音声入力タイムアウトのID
 let shouldDisplayAllSpeech = false; // 全ての音声をログに表示するかどうかの設定
-let END_WORDS = ['命令完了']; // 音声入力の強制終了ワード（カンマ区切りOR）
+const DEFAULT_END_WORDS = ['命令完了'];
+let END_WORDS = [...DEFAULT_END_WORDS]; // 音声入力の強制終了ワード（カンマ区切りOR）
+let settingsEndWords = [...DEFAULT_END_WORDS];
+let customTriggerEndWords = [];
 
 // モバイル環境のみの制御
 const isMobileDevice = (() => {
@@ -42,6 +45,8 @@ function loadAppSettings() {
         const raw = localStorage.getItem('appSettings');
         if (!raw) {
             shouldDisplayAllSpeech = false; // デフォルトはOff
+            settingsEndWords = [...DEFAULT_END_WORDS];
+            rebuildEffectiveEndWords();
             return;
         }
         const settings = JSON.parse(raw);
@@ -62,27 +67,136 @@ function loadAppSettings() {
 
         // ログ表示設定を読み込む
         shouldDisplayAllSpeech = settings?.main?.displayAllSpeech ?? false;
-        END_WORDS = parseEndWords(settings?.main?.endWord || '命令完了'); // エンドワードを読み込む
+        settingsEndWords = parseEndWords(settings?.main?.endWord || '命令完了'); // エンドワードを読み込む
+        rebuildEffectiveEndWords();
 
     } catch (e) {
         console.warn('アプリ設定の読み込みに失敗しました。', e);
         shouldDisplayAllSpeech = false; // エラー時はデフォルトOff
-        END_WORDS = ['命令完了']; // エラー時はデフォルト値を設定
+        settingsEndWords = [...DEFAULT_END_WORDS]; // エラー時はデフォルト値を設定
+        rebuildEffectiveEndWords();
     }
 }
 
 loadAppSettings();
+loadCustomVoiceTriggerEndWords();
 document.addEventListener('app-settings:updated', loadAppSettings);
 
 function parseEndWords(rawEndWords) {
     if (typeof rawEndWords !== 'string') {
-        return ['命令完了'];
+        return [...DEFAULT_END_WORDS];
     }
     const parsed = rawEndWords
         .split(',')
         .map(word => word.trim())
         .filter(Boolean);
-    return parsed.length > 0 ? parsed : ['命令完了'];
+    return parsed.length > 0 ? parsed : [...DEFAULT_END_WORDS];
+}
+
+function uniqueNormalizedWords(words) {
+    const seen = new Set();
+    const result = [];
+    (Array.isArray(words) ? words : []).forEach((raw) => {
+        const word = String(raw || '').trim();
+        if (!word) return;
+        const key = word.toLowerCase();
+        if (seen.has(key)) return;
+        seen.add(key);
+        result.push(word);
+    });
+    return result;
+}
+
+function rebuildEffectiveEndWords() {
+    END_WORDS = uniqueNormalizedWords([
+        ...DEFAULT_END_WORDS,
+        ...settingsEndWords,
+        ...customTriggerEndWords,
+    ]);
+}
+
+function extractVoiceTriggerEndWordsFromOrder(order) {
+    const words = [];
+    if (!order || typeof order !== 'object') return words;
+
+    const triggers = Array.isArray(order.triggers) ? order.triggers : [];
+    const voiceTriggers = triggers.filter((trigger) => {
+        const category = String(trigger?.category || '').trim().toLowerCase();
+        return category === 'ボイス' || category === 'voice';
+    });
+
+    voiceTriggers.forEach((trigger) => {
+        const value = trigger?.value || {};
+        const keywords = value.keywords;
+        if (Array.isArray(keywords)) {
+            keywords.forEach((group) => {
+                if (Array.isArray(group)) {
+                    const normalizedGroup = group
+                        .map((v) => String(v || '').trim())
+                        .filter(Boolean);
+                    words.push(...normalizedGroup);
+                    if (normalizedGroup.length > 1) {
+                        words.push(normalizedGroup.join(''));
+                        words.push(normalizedGroup.join(' '));
+                    }
+                    return;
+                }
+
+                const single = String(group || '').trim();
+                if (!single) return;
+                if (single.includes(',')) {
+                    const parts = single.split(',').map((v) => v.trim()).filter(Boolean);
+                    words.push(...parts);
+                    if (parts.length > 1) {
+                        words.push(parts.join(''));
+                        words.push(parts.join(' '));
+                    }
+                } else {
+                    words.push(single);
+                }
+            });
+        }
+
+        const legacyKeyword = value.keyword;
+        if (typeof legacyKeyword === 'string') {
+            words.push(...legacyKeyword.split(',').map((v) => v.trim()).filter(Boolean));
+        }
+
+        const legacyValue = value.value;
+        if (typeof legacyValue === 'string') {
+            words.push(...legacyValue.split(',').map((v) => v.trim()).filter(Boolean));
+        }
+    });
+
+    return uniqueNormalizedWords(words);
+}
+
+async function loadCustomVoiceTriggerEndWords() {
+    try {
+        const response = await fetch('/api/custom_orders', {
+            method: 'GET',
+            credentials: 'same-origin',
+            headers: { 'Accept': 'application/json' },
+        });
+        if (!response.ok) {
+            console.warn(`カスタム命令の取得に失敗しました: HTTP ${response.status}`);
+            return;
+        }
+
+        const orders = await response.json();
+        if (!Array.isArray(orders)) return;
+
+        const collected = [];
+        orders.forEach((order) => {
+            collected.push(...extractVoiceTriggerEndWordsFromOrder(order));
+        });
+
+        customTriggerEndWords = uniqueNormalizedWords(collected);
+        rebuildEffectiveEndWords();
+        console.log('[VOICE] カスタム命令ボイストリガーをエンドワードへ反映しました:', customTriggerEndWords);
+    } catch (error) {
+        console.warn('カスタム命令ボイストリガーの反映に失敗しました:', error);
+    }
 }
 
 function escapeRegExp(text) {
