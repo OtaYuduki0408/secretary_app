@@ -951,7 +951,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     console.log('DEBUG: 重複音声コマンドを抑制');
                     return;
                 }
-                processInput(finalCommand, 'voice'); // 強制的にコマンドを処理
+                processInput(finalCommand, 'voice', { forceDispatch: true }); // エンドワード確定時は強制送信
                 return; // 以降の処理をスキップ
             }
         }
@@ -1341,14 +1341,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
 
-    function processInput(input, inputType) {
+    function processInput(input, inputType, options = {}) {
         const trimmedInput = input.trim();
+        const forceDispatch = options?.forceDispatch === true;
 
         // ウェイクワードのみ、またはそれに非常に近い入力かを判定
         const isWakeWordOnly = WAKE_WORDS.some(word => trimmedInput === word);
         const isEndWordOnly = END_WORDS.some(word => trimmedInput === word);
 
-        if (isWakeWordOnly || isEndWordOnly || !trimmedInput) {
+        if ((!forceDispatch && (isWakeWordOnly || isEndWordOnly)) || !trimmedInput) {
             console.log("DEBUG: 空入力/ウェイクワードのみ/エンドワードのみの入力を検知。音声再生を停止します。");
             if (window.stopAllAudio) {
                 window.stopAllAudio();
