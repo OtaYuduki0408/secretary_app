@@ -146,7 +146,6 @@ $(document).ready(function() {
             let interim_transcript = '';
             let final_transcript = '';
 
-            // event.results全体を走査して最終的なテキストと中間テキストを再構築
             for (let i = 0; i < event.results.length; ++i) {
                 const transcript = event.results[i][0].transcript;
                 if (event.results[i].isFinal) {
@@ -168,10 +167,12 @@ $(document).ready(function() {
                     updateLogDisplay(interim_transcript, 'user', true, true);
                 }
             } else if (currentMode === 'listening') {
-                // ウェイクワードの再発をチェック
                 const command_body = stripLeadingWakeWords(display_transcript);
                 if (WAKE_WORDS.some(w => command_body.toLowerCase().includes(w.toLowerCase()))) {
-                    recognition.stop(); // 認識をリセット
+                    finalTranscript = '';
+                    updateLogDisplay('', 'user', true);
+                    setMode('waiting');
+                    recognition.stop();
                     return;
                 }
 
@@ -199,71 +200,65 @@ $(document).ready(function() {
     // コマンド処理
     // ============================================================================
     function dispatchVoiceCommand(text, endWordMatch = null) {
+        const isEndWordTrigger = !!endWordMatch;
+    
         let command = sanitizeVoiceCommand(text, endWordMatch);
-        setMode('processing');
-
-        // カスタムトリガーが発話のほぼ全てで、結果としてコマンドが空になった場合の特別処理
         if (!command && endWordMatch && endWordMatch.source === 'custom') {
-            // トリガーワードそのものをコマンドとして扱う
             command = endWordMatch.word;
         }
-
+    
         if (!command) {
-            stopTTS();
-            setMode('cooldown');
+            setMode('waiting');
             return;
         }
-        if (shouldSuppressDuplicate(command)) {
-            setMode('cooldown');
+    
+        // エンドワード検知の場合、クールダウンを無視
+        if (!isEndWordTrigger && shouldSuppressDuplicate(command)) {
+            setMode('waiting');
             return;
         }
+        
+        setMode('processing');
+    
+        // サーバー送信を即座に実行
+        sendTextToServer(command);
+    
+        // TTS再生を並行して実行
         const repeatText = `${command}ですね。`;
         updateLogDisplay(repeatText, 'assistant');
-        playTTS(repeatText, () => sendTextToServer(command));
+        playTTS(repeatText, () => {}); // 空のコールバックを渡す
     }
 
-        function sendTextToServer(text) {
+    function sendTextToServer(text) {
+        if (submissionLock) return;
 
-            if (submissionLock) return;
+        console.log("Final command to server:", text);
 
-            
+        submissionLock = true;
+        setTimeout(() => {
+            submissionLock = false;
+            if (currentMode === 'cooldown') setMode('waiting');
+        }, DISPATCH_COOLDOWN_MS);
 
-            console.log("Final command to server:", text); // DEBUG LOG
-
-    
-
-            submissionLock = true;
-
-            setTimeout(() => {
-
-                submissionLock = false;
-
-                if (currentMode === 'cooldown') setMode('waiting');
-
-            }, DISPATCH_COOLDOWN_MS);
-
-    
-
-            if(!finalTranscript) updateLogDisplay(text, 'user');
-
-            
-
-            $.ajax({
-
-                url: '/web_api/chat', type: 'POST', contentType: 'application/json',
-
-                data: JSON.stringify({ inputValue: text }),
-
-                success: handleServerResponse,
-
-                error: () => { setMode('cooldown'); updateLogDisplay('サーバー通信失敗', 'assistant'); }
-
-            });
-
-        }
+        if(!finalTranscript) updateLogDisplay(text, 'user');
+        
+        $.ajax({
+            url: '/web_api/chat',
+            type: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify({ inputValue: text }),
+            success: handleServerResponse,
+            error: () => {
+                setMode('cooldown');
+                updateLogDisplay('サーバー通信失敗', 'assistant');
+            }
+        });
+    }
 
     function handleServerResponse(response) {
-        if (response.message) {
+        if (response.triggered_by_voice && response.order_payloads) {
+            response.order_payloads.forEach(handleServerCommand);
+        } else if (response.message) {
             updateLogDisplay(response.message, 'assistant');
             if (!response.suppress_tts) {
                 playTTS(response.message, () => setMode('waiting'));
@@ -273,55 +268,37 @@ $(document).ready(function() {
         } else {
             setMode('cooldown');
         }
-        if (response.triggered_by_voice && response.order_payloads) response.order_payloads.forEach(handleServerCommand);
     }
     
-    function handleServerCommand(payload) {
-        const actionsToExecute = (payload.steps && payload.steps.length > 0)
-            ? payload.steps.map(step => step.action).filter(Boolean)
-            : (payload.actions || []);
+    const playTTSPromise = (text) => {
+        return new Promise(resolve => {
+            updateLogDisplay(text, 'assistant');
+            playTTS(text, resolve);
+        });
+    };
+
+    function executeAction(action) {
+        return new Promise(resolve => {
+            if (!action) {
+                resolve();
+                return;
+            }
+            
+            const { category, sub, detail } = action;
+            const actionKey = `${category}-${sub}`;
     
-        actionsToExecute.forEach(action => {
-            if (!action) return;
-            let overlayContent = '';
-            const { category, sub, detail } = action; // 分割代入でコードを少し読みやすくする
-    
-            switch (`${category}-${sub}`) {
-                case '画面-ブラックアウト':
-                    detail?.state === 'on' ? showBlackout() : hideBlackout();
-                    break;
-    
-                // 統合された音声読み上げ処理
+            switch (actionKey) {
                 case '音声-再生':
                 case '発声-実行':
                 case '特殊命令-目覚まし':
                     const messageToSpeak = detail?.message || detail?.text;
                     if (messageToSpeak) {
-                        updateLogDisplay(messageToSpeak, 'assistant');
-                        playTTS(messageToSpeak, () => setMode('waiting'));
+                        playTTSPromise(messageToSpeak).then(resolve);
+                    } else {
+                        resolve();
                     }
                     break;
     
-                case 'youtube-再生':
-                    if (detail?.query) window.playYoutubeVideo(detail.query);
-                    break;
-    
-                case 'youtube-操作':
-                    if (detail?.intent) window.executeYoutubeIntent(detail);
-                    break;
-    
-                case 'カレンダー-読み上げ':
-                     overlayContent = createCalendarOverlayHTML(detail);
-                     if(overlayContent) showActionOverlay(overlayContent);
-                     if (detail?.summary) playTTS(detail.summary);
-                     break;
-    
-                case '天気-読み上げ':
-                    overlayContent = createWeatherOverlayHTML(detail);
-                    if(overlayContent) showActionOverlay(overlayContent);
-                    if (detail?.message) playTTS(detail.message);
-                    break;
-                
                 case 'SwitchBot-デバイス操作':
                     if (detail?.deviceId && detail?.action) {
                         $.ajax({
@@ -329,21 +306,77 @@ $(document).ready(function() {
                             type: 'POST',
                             contentType: 'application/json',
                             data: JSON.stringify({ deviceId: detail.deviceId, action: detail.action }),
-                            success: (res) => {
-                                const successMsg = `デバイス(${detail.deviceId.slice(-4)})の操作をリクエストしました。`;
-                                updateLogDisplay(successMsg, 'assistant');
-                                setMode('waiting');
-                            },
-                            error: (err) => {
-                                const errorMsg = `デバイス(${detail.deviceId.slice(-4)})の操作に失敗しました。`;
-                                updateLogDisplay(errorMsg, 'assistant');
-                                setMode('waiting');
-                            }
+                        }).done((res) => {
+                            const successMsg = `デバイス(${detail.deviceId.slice(-4)})の操作をリクエストしました。`;
+                            updateLogDisplay(successMsg, 'assistant');
+                        }).fail((err) => {
+                            const errorMsg = `デバイス(${detail.deviceId.slice(-4)})の操作に失敗しました。`;
+                            updateLogDisplay(errorMsg, 'assistant');
+                        }).always(() => {
+                            resolve();
                         });
+                    } else {
+                        resolve();
                     }
                     break;
+    
+                case '画面-ブラックアウト':
+                    detail?.state === 'on' ? showBlackout() : hideBlackout();
+                    resolve();
+                    break;
+    
+                case 'カレンダー-読み上げ':
+                    const calContent = createCalendarOverlayHTML(detail);
+                    if (calContent) showActionOverlay(calContent);
+                    if (detail?.summary) {
+                        playTTSPromise(detail.summary).then(resolve);
+                    } else {
+                        resolve();
+                    }
+                    break;
+    
+                case '天気-読み上げ':
+                    const weatherContent = createWeatherOverlayHTML(detail);
+                    if (weatherContent) showActionOverlay(weatherContent);
+                    if (detail?.message) {
+                        playTTSPromise(detail.message).then(resolve);
+                    } else {
+                        resolve();
+                    }
+                    break;
+    
+                case 'youtube-再生':
+                    if (detail?.query) window.playYoutubeVideo(detail.query);
+                    resolve();
+                    break;
+    
+                case 'youtube-操作':
+                    if (detail?.intent) window.executeYoutubeIntent(detail);
+                    resolve();
+                    break;
+                
+                default:
+                    resolve();
             }
         });
+    }
+
+    async function handleServerCommand(payload) {
+        const actionsToExecute = (payload.steps && payload.steps.length > 0)
+            ? payload.steps.map(step => step.action).filter(Boolean)
+            : (payload.actions || []);
+    
+        const isSequential = actionsToExecute.length > 1;
+    
+        if (isSequential) {
+            setMode('processing');
+            for (const action of actionsToExecute) {
+                await executeAction(action);
+            }
+            setMode('waiting');
+        } else {
+            actionsToExecute.forEach(action => executeAction(action));
+        }
     }
     
     function createCalendarOverlayHTML(detail) {
@@ -448,7 +481,7 @@ $(document).ready(function() {
     // ============================================================================
     // TTS
     // ============================================================================
-    const playTTS = (text, onEnd) => { stopTTS(); setMode('speaking'); $.ajax({ url: '/api/tts', type: 'POST', contentType:'application/json', data:JSON.stringify({text}), success:(r)=>{ if(r.audioContent){ currentAudio=new Audio(`data:audio/mp3;base64,${r.audioContent}`); currentAudio.play().catch(()=>{setMode('waiting');if(onEnd)onEnd();}); currentAudio.onended=()=>{currentAudio=null;setMode('waiting');if(onEnd)onEnd();}; }else{setMode('waiting');if(onEnd)onEnd();}}, error:()=>{setMode('waiting');if(onEnd)onEnd();}});};
+    const playTTS = (text, onEnd) => { stopTTS(); setMode('speaking'); $.ajax({ url: '/api/tts', type: 'POST', contentType:'application/json', data:JSON.stringify({text}), success:(r)=>{ if(r.audioContent){ currentAudio=new Audio(`data:audio/mp3;base64,${r.audioContent}`); currentAudio.play().catch(()=>{setMode('waiting');if(onEnd)onEnd();}); currentAudio.onended=()=>{currentAudio=null; if(onEnd){onEnd();} else{setMode('waiting');}}; }else{setMode('waiting');if(onEnd)onEnd();}}, error:()=>{setMode('waiting');if(onEnd)onEnd();}});};
     const stopTTS = () => { if(currentAudio){currentAudio.pause();currentAudio.onended=null;currentAudio=null;} };
 
     // ============================================================================
