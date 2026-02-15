@@ -286,15 +286,16 @@ async function executeAction(action) {
     const overlay = document.getElementById('read-aloud-overlay');
     const messageElement = document.getElementById('overlay-message');
     const timeElement = document.getElementById('overlay-time');
+    const hasReadAloudOverlay = !!(overlay && messageElement);
 
-    if (!overlay || !messageElement) {
+    if (!hasReadAloudOverlay) {
         console.warn("overlay要素が見つかりません。");
-        if (textToSpeak) await speak(textToSpeak);
-        return;
     }
 
-    // オーバーレイのリセット
-    overlay.classList.remove('overlay-calendar', 'overlay-finance', 'overlay-memo', 'overlay-speech', 'overlay-image-display');
+    // オーバーレイのリセット（要素がある場合のみ）
+    if (hasReadAloudOverlay) {
+        overlay.classList.remove('overlay-calendar', 'overlay-finance', 'overlay-memo', 'overlay-speech', 'overlay-image-display');
+    }
 
     // 時刻表示
     const now = new Date();
@@ -520,17 +521,20 @@ async function executeAction(action) {
     }
 
     if (textToSpeak) {
-        overlay.classList.add(overlayCategoryClass);
-        if (messageHtml) {
-            messageElement.innerHTML = messageHtml;
+        if (hasReadAloudOverlay) {
+            overlay.classList.add(overlayCategoryClass);
+            if (messageHtml) {
+                messageElement.innerHTML = messageHtml;
+            } else {
+                messageElement.innerHTML = `<h3>${overlayTitle}</h3><p>${textToSpeak}</p>`;
+            }
+            overlay.classList.add('visible');
+            await speak(textToSpeak);
+            overlay.classList.remove('visible');
         } else {
-            messageElement.innerHTML = `<h3>${overlayTitle}</h3><p>${textToSpeak}</p>`;
+            // オーバーレイが無くても音声実行は継続する
+            await speak(textToSpeak);
         }
-        overlay.classList.add('visible');
-
-        await speak(textToSpeak);
-
-        overlay.classList.remove('visible');
     }
 }
 
