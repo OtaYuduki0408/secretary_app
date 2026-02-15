@@ -27,6 +27,17 @@ $(document).ready(function() {
 
     let userInteracted = false;
     let currentAudio = null;
+    const VOICE_WAKE_SOUND = new Audio("/static/voice/voice_wate.mp3");
+
+    function playSoundEffect(audioElement) {
+        try {
+            audioElement.currentTime = 0;
+            audioElement.play();
+        } catch (e) {
+            console.error("Sound effect playback failed", e);
+        }
+    }
+
 
     // ============================================================================
     // 初期化
@@ -257,7 +268,10 @@ $(document).ready(function() {
                     action.detail?.state === 'on' ? showBlackout() : hideBlackout();
                     break;
                 case '音声-再生':
-                    if (action.detail?.message) playTTS(action.detail.message, () => setMode('waiting'));
+                    if (action.detail?.message) {
+                        updateLogDisplay(action.detail.message, 'assistant');
+                        playTTS(action.detail.message, () => setMode('waiting'));
+                    }
                     break;
                 case 'youtube-再生':
                     if (action.detail?.query) window.playYoutubeVideo(action.detail.query);
@@ -310,8 +324,10 @@ $(document).ready(function() {
         $('#mic-status-text').text(text || status.text);
         $micIcon.addClass(`fas ${status.icon}`);
         if(status.class) $micStatus.addClass(status.class);
-        if (newMode !== 'listening') clearTimeout(recognitionTimeoutId);
-        else {
+        if (newMode !== 'listening') {
+            clearTimeout(recognitionTimeoutId);
+        } else {
+            playSoundEffect(VOICE_WAKE_SOUND);
             finalTranscript = '';
             clearTimeout(recognitionTimeoutId);
             recognitionTimeoutId = setTimeout(() => { if(currentMode === 'listening') dispatchVoiceCommand(finalTranscript); }, 10000);
