@@ -20,13 +20,13 @@ $(document).ready(function() {
     let submissionLock = false;
     const DUPLICATE_SUPPRESS_MS = 5000;
     const FINAL_SEGMENT_WAIT_MS = 800;
-    const DISPATCH_COOLDOWN_MS = 3000;
     let lastDispatchedVoiceCommandKey = '';
     let lastDispatchedVoiceCommandAt = 0;
     let pendingFinalDispatchTimerId = null;
 
     let userInteracted = false;
     let currentAudio = null;
+    let ttsFallbackTimerId = null;
     const VOICE_WAKE_SOUND = new Audio("/static/voice/voice_wate.mp3");
 
     function playSoundEffect(audioElement) {
@@ -139,28 +139,58 @@ $(document).ready(function() {
     // 音声認識ハンドラ
     // ============================================================================
     function setupRecognitionHandlers() {
+        const containsWakeWord = (text) => WAKE_WORDS.some(w => (text || '').toLowerCase().includes(w.toLowerCase()));
+        const resetVoiceInputContext = () => {
+            finalTranscript = '';
+            clearTimeout(pendingFinalDispatchTimerId);
+            updateLogDisplay('', 'user', true);
+        };
+
         recognition.onstart = () => { isRecognitionActive = true; };
         recognition.onend = () => { isRecognitionActive = false; setTimeout(() => { if(!isRecognitionActive) try { recognition.start(); } catch(e) {} }, 1000); };
         recognition.onerror = (e) => { if (e.error === 'no-speech') setMode('waiting'); };
         recognition.onresult = (event) => {
             let interim_transcript = '';
-            let final_transcript = '';
+            let event_final_transcript = '';
 
-            for (let i = 0; i < event.results.length; ++i) {
+            // 直近イベント差分だけを処理し、過去フレーズの再混入を防ぐ
+            for (let i = event.resultIndex; i < event.results.length; ++i) {
                 const transcript = event.results[i][0].transcript;
                 if (event.results[i].isFinal) {
-                    final_transcript += transcript;
+                    event_final_transcript += transcript;
                 } else {
                     interim_transcript += transcript;
                 }
             }
 
-            const display_transcript = final_transcript + interim_transcript;
+            if (event_final_transcript) {
+                finalTranscript += event_final_transcript;
+            }
+            const display_transcript = finalTranscript + interim_transcript;
 
             if (currentMode === 'waiting') {
-                if (WAKE_WORDS.some(w => display_transcript.toLowerCase().includes(w.toLowerCase()))) {
+                if (containsWakeWord(display_transcript)) {
+                    // ウェイクワード検知時点で、それまでの入力バッファを破棄
+                    resetVoiceInputContext();
                     setMode('listening');
-                    updateLogDisplay(stripLeadingWakeWords(display_transcript), 'user', true);
+                    // 同一発話内の「ウェイクワード以降」は新規コマンドとして保持
+                    const tailCommand = stripLeadingWakeWords(display_transcript).trim();
+                    if (tailCommand) {
+                        finalTranscript = tailCommand;
+                        updateLogDisplay(finalTranscript, 'user', true);
+                        if (event_final_transcript) {
+                            const endWordMatch = findEndWordMatch(finalTranscript);
+                            clearTimeout(pendingFinalDispatchTimerId);
+                            if (endWordMatch) {
+                                dispatchVoiceCommand(finalTranscript, endWordMatch);
+                            } else {
+                                pendingFinalDispatchTimerId = setTimeout(
+                                    () => dispatchVoiceCommand(finalTranscript),
+                                    FINAL_SEGMENT_WAIT_MS
+                                );
+                            }
+                        }
+                    }
                     return;
                 }
                 if (interim_transcript) {
@@ -168,21 +198,18 @@ $(document).ready(function() {
                 }
             } else if (currentMode === 'listening') {
                 const command_body = stripLeadingWakeWords(display_transcript);
-                if (WAKE_WORDS.some(w => command_body.toLowerCase().includes(w.toLowerCase()))) {
-                    finalTranscript = '';
-                    updateLogDisplay('', 'user', true);
-                    setMode('waiting');
-                    recognition.stop();
+                if (containsWakeWord(command_body)) {
+                    // 命令受付中にウェイクワードが来たら、既存入力を捨てて受付をやり直す
+                    resetVoiceInputContext();
+                    setMode('listening');
                     return;
                 }
 
                 const command_text = stripLeadingWakeWords(display_transcript);
                 updateLogDisplay(command_text, 'user', true);
                 
-                const lastResultIsFinal = event.results[event.results.length - 1].isFinal;
-
-                if (lastResultIsFinal) {
-                    const command_to_dispatch = stripLeadingWakeWords(final_transcript);
+                if (event_final_transcript) {
+                    const command_to_dispatch = stripLeadingWakeWords(finalTranscript);
                     const endWordMatch = findEndWordMatch(command_to_dispatch);
                     
                     clearTimeout(pendingFinalDispatchTimerId);
@@ -201,6 +228,9 @@ $(document).ready(function() {
     // ============================================================================
     function dispatchVoiceCommand(text, endWordMatch = null) {
         const isEndWordTrigger = !!endWordMatch;
+        // 1コマンド完了ごとにバッファをクリアし、次回認識へ持ち越さない
+        finalTranscript = '';
+        clearTimeout(pendingFinalDispatchTimerId);
     
         let command = sanitizeVoiceCommand(text, endWordMatch);
         if (!command && endWordMatch && endWordMatch.source === 'custom') {
@@ -217,16 +247,20 @@ $(document).ready(function() {
             setMode('waiting');
             return;
         }
+        markDispatchedCommand(command);
         
         setMode('processing');
     
         // サーバー送信を即座に実行
         sendTextToServer(command);
     
-        // TTS再生を並行して実行
+        // 入力確定時点で待機へ戻す（次の入力を受け付ける）
+        setMode('waiting');
+
+        // 確認読み上げは非ブロッキングで実行
         const repeatText = `${command}ですね。`;
         updateLogDisplay(repeatText, 'assistant');
-        playTTS(repeatText, () => {}); // 空のコールバックを渡す
+        playTTS(repeatText, null, { preserveMode: true });
     }
 
     function sendTextToServer(text) {
@@ -235,10 +269,6 @@ $(document).ready(function() {
         console.log("Final command to server:", text);
 
         submissionLock = true;
-        setTimeout(() => {
-            submissionLock = false;
-            if (currentMode === 'cooldown') setMode('waiting');
-        }, DISPATCH_COOLDOWN_MS);
 
         if(!finalTranscript) updateLogDisplay(text, 'user');
         
@@ -249,9 +279,11 @@ $(document).ready(function() {
             data: JSON.stringify({ inputValue: text }),
             success: handleServerResponse,
             error: () => {
-                setMode('cooldown');
+                setMode('waiting');
                 updateLogDisplay('サーバー通信失敗', 'assistant');
             }
+        }).always(() => {
+            submissionLock = false;
         });
     }
 
@@ -261,12 +293,14 @@ $(document).ready(function() {
         } else if (response.message) {
             updateLogDisplay(response.message, 'assistant');
             if (!response.suppress_tts) {
-                playTTS(response.message, () => setMode('waiting'));
+                // 返答読み上げ中も入力待機を維持
+                setMode('waiting');
+                playTTS(response.message, null, { preserveMode: true });
             } else {
-                setMode('cooldown');
+                setMode('waiting');
             }
         } else {
-            setMode('cooldown');
+            setMode('waiting');
         }
     }
     
@@ -441,7 +475,18 @@ $(document).ready(function() {
     const highlightWords = (t, w, c) => { let hT = t; w.forEach(word => { hT = hT.replace(new RegExp(escapeRegExp(word), 'gi'), `<span class="${c}">${word}</span>`); }); return hT; };
     const escapeRegExp = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const stripLeadingWakeWords = (t) => { let n = (t||'').trim(); WAKE_WORDS.sort((a,b)=>b.length-a.length).forEach(w => { if(n.toLowerCase().startsWith(w.toLowerCase())) n = n.slice(w.length).trim(); }); return n; };
-    const shouldSuppressDuplicate = (c) => { const k = c.replace(/[、。！？!?]/g,' ').toLowerCase().replace(/\s+/g,' ').trim(), n=Date.now(); if(k&&k===lastDispatchedVoiceCommandKey&&(n-lastDispatchedVoiceCommandAt)<DUPLICATE_SUPPRESS_MS) return true; lastDispatchedVoiceCommandKey=k; lastDispatchedVoiceCommandAt=n; return false; };
+    const normalizeCommandKey = (c) => (c || '').replace(/[、。！？!?]/g, ' ').toLowerCase().replace(/\s+/g, ' ').trim();
+    const shouldSuppressDuplicate = (c) => {
+        const key = normalizeCommandKey(c);
+        const now = Date.now();
+        return !!(key && key === lastDispatchedVoiceCommandKey && (now - lastDispatchedVoiceCommandAt) < DUPLICATE_SUPPRESS_MS);
+    };
+    const markDispatchedCommand = (c) => {
+        const key = normalizeCommandKey(c);
+        if (!key) return;
+        lastDispatchedVoiceCommandKey = key;
+        lastDispatchedVoiceCommandAt = Date.now();
+    };
 
     const findEndWordMatch = (text) => {
         const commandOnly = stripLeadingWakeWords(text);
@@ -481,8 +526,58 @@ $(document).ready(function() {
     // ============================================================================
     // TTS
     // ============================================================================
-    const playTTS = (text, onEnd) => { stopTTS(); setMode('speaking'); $.ajax({ url: '/api/tts', type: 'POST', contentType:'application/json', data:JSON.stringify({text}), success:(r)=>{ if(r.audioContent){ currentAudio=new Audio(`data:audio/mp3;base64,${r.audioContent}`); currentAudio.play().catch(()=>{setMode('waiting');if(onEnd)onEnd();}); currentAudio.onended=()=>{currentAudio=null; if(onEnd){onEnd();} else{setMode('waiting');}}; }else{setMode('waiting');if(onEnd)onEnd();}}, error:()=>{setMode('waiting');if(onEnd)onEnd();}});};
-    const stopTTS = () => { if(currentAudio){currentAudio.pause();currentAudio.onended=null;currentAudio=null;} };
+    const playTTS = (text, onEnd, options = {}) => {
+        const preserveMode = !!options.preserveMode;
+        const finalizeTTS = () => {
+            if (!preserveMode) {
+                setMode('waiting');
+            }
+            if (onEnd) onEnd();
+        };
+        stopTTS();
+        if (!preserveMode) {
+            setMode('speaking');
+        }
+        $.ajax({
+            url: '/api/tts',
+            type: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify({ text }),
+            timeout: 12000,
+            success: (r) => {
+                if (r.audioContent) {
+                    currentAudio = new Audio(`data:audio/mp3;base64,${r.audioContent}`);
+                    if (ttsFallbackTimerId) clearTimeout(ttsFallbackTimerId);
+                    ttsFallbackTimerId = setTimeout(() => {
+                        // まれにonendedが発火しない端末向けの保険
+                        finalizeTTS();
+                    }, 20000);
+                    currentAudio.play().catch(() => {
+                        if (ttsFallbackTimerId) clearTimeout(ttsFallbackTimerId);
+                        finalizeTTS();
+                    });
+                    currentAudio.onended = () => {
+                        if (ttsFallbackTimerId) clearTimeout(ttsFallbackTimerId);
+                        currentAudio = null;
+                        finalizeTTS();
+                    };
+                } else {
+                    finalizeTTS();
+                }
+            },
+            error: () => {
+                finalizeTTS();
+            }
+        });
+    };
+    const stopTTS = () => {
+        if (ttsFallbackTimerId) clearTimeout(ttsFallbackTimerId);
+        if (currentAudio) {
+            currentAudio.pause();
+            currentAudio.onended = null;
+            currentAudio = null;
+        }
+    };
 
     // ============================================================================
     // UI Functions & Data Fetch
