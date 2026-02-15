@@ -166,8 +166,15 @@ $(document).ready(function() {
     // コマンド処理
     // ============================================================================
     function dispatchVoiceCommand(text, endWordMatch = null) {
-        const command = sanitizeVoiceCommand(text, endWordMatch);
+        let command = sanitizeVoiceCommand(text, endWordMatch);
         setMode('processing');
+
+        // カスタムトリガーが発話のほぼ全てで、結果としてコマンドが空になった場合の特別処理
+        if (!command && endWordMatch && endWordMatch.source === 'custom') {
+            // トリガーワードそのものをコマンドとして扱う
+            command = endWordMatch.word;
+        }
+
         if (!command) {
             stopTTS();
             setMode('cooldown');
