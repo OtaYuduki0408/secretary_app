@@ -495,13 +495,45 @@ body, html {
     padding: 5px 15px;
     border-radius: 20px;
     background-color: rgba(0, 0, 0, 0.2);
-    transition: background-color 0.3s;
+    border: 1px solid #555;
+    color: #ccc;
+    transition: all 0.3s ease;
 }
 
-#mic-status.listening {
-    background-color: var(--accent-color);
-    color: white;
+/* 1. 音声待機中 */
+#mic-status.waiting {
+    background-color: rgba(0, 0, 0, 0.2);
+    color: #ccc;
 }
+
+/* 2. 命令中 */
+#mic-status.listening {
+    background-color: #e67e22; /* Orange */
+    color: white;
+    border-color: #d35400;
+}
+
+/* 3. 処理待機中 */
+#mic-status.processing {
+    background-color: #3498db; /* Blue */
+    color: white;
+    border-color: #2980b9;
+}
+
+/* 4. 発声中 */
+#mic-status.speaking {
+    background-color: #2ecc71; /* Green */
+    color: white;
+    border-color: #27ae60;
+}
+
+/* 5. 命令送信＆CD */
+#mic-status.cooldown {
+    background-color: #95a5a6; /* Gray */
+    color: #333;
+    border-color: #7f8c8d;
+}
+
 
 #mic-status .fas {
     margin-right: 10px;
