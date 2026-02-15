@@ -244,7 +244,13 @@ $(document).ready(function() {
     }
     
     function handleServerCommand(payload) {
-        (payload.actions || []).forEach(action => {
+        // 'steps' 配列が存在し、中身がある場合はそちらを優先する
+        const actionsToExecute = (payload.steps && payload.steps.length > 0)
+            ? payload.steps.map(step => step.action).filter(Boolean)
+            : (payload.actions || []);
+
+        actionsToExecute.forEach(action => {
+            if (!action) return; // ステップにアクションがない場合などをスキップ
             let overlayContent = '';
             switch (`${action.category}-${action.sub}`) {
                 case '画面-ブラックアウト':
