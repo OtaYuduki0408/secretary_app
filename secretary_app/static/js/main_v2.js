@@ -591,7 +591,23 @@ $(document).ready(function() {
     function hideActionOverlay() { $actionOverlay.hide(); $actionOverlayBody.empty(); }
     $('.action-overlay-close').on('click', hideActionOverlay);
 
-    const fetchWeather = () => $.get('/api/weather', (d) => { if(d.today){ $('#today-weather .data').text(`${d.today.weather} ${d.today.temperature}℃ / ${d.today.pop}%`); $('#today-weather .info-item-body i').removeClass().addClass(`fas ${d.today.icon}`);} if(d.tomorrow){ $('#tomorrow-weather .data').text(`${d.tomorrow.weather} ${d.tomorrow.temperature}℃ / ${d.tomorrow.pop}%`); $('#tomorrow-weather .info-item-body i').removeClass().addClass(`fas ${d.tomorrow.icon}`);} });
+    const fetchWeather = () => $.get('/api/weather', (d) => {
+        const buildWeatherText = (item) => {
+            const weather = item?.weather && item.weather !== 'N/A' ? item.weather : '不明';
+            const parts = [weather];
+            if (item?.temperature && item.temperature !== 'N/A') parts.push(`${item.temperature}℃`);
+            if (item?.pop && item.pop !== 'N/A') parts.push(`降水${item.pop}%`);
+            return parts.join(' / ');
+        };
+        if (d.today) {
+            $('#today-weather .data').text(buildWeatherText(d.today));
+            $('#today-weather .info-item-body i').removeClass().addClass(`fas ${d.today.icon || 'fa-question-circle'}`);
+        }
+        if (d.tomorrow) {
+            $('#tomorrow-weather .data').text(buildWeatherText(d.tomorrow));
+            $('#tomorrow-weather .info-item-body i').removeClass().addClass(`fas ${d.tomorrow.icon || 'fa-question-circle'}`);
+        }
+    });
     const fetchFinanceData = () => $.get('/api/finance/summary', (d) => { $('#total-balance .data').text(`¥${d.balance?.toLocaleString()||'N/A'}`); $('#monthly-expense .data').text(`¥${d.monthly_expense?.toLocaleString()||'N/A'}`); });
     const fetchCalendarData = () => {const n=new Date(),s=new Date(n.getFullYear(),n.getMonth(),n.getDate(),0,0,0),e=new Date(s.getTime()+7*24*60*60*1000); $.get(`/api/local_calendar/events?start=${s.toISOString()}&end=${e.toISOString()}`,(evts)=>{const $l=$('#schedule-list').empty();if(evts?.length){const uE=evts.map(e=>({...e,startTime:new Date(e.start_time)})).filter(e=>e.startTime>=n).sort((a,b)=>a.startTime-b.startTime).slice(0,4);if(uE.length){uE.forEach(e=>{const sT=e.startTime.toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'});let dL='';if(e.startTime.getDate()===n.getDate())dL='今日';else if(e.startTime.getDate()===n.getDate()+1)dL='明日';else dL=e.startTime.toLocaleDateString('ja-JP',{month:'short',day:'numeric'});const tS=`${dL} ${sT}`;$l.append(`<li><span class="schedule-time">${tS}</span><span class="schedule-title">${e.title}</span></li>`);});}else{$l.append('<li><span class="schedule-title">直近の予定はありません</span></li>');}}else{$l.append('<li><span class="schedule-title">予定はありません</span></li>');}}).fail(()=>{$('#schedule-list').empty().append('<li><span class="schedule-title">予定の取得に失敗</span></li>');});};
     const fetchAlarms = () => $.get('/api/custom_orders',(ords)=>{const $aL=$('#field-time-alarm .alarm-list ul').empty();let c=0;if(ords?.length){ords.forEach(o=>{if(c>=4)return;const t=o.triggers?.[0];if(t?.category==='時間'){$aL.append(`<li><span>${t.value?.time||'N/A'}</span> - ${o.name||'無題'}</li>`);c++;}});if(c===0)$aL.append('<li>アラームはありません</li>');}});

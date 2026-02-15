@@ -874,33 +874,84 @@ def get_weather_route():
         "tomorrow": {"weather": "N/A", "temperature": "N/A", "pop": "N/A", "icon": "fa-question-circle"}
     }
 
-    # Find today's data
+    def _to_jst_safe(text):
+        if not text:
+            return None
+        try:
+            return datetime.fromisoformat(str(text).replace('Z', '+00:00')).astimezone(JST)
+        except Exception:
+            return None
+
+    def _first_weather_for_date(target_date):
+        for i, dt in enumerate(time_defines):
+            if dt and dt.date() == target_date and i < len(weathers) and weathers[i]:
+                return weathers[i]
+        return "N/A"
+
+    def _max_pop_for_date(target_date):
+        # 6時間ごとの降水確率は forecast[0].timeSeries[1] に入る
+        try:
+            ts1 = (forecast_data[0].get("timeSeries") or [])[1]
+            pop_times = [_to_jst_safe(t) for t in (ts1.get("timeDefines") or [])]
+            pop_values = ((ts1.get("areas") or [{}])[0].get("pops") or [])
+        except Exception:
+            pop_times = []
+            pop_values = []
+
+        nums = []
+        for i, dt in enumerate(pop_times):
+            if not dt or dt.date() != target_date or i >= len(pop_values):
+                continue
+            raw = str(pop_values[i]).strip()
+            if raw == "":
+                continue
+            try:
+                nums.append(int(raw))
+            except ValueError:
+                continue
+        if not nums:
+            return "N/A"
+        return str(max(nums))
+
+    def _representative_temp_for_date(target_date):
+        vals = []
+        for i, dt in enumerate(temps_time):
+            if not dt or dt.date() != target_date or i >= len(temps_values):
+                continue
+            raw = temps_values[i]
+            if raw in (None, ""):
+                continue
+            try:
+                vals.append(float(raw))
+            except (TypeError, ValueError):
+                continue
+        if not vals:
+            return "N/A"
+        return str(int(round(max(vals))))
+
+    # 今日
     for i, dt in enumerate(time_defines):
         if dt.date() == today_date:
             if response['today']['weather'] == 'N/A': # Set only first one
                 response['today']['weather'] = weathers[i]
                 response['today']['icon'] = _map_weather_to_icon(weathers[i])
-            if i < len(pops) and pops[i] and response['today']['pop'] == 'N/A':
-                 response['today']['pop'] = pops[i]
+    if response['today']['weather'] == 'N/A':
+        response['today']['weather'] = _first_weather_for_date(today_date)
+    response['today']['icon'] = _map_weather_to_icon(response['today']['weather'])
+    response['today']['pop'] = _max_pop_for_date(today_date)
+    response['today']['temperature'] = _representative_temp_for_date(today_date)
 
-    for i, dt in enumerate(temps_time):
-         if dt.date() == today_date and dt.hour > 12: # Try to get afternoon temp
-            response['today']['temperature'] = temps_values[i]
-            break
-    
-    # Find tomorrow's data
+    # 明日
     for i, dt in enumerate(time_defines):
         if dt.date() == tomorrow_date:
             if response['tomorrow']['weather'] == 'N/A':
                 response['tomorrow']['weather'] = weathers[i]
                 response['tomorrow']['icon'] = _map_weather_to_icon(weathers[i])
-            if i < len(pops) and pops[i] and response['tomorrow']['pop'] == 'N/A':
-                 response['tomorrow']['pop'] = pops[i]
-
-    for i, dt in enumerate(temps_time):
-         if dt.date() == tomorrow_date and dt.hour > 12:
-            response['tomorrow']['temperature'] = temps_values[i]
-            break
+    if response['tomorrow']['weather'] == 'N/A':
+        response['tomorrow']['weather'] = _first_weather_for_date(tomorrow_date)
+    response['tomorrow']['icon'] = _map_weather_to_icon(response['tomorrow']['weather'])
+    response['tomorrow']['pop'] = _max_pop_for_date(tomorrow_date)
+    response['tomorrow']['temperature'] = _representative_temp_for_date(tomorrow_date)
             
     return jsonify(response)
 
