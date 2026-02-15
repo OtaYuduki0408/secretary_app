@@ -1447,6 +1447,19 @@ def _enrich_actions_for_dispatch(order_payload, user_id, app_logger, source="Unk
         app_logger.debug(f"[DEBUG_ENRICH] Enriching action: Category='{category}', Sub='{sub}'")
         
         try:
+            if category == '時間読み上げ':
+                now_jst = datetime.now(JST)
+                hour = now_jst.hour
+                minute = now_jst.minute
+                time_message = f"現在の時刻は、{hour}時{minute}分です。"
+                
+                # フロントが理解できる「音声-再生」アクションに変換する
+                action['category'] = '音声'
+                action['sub'] = '再生'
+                action['detail'] = {'message': time_message}
+                app_logger.debug(f"[DEBUG_ENRICH] Converted '時間読み上げ' to '音声-再生' with message: {time_message}")
+                return action # 変換したのでここで処理を終了
+
             if category == 'カレンダー' and sub == '読み上げ':
                 action['detail'] = _enrich_calendar_read(detail, user_id, now_jst, app_logger)
             elif category == '収支管理' and sub == '読み上げ':
@@ -1708,6 +1721,11 @@ def chat_api_web():
     voice_payloads = _handle_voice_triggers(user_input, user_id, app.logger)
     print(f"[CHAT_API] Voice trigger check completed. Found {len(voice_payloads)} matching orders.")
 
+    # ▼▼▼ デバッグログ追加 ▼▼▼
+    if voice_payloads:
+        print(f"--- [DEBUG] Raw voice_payloads: {json.dumps(voice_payloads, indent=2, ensure_ascii=False)} ---")
+    # ▲▲▲ デバッグログ追加 ▲▲▲
+
     if voice_payloads:
         enriched_payloads = []
         for payload in voice_payloads:
@@ -1715,11 +1733,20 @@ def chat_api_web():
             enriched_payload = _enrich_actions_for_dispatch(payload, user_id, app.logger)
             enriched_payloads.append(enriched_payload)
         
+        # ▼▼▼ デバッグログ追加 ▼▼▼
+        print(f"--- [DEBUG] Enriched payloads: {json.dumps(enriched_payloads, indent=2, ensure_ascii=False)} ---")
+        # ▲▲▲ デバッグログ追加 ▲▲▲
+
         response_data['suppress_tts'] = True
         response_data['message'] = ""
         response_data['triggered_by_voice'] = True
         response_data['triggered_by_voice_count'] = len(voice_payloads)
         response_data['order_payloads'] = enriched_payloads
+        
+        # ▼▼▼ デバッグログ追加 ▼▼▼
+        print(f"--- [DEBUG] Final response_data to be sent: {json.dumps(response_data, indent=2, ensure_ascii=False)} ---")
+        # ▲▲▲ デバッグログ追加 ▲▲▲
+        
         return jsonify(response_data)
 
     # ... (rest of the chat_api_web function)
