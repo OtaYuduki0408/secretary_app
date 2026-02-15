@@ -153,10 +153,10 @@ $(document).ready(function() {
                     const endWordMatch = findEndWordMatch(finalTranscript);
                     clearTimeout(pendingFinalDispatchTimerId);
                     if (endWordMatch) {
-                        dispatchVoiceCommand(finalTranscript, endWordMatch.word);
-                    } else {
-                        pendingFinalDispatchTimerId = setTimeout(() => dispatchVoiceCommand(finalTranscript), FINAL_SEGMENT_WAIT_MS);
+                        dispatchVoiceCommand(finalTranscript, endWordMatch);
+                        return;
                     }
+                    pendingFinalDispatchTimerId = setTimeout(() => dispatchVoiceCommand(finalTranscript), FINAL_SEGMENT_WAIT_MS);
                 }
             }
         };
@@ -165,8 +165,8 @@ $(document).ready(function() {
     // ============================================================================
     // コマンド処理
     // ============================================================================
-    function dispatchVoiceCommand(text, endWord = null) {
-        const command = sanitizeVoiceCommand(text, endWord);
+    function dispatchVoiceCommand(text, endWordMatch = null) {
+        const command = sanitizeVoiceCommand(text, endWordMatch);
         setMode('processing');
         if (!command) {
             stopTTS();
@@ -182,21 +182,45 @@ $(document).ready(function() {
         playTTS(repeatText, () => sendTextToServer(command));
     }
 
-    function sendTextToServer(text) {
-        if (submissionLock) return;
-        submissionLock = true;
-        setTimeout(() => {
-            submissionLock = false;
-            if (currentMode === 'cooldown') setMode('waiting');
-        }, DISPATCH_COOLDOWN_MS);
-        if(!finalTranscript) updateLogDisplay(text, 'user');
-        $.ajax({
-            url: '/web_api/chat', type: 'POST', contentType: 'application/json',
-            data: JSON.stringify({ inputValue: text }),
-            success: handleServerResponse,
-            error: () => { setMode('cooldown'); updateLogDisplay('サーバー通信失敗', 'assistant'); }
-        });
-    }
+        function sendTextToServer(text) {
+
+            if (submissionLock) return;
+
+            
+
+            console.log("Final command to server:", text); // DEBUG LOG
+
+    
+
+            submissionLock = true;
+
+            setTimeout(() => {
+
+                submissionLock = false;
+
+                if (currentMode === 'cooldown') setMode('waiting');
+
+            }, DISPATCH_COOLDOWN_MS);
+
+    
+
+            if(!finalTranscript) updateLogDisplay(text, 'user');
+
+            
+
+            $.ajax({
+
+                url: '/web_api/chat', type: 'POST', contentType: 'application/json',
+
+                data: JSON.stringify({ inputValue: text }),
+
+                success: handleServerResponse,
+
+                error: () => { setMode('cooldown'); updateLogDisplay('サーバー通信失敗', 'assistant'); }
+
+            });
+
+        }
 
     function handleServerResponse(response) {
         if (response.message) {
@@ -214,13 +238,43 @@ $(document).ready(function() {
     
     function handleServerCommand(payload) {
         (payload.actions || []).forEach(action => {
+            let overlayContent = '';
             switch (`${action.category}-${action.sub}`) {
-                case '画面-ブラックアウト': action.detail?.state === 'on' ? showBlackout() : hideBlackout(); break;
-                case '音声-再生': if (action.detail?.message) playTTS(action.detail.message, () => setMode('waiting')); break;
-                case 'youtube-再生': if (action.detail?.query) window.playYoutubeVideo(action.detail.query); break;
-                case 'youtube-操作': if (action.detail?.intent) window.executeYoutubeIntent(action.detail); break;
+                case '画面-ブラックアウト':
+                    action.detail?.state === 'on' ? showBlackout() : hideBlackout();
+                    break;
+                case '音声-再生':
+                    if (action.detail?.message) playTTS(action.detail.message, () => setMode('waiting'));
+                    break;
+                case 'youtube-再生':
+                    if (action.detail?.query) window.playYoutubeVideo(action.detail.query);
+                    break;
+                case 'youtube-操作':
+                    if (action.detail?.intent) window.executeYoutubeIntent(action.detail);
+                    break;
+                case 'カレンダー-読み上げ':
+                     overlayContent = createCalendarOverlayHTML(action.detail);
+                     if(overlayContent) showActionOverlay(overlayContent);
+                     if (action.detail?.summary) playTTS(action.detail.summary);
+                     break;
+                case '天気-読み上げ':
+                    overlayContent = createWeatherOverlayHTML(action.detail);
+                    if(overlayContent) showActionOverlay(overlayContent);
+                    if (action.detail?.message) playTTS(action.detail.message);
+                    break;
             }
         });
+    }
+    
+    function createCalendarOverlayHTML(detail) {
+        if (!detail || !detail.events) return '';
+        let eventHTML = detail.events.map(e => `<li><strong>${e.start_time}</strong>: ${e.summary}</li>`).join('');
+        return `<h3>今日の予定</h3><ul>${eventHTML || '<li>予定はありません</li>'}</ul>`;
+    }
+
+    function createWeatherOverlayHTML(detail) {
+        if (!detail || !detail.message) return '';
+        return `<h3>天気予報</h3><p>${detail.message}</p>`;
     }
 
     // ============================================================================
@@ -231,7 +285,7 @@ $(document).ready(function() {
         const $micStatus = $('#mic-status').removeClass();
         const $micIcon = $micStatus.find('i').removeClass();
         const statusMap = {
-            waiting:    { text: '音声待機中',   icon: 'fa-microphone-slash', class: 'waiting' },
+            waiting:    { text: '音声待機中',   icon: 'fa-microphone',       class: 'waiting' },
             listening:  { text: '命令中...',      icon: 'fa-microphone',       class: 'listening' },
             processing: { text: '処理待機中',   icon: 'fa-cogs',             class: 'processing' },
             speaking:   { text: '発声中...',      icon: 'fa-volume-up',        class: 'speaking' },
@@ -270,12 +324,34 @@ $(document).ready(function() {
     }
     
     const highlightWords = (t, w, c) => { let hT = t; w.forEach(word => { hT = hT.replace(new RegExp(escapeRegExp(word), 'gi'), `<span class="${c}">${word}</span>`); }); return hT; };
-    const sanitizeVoiceCommand = (t, eW) => { let c = stripLeadingWakeWords(t); if(eW) c = c.replace(new RegExp(escapeRegExp(eW),'gi'), ''); return c.replace(/[、。！？!?\s]+$/g,'').trim(); };
     const escapeRegExp = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const stripLeadingWakeWords = (t) => { let n = (t||'').trim(); WAKE_WORDS.sort((a,b)=>b.length-a.length).forEach(w => { if(n.toLowerCase().startsWith(w.toLowerCase())) n = n.slice(w.length).trim(); }); return n; };
     const mergeRecognizedCommandSegments = (p, n) => !p ? n : (!n ? p : (n.includes(p) ? n : (p.includes(n) ? p : `${p} ${n}`.trim())));
-    const findEndWordMatch = (t) => { const c = stripLeadingWakeWords(t); for(const g of customTriggerAndWordGroups) if(g.every(w => c.includes(w))) return {word: g.join(' & ')}; for(const w of END_WORDS) if(c.includes(w)) return {word: w}; return null; };
     const shouldSuppressDuplicate = (c) => { const k = c.replace(/[、。！？!?]/g,' ').toLowerCase().replace(/\s+/g,' ').trim(), n=Date.now(); if(k&&k===lastDispatchedVoiceCommandKey&&(n-lastDispatchedVoiceCommandAt)<DUPLICATE_SUPPRESS_MS) return true; lastDispatchedVoiceCommandKey=k; lastDispatchedVoiceCommandAt=n; return false; };
+
+    const findEndWordMatch = (text) => {
+        const commandOnly = stripLeadingWakeWords(text);
+        for (const group of customTriggerAndWordGroups) {
+            if (group.every(word => commandOnly.includes(word))) {
+                return { word: group.join(' & '), source: 'custom' };
+            }
+        }
+        for (const word of END_WORDS) {
+            if (commandOnly.includes(word)) {
+                const isCustom = customTriggerEndWords.includes(word);
+                return { word: word, source: isCustom ? 'custom' : 'settings' };
+            }
+        }
+        return null;
+    };
+
+    function sanitizeVoiceCommand(text, endWordMatch) {
+        let command = stripLeadingWakeWords(text);
+        if (endWordMatch && endWordMatch.source === 'settings') {
+             command = command.replace(new RegExp(escapeRegExp(endWordMatch.word), 'gi'), '');
+        }
+        return command.replace(/[、。！？!?\s]+$/g, '').trim();
+    }
 
     // ============================================================================
     // UIイベント
@@ -291,13 +367,21 @@ $(document).ready(function() {
     // ============================================================================
     // TTS
     // ============================================================================
-    const playTTS = (text, onEnd) => { stopTTS(); setMode('speaking'); $.ajax({ url: '/api/tts', type: 'POST', contentType:'application/json', data:JSON.stringify({text}), success:(r)=>{ if(r.audioContent){ currentAudio=new Audio(`data:audio/mp3;base64,${r.audioContent}`); currentAudio.play().catch(()=>{if(onEnd)onEnd();}); currentAudio.onended=()=>{currentAudio=null;if(onEnd)onEnd();}; }else{if(onEnd)onEnd();}}, error:()=>{if(onEnd)onEnd();}});};
+    const playTTS = (text, onEnd) => { stopTTS(); setMode('speaking'); $.ajax({ url: '/api/tts', type: 'POST', contentType:'application/json', data:JSON.stringify({text}), success:(r)=>{ if(r.audioContent){ currentAudio=new Audio(`data:audio/mp3;base64,${r.audioContent}`); currentAudio.play().catch(()=>{setMode('waiting');if(onEnd)onEnd();}); currentAudio.onended=()=>{currentAudio=null;setMode('waiting');if(onEnd)onEnd();}; }else{setMode('waiting');if(onEnd)onEnd();}}, error:()=>{setMode('waiting');if(onEnd)onEnd();}});};
     const stopTTS = () => { if(currentAudio){currentAudio.pause();currentAudio.onended=null;currentAudio=null;} };
 
     // ============================================================================
     // UI Functions & Data Fetch
     // ============================================================================
     const showBlackout=()=>$('#blackout-overlay').fadeIn(500); const hideBlackout=()=>$('#blackout-overlay').fadeOut(500);
+    
+    // --- Action Overlay ---
+    const $actionOverlay = $('#action-overlay');
+    const $actionOverlayBody = $('#action-overlay-body');
+    function showActionOverlay(htmlContent) { $actionOverlayBody.html(htmlContent); $actionOverlay.css('display', 'flex'); }
+    function hideActionOverlay() { $actionOverlay.hide(); $actionOverlayBody.empty(); }
+    $('.action-overlay-close').on('click', hideActionOverlay);
+
     const fetchWeather = () => $.get('/api/weather', (d) => { if(d.today){ $('#today-weather .data').text(`${d.today.weather} ${d.today.temperature}℃ / ${d.today.pop}%`); $('#today-weather .info-item-body i').removeClass().addClass(`fas ${d.today.icon}`);} if(d.tomorrow){ $('#tomorrow-weather .data').text(`${d.tomorrow.weather} ${d.tomorrow.temperature}℃ / ${d.tomorrow.pop}%`); $('#tomorrow-weather .info-item-body i').removeClass().addClass(`fas ${d.tomorrow.icon}`);} });
     const fetchFinanceData = () => $.get('/api/finance/summary', (d) => { $('#total-balance .data').text(`¥${d.balance?.toLocaleString()||'N/A'}`); $('#monthly-expense .data').text(`¥${d.monthly_expense?.toLocaleString()||'N/A'}`); });
     const fetchCalendarData = () => {const n=new Date(),s=new Date(n.getFullYear(),n.getMonth(),n.getDate(),0,0,0),e=new Date(s.getTime()+7*24*60*60*1000); $.get(`/api/local_calendar/events?start=${s.toISOString()}&end=${e.toISOString()}`,(evts)=>{const $l=$('#schedule-list').empty();if(evts?.length){const uE=evts.map(e=>({...e,startTime:new Date(e.start_time)})).filter(e=>e.startTime>=n).sort((a,b)=>a.startTime-b.startTime).slice(0,4);if(uE.length){uE.forEach(e=>{const sT=e.startTime.toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'});let dL='';if(e.startTime.getDate()===n.getDate())dL='今日';else if(e.startTime.getDate()===n.getDate()+1)dL='明日';else dL=e.startTime.toLocaleDateString('ja-JP',{month:'short',day:'numeric'});const tS=`${dL} ${sT}`;$l.append(`<li><span class="schedule-time">${tS}</span><span class="schedule-title">${e.title}</span></li>`);});}else{$l.append('<li><span class="schedule-title">直近の予定はありません</span></li>');}}else{$l.append('<li><span class="schedule-title">予定はありません</span></li>');}}).fail(()=>{$('#schedule-list').empty().append('<li><span class="schedule-title">予定の取得に失敗</span></li>');});};

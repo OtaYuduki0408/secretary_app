@@ -505,6 +505,9 @@ body, html {
     background-color: rgba(0, 0, 0, 0.2);
     color: #ccc;
 }
+#mic-status.waiting .fas {
+    opacity: 0.6;
+}
 
 /* 2. 命令中 */
 #mic-status.listening {
