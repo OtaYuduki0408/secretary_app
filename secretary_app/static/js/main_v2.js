@@ -143,31 +143,53 @@ $(document).ready(function() {
         recognition.onend = () => { isRecognitionActive = false; setTimeout(() => { if(!isRecognitionActive) try { recognition.start(); } catch(e) {} }, 1000); };
         recognition.onerror = (e) => { if (e.error === 'no-speech') setMode('waiting'); };
         recognition.onresult = (event) => {
-            let interim = '', final = '';
-            for (let i = event.resultIndex; i < event.results.length; ++i) {
-                if (event.results[i].isFinal) final += event.results[i][0].transcript;
-                else interim += event.results[i][0].transcript;
+            let interim_transcript = '';
+            let final_transcript = '';
+
+            // event.results全体を走査して最終的なテキストと中間テキストを再構築
+            for (let i = 0; i < event.results.length; ++i) {
+                const transcript = event.results[i][0].transcript;
+                if (event.results[i].isFinal) {
+                    final_transcript += transcript;
+                } else {
+                    interim_transcript += transcript;
+                }
             }
 
+            const display_transcript = final_transcript + interim_transcript;
+
             if (currentMode === 'waiting') {
-                const transcript = interim || final;
-                if (WAKE_WORDS.some(w => transcript.toLowerCase().includes(w.toLowerCase()))) {
-                    finalTranscript = transcript;
+                if (WAKE_WORDS.some(w => display_transcript.toLowerCase().includes(w.toLowerCase()))) {
                     setMode('listening');
+                    updateLogDisplay(stripLeadingWakeWords(display_transcript), 'user', true);
                     return;
                 }
-                if (interim) updateLogDisplay(interim, 'user', true, true);
+                if (interim_transcript) {
+                    updateLogDisplay(interim_transcript, 'user', true, true);
+                }
             } else if (currentMode === 'listening') {
-                finalTranscript = mergeRecognizedCommandSegments(finalTranscript, final || interim);
-                updateLogDisplay(finalTranscript, 'user', true);
-                if (final) {
-                    const endWordMatch = findEndWordMatch(finalTranscript);
+                // ウェイクワードの再発をチェック
+                const command_body = stripLeadingWakeWords(display_transcript);
+                if (WAKE_WORDS.some(w => command_body.toLowerCase().includes(w.toLowerCase()))) {
+                    recognition.stop(); // 認識をリセット
+                    return;
+                }
+
+                const command_text = stripLeadingWakeWords(display_transcript);
+                updateLogDisplay(command_text, 'user', true);
+                
+                const lastResultIsFinal = event.results[event.results.length - 1].isFinal;
+
+                if (lastResultIsFinal) {
+                    const command_to_dispatch = stripLeadingWakeWords(final_transcript);
+                    const endWordMatch = findEndWordMatch(command_to_dispatch);
+                    
                     clearTimeout(pendingFinalDispatchTimerId);
                     if (endWordMatch) {
-                        dispatchVoiceCommand(finalTranscript, endWordMatch);
-                        return;
+                        dispatchVoiceCommand(command_to_dispatch, endWordMatch);
+                    } else {
+                        pendingFinalDispatchTimerId = setTimeout(() => dispatchVoiceCommand(command_to_dispatch), FINAL_SEGMENT_WAIT_MS);
                     }
-                    pendingFinalDispatchTimerId = setTimeout(() => dispatchVoiceCommand(finalTranscript), FINAL_SEGMENT_WAIT_MS);
                 }
             }
         };
@@ -355,7 +377,6 @@ $(document).ready(function() {
     const highlightWords = (t, w, c) => { let hT = t; w.forEach(word => { hT = hT.replace(new RegExp(escapeRegExp(word), 'gi'), `<span class="${c}">${word}</span>`); }); return hT; };
     const escapeRegExp = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const stripLeadingWakeWords = (t) => { let n = (t||'').trim(); WAKE_WORDS.sort((a,b)=>b.length-a.length).forEach(w => { if(n.toLowerCase().startsWith(w.toLowerCase())) n = n.slice(w.length).trim(); }); return n; };
-    const mergeRecognizedCommandSegments = (p, n) => !p ? n : (!n ? p : (n.includes(p) ? n : (p.includes(n) ? p : `${p} ${n}`.trim())));
     const shouldSuppressDuplicate = (c) => { const k = c.replace(/[、。！？!?]/g,' ').toLowerCase().replace(/\s+/g,' ').trim(), n=Date.now(); if(k&&k===lastDispatchedVoiceCommandKey&&(n-lastDispatchedVoiceCommandAt)<DUPLICATE_SUPPRESS_MS) return true; lastDispatchedVoiceCommandKey=k; lastDispatchedVoiceCommandAt=n; return false; };
 
     const findEndWordMatch = (text) => {
