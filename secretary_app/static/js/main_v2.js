@@ -456,6 +456,7 @@ $(document).ready(function() {
 
     function updateLogDisplay(message, sender, isInterim = false, isWaitingLog = false) {
         const $logDisplay = $('#log-display');
+        const $scrollContainer = $('#field-log .content');
         const logClass = isWaitingLog ? 'log-waiting' : (isInterim ? 'log-interim' : '');
         const lastMsg = $logDisplay.children().last();
         let displayMsg = message;
@@ -469,7 +470,11 @@ $(document).ready(function() {
             $logDisplay.find('.log-interim, .log-waiting').remove();
             $logDisplay.append(`<div class="log-message ${sender}">${displayMsg}</div>`);
         }
-        $logDisplay.scrollTop($logDisplay.prop("scrollHeight"));
+        if ($scrollContainer.length) {
+            $scrollContainer.scrollTop($scrollContainer.prop('scrollHeight'));
+        } else {
+            $logDisplay.scrollTop($logDisplay.prop("scrollHeight"));
+        }
     }
     
     const highlightWords = (t, w, c) => { let hT = t; w.forEach(word => { hT = hT.replace(new RegExp(escapeRegExp(word), 'gi'), `<span class="${c}">${word}</span>`); }); return hT; };
