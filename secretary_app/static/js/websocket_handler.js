@@ -7,6 +7,7 @@ let lastPayloadExecutedAt = 0;
 const DUPLICATE_PAYLOAD_SUPPRESS_MS = 8000;
 let isWebSocketConnected = false;
 let fallbackBootstrapTimer = null;
+let missingOverlayWarned = false;
 
 // =====================================================================
 // ヘルパー関数
@@ -287,9 +288,26 @@ async function executeAction(action) {
     const messageElement = document.getElementById('overlay-message');
     const timeElement = document.getElementById('overlay-time');
     const hasReadAloudOverlay = !!(overlay && messageElement);
+    const logDisplay = document.getElementById('log-display');
+    const appendAssistantLog = (message) => {
+        if (!message || !logDisplay) return;
+        const el = document.createElement('div');
+        el.className = 'log-message assistant';
+        el.textContent = String(message);
+        logDisplay.appendChild(el);
+        const scrollContainer = document.querySelector('#field-log .content');
+        if (scrollContainer) {
+            scrollContainer.scrollTop = scrollContainer.scrollHeight;
+        } else {
+            logDisplay.scrollTop = logDisplay.scrollHeight;
+        }
+    };
 
     if (!hasReadAloudOverlay) {
-        console.warn("overlay要素が見つかりません。");
+        if (!missingOverlayWarned) {
+            console.warn("overlay要素が見つかりません。");
+            missingOverlayWarned = true;
+        }
     }
 
     // オーバーレイのリセット（要素がある場合のみ）
@@ -360,9 +378,11 @@ async function executeAction(action) {
             } else {
                 textToSpeak = `SwitchBotの操作に失敗しました。${serverResult?.message || ''}`;
             }
+            appendAssistantLog(textToSpeak);
         } catch (error) {
             console.error('SwitchBot execution fetch failed:', error);
             textToSpeak = "SwitchBotの操作リクエストに失敗しました。";
+            appendAssistantLog(textToSpeak);
         }
     } else if (action.category === 'カレンダー' && action.sub === '読み上げ') {
         overlayTitle = "カレンダー";
@@ -424,8 +444,9 @@ async function executeAction(action) {
 
             if (queryOrUrl && typeof window.playYoutubeVideo === 'function') {
                 textToSpeak = `${mode === 'url' ? 'URLの動画' : search_query}を再生します。`;
-                await speak(textToSpeak);
                 window.playYoutubeVideo(queryOrUrl);
+                appendAssistantLog(textToSpeak);
+                try { await speak(textToSpeak); } catch (e) { console.warn("speak failed:", e); }
                 return;
             }
 
@@ -433,7 +454,8 @@ async function executeAction(action) {
                 const resumed = window.executeYoutubeIntent({ intent: 'resume', query: '' });
                 if (resumed) {
                     textToSpeak = "YouTubeを再生します。";
-                    await speak(textToSpeak);
+                    appendAssistantLog(textToSpeak);
+                    try { await speak(textToSpeak); } catch (e) { console.warn("speak failed:", e); }
                     return;
                 }
             }
@@ -492,6 +514,7 @@ async function executeAction(action) {
                     } else {
                         textToSpeak = "YouTube操作を実行できませんでした。";
                     }
+                    appendAssistantLog(textToSpeak);
                 }
             }
         }
@@ -529,11 +552,11 @@ async function executeAction(action) {
                 messageElement.innerHTML = `<h3>${overlayTitle}</h3><p>${textToSpeak}</p>`;
             }
             overlay.classList.add('visible');
-            await speak(textToSpeak);
+            try { await speak(textToSpeak); } catch (e) { console.warn("speak failed:", e); }
             overlay.classList.remove('visible');
         } else {
             // オーバーレイが無くても音声実行は継続する
-            await speak(textToSpeak);
+            try { await speak(textToSpeak); } catch (e) { console.warn("speak failed:", e); }
         }
     }
 }
