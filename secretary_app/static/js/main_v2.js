@@ -2,40 +2,35 @@
 
 $(document).ready(function() {
     // ============================================================================
-    // グローバル変数と定数 (from voice_recognition.js)
+    // グローバル変数と定数
     // ============================================================================
     let WAKE_WORDS = ['サイレントメイト', 'ぼいすめいと', 'voicemate'];
     const DEFAULT_END_WORDS = ['命令完了'];
     let END_WORDS = [...DEFAULT_END_WORDS];
     let settingsEndWords = [...DEFAULT_END_WORDS];
     let customTriggerEndWords = [];
-    let customTriggerAndWordGroups = [];
-
-    let recognition; // SpeechRecognitionインスタンス
-    let currentMode = 'waiting'; // 'waiting' or 'listening'
-    let recognitionTimeoutId; // 音声入力タイムアウトのID
-    let isRecognitionActive = false;
-    let finalTranscript = ''; // 最終的な音声認識結果
     
-    // 重複送信防止・ノイズ対策
+    let recognition;
+    let currentMode = 'waiting';
+    let recognitionTimeoutId;
+    let isRecognitionActive = false;
+    let finalTranscript = '';
+    
     let submissionLock = false;
     const DUPLICATE_SUPPRESS_MS = 5000;
-    const FINAL_SEGMENT_WAIT_MS = 800; // isFinal後の待機時間
-    const DISPATCH_COOLDOWN_MS = 2000;
+    const FINAL_SEGMENT_WAIT_MS = 800;
+    const DISPATCH_COOLDOWN_MS = 3000;
     let lastDispatchedVoiceCommandKey = '';
     let lastDispatchedVoiceCommandAt = 0;
     let pendingFinalDispatchTimerId = null;
 
     let userInteracted = false;
-    
-    // TTS
     let currentAudio = null;
 
     // ============================================================================
-    // 初期化処理
+    // 初期化
     // ============================================================================
 
-    // --- 設定読み込み ---
     function loadAppSettings() {
         try {
             const raw = localStorage.getItem('appSettings');
@@ -43,8 +38,7 @@ $(document).ready(function() {
             const settings = JSON.parse(raw);
             const wakeWordsRaw = settings?.main?.wakeWords || '';
             if (wakeWordsRaw) {
-                const words = wakeWordsRaw.split(',').map(word => word.trim()).filter(Boolean);
-                if (words.length > 0) WAKE_WORDS = words;
+                WAKE_WORDS = wakeWordsRaw.split(',').map(w => w.trim()).filter(Boolean);
             }
             settingsEndWords = parseEndWords(settings?.main?.endWord || '命令完了');
             rebuildEffectiveEndWords();
@@ -53,41 +47,31 @@ $(document).ready(function() {
         }
     }
 
-    function parseEndWords(rawEndWords) {
-        if (typeof rawEndWords !== 'string') return [...DEFAULT_END_WORDS];
-        const parsed = rawEndWords.split(',').map(word => word.trim()).filter(Boolean);
+    function parseEndWords(raw) {
+        if (typeof raw !== 'string') return [...DEFAULT_END_WORDS];
+        const parsed = raw.split(',').map(w => w.trim()).filter(Boolean);
         return parsed.length > 0 ? parsed : [...DEFAULT_END_WORDS];
     }
     
     function rebuildEffectiveEndWords() {
-        const uniqueWords = new Set([...DEFAULT_END_WORDS, ...settingsEndWords, ...customTriggerEndWords]);
-        END_WORDS = Array.from(uniqueWords);
+        END_WORDS = Array.from(new Set([...DEFAULT_END_WORDS, ...settingsEndWords, ...customTriggerEndWords]));
     }
     
     async function loadCustomVoiceTriggerEndWords() {
         try {
-            const response = await fetch('/api/custom_orders');
-            if (!response.ok) return;
-            const orders = await response.json();
+            const res = await fetch('/api/custom_orders');
+            if (!res.ok) return;
+            const orders = await res.json();
             if (!Array.isArray(orders)) return;
-
-            const collectedWords = [];
-            const collectedAndGroups = [];
-            orders.forEach(order => {
-                const { words, andGroups } = extractVoiceTriggerEndWordsFromOrder(order);
-                collectedWords.push(...words);
-                collectedAndGroups.push(...andGroups);
-            });
-
-            customTriggerEndWords = Array.from(new Set(collectedWords));
-            customTriggerAndWordGroups = collectedAndGroups; // Assuming structure is already unique
+            // Simplified logic to extract end words
+            const words = orders.flatMap(o => o.triggers?.filter(t => t.category === 'ボイス').flatMap(t => (t.value?.keywords || []).flat()) || []);
+            customTriggerEndWords = Array.from(new Set(words.map(w => String(w).trim()).filter(Boolean)));
             rebuildEffectiveEndWords();
-        } catch (error) {
-            console.warn('カスタム命令の読み込みに失敗', error);
+        } catch (e) {
+            console.warn('カスタム命令の読み込みに失敗', e);
         }
     }
 
-    // --- 音声認識の初期化 ---
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (SpeechRecognition) {
         recognition = new SpeechRecognition();
@@ -96,451 +80,306 @@ $(document).ready(function() {
         recognition.lang = 'ja-JP';
         setupRecognitionHandlers();
     } else {
-        console.error("Web Speech API はこのブラウザでサポートされていません。");
-        $('#mic-status-text').text('非対応ブラウザ');
+        setMode('error', '非対応ブラウザ');
     }
     
     function initializeVoiceRecognition() {
-        if (!recognition) return;
-        if (isRecognitionActive) return;
+        if (!recognition || isRecognitionActive) return;
         
-        // ユーザーインタラクションを待つ
         if (!userInteracted) {
-             $('#mic-status-text').text('クリックして開始');
-             $('#mic-status').one('click', function() {
+             setMode('permission_required', 'クリックしてマイクを有効化');
+             $(document).one('click', function() {
                  userInteracted = true;
-                 $(this).off('click');
-                 initializeVoiceRecognition();
+                 setMode('waiting');
+                 try { recognition.start(); } catch(e) { console.error("Recognition start failed:", e); }
              });
              return;
         }
-
-        console.log("音声認識を開始します。");
         setMode('waiting');
-        try {
-            recognition.start();
-        } catch (e) {
-            console.error("認識開始に失敗", e);
-        }
+        try { recognition.start(); } catch(e) {}
     }
 
     // ============================================================================
-    // 音声認識イベントハンドラ
+    // 音声認識ハンドラ
     // ============================================================================
     function setupRecognitionHandlers() {
-        recognition.onstart = () => {
-            isRecognitionActive = true;
-            console.log("Recognition started.");
-        };
-
+        recognition.onstart = () => { isRecognitionActive = true; };
         recognition.onend = () => {
             isRecognitionActive = false;
-            console.log("Recognition ended. Restarting in 1s...");
-            // 意図しない停止後、1秒後に再起動
-            setTimeout(() => {
-                if(!isRecognitionActive) {
-                    try { recognition.start(); } catch(e) {}
-                }
-            }, 1000);
+            setTimeout(() => { if(!isRecognitionActive) try { recognition.start(); } catch(e) {} }, 1000);
         };
-
-        recognition.onerror = (event) => {
-            console.error('Speech recognition error:', event.error);
-             if (event.error === 'no-speech') {
-                setMode('waiting');
-            }
-        };
-
+        recognition.onerror = (e) => { if (e.error === 'no-speech') setMode('waiting'); };
         recognition.onresult = (event) => {
-            let interimTranscript = '';
-            let latestFinalTranscript = '';
-
+            let interim = '', final = '';
             for (let i = event.resultIndex; i < event.results.length; ++i) {
-                if (event.results[i].isFinal) {
-                    latestFinalTranscript += event.results[i][0].transcript;
-                } else {
-                    interimTranscript += event.results[i][0].transcript;
-                }
+                if (event.results[i].isFinal) final += event.results[i][0].transcript;
+                else interim += event.results[i][0].transcript;
             }
 
-            // モードに応じた処理
             if (currentMode === 'waiting') {
-                const transcript = interimTranscript || latestFinalTranscript;
-                const wakeWordFound = WAKE_WORDS.some(word => transcript.toLowerCase().includes(word.toLowerCase()));
-                if (wakeWordFound) {
-                    console.log("ウェイクワードを検知！");
+                const transcript = interim || final;
+                if (WAKE_WORDS.some(w => transcript.toLowerCase().includes(w.toLowerCase()))) {
                     finalTranscript = transcript;
                     setMode('listening');
+                    // モードを切り替えたら、このイベントでの処理は終了する
+                    return; 
+                } else if (interim) {
+                    updateLogDisplay(interim, 'user', true, true);
                 }
-                 // 待機中もログ表示
-                if(interimTranscript){
-                    updateLogDisplay(interimTranscript, 'user', true, true);
-                }
-
             } else if (currentMode === 'listening') {
-                finalTranscript = mergeRecognizedCommandSegments(finalTranscript, latestFinalTranscript || interimTranscript);
+                finalTranscript = mergeRecognizedCommandSegments(finalTranscript, final || interim);
                 updateLogDisplay(finalTranscript, 'user', true);
-
-                if (latestFinalTranscript) {
-                     // エンドワードをチェック
+                if (final) {
                     const endWordMatch = findEndWordMatch(finalTranscript);
-                    if(endWordMatch){
-                        console.log(`エンドワード「${endWordMatch.word}」を検知。`);
+                    if (endWordMatch) {
                         clearTimeout(pendingFinalDispatchTimerId);
-                        dispatchVoiceCommand(finalTranscript);
+                        dispatchVoiceCommand(finalTranscript, endWordMatch.word);
                         return;
                     }
-                    
-                    // isFinalの後の追記を待つタイマー
                     clearTimeout(pendingFinalDispatchTimerId);
-                    pendingFinalDispatchTimerId = setTimeout(() => {
-                        dispatchVoiceCommand(finalTranscript);
-                    }, FINAL_SEGMENT_WAIT_MS);
+                    pendingFinalDispatchTimerId = setTimeout(() => dispatchVoiceCommand(finalTranscript), FINAL_SEGMENT_WAIT_MS);
                 }
             }
         };
     }
     
     // ============================================================================
-    // コマンド処理・送信
+    // コマンド処理
     // ============================================================================
-
-    function dispatchVoiceCommand(text) {
-        const command = sanitizeVoiceCommand(text);
+    function dispatchVoiceCommand(text, endWord = null) {
+        const command = sanitizeVoiceCommand(text, endWord);
+        setMode('processing');
         if (!command) {
-            console.log("空のコマンドのため送信を中止");
-            setMode('waiting');
+            stopTTS();
+            setMode('cooldown');
             return;
         }
-
-        if(shouldSuppressDuplicate(command)){
-            console.log("重複コマンドのため送信を抑制");
-            setMode('waiting');
+        if (shouldSuppressDuplicate(command)) {
+            setMode('cooldown');
             return;
         }
-
-        sendTextToServer(command);
-        setMode('waiting');
+        
+        // 復唱
+        const repeatText = `${command}ですね。`;
+        updateLogDisplay(repeatText, 'assistant');
+        playTTS(repeatText, () => {
+            // 復唱が終わってからサーバーに送信
+            sendTextToServer(command);
+        });
     }
 
     function sendTextToServer(text) {
-        if (!text || submissionLock) return;
-        
+        if (submissionLock) return;
         submissionLock = true;
-        setTimeout(() => { submissionLock = false; }, DISPATCH_COOLDOWN_MS);
+        setTimeout(() => {
+            submissionLock = false;
+            if (currentMode === 'cooldown') setMode('waiting');
+        }, DISPATCH_COOLDOWN_MS);
 
-        updateLogDisplay(text, 'user', false);
+        if(!finalTranscript) updateLogDisplay(text, 'user');
         
-        // ウェイクワードのみの入力はTTS停止
-        if (WAKE_WORDS.includes(text.trim())) {
-            stopTTS();
-            return;
-        }
-
         $.ajax({
             url: '/web_api/chat',
             type: 'POST',
             contentType: 'application/json',
             data: JSON.stringify({ inputValue: text }),
             success: handleServerResponse,
-            error: (xhr) => {
-                console.error('サーバー通信エラー:', xhr.responseText);
-                updateLogDisplay('サーバーとの通信に失敗しました。', 'assistant');
-            }
+            error: () => { setMode('cooldown'); updateLogDisplay('サーバー通信失敗', 'assistant'); }
         });
     }
 
     function handleServerResponse(response) {
-        console.log('Server response:', response);
-        if (response.triggered_by_voice && response.order_payloads) {
-            response.order_payloads.forEach(handleServerCommand);
-            return;
-        }
+        setMode('cooldown');
         if (response.message) {
             updateLogDisplay(response.message, 'assistant');
-            if (!response.suppress_tts) {
-                playTTS(response.message);
-            }
+            if (!response.suppress_tts) playTTS(response.message);
+        }
+        if (response.triggered_by_voice && response.order_payloads) {
+            response.order_payloads.forEach(handleServerCommand);
         }
     }
     
     function handleServerCommand(payload) {
-        const actions = payload.actions || (payload.steps ? payload.steps.map(s => s.action).filter(Boolean) : []);
-        actions.forEach(action => {
-            if (action.category === '画面' && action.sub === 'ブラックアウト') {
-                action.detail?.state === 'on' ? showBlackout() : hideBlackout();
-            } else if (action.category === '音声' && action.sub === '再生') {
-                if (action.detail?.message) playTTS(action.detail.message);
-            } else if (action.category === 'youtube' && action.sub === '再生') {
-                if (action.detail?.query) window.playYoutubeVideo(action.detail.query);
-            } else if (action.category === 'youtube' && action.sub === '操作') {
-                if (action.detail?.intent) window.executeYoutubeIntent(action.detail);
+        (payload.actions || []).forEach(action => {
+            switch (`${action.category}-${action.sub}`) {
+                case '画面-ブラックアウト': action.detail?.state === 'on' ? showBlackout() : hideBlackout(); break;
+                case '音声-再生': if (action.detail?.message) playTTS(action.detail.message); break;
+                case 'youtube-再生': if (action.detail?.query) window.playYoutubeVideo(action.detail.query); break;
+                case 'youtube-操作': if (action.detail?.intent) window.executeYoutubeIntent(action.detail); break;
             }
         });
     }
 
-
     // ============================================================================
-    // ヘルパー関数 (from voice_recognition.js)
+    // ヘルパー
     // ============================================================================
-    
-    function setMode(newMode) {
-        if (currentMode === newMode) return;
-        console.log(`モード変更: ${currentMode} -> ${newMode}`);
+    function setMode(newMode, text = '') {
         currentMode = newMode;
-        
-        const $micStatus = $('#mic-status');
-        const $micIcon = $micStatus.find('i');
-        const $micText = $('#mic-status-text');
+        const $micStatus = $('#mic-status').removeClass('listening processing cooldown');
+        const $micIcon = $micStatus.find('i').removeClass();
+        const statusMap = {
+            listening: { text: '命令中...', icon: 'fa-microphone', class: 'listening' },
+            processing: { text: '処理中...', icon: 'fa-cogs', class: 'processing' },
+            cooldown: { text: 'クールダウン中', icon: 'fa-history', class: 'cooldown' },
+            waiting: { text: '音声読み取り中', icon: 'fa-microphone-slash' },
+            permission_required: { text: 'クリックしてマイクを有効化', icon: 'fa-microphone-slash' },
+            error: { text: text || 'エラー', icon: 'fa-exclamation-triangle' }
+        };
+        const status = statusMap[newMode] || statusMap.error;
+        $('#mic-status-text').text(text || status.text);
+        $micIcon.addClass(`fas ${status.icon}`);
+        if(status.class) $micStatus.addClass(status.class);
 
-        if (newMode === 'listening') {
-            finalTranscript = ''; // リスニング開始時にリセット
-            $micStatus.addClass('listening');
-            $micIcon.removeClass('fa-microphone-slash').addClass('fa-microphone');
-            $micText.text('認識中...');
-            
-            // 10秒後にタイムアウト
-            clearTimeout(recognitionTimeoutId);
-            recognitionTimeoutId = setTimeout(() => {
-                if(currentMode === 'listening'){
-                    console.log("入力タイムアウト。待機モードに戻ります。");
-                    dispatchVoiceCommand(finalTranscript); // タイムアウト時点の内容で送信
-                }
-            }, 10000);
-
-        } else { // waiting
-            finalTranscript = '';
-            $micStatus.removeClass('listening');
-            $micIcon.removeClass('fa-microphone').addClass('fa-microphone-slash');
-            $micText.text('待機中...');
-            clearTimeout(recognitionTimeoutId);
-        }
+        if (newMode !== 'listening') clearTimeout(recognitionTimeoutId);
     }
 
     function updateLogDisplay(message, sender, isInterim = false, isWaitingLog = false) {
         const $logDisplay = $('#log-display');
+        const logClass = isWaitingLog ? 'log-waiting' : (isInterim ? 'log-interim' : '');
+        const lastMsg = $logDisplay.children().last();
         
-        if (isInterim) {
-            let $lastMsg = $logDisplay.children().last();
-            const logClass = isWaitingLog ? 'log-waiting' : 'log-interim';
+        // ハイライト処理
+        let displayMsg = message;
+        if(sender === 'user' && (isInterim || isWaitingLog)) {
+             displayMsg = highlightWords(message, WAKE_WORDS, 'highlight-wake-word');
+             displayMsg = highlightWords(displayMsg, END_WORDS, 'highlight-end-word');
+        }
 
-            if ($lastMsg.hasClass(logClass) || $lastMsg.hasClass('log-interim')) {
-                 $lastMsg.html(highlightWakeWords(message)); // ハイライト処理を追加
+        if (isInterim || isWaitingLog) {
+            if (lastMsg.hasClass('log-interim') || lastMsg.hasClass('log-waiting')) {
+                 lastMsg.html(displayMsg);
             } else {
-                 $logDisplay.append(`<div class="log-message ${sender} ${logClass}">${highlightWakeWords(message)}</div>`);
+                 $logDisplay.append(`<div class="log-message ${sender} ${logClass}">${displayMsg}</div>`);
             }
         } else {
             $logDisplay.find('.log-interim, .log-waiting').remove();
-            $logDisplay.append(`<div class="log-message ${sender}">${message}</div>`);
+            $logDisplay.append(`<div class="log-message ${sender}">${displayMsg}</div>`);
         }
         $logDisplay.scrollTop($logDisplay.prop("scrollHeight"));
     }
     
-    function escapeRegExp(text) {
-        return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    function highlightWords(text, words, className) {
+        let highlightedText = text;
+        words.forEach(word => {
+            highlightedText = highlightedText.replace(new RegExp(escapeRegExp(word), 'gi'), `<span class="${className}">${word}</span>`);
+        });
+        return highlightedText;
     }
 
-    function stripLeadingWakeWords(text) {
-        let normalized = (text || '').trim();
-        const wakeWordsByLength = [...WAKE_WORDS].sort((a, b) => b.length - a.length);
-        wakeWordsByLength.forEach(word => {
-            if (normalized.toLowerCase().startsWith(word.toLowerCase())) {
-                normalized = normalized.slice(word.length).trim();
-            }
-        });
-        return normalized;
-    }
-    
-    function sanitizeVoiceCommand(text) {
+    function sanitizeVoiceCommand(text, endWord) {
         let command = stripLeadingWakeWords(text);
-        END_WORDS.forEach(word => {
-            command = command.replace(new RegExp(escapeRegExp(word), 'gi'), '');
-        });
+        if (endWord) { // エンドワードが指定されていればそれだけ除く
+             command = command.replace(new RegExp(escapeRegExp(endWord), 'gi'), '');
+        }
         return command.replace(/[、。！？!?\s]+$/g, '').trim();
     }
     
-    function shouldSuppressDuplicate(commandText) {
-        const key = commandText.replace(/[、。！？!?]/g, ' ').toLowerCase().replace(/\s+/g, ' ').trim();
-        const now = Date.now();
-        if (key === lastDispatchedVoiceCommandKey && (now - lastDispatchedVoiceCommandAt) < DUPLICATE_SUPPRESS_MS) {
-            return true;
-        }
-        lastDispatchedVoiceCommandKey = key;
-        lastDispatchedVoiceCommandAt = now;
-        return false;
-    }
+    const escapeRegExp = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const stripLeadingWakeWords = (t) => { let n = t.trim(); WAKE_WORDS.sort((a,b)=>b.length-a.length).forEach(w => { if(n.toLowerCase().startsWith(w.toLowerCase())) n = n.slice(w.length).trim(); }); return n; };
+    const mergeRecognizedCommandSegments = (p, n) => !p ? n : (!n ? p : (n.includes(p) ? n : (p.includes(n) ? p : `${p} ${n}`.trim())));
+    const findEndWordMatch = (t) => { const c = stripLeadingWakeWords(t); for (const w of END_WORDS) { if (c.includes(w)) return {word: w}; } return null; };
+    const shouldSuppressDuplicate = (c) => { const k = c.replace(/[、。！？!?]/g,' ').toLowerCase().replace(/\s+/g,' ').trim(), n = Date.now(); if(k === lastDispatchedVoiceCommandKey && (n-lastDispatchedVoiceCommandAt)<DUPLICATE_SUPPRESS_MS) return true; lastDispatchedVoiceCommandKey=k; lastDispatchedVoiceCommandAt=n; return false; };
 
-    function mergeRecognizedCommandSegments(prev, next) {
-        if (!prev) return next;
-        if (!next) return prev;
-        if (next.includes(prev)) return next;
-        if (prev.includes(next)) return prev;
-        return `${prev} ${next}`.trim();
-    }
-    
-    function findEndWordMatch(text) {
-        const commandOnly = stripLeadingWakeWords(text);
-        return END_WORDS.find(word => commandOnly.includes(word));
-    }
-    
-    // (Other helper functions from voice_recognition.js can be pasted here if needed)
-    
     // ============================================================================
-    // UIイベントハンドラ
+    // UIイベント
     // ============================================================================
-    $('#send-button').on('click', function() {
-        const text = $('#text-input').val();
-        if (text) {
-            sendTextToServer(text);
-            $('#text-input').val('');
-        }
-    });
-
-    $('#text-input').on('keypress', function(e) {
-        if (e.which === 13) $('#send-button').click();
-    });
-
-    // --- Music Player Handlers ---
+    $('#send-button').on('click', () => { const t = $('#text-input').val(); if (t) { sendTextToServer(t); $('#text-input').val(''); } });
+    $('#text-input').on('keypress', (e) => { if (e.which === 13) $('#send-button').click(); });
+    
     let isPlayingMusic = false;
-    const $playPauseBtn = $('#play-pause-track');
-    const $playPauseIcon = $playPauseBtn.find('i');
-
-    $playPauseBtn.on('click', function() {
-        if (isPlayingMusic) {
-            window.executeYoutubeIntent({ intent: 'pause' });
-            $playPauseIcon.removeClass('fa-pause').addClass('fa-play');
-            isPlayingMusic = false;
+    $('#play-pause-track').on('click', function() {
+        const $icon = $(this).find('i');
+        if (window.executeYoutubeIntent({ intent: isPlayingMusic ? 'pause' : 'resume' })) {
+            isPlayingMusic = !isPlayingMusic;
         } else {
-            // Try to resume first
-            if(window.executeYoutubeIntent({ intent: 'resume' })){
-                $playPauseIcon.removeClass('fa-play').addClass('fa-pause');
-                isPlayingMusic = true;
-                return;
-            }
-            // Fetch playlist and play
-            $.get('/api/playlist/playplan', function(plan) {
-                if (plan && plan.tracks && plan.tracks.length > 0) {
-                    window.playYoutubeTrackList(plan.tracks, { random: plan.order === 'random' });
-                    $playPauseIcon.removeClass('fa-play').addClass('fa-pause');
-                    isPlayingMusic = true;
-                } else {
-                    console.warn("プレイリストが空か、取得に失敗しました。");
-                }
-            });
+             $.get('/api/playlist/playplan', (plan) => { if(plan?.tracks?.length) { window.playYoutubeTrackList(plan.tracks); isPlayingMusic = true; }});
         }
+        $icon.toggleClass('fa-play fa-pause', isPlayingMusic);
     });
-    
     $('#next-track').on('click', () => window.executeYoutubeIntent({ intent: 'next' }));
     $('#prev-track').on('click', () => window.executeYoutubeIntent({ intent: 'prev' }));
-    
-    $('#volume-slider').on('input', function() {
-        const volume = $(this).val();
-        window.executeYoutubeIntent({ intent: 'set_volume', amount: volume });
-    });
-
+    $('#volume-slider').on('input', function() { window.executeYoutubeIntent({ intent: 'set_volume', amount: $(this).val() }); });
 
     // ============================================================================
-    // TTS (Text-to-Speech)
+    // TTS
     // ============================================================================
-    function playTTS(text) {
+    const playTTS = (text, onEndCallback = null) => {
         stopTTS();
         $.ajax({
             url: '/api/tts',
             type: 'POST',
             contentType: 'application/json',
-            data: JSON.stringify({ text: text }),
-            success: (response) => {
-                if (response.audioContent) {
-                    currentAudio = new Audio(`data:audio/mp3;base64,${response.audioContent}`);
-                    currentAudio.play();
-                    currentAudio.onended = () => { currentAudio = null; };
+            data: JSON.stringify({ text }),
+            success: (r) => {
+                if (r.audioContent) {
+                    currentAudio = new Audio(`data:audio/mp3;base64,${r.audioContent}`);
+                    currentAudio.play().catch(() => {
+                        if(onEndCallback) onEndCallback();
+                    });
+                    currentAudio.onended = () => {
+                        currentAudio = null;
+                        if(onEndCallback) onEndCallback();
+                    };
+                } else {
+                     if(onEndCallback) onEndCallback();
                 }
             },
-            error: (xhr) => console.error('TTS生成失敗:', xhr.responseText)
+            error: (e) => {
+                console.error(e);
+                if(onEndCallback) onEndCallback();
+            }
         });
-    }
-
-    function stopTTS() {
-        if (currentAudio) {
-            currentAudio.pause();
-            currentAudio = null;
-        }
-    }
+    };
+    const stopTTS = () => { if (currentAudio) { currentAudio.pause(); currentAudio = null; } };
 
     // ============================================================================
-    // UI Functions
+    // UI Functions & Data Fetch
     // ============================================================================
-    function showBlackout() { $('#blackout-overlay').fadeIn(500); }
-    function hideBlackout() { $('#blackout-overlay').fadeOut(500); }
-    
-    // ============================================================================
-    // データ取得関数
-    // ============================================================================
-    function fetchWeather() {
-        $.get('/api/weather', function(data) {
-            if (data.today) {
-                $('#today-weather .info-item-body i').removeClass().addClass(`fas ${data.today.icon}`);
-                const tempToday = data.today.temperature !== 'N/A' ? `${data.today.temperature}℃` : '';
-                $('#today-weather .data').text(`${data.today.weather} ${tempToday}`);
-            }
-            if (data.tomorrow) {
-                $('#tomorrow-weather .info-item-body i').removeClass().addClass(`fas ${data.tomorrow.icon}`);
-                const tempTomorrow = data.tomorrow.temperature !== 'N/A' ? `${data.tomorrow.temperature}℃` : '';
-                $('#tomorrow-weather .data').text(`${data.tomorrow.weather} ${tempTomorrow}`);
-            }
-        }).fail(() => console.error("天気の取得に失敗"));
-    }
-
-    function fetchFinanceData() {
-        $.get('/api/finance/summary', function(data) {
-            $('#total-balance .data').text(`¥${data.balance?.toLocaleString() || 'N/A'}`);
-            $('#monthly-expense .data').text(`¥${data.monthly_expense?.toLocaleString() || 'N/A'}`);
-        }).fail(() => console.error("収支の取得に失敗"));
-    }
-
-    function fetchCalendarData() {
-        const today = new Date();
-        const startDate = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 0, 0, 0).toISOString();
-        const endDate = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59, 999).toISOString();
-        $.get(`/api/local_calendar/events?start=${startDate}&end=${endDate}`, function(events) {
-            const $scheduleList = $('#schedule-list').empty();
-            if (events && events.length > 0) {
-                events.sort((a, b) => new Date(a.start_time) - new Date(b.start_time));
-                events.forEach(event => {
-                    const startTime = new Date(event.start_time).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
-                    const endTime = event.end_time ? new Date(event.end_time).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' }) : null;
-                    const timeString = endTime && startTime !== endTime ? `${startTime} - ${endTime}` : startTime;
-                    $scheduleList.append(`<li><span class="schedule-time">${timeString}</span><span class="schedule-title">${event.title}</span></li>`);
-                });
-            } else {
-                $scheduleList.append('<li><span class="schedule-title">今日の予定はありません</span></li>');
-            }
-        }).fail(() => $('#schedule-list').empty().append('<li><span class="schedule-title">予定の取得に失敗</span></li>'));
-    }
-    
-    function fetchAlarms() {
-        $.get('/api/custom_orders', function(orders) {
-            const $alarmList = $('#field-time-alarm .alarm-list ul').empty();
-            let alarmCount = 0;
-            if (orders && orders.length > 0) {
-                orders.forEach(order => {
-                    if (alarmCount >= 4) return;
-                    const trigger = order.triggers && order.triggers[0];
-                    if (trigger && trigger.category === '時間') {
-                        $alarmList.append(`<li><span>${trigger.value?.time || 'N/A'}</span> - ${order.name || '無題'}</li>`);
-                        alarmCount++;
-                    }
-                });
-            }
-            if (alarmCount === 0) $alarmList.append('<li>アラームはありません</li>');
-        }).fail(() => $('#field-time-alarm .alarm-list ul').empty().append('<li>アラーム取得失敗</li>'));
-    }
-
-    function updateTime() {
+    const showBlackout = () => $('#blackout-overlay').fadeIn(500);
+    const hideBlackout = () => $('#blackout-overlay').fadeOut(500);
+    const fetchWeather = () => $.get('/api/weather', (d) => { if(d.today){ $('#today-weather .data').text(`${d.today.weather} ${d.today.temperature}℃ / ${d.today.pop}%`); $('#today-weather .info-item-body i').removeClass().addClass(`fas ${d.today.icon}`);} if(d.tomorrow){ $('#tomorrow-weather .data').text(`${d.tomorrow.weather} ${d.tomorrow.temperature}℃ / ${d.tomorrow.pop}%`); $('#tomorrow-weather .info-item-body i').removeClass().addClass(`fas ${d.tomorrow.icon}`);} });
+    const fetchFinanceData = () => $.get('/api/finance/summary', (d) => { $('#total-balance .data').text(`¥${d.balance?.toLocaleString()||'N/A'}`); $('#monthly-expense .data').text(`¥${d.monthly_expense?.toLocaleString()||'N/A'}`); });
+    const fetchCalendarData = () => {
         const now = new Date();
-        $('#current-time').text(now.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
-        $('#current-date').text(now.toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' }));
-    }
+        const start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+        const end = new Date(start.getTime() + 7 * 24 * 60 * 60 * 1000); // 7 days later
+
+        $.get(`/api/local_calendar/events?start=${start.toISOString()}&end=${end.toISOString()}`, (events) => {
+            const $list = $('#schedule-list').empty();
+            if (events && events.length > 0) {
+                const upcomingEvents = events
+                    .map(e => ({ ...e, startTime: new Date(e.start_time) }))
+                    .filter(e => e.startTime >= now) // Keep only future events
+                    .sort((a, b) => a.startTime - b.startTime)
+                    .slice(0, 4); // Get the next 4
+
+                if (upcomingEvents.length > 0) {
+                    upcomingEvents.forEach(event => {
+                        const sT = event.startTime.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+                        let dateLabel = '';
+                        if (event.startTime.getDate() === now.getDate()) {
+                            dateLabel = '今日';
+                        } else if (event.startTime.getDate() === now.getDate() + 1) {
+                            dateLabel = '明日';
+                        } else {
+                            dateLabel = event.startTime.toLocaleDateString('ja-JP', { month: 'short', day: 'numeric' });
+                        }
+
+                        const timeString = `${dateLabel} ${sT}`;
+                        $list.append(`<li><span class="schedule-time">${timeString}</span><span class="schedule-title">${event.title}</span></li>`);
+                    });
+                } else {
+                    $list.append('<li><span class="schedule-title">直近の予定はありません</span></li>');
+                }
+            } else {
+                $list.append('<li><span class="schedule-title">予定はありません</span></li>');
+            }
+        }).fail(() => {
+            $('#schedule-list').empty().append('<li><span class="schedule-title">予定の取得に失敗</span></li>');
+        });
+    };
+    const fetchAlarms = () => $.get('/api/custom_orders',(ords)=>{const $aL=$('#field-time-alarm .alarm-list ul').empty();let c=0;if(ords?.length){ords.forEach(o=>{if(c>=4)return;const t=o.triggers?.[0];if(t?.category==='時間'){$aL.append(`<li><span>${t.value?.time||'N/A'}</span> - ${o.name||'無題'}</li>`);c++;}});if(c===0)$aL.append('<li>アラームはありません</li>');}});
+    const updateTime = () => { const n=new Date(); $('#current-time').text(n.toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit',second:'2-digit'})); $('#current-date').text(n.toLocaleDateString('ja-JP',{year:'numeric',month:'long',day:'numeric',weekday:'long'})); };
 
     // ============================================================================
     // 実行
@@ -548,24 +387,10 @@ $(document).ready(function() {
     function run() {
         loadAppSettings();
         loadCustomVoiceTriggerEndWords();
-        
-        updateTime();
-        setInterval(updateTime, 1000);
-        
-        fetchWeather();
-        fetchFinanceData();
-        fetchCalendarData();
-        fetchAlarms();
-        
-        setInterval(() => {
-            fetchWeather();
-            fetchFinanceData();
-            fetchCalendarData();
-            fetchAlarms();
-        }, 300000); // 5 minutes
-        
+        updateTime(); setInterval(updateTime, 1000);
+        const fetchData = () => { fetchWeather(); fetchFinanceData(); fetchCalendarData(); fetchAlarms(); };
+        fetchData(); setInterval(fetchData, 300000);
         initializeVoiceRecognition();
     }
-    
     run();
 });

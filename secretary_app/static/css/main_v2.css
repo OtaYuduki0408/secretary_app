@@ -189,6 +189,14 @@ body, html {
     font-weight: bold;
 }
 
+.highlight-end-word {
+    color: #ffadad; /* A light red/pink color */
+    font-weight: bold;
+    background-color: rgba(255, 0, 0, 0.1);
+    padding: 1px 3px;
+    border-radius: 3px;
+}
+
 .log-input-area {
     display: flex;
     margin-top: 15px;
