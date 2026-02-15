@@ -1,6 +1,6 @@
 import os
-from flask import Blueprint, jsonify
-from services.switchbot_service import get_switchbot_devices
+from flask import Blueprint, jsonify, request
+from services.switchbot_service import get_switchbot_devices, send_device_command
 
 switchbot_bp = Blueprint("switchbot_api", __name__, url_prefix="/api/switchbot")
 
@@ -49,3 +49,39 @@ def list_devices():
         })
 
     return jsonify(device_list)
+
+@switchbot_bp.route("/control", methods=["POST"])
+def control_device():
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "Invalid JSON"}), 400
+
+    device_id = data.get("deviceId")
+    action = data.get("action")
+
+    if not device_id or not action:
+        return jsonify({"error": "deviceId and action are required"}), 400
+
+    switchbot_token = os.getenv('SWITCHBOT_TOKEN')
+    switchbot_secret = os.getenv('SWITCHBOT_SECRET')
+
+    if not switchbot_token or not switchbot_secret:
+        return jsonify({"error": "SwitchBot API token or secret not configured in server environment."}), 500
+
+    command = action
+    command_type = "command"
+    parameter = "default"
+
+    result = send_device_command(
+        api_token=switchbot_token,
+        api_secret=switchbot_secret,
+        device_id=device_id,
+        command_type=command_type,
+        command=command,
+        parameter=parameter
+    )
+
+    if result.get("statusCode") == 100:
+        return jsonify({"status": "success", "message": f"Command '{command}' sent to device '{device_id}' successfully.", "details": result.get("body")})
+    else:
+        return jsonify({"status": "error", "message": f"Failed to send command to device '{device_id}'.", "details": result.get("message")}), 502

@@ -1448,7 +1448,6 @@ def _enrich_actions_for_dispatch(order_payload, user_id, app_logger, source="Unk
         
         try:
             if category == '時間読み上げ':
-                now_jst = datetime.now(JST)
                 hour = now_jst.hour
                 minute = now_jst.minute
                 time_message = f"現在の時刻は、{hour}時{minute}分です。"

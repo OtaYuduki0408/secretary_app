@@ -277,39 +277,70 @@ $(document).ready(function() {
     }
     
     function handleServerCommand(payload) {
-        // 'steps' 配列が存在し、中身がある場合はそちらを優先する
         const actionsToExecute = (payload.steps && payload.steps.length > 0)
             ? payload.steps.map(step => step.action).filter(Boolean)
             : (payload.actions || []);
-
+    
         actionsToExecute.forEach(action => {
-            if (!action) return; // ステップにアクションがない場合などをスキップ
+            if (!action) return;
             let overlayContent = '';
-            switch (`${action.category}-${action.sub}`) {
+            const { category, sub, detail } = action; // 分割代入でコードを少し読みやすくする
+    
+            switch (`${category}-${sub}`) {
                 case '画面-ブラックアウト':
-                    action.detail?.state === 'on' ? showBlackout() : hideBlackout();
+                    detail?.state === 'on' ? showBlackout() : hideBlackout();
                     break;
+    
+                // 統合された音声読み上げ処理
                 case '音声-再生':
-                    if (action.detail?.message) {
-                        updateLogDisplay(action.detail.message, 'assistant');
-                        playTTS(action.detail.message, () => setMode('waiting'));
+                case '発声-実行':
+                case '特殊命令-目覚まし':
+                    const messageToSpeak = detail?.message || detail?.text;
+                    if (messageToSpeak) {
+                        updateLogDisplay(messageToSpeak, 'assistant');
+                        playTTS(messageToSpeak, () => setMode('waiting'));
                     }
                     break;
+    
                 case 'youtube-再生':
-                    if (action.detail?.query) window.playYoutubeVideo(action.detail.query);
+                    if (detail?.query) window.playYoutubeVideo(detail.query);
                     break;
+    
                 case 'youtube-操作':
-                    if (action.detail?.intent) window.executeYoutubeIntent(action.detail);
+                    if (detail?.intent) window.executeYoutubeIntent(detail);
                     break;
+    
                 case 'カレンダー-読み上げ':
-                     overlayContent = createCalendarOverlayHTML(action.detail);
+                     overlayContent = createCalendarOverlayHTML(detail);
                      if(overlayContent) showActionOverlay(overlayContent);
-                     if (action.detail?.summary) playTTS(action.detail.summary);
+                     if (detail?.summary) playTTS(detail.summary);
                      break;
+    
                 case '天気-読み上げ':
-                    overlayContent = createWeatherOverlayHTML(action.detail);
+                    overlayContent = createWeatherOverlayHTML(detail);
                     if(overlayContent) showActionOverlay(overlayContent);
-                    if (action.detail?.message) playTTS(action.detail.message);
+                    if (detail?.message) playTTS(detail.message);
+                    break;
+                
+                case 'SwitchBot-デバイス操作':
+                    if (detail?.deviceId && detail?.action) {
+                        $.ajax({
+                            url: '/api/switchbot/control',
+                            type: 'POST',
+                            contentType: 'application/json',
+                            data: JSON.stringify({ deviceId: detail.deviceId, action: detail.action }),
+                            success: (res) => {
+                                const successMsg = `デバイス(${detail.deviceId.slice(-4)})の操作をリクエストしました。`;
+                                updateLogDisplay(successMsg, 'assistant');
+                                setMode('waiting');
+                            },
+                            error: (err) => {
+                                const errorMsg = `デバイス(${detail.deviceId.slice(-4)})の操作に失敗しました。`;
+                                updateLogDisplay(errorMsg, 'assistant');
+                                setMode('waiting');
+                            }
+                        });
+                    }
                     break;
             }
         });
