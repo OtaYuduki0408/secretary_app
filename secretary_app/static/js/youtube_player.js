@@ -330,18 +330,24 @@ function seekCurrentVideoBy(deltaSec) {
     return true;
 }
 
-function adjustCurrentVideoVolume(deltaAmount) {
+function adjustCurrentVideoVolume(deltaAmount, isAbsolute = false) {
     if (!player || typeof player.getVolume !== 'function' || typeof player.setVolume !== 'function') {
         return false;
     }
-    const delta = Number(deltaAmount);
-    if (!Number.isFinite(delta) || delta === 0) return false;
+    const amount = Number(deltaAmount);
+    if (!Number.isFinite(amount)) return false;
 
-    const current = Number(player.getVolume());
-    if (!Number.isFinite(current)) return false;
-
-    const next = Math.min(100, Math.max(0, Math.round(current + delta)));
-    player.setVolume(next);
+    let nextVolume;
+    if (isAbsolute) {
+        nextVolume = amount;
+    } else {
+        const currentVolume = Number(player.getVolume());
+        if (!Number.isFinite(currentVolume)) return false;
+        nextVolume = currentVolume + amount;
+    }
+    
+    const finalVolume = Math.min(100, Math.max(0, Math.round(nextVolume)));
+    player.setVolume(finalVolume);
     return true;
 }
 
@@ -465,9 +471,11 @@ function executeYoutubeIntent(payload = {}) {
         case 'seek_backward':
             return seekCurrentVideoBy(-Math.max(1, Math.abs(amount || 10)));
         case 'volume_up':
-            return adjustCurrentVideoVolume(Math.max(1, Math.abs(amount || 10)));
+            return adjustCurrentVideoVolume(Math.max(1, Math.abs(amount || 10)), false);
         case 'volume_down':
-            return adjustCurrentVideoVolume(-Math.max(1, Math.abs(amount || 10)));
+            return adjustCurrentVideoVolume(-Math.max(1, Math.abs(amount || 10)), false);
+        case 'set_volume':
+            return adjustCurrentVideoVolume(amount, true);
         case 'save_current':
             emitYoutubeControlEvent('save_current', {
                 current: currentPlaylist[currentVideoIndex] || null,

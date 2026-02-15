@@ -1,0 +1,538 @@
+/* Base variables for theming. These can be updated for different color schemes. */
+:root {
+    --background-color: #1a1a1a;
+    --grid-item-background: #2b2b2b;
+    --text-color: #e0e0e0;
+    --header-color: #ffffff;
+    --border-color: #444444;
+    --accent-color: #007bff;
+    --icon-color: #ffffff;
+}
+
+body, html {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: var(--background-color);
+    color: var(--text-color);
+    overflow: hidden;
+}
+
+/* Blackout overlay for sleep mode */
+#blackout-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: #000;
+    z-index: 9999;
+    display: none; /* Hidden by default */
+}
+
+/* Main grid container */
+.main-grid-container {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    grid-template-rows: repeat(2, 50vh);
+    width: 100vw;
+    height: 100vh;
+    gap: 10px;
+    padding: 10px;
+    box-sizing: border-box;
+}
+
+/* Style for each grid item */
+.grid-item {
+    background-color: var(--grid-item-background);
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    padding: 20px;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.grid-item h2 {
+    margin: 0 0 15px 0;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border-color);
+    font-size: 1.2em;
+    color: var(--header-color);
+    display: flex;
+    align-items: center;
+}
+
+.grid-item h2 .fas {
+    margin-right: 10px;
+    color: var(--icon-color);
+}
+
+.grid-item .content {
+    flex-grow: 1;
+    overflow-y: auto;
+}
+
+/* --- Field: Weather & Finance --- */
+#field-weather-finance .content {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-around;
+    align-content: space-around;
+    height: 100%;
+}
+
+.info-item {
+    flex-basis: 45%; /* 2 items per row */
+    text-align: center;
+    padding: 10px;
+    box-sizing: border-box;
+}
+
+.info-item-header {
+    font-size: 1em;
+    color: var(--text-color);
+    margin-bottom: 10px;
+    font-weight: bold;
+}
+
+.info-item-body {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5em;
+}
+
+.info-item-body .fas {
+    font-size: 1.5em;
+    margin-right: 15px;
+    color: var(--accent-color);
+}
+
+.info-item-body .data {
+    font-weight: 300;
+}
+
+/* --- Field: Calendar --- */
+#schedule-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+#schedule-list li {
+    display: flex;
+    align-items: center;
+    padding: 15px 5px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+#schedule-list li:last-child {
+    border-bottom: none;
+}
+
+.schedule-time {
+    font-weight: bold;
+    color: var(--accent-color);
+    margin-right: 20px;
+    font-size: 1.1em;
+    min-width: 120px;
+}
+
+.schedule-title {
+    font-size: 1.1em;
+}
+
+/* --- Field: Log --- */
+#field-log .content {
+    padding-right: 10px; /* for scrollbar */
+}
+
+#log-display {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.log-message {
+    padding: 10px 15px;
+    border-radius: 15px;
+    max-width: 80%;
+    word-wrap: break-word;
+}
+
+.log-message.user {
+    background-color: var(--accent-color);
+    color: white;
+    align-self: flex-end;
+    border-bottom-right-radius: 3px;
+}
+
+.log-message.assistant {
+    background-color: #4d4d4d;
+    align-self: flex-start;
+    border-bottom-left-radius: 3px;
+}
+
+.log-message.log-interim, .log-message.log-waiting {
+    opacity: 0.6;
+    background-color: transparent;
+    align-self: flex-start;
+    font-style: italic;
+}
+
+.highlight-wake-word {
+    color: var(--accent-color);
+    font-weight: bold;
+}
+
+.log-input-area {
+    display: flex;
+    margin-top: 15px;
+    border-top: 1px solid var(--border-color);
+    padding-top: 15px;
+}
+
+#text-input {
+    flex-grow: 1;
+    background: #3c3c3c;
+    border: 1px solid var(--border-color);
+    border-radius: 20px;
+    padding: 10px 15px;
+    color: var(--text-color);
+    font-size: 1em;
+}
+
+#text-input:focus {
+    outline: none;
+    border-color: var(--accent-color);
+}
+
+#send-button {
+    background: var(--accent-color);
+    border: none;
+    color: white;
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    margin-left: 10px;
+    cursor: pointer;
+    font-size: 1.2em;
+    transition: background-color 0.2s;
+}
+
+#send-button:hover {
+    background-color: #0056b3;
+}
+
+/* --- Field: Buttons --- */
+.button-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    grid-template-rows: repeat(2, 1fr);
+    gap: 15px;
+    height: 100%;
+}
+
+.menu-button {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    background-color: #3c3c3c;
+    color: var(--text-color);
+    text-decoration: none;
+    border-radius: 8px;
+    transition: background-color 0.2s, transform 0.2s;
+    font-size: 1em; /* Adjusted font size */
+    padding: 5px;
+    box-sizing: border-box;
+    text-align: center;
+}
+
+.menu-button:hover {
+    background-color: var(--accent-color);
+    color: white;
+    transform: translateY(-5px);
+}
+
+.menu-button .fas {
+    font-size: 2em; /* Adjusted icon size */
+    margin-bottom: 10px; /* Adjusted margin */
+}
+
+/* --- Field: Music --- */
+.music-player {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-around;
+    height: 100%;
+    text-align: center;
+}
+
+.music-player .artwork img {
+    width: 120px;
+    height: 120px;
+    border-radius: 8px;
+    object-fit: cover;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+}
+
+.music-player .track-info {
+    margin-top: 15px;
+}
+
+.music-player .track-info .title {
+    font-size: 1.2em;
+    font-weight: bold;
+}
+
+.music-player .track-info .artist {
+    font-size: 1em;
+    color: #b0b0b0;
+}
+
+.music-player .controls {
+    margin-top: 20px;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+}
+
+.music-player .controls button {
+    background: none;
+    border: 2px solid var(--border-color);
+    color: var(--text-color);
+    border-radius: 50%;
+    width: 50px;
+    height: 50px;
+    font-size: 1.2em;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.music-player .controls button:hover {
+    background-color: var(--accent-color);
+    border-color: var(--accent-color);
+    color: white;
+}
+
+.music-player .controls #play-pause-track {
+    width: 60px;
+    height: 60px;
+    font-size: 1.5em;
+    background-color: var(--accent-color);
+    border-color: var(--accent-color);
+}
+.music-player .controls #play-pause-track:hover {
+    background-color: #0056b3;
+    border-color: #0056b3;
+}
+
+
+.music-player .volume-control {
+    margin-top: 20px;
+    display: flex;
+    align-items: center;
+    width: 80%;
+}
+
+.music-player .volume-control .fas {
+    margin: 0 10px;
+}
+
+#volume-slider {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 8px;
+    background: #4d4d4d;
+    border-radius: 5px;
+    outline: none;
+}
+
+#volume-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 18px;
+    height: 18px;
+    background: var(--accent-color);
+    border-radius: 50%;
+    cursor: pointer;
+}
+
+#volume-slider::-moz-range-thumb {
+    width: 18px;
+    height: 18px;
+    background: var(--accent-color);
+    border-radius: 50%;
+    cursor: pointer;
+}
+
+/* --- YouTube Player Overlay --- */
+.youtube-overlay-hidden {
+    display: none;
+}
+
+#youtube-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.85);
+    z-index: 10000;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+#youtube-player-wrapper {
+    background-color: #181818;
+    padding: 20px;
+    border-radius: 10px;
+    box-shadow: 0 5px 25px rgba(0, 0, 0, 0.5);
+    width: 90vw;
+    max-width: 800px;
+}
+
+#youtube-player-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+    color: white;
+}
+
+#youtube-video-title {
+    font-size: 1.2em;
+    font-weight: bold;
+}
+
+#youtube-close-btn {
+    background: none;
+    border: none;
+    color: white;
+    font-size: 2em;
+    cursor: pointer;
+}
+
+#youtube-player {
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    background-color: black;
+}
+
+#youtube-controls {
+    display: flex;
+    justify-content: center;
+    margin-top: 15px;
+    gap: 20px;
+}
+
+#youtube-controls button {
+    padding: 10px 20px;
+    background-color: var(--accent-color);
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 1em;
+}
+
+#youtube-controls button:disabled {
+    background-color: #555;
+    cursor: not-allowed;
+}
+
+/* --- Field: Time & Alarm --- */
+#field-time-alarm {
+    display: flex;
+    flex-direction: column;
+    padding: 0; /* Remove padding to use full space */
+}
+
+#field-time-alarm .time-display {
+    flex-basis: 40%; /* 40% of the vertical space */
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    background-color: rgba(0,0,0,0.1);
+    padding: 20px;
+}
+
+#field-time-alarm .time-display h1 {
+    font-size: 4.5em;
+    margin: 0;
+    font-weight: 300;
+    letter-spacing: 2px;
+}
+
+#field-time-alarm .time-display p {
+    font-size: 1.2em;
+    margin: 5px 0 0 0;
+    color: var(--text-color);
+}
+
+#mic-status {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-top: 15px;
+    padding: 5px 15px;
+    border-radius: 20px;
+    background-color: rgba(0, 0, 0, 0.2);
+    transition: background-color 0.3s;
+}
+
+#mic-status.listening {
+    background-color: var(--accent-color);
+    color: white;
+}
+
+#mic-status .fas {
+    margin-right: 10px;
+}
+
+#field-time-alarm .alarm-list {
+    flex-basis: 60%;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+}
+
+#field-time-alarm .alarm-list h2 {
+    margin: 0 0 10px 0;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border-color);
+    font-size: 1.2em;
+    color: var(--header-color);
+}
+
+#field-time-alarm .alarm-list ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    overflow-y: auto;
+}
+
+#field-time-alarm .alarm-list li {
+    font-size: 1.1em;
+    padding: 10px 5px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+#field-time-alarm .alarm-list li:last-child {
+    border-bottom: none;
+}
+
+#field-time-alarm .alarm-list li span {
+    font-weight: bold;
+    margin-right: 15px;
+    color: var(--accent-color);
+}

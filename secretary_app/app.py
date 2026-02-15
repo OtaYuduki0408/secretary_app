@@ -834,6 +834,77 @@ def upsert_youtube_preferences_route():
     })
 
 # ============== Server-side TTS ==============
+from services.weather_service import _get_jma_forecast_data, _extract_daily_series, DEFAULT_AREA_CODE, resolve_area_code_from_address
+
+def _map_weather_to_icon(weather_text):
+    if "晴" in weather_text:
+        return "fa-sun"
+    if "曇" in weather_text:
+        return "fa-cloud"
+    if "雨" in weather_text:
+        return "fa-cloud-showers-heavy"
+    if "雪" in weather_text:
+        return "fa-snowflake"
+    if "雷" in weather_text:
+        return "fa-bolt"
+    return "fa-smog" # Default icon
+
+@app.route('/api/weather', methods=['GET'])
+@login_required
+def get_weather_route():
+    user_id = session.get('user', {}).get('id')
+    settings = get_user_settings(user_id) or {}
+    address = (settings.get('main') or {}).get('address', '')
+    area_code = resolve_area_code_from_address(address, DEFAULT_AREA_CODE)
+    
+    forecast_data = _get_jma_forecast_data(area_code)
+    if not forecast_data:
+        return jsonify({"error": "Failed to get weather data"}), 500
+
+    area_name, time_defines, weathers, pops, temps_time, temps_values = _extract_daily_series(forecast_data)
+    if not area_name:
+        return jsonify({"error": "Failed to parse weather data"}), 500
+
+    now = datetime.now(JST)
+    today_date = now.date()
+    tomorrow_date = (now + timedelta(days=1)).date()
+
+    response = {
+        "today": {"weather": "N/A", "temperature": "N/A", "pop": "N/A", "icon": "fa-question-circle"},
+        "tomorrow": {"weather": "N/A", "temperature": "N/A", "pop": "N/A", "icon": "fa-question-circle"}
+    }
+
+    # Find today's data
+    for i, dt in enumerate(time_defines):
+        if dt.date() == today_date:
+            if response['today']['weather'] == 'N/A': # Set only first one
+                response['today']['weather'] = weathers[i]
+                response['today']['icon'] = _map_weather_to_icon(weathers[i])
+            if i < len(pops) and pops[i] and response['today']['pop'] == 'N/A':
+                 response['today']['pop'] = pops[i]
+
+    for i, dt in enumerate(temps_time):
+         if dt.date() == today_date and dt.hour > 12: # Try to get afternoon temp
+            response['today']['temperature'] = temps_values[i]
+            break
+    
+    # Find tomorrow's data
+    for i, dt in enumerate(time_defines):
+        if dt.date() == tomorrow_date:
+            if response['tomorrow']['weather'] == 'N/A':
+                response['tomorrow']['weather'] = weathers[i]
+                response['tomorrow']['icon'] = _map_weather_to_icon(weathers[i])
+            if i < len(pops) and pops[i] and response['tomorrow']['pop'] == 'N/A':
+                 response['tomorrow']['pop'] = pops[i]
+
+    for i, dt in enumerate(temps_time):
+         if dt.date() == tomorrow_date and dt.hour > 12:
+            response['tomorrow']['temperature'] = temps_values[i]
+            break
+            
+    return jsonify(response)
+
+
 def text_to_speech_base64(text: str) -> str:
     """Google Cloud TTSを使用してテキストを音声に変換し、Base64エンコードされたMP3を返す"""
     try:

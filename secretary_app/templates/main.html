@@ -1,923 +1,182 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Voice Secretary — Main</title>
-  <script>
-    window.onYouTubeIframeAPIReady = function() {
-        if (typeof window.setYoutubeApiReady === 'function') {
-            window.setYoutubeApiReady(true);
-        } else {
-            // youtube_player.js がまだロードされていなければ、グローバル変数にフラグを立てておく
-            window._youtubeApiReadyGlobal = true;
-        }
-        console.log("DEBUG: main.htmlからonYouTubeIframeAPIReadyが呼び出されました。");
-    };
-  </script>
-  <script src="https://www.youtube.com/iframe_api"></script> <!-- YouTube IFrame Player API -->
-  <script src="https://apis.google.com/js/api.js"></script>
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-      <style>
-        /* 新しいオーバーレイのスタイル */
-        #audio-permission-overlay {
-          position: fixed;
-          top: 0;
-          left: 0;
-          width: 100%;
-          height: 100%;
-          background-color: rgba(0, 0, 0, 0.9); /* 半透明の暗い背景 */
-          display: flex;
-          flex-direction: column;
-          justify-content: center;
-          align-items: center;
-          z-index: 15000; /* 既存のmodal-overlay (10000) よりも高く */
-          color: white;
-          text-align: center;
-          padding: 20px;
-          box-sizing: border-box;
-        }
-  
-        #audio-permission-overlay.hidden {
-          display: none;
-        }
-  
-        #audio-permission-overlay h2 {
-          font-size: 2.2em;
-          margin-bottom: 20px;
-          color: #7aa8ff; /* メインボタンの色に合わせる */
-        }
-  
-        #audio-permission-overlay p {
-          font-size: 1.3em;
-          margin-bottom: 30px;
-          line-height: 1.5;
-        }
-  
-        #activate-audio-button {
-          background-color: #7aa8ff; /* メインボタンの色に合わせる */
-          color: #1f2a33; /* メインボタンのテキスト色に合わせる */
-          border: none;
-          padding: 18px 40px;
-          border-radius: 999px; /* 角を丸く */
-          font-size: 1.6em;
-          font-weight: bold;
-          cursor: pointer;
-          transition: background-color 0.3s ease, transform 0.2s ease;
-          box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
-        }
-  
-        #activate-audio-button:hover {
-          background-color: #5d8ce6; /* ホバー時の色 */
-          transform: translateY(-2px);
-        }
-  
-        #activate-audio-button:active {
-          transform: translateY(0);
-          box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
-        }
-
-        .close-overlay-btn {
-            position: absolute;
-            top: 15px;
-            right: 15px;
-            background: rgba(255, 255, 255, 0.2);
-            border: none;
-            color: #fff;
-            font-size: 24px;
-            font-weight: bold;
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            cursor: pointer;
-            z-index: 15010; /* オーバーレイ本体より手前に */
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            line-height: 1;
-        }
-        .close-overlay-btn:hover {
-            background: rgba(255, 255, 255, 0.4);
-        }
-
-        .image-display-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.85);
-            display: none; /* Initially hidden */
-            justify-content: center;
-            align-items: center;
-            z-index: 16000;
-        }
-        .image-display-overlay.visible {
-            display: flex;
-        }
-        #displayed-image {
-            max-width: 80vw;
-            max-height: 80vh;
-            object-fit: contain;
-            border-radius: 12px;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
-        }
-
-        .modal-overlay {
-          position: fixed;
-          top: 0;
-          left: 0;
-          width: 100%;
-          height: 100%;
-          background: rgba(0, 0, 0, 0.7);
-          display: flex;
-          justify-content: center;
-          align-items: center;
-          z-index: 10000;
-        }
-      
-    .modal-content {
-      background: var(--main-log-bg, #1f2a33);
-      padding: 20px;
-      border-radius: 10px;
-      position: relative;
-      text-align: center;
-      border: 1px solid var(--stripe-color, #a8b6c6);
-    }
-
-    .modal-close-btn {
-      position: absolute;
-      top: 10px;
-      right: 10px;
-      background: none;
-      border: none;
-      font-size: 1.5rem;
-      color: var(--main-text-color, #a8b6c6);
-      cursor: pointer;
-    }
-
-    .switchbot-controls {
-      margin-top: 20px;
-    }
-
-    .switchbot-controls .btn {
-      margin: 0 10px;
-      /* Assuming .btn class exists and has base styling */
-      padding: 10px 20px;
-      border-radius: 5px;
-      cursor: pointer;
-      background-color: var(--main-btn-color, #7aa8ff);
-      color: var(--main-btn-text, #1f2a33);
-      border: 1px solid var(--stripe-color, #a8b6c6);
-    }
-
-    .user-badge {
-      margin: 12px auto 0;
-      padding: 8px 16px;
-      border-radius: 999px;
-      background: var(--main-user-badge-bg, #f1f5f9);
-      border: 1px solid var(--stripe-color, #e2e8f0); /* Slightly darker border */
-      color: var(--main-text-color, #1f2937);
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      font-size: 0.9rem;
-    }
-
-    .user-name {
-      font-weight: 600;
-      color: var(--main-text-color, #1f2937);
-    }
-
-    /* New Terminal UI Styles */
-    .ui-stack {
-      gap: 24px;
-    }
-
-    .terminal-window {
-      width: min(700px, 100%);
-      max-width: 100%;
-      min-height: 320px;
-      height: min(420px, 65vh);
-      margin: 0 auto clamp(18px, 3vh, 26px);
-      border-radius: 16px;
-      background: var(--main-log-bg, #ffffff);
-      border: 1px solid var(--stripe-color, #d1d5db); /* Gray border */
-      box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
-    }
-
-    .voice-log-panel {
-      flex-grow: 1;
-      padding: clamp(16px, 3vw, 24px);
-      overflow-y: auto;
-      color: var(--main-text-color, #000000);
-      font-family: 'Consolas', 'Monaco', monospace;
-      font-size: 1rem;
-      line-height: 1.7;
-    }
-
-    .log-interim {
-        color: var(--main-text-color, #6b7280);
-        opacity: 0.6;
-    }
-
-    .voice-log-panel::-webkit-scrollbar {
-      width: 8px;
-    }
-    .voice-log-panel::-webkit-scrollbar-track {
-      background: var(--main-log-bg, #f1f5f9);
-    }
-    .voice-log-panel::-webkit-scrollbar-thumb {
-      background-color: var(--stripe-color, #cbd5e1);
-      border-radius: 4px;
-    }
-
-    .voice-log-entry {
-      opacity: 1;
-    }
-    .voice-log-entry + .voice-log-entry {
-        margin-top: 12px;
-    }
-
-    .search {
-      flex-shrink: 0;
-      display: grid;
-      grid-template-columns: auto minmax(0, 1fr);
-      align-items: center;
-      gap: 16px;
-      width: min(960px, 92vw);
-      padding: 16px clamp(22px, 4vw, 30px);
-      margin: 0 auto;
-      box-sizing: border-box;
-      background: var(--main-log-bg, rgba(8,12,18,0.55));
-      border: 1px solid var(--stripe-color, rgba(255,255,255,0.14));
-      border-radius: 999px;
-      box-shadow: 0 12px 34px rgba(0,0,0,0.45);
-    }
-    
-    .search .icon {
-      stroke: var(--main-text-color, #64748b); /* Icon color */
-      margin-right: 0;
-      width: 32px;
-      height: 32px;
-      flex-shrink: 0;
-      align-self: center;
-    }
-
-    .search input {
-      flex-grow: 1;
-      width: 100%;
-      background: transparent;
-      border: none;
-      outline: none;
-      color: var(--main-text-color, #000000);
-      font-size: 1.05rem;
-      font-family: 'Consolas', 'Monaco', monospace;
-    }
-
-    .search input::placeholder {
-      color: var(--main-text-color, #9ca3af);
-      opacity: 0.6;
-    }
-
-    .highlight-wake-word {
-      color: var(--main-btn-text, #D97706); /* Darker, rich yellow/orange */
-      font-weight: 600;
-      background-color: var(--main-btn-color, #FEF3C7); /* Light yellow background */
-      padding: 2px 4px;
-      border-radius: 4px;
-    }
-
-    .highlight-end-word {
-      color: #0f172a;
-      font-weight: 700;
-      background-color: #fcd34d;
-      padding: 2px 4px;
-      border-radius: 4px;
-      box-shadow: 0 0 0 1px rgba(120, 53, 15, 0.25) inset;
-    }
-
-    .highlight-end-word-badge {
-      color: #92400e;
-      font-size: 0.85rem;
-      font-weight: 700;
-      margin-left: 8px;
-    }
-
-    .abort-row {
-      margin-bottom: 10px;
-      display: flex;
-      justify-content: flex-end;
-      gap: 10px;
-    }
-
-    .abort-btn {
-      border: 1px solid var(--app-danger, rgba(255, 84, 84, 0.9));
-      background: var(--app-danger, rgba(255, 34, 34, 0.22));
-      color: var(--main-btn-text, #ffe6e6);
-      padding: 10px 16px;
-      border-radius: 999px;
-      font-weight: 700;
-      letter-spacing: 0.05em;
-      cursor: pointer;
-      transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.12s ease, opacity 0.12s ease;
-      text-transform: uppercase;
-    }
-
-    .abort-btn:hover {
-      transform: translateY(-1px);
-      box-shadow: 0 10px 22px rgba(255, 60, 60, 0.35);
-      background: var(--app-danger, rgba(255, 40, 40, 0.35));
-    }
-
-    .abort-btn:disabled {
-      cursor: not-allowed;
-      box-shadow: none;
-    }
-
-    .abort-btn.is-active {
-      box-shadow: 0 12px 26px rgba(255, 60, 60, 0.5);
-      background: var(--app-danger, rgba(255, 24, 24, 0.7));
-      border-color: var(--app-danger, rgba(255, 140, 140, 0.95));
-      color: var(--main-btn-text, #fff);
-    }
-
-    body {
-      font-family: var(--app-font, inherit);
-    }
-
-    .character-buddy {
-      position: fixed;
-      left: 24px;
-      bottom: 24px;
-      width: min(var(--character-size, 220px), 32vw);
-      z-index: 1200;
-      pointer-events: none;
-      filter: var(--character-filter, none);
-    }
-
-    .character-buddy img {
-      width: 100%;
-      height: auto;
-      display: none;
-    }
-
-    .character-buddy img.active {
-      display: block;
-    }
-
-    .mic-surface svg {
-      color: var(--main-btn-text, #ffffff);
-    }
-
-    .fab {
-      color: var(--main-btn-text, #ffffff);
-    }
-
-    .fab-label {
-      display: none;
-    }
-
-    @media (min-width: 1200px) {
-      .fab-group {
-        right: clamp(16px, 2vw, 32px);
-      }
-
-      .fab-group .fab {
-        width: 210px;
-        height: 68px;
-        border-radius: 16px;
-        display: grid;
-        grid-template-columns: 52px 1fr;
-        align-items: center;
-        justify-items: start;
-        padding: 0 16px 0 8px;
-      }
-
-      .fab-group .fab svg {
-        width: 30px;
-        height: 30px;
-        justify-self: center;
-      }
-
-      .fab-group .fab .fab-label {
-        display: block;
-        font-size: 0.96rem;
-        font-weight: 700;
-        color: var(--main-btn-text, #ffffff);
-        white-space: nowrap;
-      }
-    }
-
-    #ai-indicator .ai-indicator-card {
-      min-width: 240px;
-      background: var(--main-log-bg, #0f172a);
-      border: 1px solid var(--stripe-color, #334155);
-      border-radius: 12px;
-      padding: 12px 14px;
-      box-shadow: 0 12px 40px rgba(0,0,0,.45);
-      color: var(--main-text-color, #e5e7eb);
-    }
-
-    #ai-indicator .ai-indicator-steps {
-      display: flex;
-      gap: 6px;
-      margin-bottom: 8px;
-    }
-
-    #ai-indicator .ai-indicator-bar {
-      flex: 1;
-      height: 6px;
-      background: var(--stripe-color, #475569);
-      border-radius: 999px;
-      opacity: 0.45;
-    }
-
-    #ai-indicator .ai-indicator-label {
-      font-size: 0.92rem;
-      opacity: 0.85;
-    }
-
-    @media (max-width: 768px) {
-      body {
-        font-size: 15px; /* Adjust base font size for smaller screens */
-      }
-
-      main.shell {
-        padding: clamp(16px, 4vw, 24px); /* Reduce overall padding */
-      }
-
-      .user-badge {
-        font-size: 0.85rem;
-        padding: 6px 12px;
-        width: 100%;
-        justify-content: center;
-      }
-
-      .terminal-window {
-        min-height: clamp(260px, 60vh, 360px);
-        height: auto;
-      }
-
-      .voice-log-panel {
-        font-size: 0.9rem;
-        padding: 14px;
-        line-height: 1.6;
-      }
-
-    .search {
-      grid-template-columns: 1fr;
-      width: 100%;
-      margin: 0;
-      padding: 12px;
-      border-radius: 20px;
-    }
-
-      .search input {
-        font-size: 1rem;
-      }
-
-      .mic-wrap .mic-btn {
-        width: min(220px, 60vw);
-        height: min(220px, 60vw);
-      }
-
-    .fab-group {
-      position: static;
-      display: flex;
-      flex-wrap: wrap;
-      width: 100%;
-      margin-top: 18px;
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(70px, 1fr));
-      gap: 16px;
-      justify-items: center;
-    }
-
-    .fab, .fab svg {
-      width: 62px;
-      height: 62px;
-    }
-
-    .character-buddy {
-      left: 12px;
-      bottom: 12px;
-      width: min(var(--character-size, 160px), 38vw);
-    }
-    }
-
-    @media (max-width: 480px) {
-      .terminal-window {
-        min-height: clamp(240px, 55vh, 320px);
-      }
-
-      .voice-log-panel {
-        font-size: 0.85rem;
-        padding: 12px;
-      }
-
-      .search {
-        grid-template-columns: 1fr;
-        text-align: center;
-      }
-
-      .fab, .fab svg {
-        width: 48px;
-        height: 48px;
-      }
-
-      .character-buddy {
-        width: min(140px, 44vw);
-      }
-    }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Secretary App - Main</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main_v2.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
 </head>
-<body data-user-id="{{ user.id or '' }}">
- <div id="audio-permission-overlay">
-    <button type="button" class="close-overlay-btn" aria-label="閉じる">&times;</button>
-    <h2>音声機能の有効化</h2>
-    <p>より快適な操作のために、音声認識と応答機能を利用するには、以下のボタンをクリックしてください。</p>
-    <button id="activate-audio-button">音声認識を有効にする</button>
- </div>
-  <div class="parallax" aria-hidden="true">
-    <div id="plx-back"  class="plx-layer back"></div>
-    <div id="plx-mid"   class="plx-layer mid"></div>
-    <div id="plx-front" class="plx-layer front"></div>
-  </div>
- 
-  <div class="ui-backdrop" aria-hidden="true"></div>
- 
-  <main class="shell">
- 
-    <div class="user-badge" aria-live="polite">
-      <span>ログイン中:</span>
-      <span class="user-name">{{ user_name }}</span>
-    </div>
+<body>
+    <div id="blackout-overlay"></div>
 
-    <section aria-label="メイン操作" class="ui-stack">
-      <div class="mic-wrap">
-        <button class="mic-btn glass" aria-label="音声入力を開始">
-          <div class="mic-surface" aria-hidden="true">
-            <svg width="64" height="64" viewBox="0 0 24 24" fill="none" role="img" aria-hidden="true">
-              <defs><linearGradient id="g1" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stop-color="var(--main-btn-text, #ffffff)"/><stop offset="100%" stop-color="var(--main-btn-text, #e6eef8)"/>
-              </linearGradient></defs>
-              <path d="M8 9a4 4 0 0 1 8 0v3a4 4 0 1 1-8 0V9Z" fill="currentColor"/>
-              <path d="M5 11.5a7 7 0 0 0 14 0" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
-              <path d="M12 18v3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
-            </svg>
-          </div>
-        </button>
-      </div>
-
-      <div class="terminal-window glass">
-        <div id="voice-log-container" class="voice-log-panel">
-            <!-- Voice logs will be dynamically inserted here -->
+    <div class="main-grid-container">
+        <!-- ① 天気・収支管理フィールド -->
+        <div class="grid-item" id="field-weather-finance">
+            <div class="content">
+                <div class="info-item" id="today-weather">
+                    <div class="info-item-header">今日の天気</div>
+                    <div class="info-item-body">
+                        <i class="fas fa-sun"></i>
+                        <span class="data">晴れ 25℃</span>
+                    </div>
+                </div>
+                <div class="info-item" id="tomorrow-weather">
+                    <div class="info-item-header">明日の天気</div>
+                    <div class="info-item-body">
+                        <i class="fas fa-cloud-showers-heavy"></i>
+                        <span class="data">雨 18℃</span>
+                    </div>
+                </div>
+                <div class="info-item" id="total-balance">
+                    <div class="info-item-header">総所持金</div>
+                    <div class="info-item-body">
+                        <i class="fas fa-wallet"></i>
+                        <span class="data">¥1,234,567</span>
+                    </div>
+                </div>
+                <div class="info-item" id="monthly-expense">
+                    <div class="info-item-header">今月の支出</div>
+                    <div class="info-item-body">
+                        <i class="fas fa-money-bill-wave"></i>
+                        <span class="data">¥88,000</span>
+                    </div>
+                </div>
+            </div>
         </div>
-        <div class="abort-row">
-          <button id="force-abort-btn" class="abort-btn" type="button" aria-label="強制終了" disabled>強制終了</button>
+
+        <!-- ② 時刻・アラーム・タイマーフィールド -->
+        <div class="grid-item" id="field-time-alarm">
+            <div class="time-display">
+                <h1 id="current-time">12:34:56</h1>
+                <p id="current-date">2026年2月15日 日曜日</p>
+                <div id="mic-status">
+                    <i class="fas fa-microphone-slash"></i>
+                    <span id="mic-status-text">待機中...</span>
+                </div>
+            </div>
+            <div class="alarm-list">
+                <h2><i class="fas fa-bell"></i> Alarms</h2>
+                <ul>
+                    <!-- Alarm items will be dynamically inserted here -->
+                    <li><span>07:00</span> - Wake Up</li>
+                    <li><span>09:00</span> - Meeting</li>
+                    <li><span>18:30</span> - Dinner</li>
+                </ul>
+            </div>
         </div>
-        <form id="search-form" class="search" role="search" aria-label="検索フォーム">
-          <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-            <path d="M4 12l2-2 3 3 3-3 2 2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-            <path d="M10 17l-3-3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-          <input id="searchbox" type="text" inputmode="search" name="search" placeholder="テキストでコマンドを入力..." aria-label="入力" />
-        </form>
-      </div>
-    </section>
- 
-    <div aria-hidden="true"></div>
- 
-    <div class="fab-group">
-      <a id="logout-link" class="stats-btn fab" href="{{ url_for('logout') }}" aria-label="ログアウト" title="ログアウト">
-        <svg width="34" height="34" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-          <rect x="4" y="4" width="16" height="16" rx="4" fill="var(--main-bg-color, #1f2a33)" stroke="var(--stripe-color, #a8b6c6)" stroke-width="1.2"/>
-          <path d="M10 8h4v8h-4z" fill="var(--main-btn-color, #7aa8ff)" opacity="0.85"/>
-          <path d="M7 12h7" stroke="var(--main-text-color, #dbe6ff)" stroke-width="1.4" stroke-linecap="round"/>
-          <path d="M12 9l4 3-4 3" stroke="var(--stripe-color, #a8b6c6)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
-        <span class="fab-label">ログアウト</span>
-      </a>
-      <a class="finance-btn fab" href="/expense" aria-label="収支管理を開く" title="収支管理">
-        <svg width="34" height="34" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-          <rect x="3" y="3.5" width="18" height="17" rx="4" fill="var(--main-bg-color, #1f2a33)" stroke="var(--stripe-color, #a8b6c6)" stroke-width="1.2"/>
-          <path d="M8 6l4 5 4-5" stroke="var(--stripe-color, #a8b6c6)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-          <path d="M9 13h6M9 15h6M12 11v6" stroke="var(--main-btn-color, #7aa8ff)" stroke-width="1.4" stroke-linecap="round"/>
-        </svg>
-        <span class="fab-label">収支登録</span>
-      </a>
-      
-      <a class="stats-btn fab" href="{{ url_for('finance') }}" aria-label="統計ダッシュボードを開く" title="統計">
-        <svg width="34" height="34" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-          <rect x="3.5" y="4" width="17" height="16" rx="4" fill="var(--main-bg-color, #1f2a33)" stroke="var(--stripe-color, #a8b6c6)" stroke-width="1.2"/>
-          <path d="M8 16V11" stroke="var(--main-btn-color, #7aa8ff)" stroke-width="1.6" stroke-linecap="round"/>
-          <path d="M12 16V8" stroke="var(--main-btn-color, #7aa8ff)" stroke-width="1.6" stroke-linecap="round"/>
-          <path d="M16 16v-5" stroke="var(--main-btn-color, #7aa8ff)" stroke-width="1.6" stroke-linecap="round"/>
-          <path d="M7 17.5h10" stroke="var(--stripe-color, #a8b6c6)" stroke-width="1.2" stroke-linecap="round"/>
-        </svg>
-        <span class="fab-label">収支統計</span>
-      </a>
- 
-      <!-- ✅ 変更後 -->
-<a class="calendar-btn fab" href="{{ url_for('calender_page') }}" title="カレンダー" aria-label="カレンダーを開く">
-  <svg width="34" height="34" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-    <rect x="3" y="5.5" width="18" height="15" rx="3" fill="var(--main-bg-color, #24303a)" stroke="var(--stripe-color, #a8b6c6)" stroke-width="1.2"/>
-    <path d="M8 3v4M16 3v4" stroke="var(--stripe-color, #a8b6c6)" stroke-width="1.4" stroke-linecap="round"/>
-    <path d="M3 9.5h18" stroke="var(--stripe-color, #a8b6c6)" stroke-width="1.2"/>
-    <rect x="7" y="12" width="3" height="3" rx="0.8" fill="var(--main-btn-color, #7aa8ff)"/>
-    <rect x="12" y="12" width="3" height="3" rx="0.8" fill="var(--main-btn-color, #7aa8ff)" opacity=".85"/>
-    <rect x="7" y="16" width="3" height="3" rx="0.8" fill="var(--main-btn-color, #7aa8ff)" opacity=".7"/>
-  </svg>
-  <span class="fab-label">カレンダー</span>
-</a>
 
+        <!-- ③ カレンダーフィールド -->
+        <div class="grid-item" id="field-calendar">
+            <h2><i class="fas fa-calendar-alt"></i> Today's Schedule</h2>
+            <div class="content">
+                <ul id="schedule-list">
+                    <!-- Schedule items will be dynamically inserted here -->
+                    <li>
+                        <span class="schedule-time">10:00 - 11:00</span>
+                        <span class="schedule-title">プロジェクトミーティング</span>
+                    </li>
+                    <li>
+                        <span class="schedule-time">12:30</span>
+                        <span class="schedule-title">ランチ @カフェ</span>
+                    </li>
+                    <li>
+                        <span class="schedule-time">15:00 - 16:00</span>
+                        <span class="schedule-title">クライアント訪問</span>
+                    </li>
+                    <li>
+                        <span class="schedule-time">19:00</span>
+                        <span class="schedule-title">ジム</span>
+                    </li>
+                </ul>
+            </div>
+        </div>
 
-      <a class="memo-btn fab" href="{{ url_for('memo') }}" aria-label="メモを開く" title="メモ">
-        <svg width="34" height="34" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-          <rect x="4" y="4" width="16" height="16" rx="4" fill="var(--main-bg-color, #1f2a33)" stroke="var(--stripe-color, #a8b6c6)" stroke-width="1.2"/>
-          <path d="M8 8h8M8 11.5h8M8 15h5" stroke="var(--main-btn-color, #7aa8ff)" stroke-width="1.3" stroke-linecap="round"/>
-          <path d="M14.5 15l2.5 2.5" stroke="var(--stripe-color, #a8b6c6)" stroke-width="1.2" stroke-linecap="round"/>
-        </svg>
-        <span class="fab-label">メモ</span>
-      </a>
-      <a class="custom-order-btn fab" href="{{ url_for('custom_order_pages.custom_order_index') }}" aria-label="カスタム命令を開く" title="カスタム命令">
-        <svg width="34" height="34" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-          <rect x="4" y="4" width="16" height="16" rx="4" fill="var(--main-bg-color, #1f2a33)" stroke="var(--stripe-color, #a8b6c6)" stroke-width="1.2"/>
-          <circle cx="12" cy="12" r="3" stroke="var(--main-btn-color, #7aa8ff)" stroke-width="1.5"/>
-          <path d="M12 4.5V6.5" stroke="var(--stripe-color, #a8b6c6)" stroke-width="1.2" stroke-linecap="round"/>
-          <path d="M12 17.5V19.5" stroke="var(--stripe-color, #a8b6c6)" stroke-width="1.2" stroke-linecap="round"/>
-          <path d="M17.6,6.4 l-1.4,1.4" stroke="var(--stripe-color, #a8b6c6)" stroke-width="1.2" stroke-linecap="round"/>
-          <path d="M7.8,16.2 l-1.4,1.4" stroke="var(--stripe-color, #a8b6c6)" stroke-width="1.2" stroke-linecap="round"/>
-          <path d="M19.5,12H17.5" stroke="var(--stripe-color, #a8b6c6)" stroke-width="1.2" stroke-linecap="round"/>
-          <path d="M6.5,12H4.5" stroke="var(--stripe-color, #a8b6c6)" stroke-width="1.2" stroke-linecap="round"/>
-          <path d="M17.6,17.6 l-1.4,-1.4" stroke="var(--stripe-color, #a8b6c6)" stroke-width="1.2" stroke-linecap="round"/>
-          <path d="M7.8,7.8 l-1.4,-1.4" stroke="var(--stripe-color, #a8b6c6)" stroke-width="1.2" stroke-linecap="round"/>
-        </svg>
-        <span class="fab-label">カスタム命令</span>
-      </a>
-      <a class="custom-order-btn fab" href="{{ url_for('settings_page') }}" aria-label="設定を開く" title="設定">
-        <svg width="34" height="34" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-          <path d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.004.827c-.292.24-.437.613-.43.992a6.759 6.759 0 010 1.25c.007.379.138.752.43.992l1.005.827c.524.43.685 1.17-.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 01-.22.128c-.333.183-.582.495-.644.869l-.213 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.02-.398-1.11-.94l-.213-1.281c-.063-.374-.313-.686-.645-.87a6.52 6.52 0 01-.22-.127c-.324-.196-.72-.257-1.075-.124l-1.217.456a1.125 1.125 0 01-1.37-.49l-1.296-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437.613.43-.992a6.759 6.759 0 010-1.25c-.007-.379-.138-.752-.430-.992l-1.005-.827c-.524-.43-.685-1.17-.26-1.43l1.298-2.247a1.125 1.125 0 011.369-.491l1.217.456c.355.133.75.072 1.076-.124.072-.044.146-.087.22-.128.333-.183.582.495.644-.869l.213-1.28z" stroke="var(--stripe-color, #a8b6c6)" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
-          <circle cx="12" cy="12" r="3" fill="var(--main-btn-color, #7aa8ff)" />
-        </svg>
-        <span class="fab-label">設定</span>
-      </a>
-      <a class="custom-order-btn fab" href="{{ url_for('playlist_page') }}" aria-label="プレイリスト管理を開く" title="プレイリスト管理">
-        <svg width="34" height="34" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-          <rect x="4" y="4" width="16" height="16" rx="4" fill="var(--main-bg-color, #1f2a33)" stroke="var(--stripe-color, #a8b6c6)" stroke-width="1.2"/>
-          <path d="M8 8h8M8 11h8M8 14h5" stroke="var(--main-btn-color, #7aa8ff)" stroke-width="1.4" stroke-linecap="round"/>
-          <circle cx="16.5" cy="14.5" r="1.8" fill="var(--main-btn-color, #7aa8ff)" opacity="0.9"/>
-        </svg>
-        <span class="fab-label">プレイリスト</span>
-      </a>
-    </div>  </main>
+        <!-- ④ Logフィールド -->
+        <div class="grid-item" id="field-log">
+            <h2><i class="fas fa-file-alt"></i> Log</h2>
+            <div class="content">
+                <div id="log-display">
+                    <!-- Log messages will be dynamically inserted here -->
+                    <div class="log-message user">今日の天気は？</div>
+                    <div class="log-message assistant">東京は晴れ、最高気温は25℃です。</div>
+                </div>
+            </div>
+            <div class="log-input-area">
+                <input type="text" id="text-input" placeholder="テキストで入力...">
+                <button id="send-button"><i class="fas fa-paper-plane"></i></button>
+            </div>
+        </div>
 
-  <a href="{{ url_for('register') }}">ユーザー登録</a>
+        <!-- ⑤ ボタンフィールド -->
+        <div class="grid-item" id="field-buttons">
+            <h2><i class="fas fa-th-large"></i> Menu</h2>
+            <div class="content button-grid">
+                <a href="{{ url_for('logout') }}" class="menu-button">
+                    <i class="fas fa-sign-out-alt"></i>
+                    <span>ログアウト</span>
+                </a>
+                <a href="{{ url_for('expense') }}" class="menu-button">
+                    <i class="fas fa-money-check-alt"></i>
+                    <span>収支登録</span>
+                </a>
+                <a href="{{ url_for('finance') }}" class="menu-button">
+                    <i class="fas fa-chart-pie"></i>
+                    <span>収支統計</span>
+                </a>
+                <a href="{{ url_for('calender_page') }}" class="menu-button">
+                    <i class="fas fa-calendar-alt"></i>
+                    <span>カレンダー</span>
+                </a>
+                <a href="{{ url_for('memo') }}" class="menu-button">
+                    <i class="fas fa-sticky-note"></i>
+                    <span>メモ</span>
+                </a>
+                <a href="{{ url_for('custom_order_pages.custom_order_index') }}" class="menu-button">
+                    <i class="fas fa-cogs"></i>
+                    <span>カスタム命令</span>
+                </a>
+                <a href="{{ url_for('playlist_page') }}" class="menu-button">
+                    <i class="fas fa-headphones"></i>
+                    <span>プレイリスト</span>
+                </a>
+                <a href="{{ url_for('settings_page') }}" class="menu-button">
+                    <i class="fas fa-cog"></i>
+                    <span>設定</span>
+                </a>
+            </div>
+        </div>
 
-  <div id="character-buddy" class="character-buddy" aria-hidden="true">
-    <img id="character-frame-idle" class="active" src="{{ url_for('serve_img_file', filename='サイレントメイト君_差分0.png') }}" alt="">
-    <img id="character-frame-1" src="{{ url_for('serve_img_file', filename='サイレントメイト君_差分1.png') }}" alt="">
-    <img id="character-frame-2" src="{{ url_for('serve_img_file', filename='サイレントメイト君_差分2.png') }}" alt="">
-  </div>
- 
-  <div id="ai-indicator" aria-live="polite" style="position:fixed;right:14px;bottom:14px;z-index:14000;display:none;">
-    <div class="ai-indicator-card">
-      <div id="aii-title" style="font-weight:700;margin-bottom:8px">????????</div>
-      <div id="aii-steps" class="ai-indicator-steps">
-        <span class="ai-indicator-bar"></span>
-        <span class="ai-indicator-bar"></span>
-        <span class="ai-indicator-bar"></span>
-      </div>
-      <div id="aii-label" class="ai-indicator-label">?????</div>
+        <!-- ⑥ ミュージックフィールド -->
+        <div class="grid-item" id="field-music">
+            <h2><i class="fas fa-music"></i> Music Player</h2>
+            <div class="content music-player">
+                <div class="artwork">
+                    <img src="https://via.placeholder.com/150" alt="Album Art">
+                </div>
+                <div class="track-info">
+                    <div class="title">曲名がここに表示されます</div>
+                    <div class="artist">アーティスト名</div>
+                </div>
+                <div class="controls">
+                    <button id="prev-track"><i class="fas fa-step-backward"></i></button>
+                    <button id="play-pause-track"><i class="fas fa-play"></i></button>
+                    <button id="next-track"><i class="fas fa-step-forward"></i></button>
+                </div>
+                <div class="volume-control">
+                    <i class="fas fa-volume-down"></i>
+                    <input type="range" id="volume-slider" min="0" max="100" value="80">
+                    <i class="fas fa-volume-up"></i>
+                </div>
+            </div>
+        </div>
     </div>
-  </div>
-  </div>
- 
-<script type="module">
-  // ScheduleManager を明示的にインポートする
-  import { ScheduleManager } from './static/js/ScheduleManager.js';
- 
-  // 创建全局インスタンス，让其他脚本可以访问
-  window.manager = new ScheduleManager();
- 
-  const log = (msg) => {
-    console.log(msg);
-  };
- 
-// AIインジケータ制御スクリプト (両方に存在)
-(() => {
-  const box   = document.getElementById('ai-indicator');
-  const title = document.getElementById('aii-title');
-  const label = document.getElementById('aii-label');
-  const bars  = Array.from(document.querySelectorAll('#aii-steps span'));
-  let steps = ['目的判定','詳細抽出','結果反映'];
 
-  const getCssVar = (name, fallback) => {
-    const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-    return value || fallback;
-  };
-
-  function setActive(n){
-    const activeColor = getCssVar('--main-btn-color', '#93c5fd');
-    const inactiveColor = getCssVar('--stripe-color', '#475569');
-    bars.forEach((b,i)=> b.style.background = i < n ? activeColor : inactiveColor);
-    bars.forEach((b,i)=> b.style.opacity = i < n ? '1' : '.45');
-    label.textContent = steps[Math.max(0, Math.min(n-1, steps.length-1))] || '処理中';
-  }
- 
-  document.addEventListener('analysis:start', (e)=>{
-    steps = e.detail?.steps || steps;
-    title.textContent = '解析中…';
-    label.textContent = '準備中';
-    setActive(0);
-    box.style.display = 'block';
-  });
- 
-  document.addEventListener('analysis:step', (e)=>{
-    const idx = (e.detail?.index|0);
-    if (e.detail?.label) steps[idx-1] = e.detail.label;
-    setActive(idx);
-  });
- 
-  document.addEventListener('analysis:end', ()=>{
-    setActive(steps.length);
-    title.textContent = '完了';
-    setTimeout(()=> box.style.display = 'none', 700);
-  });
-})();
-</script>
-
-<div id="toast-stack" aria-live="polite" aria-atomic="true"></div>
- 
-<div id="read-aloud-overlay" class="read-aloud-overlay">
-    <div class="overlay-content">
-        <button type="button" class="close-overlay-btn" aria-label="閉じる">&times;</button>
-        <div id="overlay-time" class="overlay-time"></div>
-        <div id="overlay-message" class="overlay-message"></div>
-    </div>
-</div>
-
-<!-- 画像表示用オーバーレイ -->
-<div id="image-display-overlay" class="image-display-overlay">
-    <button type="button" class="close-overlay-btn" aria-label="閉じる">&times;</button>
-    <img id="displayed-image" src="" alt="表示画像">
-</div>
-
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.5/socket.io.min.js"></script>
-  <script>
-    window.APP_VERSION = "{{ config['VERSION_TIMESTAMP'] }}";
-  </script>
-  <script src="{{ url_for('static', filename='js/app_settings_apply.js', _t=config['VERSION_TIMESTAMP']) }}"></script>
-<script>
-  (() => {
-    const logoutLink = document.getElementById('logout-link');
-    if (!logoutLink) return;
-    logoutLink.addEventListener('click', (event) => {
-      if (!confirm('ログアウトしますか？')) {
-        event.preventDefault();
-      }
-    });
-  })();
-</script>
-<script>
-  (() => {
-    const idleFrame = document.getElementById('character-frame-idle');
-    const frameA = document.getElementById('character-frame-1');
-    const frameB = document.getElementById('character-frame-2');
-    if (!idleFrame || !frameA || !frameB) return;
-
-    const talkFrames = [frameA, frameB];
-    let talkIndex = 0;
-    let timerId = null;
-
-    const showFrame = (index) => {
-      idleFrame.classList.toggle('active', index === 'idle');
-      talkFrames.forEach((frame, i) => frame.classList.toggle('active', index === i));
-    };
-
-    const startTalking = () => {
-      if (timerId) return;
-      let idx = talkIndex;
-      timerId = setInterval(() => {
-        idx = idx === 0 ? 1 : 0;
-        showFrame(idx);
-        talkIndex = idx;
-      }, 220);
-    };
-
-    const stopTalking = () => {
-      if (timerId) {
-        clearInterval(timerId);
-        timerId = null;
-      }
-      showFrame('idle');
-    };
-
-    showFrame('idle');
-    document.addEventListener('voice:playstart', startTalking);
-    document.addEventListener('voice:playend', stopTalking);
-  })();
-</script>
-<script>
-  (() => {
-    const log = (...args) => console.log('[DEBUG:CSS]', ...args);
-    const warn = (...args) => console.warn('[DEBUG:CSS]', ...args);
-
-    function findResourceEntry(keyword) {
-      const entries = performance.getEntriesByType('resource');
-      return entries.find((entry) => entry.name.includes(keyword));
-    }
-
-    function dumpResourceEntry(keyword) {
-      const entry = findResourceEntry(keyword);
-      if (!entry) {
-        warn(`resource not found: ${keyword}`);
-        return;
-      }
-      log(`resource: ${keyword}`, {
-        name: entry.name,
-        initiatorType: entry.initiatorType,
-        transferSize: entry.transferSize,
-        encodedBodySize: entry.encodedBodySize,
-        decodedBodySize: entry.decodedBodySize,
-      });
-    }
-
-    function dumpStyleSnapshot() {
-      const rootStyle = getComputedStyle(document.documentElement);
-      const bodyStyle = getComputedStyle(document.body);
-      log('env', {
-        time: new Date().toISOString(),
-        location: location.href,
-        origin: location.origin,
-        userAgent: navigator.userAgent,
-        language: navigator.language,
-        timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-        devicePixelRatio: window.devicePixelRatio,
-        styleSheetCount: document.styleSheets.length,
-      });
-      log('theme', {
-        vsThemeIdx: localStorage.getItem('vs_theme_idx'),
-        htmlClass: document.documentElement.className,
-      });
-      log('css-vars', {
-        bg1: rootStyle.getPropertyValue('--bg-1').trim(),
-        bg2: rootStyle.getPropertyValue('--bg-2').trim(),
-        accent: rootStyle.getPropertyValue('--accent').trim(),
-        wallpaper: rootStyle.getPropertyValue('--wallpaper').trim(),
-      });
-      log('body-background', {
-        backgroundImage: bodyStyle.backgroundImage,
-        backgroundColor: bodyStyle.backgroundColor,
-      });
-
-      const styleLink = document.querySelector('link[rel="stylesheet"][href*="style.css"]');
-      if (styleLink) {
-        log('style.css link', styleLink.href);
-      } else {
-        warn('style.css link not found');
-      }
-
-      const sheets = Array.from(document.styleSheets).map((sheet) => sheet.href || 'inline');
-      log('stylesheets', sheets);
-
-      dumpResourceEntry('style.css');
-      dumpResourceEntry('websocket_handler.js');
-      dumpResourceEntry('Parallax_and_Theme_rotation.js');
-    }
-
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', dumpStyleSnapshot);
-    } else {
-      dumpStyleSnapshot();
-    }
-  })();
-</script>
-  <script src="{{ url_for('static', filename='js/websocket_handler.js', _t=config['VERSION_TIMESTAMP']) }}" type="module" defer></script>
-  <script src="{{ url_for('static', filename='js/voice_recognition.js', _t=config['VERSION_TIMESTAMP']) }}"></script>
-  <script src="{{ url_for('static', filename='js/Parallax_and_Theme_rotation.js', _t=config['VERSION_TIMESTAMP']) }}" type="module"></script>
-<!-- <script src="{{ url_for('static', filename='js/calendar_toast.js') }}" defer></script> -->
-
-<!-- YouTube Player Overlay -->
-<div id="youtube-overlay" class="youtube-overlay-hidden">
-  <div id="youtube-player-wrapper">
-    <div id="youtube-player-header">
-        <span id="youtube-video-title"></span>
-        <button id="youtube-close-btn">&times;</button>
-    </div>
-    <div id="youtube-error-message" style="color: red; text-align: center; margin-top: 10px; display: none;"></div>
-    <div id="youtube-player"></div>
-    <div id="youtube-controls">
-      <button id="youtube-prev-btn">前の動画</button>
-      <button id="youtube-next-btn">次の動画</button>
-    </div>
-  </div>
-</div>
-
-<script src="{{ url_for('static', filename='js/youtube_player.js', _t=config['VERSION_TIMESTAMP']) }}" type="module" defer></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.socket.io/4.5.2/socket.io.min.js"></script>
+    <script>
+        const USER_ID = {{ user.id|tojson }};
+    </script>
+    <script src="{{ url_for('static', filename='js/main_v2.js') }}"></script>
 </body>
 </html>
