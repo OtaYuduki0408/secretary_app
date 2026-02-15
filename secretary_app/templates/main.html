@@ -7,7 +7,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/main_v2.css') }}">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
 </head>
-<body>
+<body data-user-id="{{ user.id or '' }}">
     <div id="blackout-overlay"></div>
 
     <div class="main-grid-container">
@@ -177,6 +177,7 @@
     <script>
         const USER_ID = {{ user.id|tojson }};
     </script>
+    <script src="{{ url_for('static', filename='js/websocket_handler.js') }}"></script>
     <script src="{{ url_for('static', filename='js/main_v2.js') }}"></script>
 </body>
 </html>
