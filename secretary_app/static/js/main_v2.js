@@ -433,12 +433,61 @@ $(document).ready(function() {
                     break;
     
                 case 'youtube-再生':
-                    if (detail?.query) window.playYoutubeVideo(detail.query);
+                case 'Youtube-再生': {
+                    const mode = String(detail?.mode || '').toLowerCase();
+                    const queryOrUrl =
+                        (mode === 'url' ? detail?.video_url : detail?.search_query)
+                        || detail?.query
+                        || detail?.video_url
+                        || detail?.search_query;
+                    if (queryOrUrl && typeof window.playYoutubeVideo === 'function') {
+                        window.playYoutubeVideo(queryOrUrl);
+                    } else {
+                        updateLogDisplay('YouTube再生パラメータが不足しています。', 'assistant');
+                    }
                     resolve();
                     break;
-    
+                }
                 case 'youtube-操作':
-                    if (detail?.intent) window.executeYoutubeIntent(detail);
+                    if (detail?.intent && typeof window.executeYoutubeIntent === 'function') {
+                        window.executeYoutubeIntent(detail);
+                    }
+                    resolve();
+                    break;
+                case 'Youtube-再開':
+                    if (typeof window.executeYoutubeIntent === 'function') {
+                        window.executeYoutubeIntent({ intent: 'resume', query: '' });
+                    }
+                    resolve();
+                    break;
+                case 'Youtube-一時停止':
+                    if (typeof window.executeYoutubeIntent === 'function') {
+                        window.executeYoutubeIntent({ intent: 'pause', query: '' });
+                    }
+                    resolve();
+                    break;
+                case 'Youtube-動画を進める':
+                    if (typeof window.executeYoutubeIntent === 'function') {
+                        window.executeYoutubeIntent({ intent: 'seek_forward', amount: detail?.seconds || 10 });
+                    }
+                    resolve();
+                    break;
+                case 'Youtube-動画を戻す':
+                    if (typeof window.executeYoutubeIntent === 'function') {
+                        window.executeYoutubeIntent({ intent: 'seek_backward', amount: detail?.seconds || 10 });
+                    }
+                    resolve();
+                    break;
+                case 'Youtube-音量を上げる':
+                    if (typeof window.executeYoutubeIntent === 'function') {
+                        window.executeYoutubeIntent({ intent: 'volume_up', amount: detail?.volume_step || 10 });
+                    }
+                    resolve();
+                    break;
+                case 'Youtube-音量を下げる':
+                    if (typeof window.executeYoutubeIntent === 'function') {
+                        window.executeYoutubeIntent({ intent: 'volume_down', amount: detail?.volume_step || 10 });
+                    }
                     resolve();
                     break;
                 
