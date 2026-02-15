@@ -382,7 +382,7 @@ body, html {
 }
 
 /* --- YouTube Player Overlay --- */
-.youtube-overlay-hidden {
+#youtube-overlay.youtube-overlay-hidden {
     display: none;
 }
 

@@ -271,12 +271,15 @@ $(document).ready(function() {
         submissionLock = true;
 
         if(!finalTranscript) updateLogDisplay(text, 'user');
+        const youtubeContext = (typeof window.getYoutubeContextState === 'function')
+            ? window.getYoutubeContextState()
+            : { active: false };
         
         $.ajax({
             url: '/web_api/chat',
             type: 'POST',
             contentType: 'application/json',
-            data: JSON.stringify({ inputValue: text }),
+            data: JSON.stringify({ inputValue: text, youtubeContext }),
             success: handleServerResponse,
             error: () => {
                 setMode('waiting');
@@ -288,6 +291,56 @@ $(document).ready(function() {
     }
 
     function handleServerResponse(response) {
+        // YouTube検索再生
+        if (response?.purpose === 'Yp' && response?.data?.search_query) {
+            if (typeof window.playYoutubeVideo === 'function') {
+                window.playYoutubeVideo(response.data.search_query);
+            } else {
+                updateLogDisplay('YouTubeプレーヤーが未初期化です。', 'assistant');
+            }
+            setMode('waiting');
+            return;
+        }
+
+        // YouTube操作（停止/次/前/音量等）
+        if (response?.purpose === 'Yc' && response?.action === 'youtube_control' && response?.data) {
+            if (typeof window.executeYoutubeIntent === 'function') {
+                const handled = window.executeYoutubeIntent(response.data);
+                if (!handled) updateLogDisplay('YouTube操作を実行できませんでした。', 'assistant');
+            } else {
+                updateLogDisplay('YouTubeプレーヤーが未初期化です。', 'assistant');
+            }
+            setMode('waiting');
+            return;
+        }
+
+        // プレイリスト再生要求
+        if (response?.action === 'playlist_play_request' && response?.data) {
+            $.ajax({
+                url: '/api/playlist/playplan',
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify(response.data),
+            }).done((plan) => {
+                const videos = Array.isArray(plan?.videos) ? plan.videos : (Array.isArray(plan?.tracks) ? plan.tracks : []);
+                if (videos.length === 0) {
+                    updateLogDisplay('プレイリストに該当する曲がありません。', 'assistant');
+                    return;
+                }
+                if (typeof window.playYoutubeTrackList === 'function') {
+                    const started = window.playYoutubeTrackList(videos, { random: response?.data?.order === 'random' });
+                    if (!started) updateLogDisplay('プレイリスト再生を開始できませんでした。', 'assistant');
+                } else {
+                    updateLogDisplay('YouTubeプレーヤーが未初期化です。', 'assistant');
+                }
+            }).fail(() => {
+                updateLogDisplay('プレイリスト再生の準備に失敗しました。', 'assistant');
+            }).always(() => {
+                setMode('waiting');
+            });
+            return;
+        }
+
         if (response.triggered_by_voice && response.order_payloads) {
             response.order_payloads.forEach(handleServerCommand);
         } else if (response.message) {
@@ -522,11 +575,76 @@ $(document).ready(function() {
     // ============================================================================
     $('#send-button').on('click', () => { const t = $('#text-input').val(); if(t){ sendTextToServer(t); $('#text-input').val(''); } });
     $('#text-input').on('keypress', (e) => { if(e.which === 13) $('#send-button').click(); });
-    let isPlayingMusic = false;
-    $('#play-pause-track').on('click', function() { const i=$(this).find('i'); if(window.executeYoutubeIntent({intent: isPlayingMusic ? 'pause':'resume'})){ isPlayingMusic=!isPlayingMusic; }else{ $.get('/api/playlist/playplan',(p)=>{if(p?.tracks?.length){window.playYoutubeTrackList(p.tracks);isPlayingMusic=true;}}); } i.toggleClass('fa-play fa-pause',isPlayingMusic); });
-    $('#next-track').on('click', () => window.executeYoutubeIntent({ intent: 'next' }));
-    $('#prev-track').on('click', () => window.executeYoutubeIntent({ intent: 'prev' }));
-    $('#volume-slider').on('input', function() { window.executeYoutubeIntent({ intent: 'set_volume', amount: $(this).val() }); });
+    const $playPauseBtn = $('#play-pause-track');
+    const $playPauseIcon = $playPauseBtn.find('i');
+    const syncPlayPauseIcon = () => {
+        if (typeof window.getYoutubeContextState !== 'function') {
+            $playPauseIcon.removeClass('fa-pause').addClass('fa-play');
+            return;
+        }
+        let state = {};
+        try {
+            state = window.getYoutubeContextState() || {};
+        } catch (e) {
+            console.warn('YouTube state read failed:', e);
+            $playPauseIcon.removeClass('fa-pause').addClass('fa-play');
+            return;
+        }
+        const isPlaying = !!state.playing;
+        $playPauseIcon.toggleClass('fa-play', !isPlaying);
+        $playPauseIcon.toggleClass('fa-pause', isPlaying);
+    };
+    const startPlaybackFromPlaylist = () => {
+        $.get('/api/playlist/playplan', (plan) => {
+            const tracks = plan?.tracks || [];
+            if (tracks.length === 0) {
+                updateLogDisplay('プレイリストが空です。', 'assistant');
+                syncPlayPauseIcon();
+                return;
+            }
+            if (typeof window.playYoutubeTrackList === 'function') {
+                const started = window.playYoutubeTrackList(tracks);
+                if (!started) updateLogDisplay('YouTube再生の開始に失敗しました。', 'assistant');
+            } else {
+                updateLogDisplay('YouTubeプレーヤーが未初期化です。', 'assistant');
+            }
+            syncPlayPauseIcon();
+        }).fail(() => {
+            updateLogDisplay('プレイリスト取得に失敗しました。', 'assistant');
+            syncPlayPauseIcon();
+        });
+    };
+    $playPauseBtn.on('click', function() {
+        if (typeof window.executeYoutubeIntent !== 'function') {
+            updateLogDisplay('YouTubeプレーヤーが未初期化です。', 'assistant');
+            return;
+        }
+        const state = (typeof window.getYoutubeContextState === 'function') ? window.getYoutubeContextState() : {};
+        if (state.active) {
+            window.executeYoutubeIntent({ intent: state.playing ? 'pause' : 'resume' });
+            syncPlayPauseIcon();
+            return;
+        }
+        startPlaybackFromPlaylist();
+    });
+    $('#next-track').on('click', () => {
+        if (typeof window.executeYoutubeIntent === 'function') {
+            window.executeYoutubeIntent({ intent: 'next' });
+            syncPlayPauseIcon();
+        }
+    });
+    $('#prev-track').on('click', () => {
+        if (typeof window.executeYoutubeIntent === 'function') {
+            window.executeYoutubeIntent({ intent: 'prev' });
+            syncPlayPauseIcon();
+        }
+    });
+    $('#volume-slider').on('input', function() {
+        if (typeof window.executeYoutubeIntent === 'function') {
+            window.executeYoutubeIntent({ intent: 'set_volume', amount: $(this).val() });
+        }
+    });
+    $(document).on('youtube:control', syncPlayPauseIcon);
 
     // ============================================================================
     // TTS
@@ -624,6 +742,7 @@ $(document).ready(function() {
     function run() {
         loadAppSettings();
         loadCustomVoiceTriggerEndWords();
+        syncPlayPauseIcon();
         updateTime(); setInterval(updateTime, 1000);
         const fetchData = () => { fetchWeather(); fetchFinanceData(); fetchCalendarData(); fetchAlarms(); };
         fetchData(); setInterval(fetchData, 300000);

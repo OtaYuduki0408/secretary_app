@@ -172,11 +172,35 @@
         </div>
     </div>
 
+    <div id="youtube-overlay" class="youtube-overlay-hidden">
+        <div id="youtube-player-wrapper">
+            <div id="youtube-player-header">
+                <span id="youtube-video-title"></span>
+                <button id="youtube-close-btn" type="button">&times;</button>
+            </div>
+            <div id="youtube-error-message" style="display:none;"></div>
+            <div id="youtube-player"></div>
+            <div id="youtube-controls">
+                <button id="youtube-prev-btn" type="button">前へ</button>
+                <button id="youtube-next-btn" type="button">次へ</button>
+            </div>
+        </div>
+    </div>
+
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://cdn.socket.io/4.5.2/socket.io.min.js"></script>
+    <script src="https://www.youtube.com/iframe_api"></script>
     <script>
         const USER_ID = {{ user.id|tojson }};
+        window.onYouTubeIframeAPIReady = function() {
+            if (typeof window.setYoutubeApiReady === 'function') {
+                window.setYoutubeApiReady(true);
+            } else {
+                window._youtubeApiReadyGlobal = true;
+            }
+        };
     </script>
+    <script type="module" src="{{ url_for('static', filename='js/youtube_player.js') }}"></script>
     <script src="{{ url_for('static', filename='js/websocket_handler.js') }}"></script>
     <script src="{{ url_for('static', filename='js/main_v2.js') }}"></script>
 </body>

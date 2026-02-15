@@ -497,8 +497,11 @@ function executeYoutubeIntent(payload = {}) {
 }
 
 function getYoutubeContextState() {
-    const isPaused = !!(window.YT && lastPlayerState === YT.PlayerState.PAUSED);
-    const isPlaying = !!(window.YT && lastPlayerState === YT.PlayerState.PLAYING);
+    const playerState = window.YT && window.YT.PlayerState ? window.YT.PlayerState : null;
+    const pausedCode = playerState ? playerState.PAUSED : 2;
+    const playingCode = playerState ? playerState.PLAYING : 1;
+    const isPaused = lastPlayerState === pausedCode;
+    const isPlaying = lastPlayerState === playingCode;
     const currentVolume = (player && typeof player.getVolume === 'function') ? Number(player.getVolume()) : null;
     return {
         active: Boolean((player && typeof player.playVideo === 'function') || pendingVideoId || (currentPlaylist && currentPlaylist.length > 0)),
