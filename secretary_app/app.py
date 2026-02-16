@@ -835,8 +835,8 @@ def upsert_youtube_preferences_route():
 
 # ============== Server-side TTS ==============
 from services.weather_service import (
-    _get_jma_forecast_data, _extract_daily_series, DEFAULT_AREA_CODE, 
-    resolve_area_code_from_address, _get_weather_for_period
+    _get_jma_forecast_data, DEFAULT_AREA_CODE, 
+    resolve_area_code_from_address
 )
 
 @app.route('/api/weather', methods=['GET'])
@@ -848,22 +848,79 @@ def get_weather_route():
     area_code = resolve_area_code_from_address(address, DEFAULT_AREA_CODE)
     
     forecast_data = _get_jma_forecast_data(area_code)
-    if not forecast_data:
+    if not forecast_data or not isinstance(forecast_data, list) or len(forecast_data) == 0:
         return jsonify({"error": "Failed to get weather data"}), 500
 
-    area_name, time_defines, weathers, pops, temps_time, temps_values = _extract_daily_series(forecast_data)
-    if not area_name:
+    try:
+        # 気象庁のデータ構造に合わせて各時系列データを取得
+        # 0: 天気, 1: 降水確率, 2: 気温
+        weather_ts = forecast_data[0]['timeSeries'][0]
+        pop_ts = forecast_data[0]['timeSeries'][1]
+        temp_ts = forecast_data[0]['timeSeries'][2]
+
+        weather_times = [datetime.fromisoformat(t) for t in weather_ts['timeDefines']]
+        weather_values = weather_ts['areas'][0]['weathers']
+        
+        pop_times = [datetime.fromisoformat(t) for t in pop_ts['timeDefines']]
+        pop_values = pop_ts['areas'][0]['pops']
+
+        temp_times = [datetime.fromisoformat(t) for t in temp_ts['timeDefines']]
+        temp_values = temp_ts['areas'][0]['temps']
+
+    except (IndexError, KeyError) as e:
+        app.logger.error(f"Failed to parse JMA forecast data structure: {e}")
         return jsonify({"error": "Failed to parse weather data"}), 500
+
+
+    def get_period_data(target_date, start_hour, end_hour):
+        """指定された期間の天気、最高気温、最大降水確率を抽出する"""
+        period_weather = "N/A"
+        period_temp = "N/A"
+        period_pop = "N/A"
+
+        # 天気: 期間内で最初に見つかったものを代表とする
+        for i, dt in enumerate(weather_times):
+            if dt.date() == target_date and start_hour <= dt.hour < end_hour:
+                if i < len(weather_values):
+                    # "くもり　夜　晴れ" のような文字列を最初の部分だけ取得
+                    period_weather = weather_values[i].split("　")[0]
+                    break
+        
+        # 気温: 期間内の最高気温
+        temps_in_period = []
+        for i, dt in enumerate(temp_times):
+            if dt.date() == target_date and start_hour <= dt.hour < end_hour:
+                if i < len(temp_values) and temp_values[i] is not None:
+                    try:
+                        temps_in_period.append(float(temp_values[i]))
+                    except (ValueError, TypeError):
+                        continue
+        if temps_in_period:
+            period_temp = str(int(round(max(temps_in_period))))
+
+        # 降水確率: 期間内の最大値
+        pops_in_period = []
+        for i, dt in enumerate(pop_times):
+            if dt.date() == target_date and start_hour <= dt.hour < end_hour:
+                 if i < len(pop_values) and pop_values[i] is not None and pop_values[i] != '':
+                    try:
+                        pops_in_period.append(int(pop_values[i]))
+                    except (ValueError, TypeError):
+                        continue
+        if pops_in_period:
+            period_pop = str(max(pops_in_period))
+
+        return {"weather": period_weather, "temperature": period_temp, "pop": period_pop}
 
     now = datetime.now(JST)
     today_date = now.date()
     tomorrow_date = (now + timedelta(days=1)).date()
 
     response = {
-        "today_am": _get_weather_for_period(today_date, 6, 12, time_defines, weathers, pops, temps_time, temps_values),
-        "today_pm": _get_weather_for_period(today_date, 12, 18, time_defines, weathers, pops, temps_time, temps_values),
-        "tomorrow_am": _get_weather_for_period(tomorrow_date, 6, 12, time_defines, weathers, pops, temps_time, temps_values),
-        "tomorrow_pm": _get_weather_for_period(tomorrow_date, 12, 18, time_defines, weathers, pops, temps_time, temps_values),
+        "today_am": get_period_data(today_date, 6, 12),
+        "today_pm": get_period_data(today_date, 12, 18),
+        "tomorrow_am": get_period_data(tomorrow_date, 6, 12),
+        "tomorrow_pm": get_period_data(tomorrow_date, 12, 18),
     }
             
     return jsonify(response)

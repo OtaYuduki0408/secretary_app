@@ -260,12 +260,7 @@ $(document).ready(function() {
         markDispatchedCommand(command);
         
         lastSubmissionTime = now;
-        setMode('cooldown');
-        setTimeout(() => {
-            if (currentMode === 'cooldown') {
-                setMode('waiting');
-            }
-        }, SUBMISSION_COOLDOWN_MS);
+        setMode('processing');
     
         sendTextToServer(command);
 

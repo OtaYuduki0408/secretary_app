@@ -91,33 +91,6 @@ def _to_jst(dt_text: str):
         return None
 
 
-def _extract_daily_series(forecast_data):
-    if not isinstance(forecast_data, list) or not forecast_data:
-        return None, [], [], [], [], []
-
-    daily = forecast_data[0]
-    ts_list = daily.get("timeSeries", [])
-    if not ts_list:
-        return None, [], [], [], [], []
-
-    ts0 = ts_list[0]
-    area0 = (ts0.get("areas") or [{}])[0]
-
-    area_name = ((area0.get("area") or {}).get("name")) or "地域"
-    time_defines = [_to_jst(t) for t in (ts0.get("timeDefines") or [])]
-    weathers = area0.get("weathers") or []
-    pops = area0.get("pops") or []
-
-    temps_time = []
-    temps_values = []
-    if len(ts_list) > 2:
-        ts2 = ts_list[2]
-        temps_time = [_to_jst(t) for t in (ts2.get("timeDefines") or [])]
-        temps_values = ((ts2.get("areas") or [{}])[0].get("temps") or [])
-
-    return area_name, time_defines, weathers, pops, temps_time, temps_values
-
-
 def _extract_temp_by_datetime(temps_time, temps_values):
     result = {}
     for idx, tdt in enumerate(temps_time):
@@ -466,50 +439,4 @@ def get_weather_forecast_message(
             now_jst=now_jst,
         )
     return _build_today_tomorrow_message(area_name, target_label, slots, contents)
-
-
-def _get_weather_for_period(target_date, start_hour, end_hour, time_defines, weathers, pops, temps_time, temps_values):
-    """指定された日付と時間範囲の天気、最高気温、最大降水確率を取得する"""
-    period_weather = "N/A"
-    period_temp = "N/A"
-    period_pop = "N/A"
-
-    # 天気：時間範囲内で最初に見つかったものを代表とする
-    for i, dt in enumerate(time_defines):
-        if dt.date() == target_date and start_hour <= dt.hour < end_hour:
-            if i < len(weathers):
-                period_weather = weathers[i]
-                break
-
-    # 気温：時間範囲内の最高気温を取得
-    temp_vals = []
-    for i, dt in enumerate(temps_time):
-        if dt.date() == target_date and start_hour <= dt.hour < end_hour:
-            if i < len(temps_values) and temps_values[i] is not None:
-                try:
-                    temp_vals.append(float(temps_values[i]))
-                except (ValueError, TypeError):
-                    continue
-    if temp_vals:
-        period_temp = str(int(round(max(temp_vals))))
-
-    # 降水確率：時間範囲内の最大値を取得
-    # popsはtime_definesと同じインデックスで対応していると仮定
-    pop_vals = []
-    for i, dt in enumerate(time_defines):
-         if dt.date() == target_date and start_hour <= dt.hour < end_hour:
-            if i < len(pops) and pops[i] is not None and pops[i] != '':
-                try:
-                    pop_vals.append(int(pops[i]))
-                except (ValueError, TypeError):
-                    continue
-    if pop_vals:
-        period_pop = str(max(pop_vals))
-
-
-    return {
-        "weather": period_weather,
-        "temperature": period_temp,
-        "pop": period_pop
-    }
 
