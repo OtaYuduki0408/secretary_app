@@ -251,6 +251,22 @@ export function createActionUI(prefix = '', initialValue = {}) {
         `;
       }
       break;
+
+    case "画面":
+      if (sub === "ブラックアウト") {
+        const state = initialValue.state || 'on';
+        detailContainer.innerHTML = `
+          <label>状態</label>
+          <div class="co-radio-group">
+            <input type="radio" id="${prefix}blackout_on" name="${prefix}blackout_state" value="on" ${state === 'on' ? 'checked' : ''}>
+            <label for="${prefix}blackout_on">ON (画面を黒くする)</label>
+            <input type="radio" id="${prefix}blackout_off" name="${prefix}blackout_state" value="off" ${state === 'off' ? 'checked' : ''}>
+            <label for="${prefix}blackout_off">OFF (元に戻す)</label>
+          </div>
+        `;
+      }
+      break;
+
     case "SwitchBot":
       if (sub === "デバイス操作") {
         detailContainer.innerHTML = `

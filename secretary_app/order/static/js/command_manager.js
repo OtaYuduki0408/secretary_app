@@ -129,6 +129,11 @@ function parseActionItem(actionItem) {
         // 追加パラメータなし。サーバー側で目覚まし時刻を解決して読み上げる。
       }
       break;
+    case "画面":
+      if (sub === "ブラックアウト") {
+        detail.state = detailContainer.querySelector('input[name*="blackout_state"]:checked')?.value;
+      }
+      break;
     case "SwitchBot":
       if (sub === "デバイス操作") {
         detail.deviceId = detailContainer.querySelector('.action-detail-switchbot-device')?.value;

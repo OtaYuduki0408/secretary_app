@@ -58,6 +58,7 @@ export const TRIGGER_VALUE_PLACEHOLDERS = {
 };
 
 export const ACTION_CATEGORIES = {
+    "画面": ["ブラックアウト"],
     "カレンダー": ["追加", "削除", "読み上げ"],
     "収支管理": ["読み上げ"],
     "メモ": ["読み上げ"],
