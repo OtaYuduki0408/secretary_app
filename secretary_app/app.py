@@ -851,26 +851,42 @@ def get_weather_route():
     if not forecast_data or not isinstance(forecast_data, list) or len(forecast_data) == 0:
         return jsonify({"error": "Failed to get weather data"}), 500
 
-    try:
-        # 気象庁のデータ構造に合わせて各時系列データを取得
-        # 0: 天気, 1: 降水確率, 2: 気温
-        weather_ts = forecast_data[0]['timeSeries'][0]
-        pop_ts = forecast_data[0]['timeSeries'][1]
-        temp_ts = forecast_data[0]['timeSeries'][2]
+    # 各時系列データを動的に探すヘルパー
+    def _find_time_series_data(data_type, series_list):
+        for series in series_list:
+            if series.get('areas') and series['areas'][0].get(data_type):
+                return series
+        return None
 
-        weather_times = [datetime.fromisoformat(t) for t in weather_ts['timeDefines']]
+    try:
+        daily_forecast = forecast_data[0]
+        time_series_list = daily_forecast.get('timeSeries', [])
+
+        weather_ts = _find_time_series_data('weathers', time_series_list)
+        pop_ts = _find_time_series_data('pops', time_series_list)
+        temp_ts = _find_time_series_data('temps', time_series_list)
+        
+        if not weather_ts or not pop_ts or not temp_ts:
+            app.logger.error("Required timeSeries data (weathers, pops, temps) not found.")
+            return jsonify({"error": "Failed to parse weather data: missing timeSeries"}), 500
+
+        weather_times_raw = weather_ts['timeDefines']
         weather_values = weather_ts['areas'][0]['weathers']
         
-        pop_times = [datetime.fromisoformat(t) for t in pop_ts['timeDefines']]
+        pop_times_raw = pop_ts['timeDefines']
         pop_values = pop_ts['areas'][0]['pops']
 
-        temp_times = [datetime.fromisoformat(t) for t in temp_ts['timeDefines']]
+        temp_times_raw = temp_ts['timeDefines']
         temp_values = temp_ts['areas'][0]['temps']
 
-    except (IndexError, KeyError) as e:
+        # datetimeオブジェクトに変換
+        weather_times = [datetime.fromisoformat(t.replace('Z', '+00:00')).astimezone(JST) for t in weather_times_raw]
+        pop_times = [datetime.fromisoformat(t.replace('Z', '+00:00')).astimezone(JST) for t in pop_times_raw]
+        temp_times = [datetime.fromisoformat(t.replace('Z', '+00:00')).astimezone(JST) for t in temp_times_raw]
+
+    except (IndexError, KeyError, ValueError) as e:
         app.logger.error(f"Failed to parse JMA forecast data structure: {e}")
         return jsonify({"error": "Failed to parse weather data"}), 500
-
 
     def get_period_data(target_date, start_hour, end_hour):
         """指定された期間の天気、最高気温、最大降水確率を抽出する"""
@@ -878,15 +894,17 @@ def get_weather_route():
         period_temp = "N/A"
         period_pop = "N/A"
 
-        # 天気: 期間内で最初に見つかったものを代表とする
+        # 天気: 期間内で最も近い時刻のものを代表とする
+        # 複数ある場合は結合して返す
+        weathers_in_period = []
         for i, dt in enumerate(weather_times):
             if dt.date() == target_date and start_hour <= dt.hour < end_hour:
-                if i < len(weather_values):
-                    # "くもり　夜　晴れ" のような文字列を最初の部分だけ取得
-                    period_weather = weather_values[i].split("　")[0]
-                    break
-        
-        # 気温: 期間内の最高気温
+                if i < len(weather_values) and weather_values[i].strip():
+                    weathers_in_period.append(weather_values[i])
+        if weathers_in_period:
+            period_weather = " / ".join(weathers_in_period) # 結合して返す
+
+        # 気温: 期間内の最高気温を取得
         temps_in_period = []
         for i, dt in enumerate(temp_times):
             if dt.date() == target_date and start_hour <= dt.hour < end_hour:
@@ -897,8 +915,8 @@ def get_weather_route():
                         continue
         if temps_in_period:
             period_temp = str(int(round(max(temps_in_period))))
-
-        # 降水確率: 期間内の最大値
+        
+        # 降水確率: 期間内の最大値を取得
         pops_in_period = []
         for i, dt in enumerate(pop_times):
             if dt.date() == target_date and start_hour <= dt.hour < end_hour:

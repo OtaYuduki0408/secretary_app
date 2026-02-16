@@ -252,6 +252,14 @@ $(document).ready(function() {
             setMode('waiting');
             return;
         }
+
+        // ウェイクワード単体での呼び出しの場合、TTSを抑制し、何もせずに待機モードに戻る
+        const isWakeWordOnly = WAKE_WORDS.some(w => command.toLowerCase() === w.toLowerCase());
+        if (isWakeWordOnly) {
+            console.log("Wake word only detected. Suppressing TTS and returning to waiting mode.");
+            setMode('waiting');
+            return;
+        }
     
         if (!isEndWordTrigger && shouldSuppressDuplicate(command)) {
             setMode('waiting');
