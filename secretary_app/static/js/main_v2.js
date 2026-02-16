@@ -613,9 +613,6 @@ $(document).ready(function() {
 
     function sanitizeVoiceCommand(text, endWordMatch) {
         let command = stripLeadingWakeWords(text);
-        if (endWordMatch && endWordMatch.source === 'settings') {
-             command = command.replace(new RegExp(escapeRegExp(endWordMatch.word), 'gi'), '');
-        }
         return command.replace(/[、。！？!?\s]+$/g, '').trim();
     }
 
@@ -763,22 +760,37 @@ $(document).ready(function() {
     function hideActionOverlay() { $actionOverlay.hide(); $actionOverlayBody.empty(); }
     $('.action-overlay-close').on('click', hideActionOverlay);
 
+    const weatherTextToIcon = (weather) => {
+        if (!weather || weather === 'N/A') return '？';
+        if (weather.includes('晴')) {
+            return weather.includes('曇') ? '⛅' : '☀';
+        }
+        if (weather.includes('雨')) {
+            return weather.includes('曇') ? '🌦' : '☔';
+        }
+        if (weather.includes('曇')) return '☁';
+        if (weather.includes('雪')) return '❄️';
+        return '？';
+    };
+
+    const updateWeatherCard = (cardId, data) => {
+        const $card = $(`#${cardId}`);
+        if (!$card.length) return;
+
+        const icon = weatherTextToIcon(data?.weather);
+        const temp = data?.temperature !== 'N/A' ? `${data.temperature}℃` : '--℃';
+        const pop = data?.pop !== 'N/A' ? `${data.pop}%` : '--%';
+
+        $card.find('.weather-icon').text(icon);
+        $card.find('.temp').text(temp);
+        $card.find('.pop').text(pop);
+    };
+
     const fetchWeather = () => $.get('/api/weather', (d) => {
-        const buildWeatherText = (item) => {
-            const weather = item?.weather && item.weather !== 'N/A' ? item.weather : '不明';
-            const parts = [weather];
-            if (item?.temperature && item.temperature !== 'N/A') parts.push(`${item.temperature}℃`);
-            if (item?.pop && item.pop !== 'N/A') parts.push(`降水${item.pop}%`);
-            return parts.join(' / ');
-        };
-        if (d.today) {
-            $('#today-weather .data').text(buildWeatherText(d.today));
-            $('#today-weather .info-item-body i').removeClass().addClass(`fas ${d.today.icon || 'fa-question-circle'}`);
-        }
-        if (d.tomorrow) {
-            $('#tomorrow-weather .data').text(buildWeatherText(d.tomorrow));
-            $('#tomorrow-weather .info-item-body i').removeClass().addClass(`fas ${d.tomorrow.icon || 'fa-question-circle'}`);
-        }
+        if (d.today_am) updateWeatherCard('weather-today-am', d.today_am);
+        if (d.today_pm) updateWeatherCard('weather-today-pm', d.today_pm);
+        if (d.tomorrow_am) updateWeatherCard('weather-tomorrow-am', d.tomorrow_am);
+        if (d.tomorrow_pm) updateWeatherCard('weather-tomorrow-pm', d.tomorrow_pm);
     });
     const fetchFinanceData = () => $.get('/api/finance/summary', (d) => { $('#total-balance .data').text(`¥${d.balance?.toLocaleString()||'N/A'}`); $('#monthly-expense .data').text(`¥${d.monthly_expense?.toLocaleString()||'N/A'}`); });
     const fetchCalendarData = () => {const n=new Date(),s=new Date(n.getFullYear(),n.getMonth(),n.getDate(),0,0,0),e=new Date(s.getTime()+7*24*60*60*1000); $.get(`/api/local_calendar/events?start=${s.toISOString()}&end=${e.toISOString()}`,(evts)=>{const $l=$('#schedule-list').empty();if(evts?.length){const uE=evts.map(e=>({...e,startTime:new Date(e.start_time)})).filter(e=>e.startTime>=n).sort((a,b)=>a.startTime-b.startTime).slice(0,4);if(uE.length){uE.forEach(e=>{const sT=e.startTime.toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'});let dL='';if(e.startTime.getDate()===n.getDate())dL='今日';else if(e.startTime.getDate()===n.getDate()+1)dL='明日';else dL=e.startTime.toLocaleDateString('ja-JP',{month:'short',day:'numeric'});const tS=`${dL} ${sT}`;$l.append(`<li><span class="schedule-time">${tS}</span><span class="schedule-title">${e.title}</span></li>`);});}else{$l.append('<li><span class="schedule-title">直近の予定はありません</span></li>');}}else{$l.append('<li><span class="schedule-title">予定はありません</span></li>');}}).fail(()=>{$('#schedule-list').empty().append('<li><span class="schedule-title">予定の取得に失敗</span></li>');});};

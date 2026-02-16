@@ -466,3 +466,50 @@ def get_weather_forecast_message(
             now_jst=now_jst,
         )
     return _build_today_tomorrow_message(area_name, target_label, slots, contents)
+
+
+def _get_weather_for_period(target_date, start_hour, end_hour, time_defines, weathers, pops, temps_time, temps_values):
+    """指定された日付と時間範囲の天気、最高気温、最大降水確率を取得する"""
+    period_weather = "N/A"
+    period_temp = "N/A"
+    period_pop = "N/A"
+
+    # 天気：時間範囲内で最初に見つかったものを代表とする
+    for i, dt in enumerate(time_defines):
+        if dt.date() == target_date and start_hour <= dt.hour < end_hour:
+            if i < len(weathers):
+                period_weather = weathers[i]
+                break
+
+    # 気温：時間範囲内の最高気温を取得
+    temp_vals = []
+    for i, dt in enumerate(temps_time):
+        if dt.date() == target_date and start_hour <= dt.hour < end_hour:
+            if i < len(temps_values) and temps_values[i] is not None:
+                try:
+                    temp_vals.append(float(temps_values[i]))
+                except (ValueError, TypeError):
+                    continue
+    if temp_vals:
+        period_temp = str(int(round(max(temp_vals))))
+
+    # 降水確率：時間範囲内の最大値を取得
+    # popsはtime_definesと同じインデックスで対応していると仮定
+    pop_vals = []
+    for i, dt in enumerate(time_defines):
+         if dt.date() == target_date and start_hour <= dt.hour < end_hour:
+            if i < len(pops) and pops[i] is not None and pops[i] != '':
+                try:
+                    pop_vals.append(int(pops[i]))
+                except (ValueError, TypeError):
+                    continue
+    if pop_vals:
+        period_pop = str(max(pop_vals))
+
+
+    return {
+        "weather": period_weather,
+        "temperature": period_temp,
+        "pop": period_pop
+    }
+
