@@ -690,13 +690,22 @@ body, html {
 .weather-details {
     display: flex;
     flex-direction: column;
-    align-items: flex-start; /* Align text to the left */
-    gap: 0;
+    align-items: flex-start;
+    gap: 0; /* Remove gap here */
     font-weight: 500;
 }
 
-.temp {
-    font-size: 1em;
+.temps {
+    display: flex;
+    gap: 5px; /* Space between max and min temp */
+    margin-bottom: 2px; /* Space between temps and pop */
+}
+
+.temp-max {
+    color: #ff8a8a; /* Light red for max temp */
+}
+.temp-min {
+    color: #8ab8ff; /* Light blue for min temp */
 }
 
 .pop {

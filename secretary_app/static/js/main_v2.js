@@ -170,32 +170,28 @@ $(document).ready(function() {
             }
             const display_transcript = finalTranscript + interim_transcript;
 
-            if (currentMode === 'waiting') {
+            if (currentMode === 'waiting' || currentMode === 'speaking') {
                 if (containsWakeWord(display_transcript)) {
-                    // ウェイクワード検知時点で、それまでの入力バッファを破棄
+                    stopTTS(); // ★★★ TTSを最優先で停止
                     resetVoiceInputContext();
                     setMode('listening');
-                    // 同一発話内の「ウェイクワード以降」は新規コマンドとして保持
+                    
                     const tailCommand = stripLeadingWakeWords(display_transcript).trim();
                     if (tailCommand) {
                         finalTranscript = tailCommand;
                         updateLogDisplay(finalTranscript, 'user', true);
-                        if (event_final_transcript) {
-                            const endWordMatch = findEndWordMatch(finalTranscript);
-                            clearTimeout(pendingFinalDispatchTimerId);
-                            if (endWordMatch) {
-                                dispatchVoiceCommand(finalTranscript, endWordMatch);
-                            } else {
-                                pendingFinalDispatchTimerId = setTimeout(
-                                    () => dispatchVoiceCommand(finalTranscript),
-                                    FINAL_SEGMENT_WAIT_MS
-                                );
-                            }
+                        
+                        // タイマーロジックはlisteningモードのonresultに集約
+                        // ここでは即時実行可能なエンドワードの場合のみディスパッチを試みる
+                        const endWordMatch = findEndWordMatch(finalTranscript);
+                        if (endWordMatch) {
+                            dispatchVoiceCommand(finalTranscript, endWordMatch);
                         }
                     }
-                    return;
+                    return; // listeningモードに遷移したので、この回の処理は終了
                 }
-                if (interim_transcript) {
+
+                if (currentMode === 'waiting' && interim_transcript) {
                     updateLogDisplay(interim_transcript, 'user', true, true);
                 }
             } else if (currentMode === 'listening') {
@@ -777,12 +773,12 @@ $(document).ready(function() {
     const weatherTextToIcon = (weather) => {
         if (!weather || weather === 'N/A') return '？';
         if (weather.includes('晴')) {
-            return weather.includes('曇') ? '⛅' : '☀';
+            return weather.includes('曇') || weather.includes('くもり') ? '⛅' : '☀';
         }
         if (weather.includes('雨')) {
-            return weather.includes('曇') ? '🌦' : '☔';
+            return weather.includes('曇') || weather.includes('くもり') ? '🌦' : '☔';
         }
-        if (weather.includes('曇')) return '☁';
+        if (weather.includes('曇') || weather.includes('くもり')) return '☁';
         if (weather.includes('雪')) return '❄️';
         return '？';
     };
@@ -792,11 +788,13 @@ $(document).ready(function() {
         if (!$card.length) return;
 
         const icon = weatherTextToIcon(data?.weather);
-        const temp = data?.temperature !== 'N/A' ? `${data.temperature}℃` : '--℃';
-        const pop = data?.pop !== 'N/A' ? `${data.pop}%` : '--%';
+        const temp_max = (data?.temperature_max && data.temperature_max !== 'N/A' && data.temperature_max !== '0') ? `${data.temperature_max}℃` : '--℃';
+        const temp_min = (data?.temperature_min && data.temperature_min !== 'N/A' && data.temperature_min !== '0') ? `${data.temperature_min}℃` : '--℃';
+        const pop = (data?.pop && data.pop !== 'N/A') ? `${data.pop}%` : '--%';
 
         $card.find('.weather-icon').text(icon);
-        $card.find('.temp').text(temp);
+        $card.find('.temp-max').text(temp_max);
+        $card.find('.temp-min').text(temp_min);
         $card.find('.pop').text(pop);
     };
 

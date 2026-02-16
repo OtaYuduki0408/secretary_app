@@ -835,26 +835,22 @@ def upsert_youtube_preferences_route():
 
 # ============== Server-side TTS ==============
 from services.weather_service import (
-    _get_jma_forecast_data, DEFAULT_AREA_CODE, 
-    resolve_area_code_from_address
+    _get_jma_forecast_data, DEFAULT_AREA_CODE
 )
 
 @app.route('/api/weather', methods=['GET'])
 @login_required
 def get_weather_route():
-    user_id = session.get('user', {}).get('id')
-    settings = get_user_settings(user_id) or {}
-    address = (settings.get('main') or {}).get('address', '')
-    area_code = resolve_area_code_from_address(address, DEFAULT_AREA_CODE)
+    # ユーザー指示に基づき、場所を「群馬県南部」に固定
+    area_code = "100000" 
     
     forecast_data = _get_jma_forecast_data(area_code)
     if not forecast_data or not isinstance(forecast_data, list) or len(forecast_data) == 0:
         return jsonify({"error": "Failed to get weather data"}), 500
 
-    # 各時系列データを動的に探すヘルパー
-    def _find_time_series_data(data_type, series_list):
+    def _find_time_series_by_key(key, series_list):
         for series in series_list:
-            if series.get('areas') and series['areas'][0].get(data_type):
+            if series.get('areas') and series['areas'][0].get(key):
                 return series
         return None
 
@@ -862,83 +858,69 @@ def get_weather_route():
         daily_forecast = forecast_data[0]
         time_series_list = daily_forecast.get('timeSeries', [])
 
-        weather_ts = _find_time_series_data('weathers', time_series_list)
-        pop_ts = _find_time_series_data('pops', time_series_list)
-        temp_ts = _find_time_series_data('temps', time_series_list)
+        weather_ts = _find_time_series_by_key('weathers', time_series_list)
+        pop_ts = _find_time_series_by_key('pops', time_series_list)
+        temp_ts = _find_time_series_by_key('temps', time_series_list)
         
         if not weather_ts or not pop_ts or not temp_ts:
             app.logger.error("Required timeSeries data (weathers, pops, temps) not found.")
             return jsonify({"error": "Failed to parse weather data: missing timeSeries"}), 500
 
-        weather_times_raw = weather_ts['timeDefines']
-        weather_values = weather_ts['areas'][0]['weathers']
-        
-        pop_times_raw = pop_ts['timeDefines']
-        pop_values = pop_ts['areas'][0]['pops']
+        # 全データポイントを (datetime, value) のタプルリストとして抽出
+        weather_points = [(datetime.fromisoformat(t.replace('Z', '+00:00')).astimezone(JST), v) for t, v in zip(weather_ts['timeDefines'], weather_ts['areas'][0]['weathers'])]
+        pop_points = [(datetime.fromisoformat(t.replace('Z', '+00:00')).astimezone(JST), v) for t, v in zip(pop_ts['timeDefines'], pop_ts['areas'][0]['pops'])]
+        temp_points = [(datetime.fromisoformat(t.replace('Z', '+00:00')).astimezone(JST), v) for t, v in zip(temp_ts['timeDefines'], temp_ts['areas'][0]['temps'])]
 
-        temp_times_raw = temp_ts['timeDefines']
-        temp_values = temp_ts['areas'][0]['temps']
-
-        # datetimeオブジェクトに変換
-        weather_times = [datetime.fromisoformat(t.replace('Z', '+00:00')).astimezone(JST) for t in weather_times_raw]
-        pop_times = [datetime.fromisoformat(t.replace('Z', '+00:00')).astimezone(JST) for t in pop_times_raw]
-        temp_times = [datetime.fromisoformat(t.replace('Z', '+00:00')).astimezone(JST) for t in temp_times_raw]
+        # ユーザー指示: 全ての時刻のデータをコンソールに表示
+        app.logger.info("--- All Weather Data Points ---")
+        app.logger.info(f"Weather: {weather_points}")
+        app.logger.info(f"PoP: {pop_points}")
+        app.logger.info(f"Temp: {temp_points}")
+        app.logger.info("---------------------------------")
 
     except (IndexError, KeyError, ValueError) as e:
         app.logger.error(f"Failed to parse JMA forecast data structure: {e}")
         return jsonify({"error": "Failed to parse weather data"}), 500
 
-    def get_period_data(target_date, start_hour, end_hour):
-        """指定された期間の天気、最高気温、最大降水確率を抽出する"""
-        period_weather = "N/A"
-        period_temp = "N/A"
-        period_pop = "N/A"
-
-        # 天気: 期間内で最も近い時刻のものを代表とする
-        # 複数ある場合は結合して返す
-        weathers_in_period = []
-        for i, dt in enumerate(weather_times):
-            if dt.date() == target_date and start_hour <= dt.hour < end_hour:
-                if i < len(weather_values) and weather_values[i].strip():
-                    weathers_in_period.append(weather_values[i])
-        if weathers_in_period:
-            period_weather = " / ".join(weathers_in_period) # 結合して返す
-
-        # 気温: 期間内の最高気温を取得
-        temps_in_period = []
-        for i, dt in enumerate(temp_times):
-            if dt.date() == target_date and start_hour <= dt.hour < end_hour:
-                if i < len(temp_values) and temp_values[i] is not None:
-                    try:
-                        temps_in_period.append(float(temp_values[i]))
-                    except (ValueError, TypeError):
-                        continue
-        if temps_in_period:
-            period_temp = str(int(round(max(temps_in_period))))
+    def _find_closest_data(target_dt, data_points):
+        """データポイントのリストからターゲット時刻に最も近い有効な値を見つける"""
+        valid_points = [(dt, val) for dt, val in data_points if val is not None and str(val).strip() != ""]
+        if not valid_points:
+            return "N/A"
         
-        # 降水確率: 期間内の最大値を取得
-        pops_in_period = []
-        for i, dt in enumerate(pop_times):
-            if dt.date() == target_date and start_hour <= dt.hour < end_hour:
-                 if i < len(pop_values) and pop_values[i] is not None and pop_values[i] != '':
-                    try:
-                        pops_in_period.append(int(pop_values[i]))
-                    except (ValueError, TypeError):
-                        continue
-        if pops_in_period:
-            period_pop = str(max(pops_in_period))
+        closest_point = min(valid_points, key=lambda point: abs((point[0] - target_dt).total_seconds()))
+        return closest_point[1]
 
-        return {"weather": period_weather, "temperature": period_temp, "pop": period_pop}
+    def get_forecast_for_target(target_dt):
+        weather = _find_closest_data(target_dt, weather_points)
+        temp = _find_closest_data(target_dt, temp_points)
+        pop = _find_closest_data(target_dt, pop_points)
+        
+        # 天気文字列を整形
+        if isinstance(weather, str):
+            weather = weather.split("　")[0]
+
+        return {
+            "weather": str(weather),
+            "temperature": str(temp),
+            "pop": str(pop)
+        }
 
     now = datetime.now(JST)
     today_date = now.date()
     tomorrow_date = (now + timedelta(days=1)).date()
 
+    # ターゲット時刻を定義
+    today_am_target = JST.localize(datetime.combine(today_date, datetime.min.time())).replace(hour=9)
+    today_pm_target = JST.localize(datetime.combine(today_date, datetime.min.time())).replace(hour=15)
+    tomorrow_am_target = JST.localize(datetime.combine(tomorrow_date, datetime.min.time())).replace(hour=9)
+    tomorrow_pm_target = JST.localize(datetime.combine(tomorrow_date, datetime.min.time())).replace(hour=15)
+
     response = {
-        "today_am": get_period_data(today_date, 6, 12),
-        "today_pm": get_period_data(today_date, 12, 18),
-        "tomorrow_am": get_period_data(tomorrow_date, 6, 12),
-        "tomorrow_pm": get_period_data(tomorrow_date, 12, 18),
+        "today_am": get_forecast_for_target(today_am_target),
+        "today_pm": get_forecast_for_target(today_pm_target),
+        "tomorrow_am": get_forecast_for_target(tomorrow_am_target),
+        "tomorrow_pm": get_forecast_for_target(tomorrow_pm_target),
     }
             
     return jsonify(response)
@@ -1226,7 +1208,6 @@ JST = pytz.timezone('Asia/Tokyo')
 from services import local_calendar_service
 from services.memo_service import get_all_memos as get_all_memo_records
 from services.weather_service import (
-    get_weather_forecast_message,
     DEFAULT_AREA_CODE,
     resolve_area_code_from_address,
 )
