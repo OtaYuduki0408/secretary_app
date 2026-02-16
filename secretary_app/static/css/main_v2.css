@@ -639,8 +639,9 @@ body, html {
 /* --- New Weather & Finance Grid --- */
 #field-weather-finance .content {
     display: flex;
-    flex-direction: column; /* Stack weather and finance vertically */
+    flex-direction: column;
     justify-content: space-between;
+    height: 100%; /* Ensure content fills the grid item */
 }
 
 .weather-grid {
@@ -648,14 +649,14 @@ body, html {
     grid-template-columns: 1fr 1fr;
     grid-template-rows: 1fr 1fr;
     gap: 10px;
-    flex-grow: 1; /* Takes up available space */
+    height: 65%; /* Allocate a fixed portion of the height */
     margin-bottom: 10px;
 }
 
 .weather-card {
     background-color: rgba(0,0,0,0.15);
     border-radius: 6px;
-    padding: 10px;
+    padding: 5px; /* Reduced padding */
     display: flex;
     flex-direction: column;
     justify-content: center;
@@ -670,33 +671,32 @@ body, html {
 }
 
 .weather-card .info-item-header {
-    margin-bottom: 8px;
-    font-size: 0.9em;
+    margin-bottom: 5px; /* Reduced margin */
+    font-size: 0.8em; /* Smaller header */
 }
 
 .weather-card .info-item-body {
-    flex-direction: column; /* Stack icon and details vertically */
-    gap: 8px;
+    flex-direction: column;
+    gap: 5px; /* Reduced gap */
 }
 
 .weather-icon {
-    font-size: 2.5em; /* Larger icon */
+    font-size: 2em; /* Reduced icon size */
 }
 
 .weather-details {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 4px;
-    font-size: 1em;
+    gap: 2px; /* Reduced gap */
     font-weight: 500;
 }
 
 .temp {
-    font-size: 1.2em;
+    font-size: 1em; /* Reduced temp size */
 }
 
 .pop {
-    font-size: 0.9em;
+    font-size: 0.8em; /* Reduced pop size */
     color: #b0b0b0;
 }

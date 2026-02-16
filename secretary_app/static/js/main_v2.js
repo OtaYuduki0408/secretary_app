@@ -23,6 +23,8 @@ $(document).ready(function() {
     let lastDispatchedVoiceCommandKey = '';
     let lastDispatchedVoiceCommandAt = 0;
     let pendingFinalDispatchTimerId = null;
+    let lastSubmissionTime = 0;
+    const SUBMISSION_COOLDOWN_MS = 3000;
 
     let userInteracted = false;
     let currentAudio = null;
@@ -199,25 +201,29 @@ $(document).ready(function() {
             } else if (currentMode === 'listening') {
                 const command_body = stripLeadingWakeWords(display_transcript);
                 if (containsWakeWord(command_body)) {
-                    // 命令受付中にウェイクワードが来たら、既存入力を捨てて受付をやり直す
                     resetVoiceInputContext();
                     setMode('listening');
                     return;
                 }
 
-                const command_text = stripLeadingWakeWords(display_transcript);
-                updateLogDisplay(command_text, 'user', true);
+                updateLogDisplay(command_body, 'user', true);
                 
-                if (event_final_transcript) {
-                    const command_to_dispatch = stripLeadingWakeWords(finalTranscript);
-                    const endWordMatch = findEndWordMatch(command_to_dispatch);
-                    
-                    clearTimeout(pendingFinalDispatchTimerId);
-                    if (endWordMatch) {
-                        dispatchVoiceCommand(command_to_dispatch, endWordMatch);
-                    } else {
-                        pendingFinalDispatchTimerId = setTimeout(() => dispatchVoiceCommand(command_to_dispatch), FINAL_SEGMENT_WAIT_MS);
-                    }
+                // 常にタイマーをリセットし、発話が続く限り送信を延長する
+                clearTimeout(pendingFinalDispatchTimerId);
+
+                const command_to_dispatch = stripLeadingWakeWords(finalTranscript);
+                const endWordMatch = findEndWordMatch(command_to_dispatch);
+                
+                if (endWordMatch) {
+                    // エンドワードがあれば即時実行
+                    dispatchVoiceCommand(command_to_dispatch, endWordMatch);
+                } else if (finalTranscript) {
+                    // 確定したテキストがあれば、タイマーをセット
+                    pendingFinalDispatchTimerId = setTimeout(() => {
+                        // タイマー発火時の最新のfinalTranscriptでディスパッチ
+                        const latest_command = stripLeadingWakeWords(finalTranscript);
+                        dispatchVoiceCommand(latest_command);
+                    }, FINAL_SEGMENT_WAIT_MS);
                 }
             }
         };
@@ -227,8 +233,13 @@ $(document).ready(function() {
     // コマンド処理
     // ============================================================================
     function dispatchVoiceCommand(text, endWordMatch = null) {
+        const now = Date.now();
+        if (now - lastSubmissionTime < SUBMISSION_COOLDOWN_MS) {
+            console.log("Submission cooldown active. Ignoring command.");
+            return;
+        }
+
         const isEndWordTrigger = !!endWordMatch;
-        // 1コマンド完了ごとにバッファをクリアし、次回認識へ持ち越さない
         finalTranscript = '';
         clearTimeout(pendingFinalDispatchTimerId);
     
@@ -242,22 +253,22 @@ $(document).ready(function() {
             return;
         }
     
-        // エンドワード検知の場合、クールダウンを無視
         if (!isEndWordTrigger && shouldSuppressDuplicate(command)) {
             setMode('waiting');
             return;
         }
         markDispatchedCommand(command);
         
-        setMode('processing');
+        lastSubmissionTime = now;
+        setMode('cooldown');
+        setTimeout(() => {
+            if (currentMode === 'cooldown') {
+                setMode('waiting');
+            }
+        }, SUBMISSION_COOLDOWN_MS);
     
-        // サーバー送信を即座に実行
         sendTextToServer(command);
-    
-        // 入力確定時点で待機へ戻す（次の入力を受け付ける）
-        setMode('waiting');
 
-        // 確認読み上げは非ブロッキングで実行
         const repeatText = `${command}ですね。`;
         updateLogDisplay(repeatText, 'assistant');
         playTTS(repeatText, null, { preserveMode: true });
@@ -787,6 +798,7 @@ $(document).ready(function() {
     };
 
     const fetchWeather = () => $.get('/api/weather', (d) => {
+        console.log("Weather API response:", d);
         if (d.today_am) updateWeatherCard('weather-today-am', d.today_am);
         if (d.today_pm) updateWeatherCard('weather-today-pm', d.today_pm);
         if (d.tomorrow_am) updateWeatherCard('weather-tomorrow-am', d.tomorrow_am);
