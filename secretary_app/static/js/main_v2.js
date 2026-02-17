@@ -375,6 +375,7 @@ $(document).ready(function() {
     };
 
     function executeAction(action) {
+        console.log("Executing action:", action); // デバッグ用ログ
         return new Promise(resolve => {
             if (!action) {
                 resolve();
