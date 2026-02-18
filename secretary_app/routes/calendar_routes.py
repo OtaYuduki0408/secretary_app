@@ -34,18 +34,20 @@ def handle_add_event():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+from datetime import datetime, timezone
+
 @calendar_bp.route('/api/local_calendar/events', methods=['GET'])
 def handle_get_events():
     user_id = _get_user_id()
     if not user_id:
         return jsonify({"error": "User not authenticated"}), 401
     
-    # クエリパラメータの文字列をそのままサービス層に渡す
-    start_time_iso = request.args.get('start') # FullCalendar v5+ は 'start' を使う
-    end_time_iso = request.args.get('end')     # FullCalendar v5+ は 'end' を使う
-
+    # フロントからの日付範囲指定は無視し、常に現在時刻を開始点とする
+    start_time_iso = datetime.now(timezone.utc).isoformat()
+    
     try:
-        events = local_calendar_service.get_events(user_id, start_time_iso, end_time_iso)
+        # limit=6 を渡して直近6件を取得する
+        events = local_calendar_service.get_events(user_id, start_time_iso=start_time_iso, end_time_iso=None, limit=6)
         return jsonify(events)
     except Exception as e:
         return jsonify({"error": str(e)}), 500

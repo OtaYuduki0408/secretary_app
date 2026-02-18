@@ -1,3 +1,7 @@
+try:
+    from app import socketio, connected_users
+except ImportError:
+    socketio, connected_users = None, None
 from supabase_client import supabase
 from datetime import datetime, timedelta
 from flask import current_app
@@ -25,47 +29,6 @@ from services.finance_service import ( # finance_serviceから必要な関数を
 )
 from services.memo_service import get_all_memos # memo_serviceから必要な関数をインポート
 from services.datetime_range_utils import parse_time_param as shared_parse_time_param
-
-TABLE_NAME = "pending_user_actions"
-JST = pytz.timezone('Asia/Tokyo')
-
-
-def _format_event_time(iso_time: str, tz=JST) -> str:
-    """ISO形式の時刻文字列を「〇月〇日〇時〇分」形式に整形する"""
-    if not iso_time:
-        return ""
-    try:
-        # 'Z'がある場合はUTCとしてパース
-        dt_object = datetime.fromisoformat(iso_time.replace('Z', '+00:00'))
-        dt_local = dt_object.astimezone(tz)
-        return dt_local.strftime('%m月%d日%H時%M分')
-    except ValueError:
-        return iso_time # パースできない場合はそのまま返す
-
-import services.local_calendar_service as local_calendar_service # local_calendar_serviceをインポート
-from supabase_client import supabase
-from datetime import datetime, timedelta
-from flask import current_app
-import json
-import base64
-from email.mime.text import MIMEText
-import google.auth
-from google.oauth2.credentials import Credentials
-from googleapiclient.discovery import build
-from services.google_token_service import get_credentials
-from services.ScheduleManager import ScheduleManager
-import pytz
-from google.auth.transport.requests import Request # メール送信時のクレデンシャル更新に必要
-from services.finance_service import ( # finance_serviceから必要な関数をインポート
-    get_current_balance,
-    get_monthly_expense,
-    get_daily_expense,
-    get_monthly_goal,
-    get_all_finance_records,
-    get_last_finance_error,
-    upsert_monthly_goal
-)
-from services.memo_service import get_all_memos # memo_serviceから必要な関数をインポート
 
 TABLE_NAME = "pending_user_actions"
 JST = pytz.timezone('Asia/Tokyo')
@@ -644,6 +607,42 @@ def execute_action(user_id: str, action_data: dict) -> dict: # triggered_atをac
         except Exception as e:
             current_app.logger.error(f"Calendar Add Action: Error adding event: {e}", exc_info=True)
             return {"status": "error", "message": f"カレンダーイベントの追加中にエラーが発生しました: {e}"}
+    elif category == '画面' and sub == 'ブラックアウト':
+        if not socketio or not connected_users:
+            return {"status": "error", "message": "WebSocketが初期化されていません。"}
+        state = detail.get('state', 'off') # detailがなければ 'off' に
+        sid = connected_users.get(user_id)
+        if sid:
+            socketio.emit('dispatch_command', {
+                'actions': [{
+                    'category': '画面制御',
+                    'sub': '状態変更',
+                    'detail': { 'state': state }
+                }]
+            }, room=sid)
+            return {"status": "success", "message": f"画面を {state} にするようフロントエンドに通知しました。"}
+        else:
+            # ユーザーが接続していない場合は保留アクションとして登録するなどのフォールバックも考えられる
+            return {"status": "error", "message": "ユーザーが接続されていません。"}
+    elif category == '画面' and sub == 'ブラックアウト':
+        if not socketio or not connected_users:
+            current_app.logger.error("WebSocket is not initialized, cannot control screen.")
+            return {"status": "error", "message": "WebSocketが初期化されていません。"}
+        state = detail.get('state', 'off') # detailがなければ 'off' に
+        sid = connected_users.get(user_id)
+        if sid:
+            socketio.emit('dispatch_command', {
+                'actions': [{
+                    'category': '画面制御',
+                    'sub': '状態変更',
+                    'detail': { 'state': state }
+                }]
+            }, room=sid)
+            return {"status": "success", "message": f"画面を {state} にするようフロントエンドに通知しました。"}
+        else:
+            # ユーザーが接続していない場合は保留アクションとして登録するなどのフォールバックも考えられる
+            current_app.logger.warning(f"User {user_id} not connected, cannot control screen.")
+            return {"status": "error", "message": "ユーザーが接続されていません。"}
     elif category == 'カレンダー' and sub == '読み上げ':
         return _execute_calendar_read_aloud(user_id, detail, triggered_at)
     elif category == '収支管理' and sub == '読み上げ':

@@ -276,6 +276,11 @@ async function executePlan(plan) {
         }
         if (actionToExecute) await executeAction(actionToExecute);
     }
+
+    if (window.updateAllInfo) {
+        console.log("[DEBUG_WS] すべてのアクション実行後に情報を更新します。");
+        window.updateAllInfo();
+    }
 }
 
 async function executeAction(action) {
@@ -540,6 +545,15 @@ async function executeAction(action) {
         } else {
             console.error("画像表示に必要な要素、または画像データが不足しています。");
             textToSpeak = "画像を表示できませんでした。";
+        }
+    } else if (action.category === '画面制御') {
+        overlayTitle = "画面制御";
+        if (detail.state === 'on') {
+            if(window.showBlackout) window.showBlackout();
+            textToSpeak = "画面をオフにします";
+        } else if (detail.state === 'off') {
+            if(window.hideBlackout) window.hideBlackout();
+            textToSpeak = "画面をオンにします";
         }
     }
 

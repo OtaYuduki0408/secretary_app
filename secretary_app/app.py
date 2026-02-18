@@ -1696,7 +1696,8 @@ def _handle_voice_triggers(user_input, user_id, app_logger):
         if not isinstance(or_keyword_groups, list) or not or_keyword_groups or not any(isinstance(i, list) for i in or_keyword_groups):
              legacy_keywords = _normalize_keyword_list(value.get('keywords') or value.get('keyword') or value.get('value'))
              if legacy_keywords:
-                 or_keyword_groups = [legacy_keywords] # [[ 'a', 'b', 'c' ]] のようにラップして処理
+                 # [['a'], ['b'], ['c']] のように変換し、OR条件として扱う
+                 or_keyword_groups = [[word] for word in legacy_keywords]
              else:
                  continue
         

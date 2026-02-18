@@ -59,20 +59,25 @@ def add_event(user_id, title, start_time, end_time, description=None):
         current_app.logger.error(f"[ERROR] Failed to add event to Supabase: {e}", exc_info=True)
         raise
 
-def get_events(user_id, start_time_iso=None, end_time_iso=None):
+def get_events(user_id, start_time_iso=None, end_time_iso=None, limit=None):
     """指定されたユーザーと期間のイベントをSupabaseから取得する"""
     try:
         query = supabase.table(TABLE_NAME).select("*").eq('user_id', user_id)
 
         if start_time_iso:
             utc_start = _to_utc(start_time_iso)
-            query = query.filter('end_time', 'gte', utc_start)
+            query = query.filter('start_time', 'gte', utc_start)
 
         if end_time_iso:
             utc_end = _to_utc(end_time_iso)
             query = query.filter('start_time', 'lte', utc_end)
 
-        data, count = query.order('start_time', desc=False).execute()
+        query = query.order('start_time', desc=False)
+
+        if limit:
+            query = query.limit(limit)
+
+        data, count = query.execute()
         
         return data[1] if count else []
     except Exception as e:

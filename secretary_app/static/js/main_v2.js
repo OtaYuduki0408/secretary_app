@@ -567,22 +567,51 @@ $(document).ready(function() {
         }
     }
 
+    let lastLogDate = null;
+
     function updateLogDisplay(message, sender, isInterim = false, isWaitingLog = false) {
         const $logDisplay = $('#log-display');
         const $scrollContainer = $('#field-log .content');
-        const logClass = isWaitingLog ? 'log-waiting' : (isInterim ? 'log-interim' : '');
-        const lastMsg = $logDisplay.children().last();
-        let displayMsg = message;
-        if (sender === 'user' && (isInterim || isWaitingLog)) {
-             displayMsg = highlightWords(highlightWords(message, WAKE_WORDS, 'highlight-wake-word'), END_WORDS, 'highlight-end-word');
+        
+        const now = new Date();
+        const currentDate = now.toLocaleDateString('ja-JP');
+    
+        // 日付が変わったら区切り線を追加 (isInterimとisWaitingLogの場合は追加しない)
+        if (lastLogDate === null) { // 初回ログの場合、現在の日付をセット
+            lastLogDate = currentDate;
+        } else if (currentDate !== lastLogDate && !isInterim && !isWaitingLog) {
+            const dateString = now.toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' });
+            $logDisplay.append(`<div class="log-date-separator">------- ${dateString} -------</div>`);
+            lastLogDate = currentDate;
         }
+        
+        // InterimやWaitingログはタイムスタンプ不要で、単純な表示
         if (isInterim || isWaitingLog) {
-            if (lastMsg.hasClass('log-interim') || lastMsg.hasClass('log-waiting')) lastMsg.html(displayMsg);
-            else $logDisplay.append(`<div class="log-message ${sender} ${logClass}">${displayMsg}</div>`);
+            const lastMsg = $logDisplay.children().last();
+            let displayMsg = highlightWords(highlightWords(message, WAKE_WORDS, 'highlight-wake-word'), END_WORDS, 'highlight-end-word');
+            const logClass = isWaitingLog ? 'log-waiting' : 'log-interim';
+    
+            if (lastMsg.hasClass('log-interim') || lastMsg.hasClass('log-waiting')) {
+                lastMsg.html(displayMsg);
+            } else {
+                $logDisplay.append(`<div class="log-message ${sender} ${logClass}">${displayMsg}</div>`);
+            }
         } else {
+            // 通常ログにはタイムスタンプを追加
             $logDisplay.find('.log-interim, .log-waiting').remove();
-            $logDisplay.append(`<div class="log-message ${sender}">${displayMsg}</div>`);
+            
+            const timeString = now.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+            // メッセージをcontentとtimestampに分割するHTML構造に変更
+            const messageHtml = `
+                <div class="log-message ${sender}">
+                    <div class="log-content">${message}</div>
+                    <div class="log-timestamp">${timeString}</div>
+                </div>
+            `;
+            $logDisplay.append(messageHtml);
         }
+        
+        // スクロール処理
         if ($scrollContainer.length) {
             $scrollContainer.scrollTop($scrollContainer.prop('scrollHeight'));
         } else {
@@ -762,7 +791,7 @@ $(document).ready(function() {
     // ============================================================================
     // UI Functions & Data Fetch
     // ============================================================================
-    const showBlackout=()=>$('#blackout-overlay').fadeIn(500); const hideBlackout=()=>$('#blackout-overlay').fadeOut(500);
+    window.showBlackout=()=>$('#blackout-overlay').fadeIn(500); window.hideBlackout=()=>$('#blackout-overlay').fadeOut(500);
     
     // --- Action Overlay ---
     const $actionOverlay = $('#action-overlay');
@@ -807,7 +836,7 @@ $(document).ready(function() {
         if (d.tomorrow_pm) updateWeatherCard('weather-tomorrow-pm', d.tomorrow_pm);
     });
     const fetchFinanceData = () => $.get('/api/finance/summary', (d) => { $('#total-balance .data').text(`¥${d.balance?.toLocaleString()||'N/A'}`); $('#monthly-expense .data').text(`¥${d.monthly_expense?.toLocaleString()||'N/A'}`); });
-    const fetchCalendarData = () => {const n=new Date(),s=new Date(n.getFullYear(),n.getMonth(),n.getDate(),0,0,0),e=new Date(s.getTime()+7*24*60*60*1000); $.get(`/api/local_calendar/events?start=${s.toISOString()}&end=${e.toISOString()}`,(evts)=>{const $l=$('#schedule-list').empty();if(evts?.length){const uE=evts.map(e=>({...e,startTime:new Date(e.start_time)})).filter(e=>e.startTime>=n).sort((a,b)=>a.startTime-b.startTime).slice(0,4);if(uE.length){uE.forEach(e=>{const sT=e.startTime.toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'});let dL='';if(e.startTime.getDate()===n.getDate())dL='今日';else if(e.startTime.getDate()===n.getDate()+1)dL='明日';else dL=e.startTime.toLocaleDateString('ja-JP',{month:'short',day:'numeric'});const tS=`${dL} ${sT}`;$l.append(`<li><span class="schedule-time">${tS}</span><span class="schedule-title">${e.title}</span></li>`);});}else{$l.append('<li><span class="schedule-title">直近の予定はありません</span></li>');}}else{$l.append('<li><span class="schedule-title">予定はありません</span></li>');}}).fail(()=>{$('#schedule-list').empty().append('<li><span class="schedule-title">予定の取得に失敗</span></li>');});};
+    const fetchCalendarData = () => {const n=new Date(),s=new Date(n.getFullYear(),n.getMonth(),n.getDate(),0,0,0),e=new Date(s.getTime()+7*24*60*60*1000); $.get(`/api/local_calendar/events`,(evts)=>{const $l=$('#schedule-list').empty();if(evts?.length){const uE=evts.map(e=>({...e,startTime:new Date(e.start_time)})).filter(e=>new Date(e.start_time)>=n).sort((a,b)=>new Date(a.start_time)-new Date(b.start_time)).slice(0,6);if(uE.length){uE.forEach(e=>{const sT=e.startTime.toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'});let dL='';if(e.startTime.getDate()===n.getDate())dL='今日';else if(e.startTime.getDate()===n.getDate()+1)dL='明日';else dL=e.startTime.toLocaleDateString('ja-JP',{month:'short',day:'numeric'});const tS=`${dL} ${sT}`;$l.append(`<li><span class="schedule-time">${tS}</span><span class="schedule-title">${e.title}</span></li>`);});}else{$l.append('<li><span class="schedule-title">直近の予定はありません</span></li>');}}else{$l.append('<li><span class="schedule-title">予定はありません</span></li>');}}).fail(()=>{$('#schedule-list').empty().append('<li><span class="schedule-title">予定の取得に失敗</span></li>');});};
     const fetchAlarms = () => $.get('/api/custom_orders',(ords)=>{const $aL=$('#field-time-alarm .alarm-list ul').empty();let c=0;if(ords?.length){ords.forEach(o=>{if(c>=4)return;const t=o.triggers?.[0];if(t?.category==='時間'){$aL.append(`<li><span>${t.value?.time||'N/A'}</span> - ${o.name||'無題'}</li>`);c++;}});if(c===0)$aL.append('<li>アラームはありません</li>');}});
     const updateTime = () => { const n=new Date(); $('#current-time').text(n.toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit',second:'2-digit'})); $('#current-date').text(n.toLocaleDateString('ja-JP',{year:'numeric',month:'long',day:'numeric',weekday:'long'})); };
 
@@ -819,8 +848,9 @@ $(document).ready(function() {
         loadCustomVoiceTriggerEndWords();
         syncPlayPauseIcon();
         updateTime(); setInterval(updateTime, 1000);
-        const fetchData = () => { fetchWeather(); fetchFinanceData(); fetchCalendarData(); fetchAlarms(); };
-        fetchData(); setInterval(fetchData, 300000);
+    const updateAllInfo = () => { fetchWeather(); fetchFinanceData(); fetchCalendarData(); fetchAlarms(); };
+        window.updateAllInfo = updateAllInfo;
+        updateAllInfo(); setInterval(updateAllInfo, 30000);
         initializeVoiceRecognition();
     }
     run();

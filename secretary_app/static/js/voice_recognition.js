@@ -1402,6 +1402,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (window.check_chat_Space) {
             window.check_chat_Space(input);
+            if (window.updateAllInfo) {
+                console.log("[DEBUG_VOICE] 入力処理後に情報を更新します。");
+                window.updateAllInfo();
+            }
         } else {
             console.error("check_chat_Space is not available on window.");
         }

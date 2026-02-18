@@ -565,51 +565,6 @@ class ChatSpaceModel:
         except Exception:
             return None
 
-    def _extract_calc_expression(self, raw: str) -> str:
-        if not raw:
-            return ""
-        text = raw.strip()
-        text = re.sub(r"^```[a-zA-Z]*\\n|```$", "", text, flags=re.MULTILINE).strip()
-        if text.startswith("{") or text.startswith("["):
-            try:
-                obj = json.loads(text)
-                if isinstance(obj, dict):
-                    for key in ("expr", "expression", "calc", "formula"):
-                        if isinstance(obj.get(key), str):
-                            return obj[key].strip()
-                if isinstance(obj, list) and obj:
-                    first = obj[0]
-                    if isinstance(first, str):
-                        return first.strip()
-                    if isinstance(first, dict):
-                        for key in ("expr", "expression", "calc", "formula"):
-                            if isinstance(first.get(key), str):
-                                return first[key].strip()
-            except Exception:
-                pass
-        return text.splitlines()[0].strip()
-
-    def _try_eval_expression(self, text: str) -> str | None:
-        if not text:
-            return None
-        normalized = text.strip()
-        normalized = normalized.replace("×", "*").replace("÷", "/")
-        normalized = normalized.replace("＋", "+").replace("－", "-").replace("−", "-")
-        normalized = normalized.replace("＝", "=")
-        if not re.fullmatch(r"[0-9eE+*/().%\\s=-]+", normalized):
-            return None
-        expr = normalized.replace("=", "").strip()
-        if not expr or not re.search(r"[0-9]", expr):
-            return None
-        if not re.search(r"[+*/%()\\-]", expr):
-            return None
-        try:
-            value = eval(expr, {"__builtins__": {}}, {})
-        except Exception:
-            return None
-        formatted = self._format_calc_value(value)
-        return f"答えは{formatted}です。計算式は{expr}です。"
-
     def _format_calc_value(self, value) -> str:
         try:
             dec = Decimal(str(value))
@@ -627,20 +582,7 @@ class ChatSpaceModel:
         rounded = abs_dec.quantize(quant, rounding=ROUND_HALF_UP)
         return f"{sign}{rounded:,.{frac_digits}f}"
 
-    def _calculate_expression(self, text: str) -> str:
-        prompt = self.CALC_PROMPT_TEMPLATE.format(input_value=text)
-        raw = self._gemini_request(prompt)
-        expr = self._extract_calc_expression(raw)
-        if not expr:
-            return "計算式を取得できませんでした。"
-        if not re.fullmatch(r"[0-9eE+*/().%\\s-]+", expr):
-            return "計算式に許可されていない文字が含まれていました。"
-        try:
-            value = eval(expr, {"__builtins__": {}}, {})
-        except Exception:
-            return "計算に失敗しました。"
-        formatted = self._format_calc_value(value)
-        return f"答えは{formatted}です。計算式は{expr}です。"
+
 
     def _format_event_time(self, iso_time: str) -> str:
         if not iso_time: return ""
@@ -1192,7 +1134,6 @@ class ChatSpaceModel:
         youtube_context: dict | None = None
     ) -> dict:
         print("--- [DEBUG] check_chat_space: Starting ---")
-        # 起動コマンドを除外してGeminiへ渡す
         cleaned_input = (
             (input_value or "")
             .replace("サイレントメイト", "")
@@ -1200,6 +1141,7 @@ class ChatSpaceModel:
             .strip()
         )
         current_time = self._current_time_for_prompt()
+
         if self._is_cancelled(user_id):
             return {
                 "status": "success",
@@ -1208,13 +1150,32 @@ class ChatSpaceModel:
                 "suppress_tts": True,
                 "cancelled": True
             }
-        calc_message = self._try_eval_expression(cleaned_input)
-        if calc_message:
-            return {
-                "status": "success",
-                "message": calc_message,
-                "skip_tone": True
+
+        # ▼▼▼ 新しいevalロジック ▼▼▼
+        try:
+            # 安全のため、evalで使える関数を制限する
+            safe_builtins = {
+                'abs', 'divmod', 'float', 'int', 'max', 'min', 'pow', 'round', 'sum'
             }
+            # __builtins__を限定的に差し替える
+            restricted_globals = {"__builtins__": {k: v for k, v in __builtins__.items() if k in safe_builtins}}
+            
+            # 式を評価
+            value = eval(cleaned_input, restricted_globals, {})
+            
+            # 評価結果が数値型の場合のみ計算結果として扱う
+            if isinstance(value, (int, float)):
+                formatted = self._format_calc_value(value)
+                return {
+                    "status": "success",
+                    "message": f"答えは{formatted}です。",
+                    "skip_tone": True
+                }
+        except Exception:
+            # evalが失敗した場合は、通常のチャット処理に進む
+            pass
+        # ▲▲▲ 新しいevalロジック ▲▲▲
+
         self._current_user_id = user_id
         try:
             yt_active = bool((youtube_context or {}).get("active"))
@@ -1404,7 +1365,8 @@ class ChatSpaceModel:
                     result["message"] = ""
                     result["suppress_tts"] = True
             elif purpose in ("Kn", "K"):
-                result["message"] = self._calculate_expression(cleaned_input)
+                result["message"] = self._fallback_with_gemini(cleaned_input, tone_response)
+                result["skip_tone"] = True
             else:
                 result["message"] = "申し訳ございません。お客様の意図を特定できませんでした。"
                 print(f"DEBUG: 意図不明なpurpose: {purpose}")
