@@ -1,122 +1,679 @@
-/* 推定される main_v2.css の基本レイアウト */
-body {
-    background-color: #f0f2f5;
-    font-family: sans-serif;
-    margin: 0;
-    padding: 10px;
-    color: #333;
+/* Base variables for theming. These can be updated for different color schemes. */
+:root {
+    --background-color: #1a1a1a;
+    --grid-item-background: #2b2b2b;
+    --text-color: #e0e0e0;
+    --header-color: #ffffff;
+    --border-color: #444444;
+    --accent-color: #007bff;
+    --icon-color: #ffffff;
 }
 
+body, html {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: var(--background-color);
+    color: var(--text-color);
+    overflow: hidden;
+}
+
+/* Blackout overlay for sleep mode */
+#blackout-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: #000;
+    z-index: 9999;
+    display: none; /* Hidden by default */
+}
+
+/* Main grid container */
 .main-grid-container {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
-    grid-template-rows: auto 1fr auto;
-    gap: 15px;
-    max-width: 1800px;
-    margin: 0 auto;
-    height: calc(100vh - 20px);
+    grid-template-rows: repeat(2, 50vh);
+    width: 100vw;
+    height: 100vh;
+    gap: 10px;
+    padding: 10px;
+    box-sizing: border-box;
 }
 
+/* Style for each grid item */
 .grid-item {
-    background-color: #fff;
+    background-color: var(--grid-item-background);
     border-radius: 8px;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.12);
+    border: 1px solid var(--border-color);
     padding: 20px;
+    box-sizing: border-box;
     display: flex;
     flex-direction: column;
     overflow: hidden;
 }
 
-h2 {
-    margin-top: 0;
-    font-size: 1.3em;
-    color: #1a202c;
-    border-bottom: 1px solid #e2e8f0;
-    padding-bottom: 15px;
-    margin-bottom: 15px;
+.grid-item h2 {
+    margin: 0 0 15px 0;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border-color);
+    font-size: 1.2em;
+    color: var(--header-color);
     display: flex;
     align-items: center;
 }
 
-h2 i {
+.grid-item h2 .fas {
     margin-right: 10px;
-    color: #4a5568;
+    color: var(--icon-color);
 }
 
-.content {
+.grid-item .content {
     flex-grow: 1;
     overflow-y: auto;
-    -ms-overflow-style: none;
-    scrollbar-width: none;
 }
-.content::-webkit-scrollbar {
+
+/* --- Field: Weather & Finance --- */
+#field-weather-finance .content {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-around;
+    align-content: space-around;
+    height: 100%;
+}
+
+.info-item {
+    flex-basis: 45%; /* 2 items per row */
+    text-align: center;
+    padding: 10px;
+    box-sizing: border-box;
+}
+
+.info-item-header {
+    font-size: 1em;
+    color: var(--text-color);
+    margin-bottom: 10px;
+    font-weight: bold;
+}
+
+.info-item-body {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5em;
+}
+
+.info-item-body .fas {
+    font-size: 1.5em;
+    margin-right: 15px;
+    color: var(--accent-color);
+}
+
+.info-item-body .data {
+    font-weight: 300;
+}
+
+/* --- Field: Calendar --- */
+#schedule-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+#schedule-list li {
+    display: flex;
+    align-items: center;
+    padding: 15px 5px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+#schedule-list li:last-child {
+    border-bottom: none;
+}
+
+.schedule-time {
+    font-weight: bold;
+    color: var(--accent-color);
+    margin-right: 20px;
+    font-size: 1.1em;
+    min-width: 120px;
+}
+
+.schedule-title {
+    font-size: 1.1em;
+}
+
+/* --- Field: Log --- */
+#field-log .content {
+    padding-right: 10px; /* for scrollbar */
+}
+
+#log-display {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.log-input-area {
+    display: flex;
+    margin-top: 15px;
+    border-top: 1px solid var(--border-color);
+    padding-top: 15px;
+}
+
+#text-input {
+    flex-grow: 1;
+    background: #3c3c3c;
+    border: 1px solid var(--border-color);
+    border-radius: 20px;
+    padding: 10px 15px;
+    color: var(--text-color);
+    font-size: 1em;
+}
+
+#text-input:focus {
+    outline: none;
+    border-color: var(--accent-color);
+}
+
+#send-button {
+    background: var(--accent-color);
+    border: none;
+    color: white;
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    margin-left: 10px;
+    cursor: pointer;
+    font-size: 1.2em;
+    transition: background-color 0.2s;
+}
+
+#send-button:hover {
+    background-color: #0056b3;
+}
+
+/* --- Field: Buttons --- */
+.button-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    grid-template-rows: repeat(2, 1fr);
+    gap: 15px;
+    height: 100%;
+}
+
+.menu-button {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    background-color: #3c3c3c;
+    color: var(--text-color);
+    text-decoration: none;
+    border-radius: 8px;
+    transition: background-color 0.2s, transform 0.2s;
+    font-size: 1em; /* Adjusted font size */
+    padding: 5px;
+    box-sizing: border-box;
+    text-align: center;
+}
+
+.menu-button:hover {
+    background-color: var(--accent-color);
+    color: white;
+    transform: translateY(-5px);
+}
+
+.menu-button .fas {
+    font-size: 2em; /* Adjusted icon size */
+    margin-bottom: 10px; /* Adjusted margin */
+}
+
+/* --- Field: Music --- */
+.music-player {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-around;
+    height: 100%;
+    text-align: center;
+}
+
+.music-player .artwork img {
+    width: 120px;
+    height: 120px;
+    border-radius: 8px;
+    object-fit: cover;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+}
+
+.music-player .track-info {
+    margin-top: 15px;
+}
+
+.music-player .track-info .title {
+    font-size: 1.2em;
+    font-weight: bold;
+}
+
+.music-player .track-info .artist {
+    font-size: 1em;
+    color: #b0b0b0;
+}
+
+.music-player .controls {
+    margin-top: 20px;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+}
+
+.music-player .controls button {
+    background: none;
+    border: 2px solid var(--border-color);
+    color: var(--text-color);
+    border-radius: 50%;
+    width: 50px;
+    height: 50px;
+    font-size: 1.2em;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.music-player .controls button:hover {
+    background-color: var(--accent-color);
+    border-color: var(--accent-color);
+    color: white;
+}
+
+.music-player .controls #play-pause-track {
+    width: 60px;
+    height: 60px;
+    font-size: 1.5em;
+    background-color: var(--accent-color);
+    border-color: var(--accent-color);
+}
+.music-player .controls #play-pause-track:hover {
+    background-color: #0056b3;
+    border-color: #0056b3;
+}
+
+
+.music-player .volume-control {
+    margin-top: 20px;
+    display: flex;
+    align-items: center;
+    width: 80%;
+}
+
+.music-player .volume-control .fas {
+    margin: 0 10px;
+}
+
+#volume-slider {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 8px;
+    background: #4d4d4d;
+    border-radius: 5px;
+    outline: none;
+}
+
+#volume-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 18px;
+    height: 18px;
+    background: var(--accent-color);
+    border-radius: 50%;
+    cursor: pointer;
+}
+
+#volume-slider::-moz-range-thumb {
+    width: 18px;
+    height: 18px;
+    background: var(--accent-color);
+    border-radius: 50%;
+    cursor: pointer;
+}
+
+/* --- YouTube Player Overlay --- */
+#youtube-overlay.youtube-overlay-hidden {
     display: none;
 }
 
-/* Specific grid item layouts */
-#field-weather-finance { grid-column: 1 / 3; }
-#field-time-alarm { grid-column: 3 / 4; grid-row: 1 / 2; }
-#field-calendar { grid-column: 1 / 2; grid-row: 2 / 3; }
-#field-log { grid-column: 2 / 4; grid-row: 2 / 3; }
-#field-buttons { grid-column: 1 / 2; grid-row: 3 / 4; }
-#field-music { grid-column: 2 / 4; grid-row: 3 / 4; }
+#youtube-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.85);
+    z-index: 10000;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
 
-/* Weather & Finance */
-.weather-grid, .finance-grid { display: flex; gap: 15px; }
-.finance-grid { margin-top: 15px; }
-.weather-card, .info-item { flex: 1; background: #f7fafc; padding: 15px; border-radius: 6px; }
-.info-item-header { font-weight: bold; color: #4a5568; margin-bottom: 10px; }
-.info-item-body { display: flex; align-items: center; font-size: 1.5em; }
-.info-item-body i { margin-right: 10px; color: #718096; }
-.weather-details { display: flex; justify-content: space-between; align-items: center; width: 100%; }
-.weather-icon { font-size: 2em; }
-.temps { display: flex; flex-direction: column; }
-.temp-max { font-weight: bold; }
-.temp-min { color: #718096; }
-.pop { font-size: 0.8em; color: #4299e1; }
+#youtube-player-wrapper {
+    background-color: #181818;
+    padding: 20px;
+    border-radius: 10px;
+    box-shadow: 0 5px 25px rgba(0, 0, 0, 0.5);
+    width: 90vw;
+    max-width: 800px;
+}
 
-/* Time & Alarms */
-.time-display { text-align: center; }
-#current-time { font-size: 3.5em; margin: 0; }
-#current-date { margin: 0 0 10px 0; color: #718096; }
-#mic-status { display: flex; align-items: center; justify-content: center; gap: 8px; }
-.alarm-list ul { list-style: none; padding: 0; margin: 0; }
-.alarm-list li { display: flex; justify-content: space-between; padding: 5px 0; border-bottom: 1px solid #edf2f7; }
+#youtube-player-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+    color: white;
+}
 
-/* Calendar */
-#schedule-list { list-style: none; padding: 0; margin: 0; }
-#schedule-list li { display: flex; gap: 15px; padding: 8px 0; border-bottom: 1px solid #edf2f7; }
-.schedule-time { font-weight: bold; white-space: nowrap; }
+#youtube-video-title {
+    font-size: 1.2em;
+    font-weight: bold;
+}
 
-/* Log */
-#log-display { padding: 10px; }
-.log-input-area { display: flex; margin-top: 10px; }
-#text-input { flex-grow: 1; border: 1px solid #cbd5e0; padding: 8px; border-radius: 4px 0 0 4px; }
-#send-button { background-color: #4299e1; color: white; border: none; padding: 0 15px; border-radius: 0 4px 4px 0; cursor: pointer; }
+#youtube-close-btn {
+    background: none;
+    border: none;
+    color: white;
+    font-size: 2em;
+    cursor: pointer;
+}
 
-/* Buttons */
-.button-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
-.menu-button { background: #f7fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 15px; text-decoration: none; color: #4a5568; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 8px; }
-.menu-button i { font-size: 1.5em; }
+#youtube-player {
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    background-color: black;
+}
 
-/* Music Player */
-.music-player { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 15px; height: 100%; }
-.artwork img { width: 100px; height: 100px; border-radius: 6px; }
-.track-info { text-align: center; }
-.track-info .title { font-weight: bold; }
-.track-info .artist { font-size: 0.9em; color: #718096; }
-.controls { display: flex; gap: 20px; align-items: center; }
-.controls button { background: none; border: none; font-size: 1.2em; cursor: pointer; }
-#play-pause-track { font-size: 1.8em; }
-.volume-control { display: flex; align-items: center; gap: 10px; width: 80%; }
-#volume-slider { flex-grow: 1; }
+#youtube-controls {
+    display: flex;
+    justify-content: center;
+    margin-top: 15px;
+    gap: 20px;
+}
 
-/* Overlays */
-#blackout-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: black; z-index: 1000; display: none; }
-.youtube-overlay-hidden { display: none; } /* Add other overlay styles if needed */
+#youtube-controls button {
+    padding: 10px 20px;
+    background-color: var(--accent-color);
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 1em;
+}
+
+#youtube-controls button:disabled {
+    background-color: #555;
+    cursor: not-allowed;
+}
+
+/* --- Read Aloud Overlay (for websocket_handler fallback) --- */
+#read-aloud-overlay {
+    position: fixed;
+    inset: 0;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.7);
+    z-index: 11000;
+}
+
+#read-aloud-overlay.visible {
+    display: flex;
+}
+
+#read-aloud-overlay #overlay-message {
+    max-width: 720px;
+    width: 92%;
+    background: #2b2b2b;
+    border: 1px solid #444;
+    border-radius: 10px;
+    padding: 16px;
+    color: #e0e0e0;
+}
+
+#read-aloud-overlay .close-overlay-btn {
+    position: absolute;
+    top: 14px;
+    right: 16px;
+    background: transparent;
+    border: none;
+    color: #fff;
+    font-size: 22px;
+    cursor: pointer;
+}
+
+#image-display-overlay {
+    position: fixed;
+    inset: 0;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.7);
+    z-index: 11000;
+}
+
+#image-display-overlay.visible {
+    display: flex;
+}
+
+#image-display-overlay img {
+    max-width: 92vw;
+    max-height: 84vh;
+    border-radius: 8px;
+}
+
+/* --- Field: Time & Alarm --- */
+#field-time-alarm {
+    display: flex;
+    flex-direction: column;
+    padding: 0; /* Remove padding to use full space */
+}
+
+#field-time-alarm .time-display {
+    flex-basis: 40%; /* 40% of the vertical space */
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    background-color: rgba(0,0,0,0.1);
+    padding: 20px;
+}
+
+#field-time-alarm .time-display h1 {
+    font-size: 4.5em;
+    margin: 0;
+    font-weight: 300;
+    letter-spacing: 2px;
+}
+
+#field-time-alarm .time-display p {
+    font-size: 1.2em;
+    margin: 5px 0 0 0;
+    color: var(--text-color);
+}
+
+#mic-status {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-top: 15px;
+    padding: 5px 15px;
+    border-radius: 20px;
+    background-color: rgba(0, 0, 0, 0.2);
+    border: 1px solid #555;
+    color: #ccc;
+    transition: all 0.3s ease;
+}
+
+/* 1. 髻ｳ螢ｰ蠕ｩ滉ｸｭ */
+#mic-status.waiting {
+    background-color: rgba(0, 0, 0, 0.2);
+    color: #ccc;
+}
+#mic-status.waiting .fas {
+    opacity: 0.6;
+}
+
+/* 2. 蜻ｽ莉､荳ｭ */
+#mic-status.listening {
+    background-color: #e67e22; /* Orange */
+    color: white;
+    border-color: #d35400;
+}
+
+/* 3. 蜃ｦ逅ｾｩ滉ｸｭ */
+#mic-status.processing {
+    background-color: #3498db; /* Blue */
+    color: white;
+    border-color: #2980b9;
+}
+
+/* 4. 逋ｺ螢ｰ荳ｭ */
+#mic-status.speaking {
+    background-color: #2ecc71; /* Green */
+    color: white;
+    border-color: #27ae60;
+}
+
+/* 5. 蜻ｽ莉､騾∽ｿ｡D */
+#mic-status.cooldown {
+    background-color: #95a5a6; /* Gray */
+    color: #333;
+    border-color: #7f8c8d;
+}
 
 
-/* ログ表示用のCSS（先ほど上書きしたもの） */
+#mic-status .fas {
+    margin-right: 10px;
+}
+
+#field-time-alarm .alarm-list {
+    flex-basis: 60%;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+}
+
+#field-time-alarm .alarm-list h2 {
+    margin: 0 0 10px 0;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border-color);
+    font-size: 1.2em;
+    color: var(--header-color);
+}
+
+#field-time-alarm .alarm-list ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    overflow-y: auto;
+}
+
+#field-time-alarm .alarm-list li {
+    font-size: 1.1em;
+    padding: 10px 5px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+#field-time-alarm .alarm-list li:last-child {
+    border-bottom: none;
+}
+
+#field-time-alarm .alarm-list li span {
+    font-weight: bold;
+    margin-right: 15px;
+    color: var(--accent-color);
+}
+
+/* --- New Weather & Finance Grid --- */
+#field-weather-finance .content {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    height: 100%; /* Ensure content fills the grid item */
+}
+
+.weather-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr 1fr;
+    gap: 10px;
+    height: 65%; /* Allocate a fixed portion of the height */
+    margin-bottom: 10px;
+}
+
+.weather-card {
+    background-color: rgba(0,0,0,0.15);
+    border-radius: 6px;
+    padding: 8px; /* Adjusted padding */
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+}
+
+.finance-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+}
+
+.weather-card .info-item-header {
+    margin-bottom: 5px;
+    font-size: 0.8em;
+}
+
+.weather-card .info-item-body {
+    display: flex;
+    flex-direction: row; /* Icon and details side-by-side */
+    align-items: center;
+    justify-content: center;
+    gap: 10px; /* Gap between icon and details */
+}
+
+.weather-icon {
+    font-size: 2em;
+}
+
+.weather-details {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0; /* Remove gap here */
+    font-weight: 500;
+}
+
+.temps {
+    display: flex;
+    gap: 5px; /* Space between max and min temp */
+    margin-bottom: 2px; /* Space between temps and pop */
+}
+
+.temp-max {
+    color: #ff8a8a; /* Light red for max temp */
+}
+.temp-min {
+    color: #8ab8ff; /* Light blue for min temp */
+}
+
+.pop {
+    font-size: 0.8em;
+    color: #b0b0b0;
+}
+
+/* ログ表示用のCSS（タイムスタンプ対応） */
 .log-date-separator {
     text-align: center;
     color: #888;
@@ -125,18 +682,23 @@ h2 i {
     font-weight: bold;
 }
 
-.log-message {
+#log-display .log-message {
     display: flex;
+    max-width: 100%;
     align-items: flex-end;
     margin-bottom: 8px;
     gap: 8px;
+    /* Resetting some old properties */
+    padding: 0;
+    background-color: transparent;
 }
 
 .log-content {
     padding: 8px 12px;
     border-radius: 18px;
-    max-width: 80%;
     word-wrap: break-word;
+    flex-grow: 0; /* Do not grow, let the content decide the width */
+    max-width: 80%;
 }
 
 .log-timestamp {
@@ -146,44 +708,42 @@ h2 i {
     margin-bottom: 2px;
 }
 
-.log-message.user {
+#log-display .log-message.user {
     justify-content: flex-end;
+    align-self: auto; /* Reset align-self */
 }
-.log-message.user .log-content {
-    background-color: #48bb78;
+#log-display .log-message.user .log-content {
+    background-color: var(--accent-color);
     color: white;
     border-radius: 18px 18px 4px 18px;
 }
 
-.log-message.assistant {
+#log-display .log-message.assistant {
     justify-content: flex-start;
+    align-self: auto; /* Reset align-self */
 }
-.log-message.assistant .log-content {
-    background-color: #edf2f7;
-    color: #1a202c;
+#log-display .log-message.assistant .log-content {
+    background-color: #4d4d4d;
+    color: var(--text-color);
     border-radius: 18px 18px 18px 4px;
 }
 
-/* Interim/Waiting log (no timestamp) */
 .log-message.log-interim, .log-message.log-waiting {
-    justify-content: center;
+    opacity: 0.6;
+    background-color: transparent;
+    align-self: flex-start;
     font-style: italic;
-    color: #718096;
-    padding: 4px;
 }
 
 .highlight-wake-word {
-    color: #dd6b20;
-    font-weight: bold;
-}
-.highlight-end-word {
-    color: #3182ce;
+    color: var(--accent-color);
     font-weight: bold;
 }
 
-/* Remove default padding from .log-message.user/assistant if .log-content has it */
-#log-display .log-message.user, #log-display .log-message.assistant {
-    background-color: transparent;
-    padding: 0;
-    border: none;
+.highlight-end-word {
+    color: #ffadad; /* A light red/pink color */
+    font-weight: bold;
+    background-color: rgba(255, 0, 0, 0.1);
+    padding: 1px 3px;
+    border-radius: 3px;
 }
