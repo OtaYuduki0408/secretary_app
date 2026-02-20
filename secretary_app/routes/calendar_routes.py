@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify, session
-from services import local_calendar_service
+from services.google_calendar_service import GoogleCalendarService
 
 # Blueprintを作成
 calendar_bp = Blueprint('calendar_bp', __name__)
@@ -11,10 +11,16 @@ def _get_user_id():
         return None
     return user.get('id')
 
-@calendar_bp.route('/api/local_calendar/events', methods=['POST'])
-def handle_add_event():
+def _get_service():
     user_id = _get_user_id()
     if not user_id:
+        return None
+    return GoogleCalendarService(user_id)
+
+@calendar_bp.route('/api/local_calendar/events', methods=['POST'])
+def handle_add_event():
+    service = _get_service()
+    if not service:
         return jsonify({"error": "User not authenticated"}), 401
 
     data = request.get_json()
@@ -22,15 +28,17 @@ def handle_add_event():
         return jsonify({"error": "Missing required fields"}), 400
 
     try:
-        # タイムゾーン変換はサービス層に任せ、文字列をそのまま渡す
-        new_event = local_calendar_service.add_event(
-            user_id=user_id,
+        new_event = service.add_event(
             title=data['title'],
-            start_time=data['start_time'], # 文字列のまま
-            end_time=data['end_time'],     # 文字列のまま
-            description=data.get('description')
+            start_time=data['start_time'],
+            end_time=data['end_time'],
+            description=data.get('description', '')
         )
         return jsonify(new_event), 201
+    except RuntimeError as e:
+        if str(e) == "not_authenticated":
+            return jsonify({"error": "Google authentication required"}), 403
+        return jsonify({"error": str(e)}), 500
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -38,24 +46,28 @@ from datetime import datetime, timezone
 
 @calendar_bp.route('/api/local_calendar/events', methods=['GET'])
 def handle_get_events():
-    user_id = _get_user_id()
-    if not user_id:
+    service = _get_service()
+    if not service:
         return jsonify({"error": "User not authenticated"}), 401
     
-    # フロントからの日付範囲指定は無視し、常に現在時刻を開始点とする
-    start_time_iso = datetime.now(timezone.utc).isoformat()
+    # フロントからは time_min/time_max が渡される場合もある（FullCalendar）
+    time_min = request.args.get('start') # FullCalendarは 'start' と 'end' で送ってくる
+    time_max = request.args.get('end')
     
     try:
-        # limit=6 を渡して直近6件を取得する
-        events = local_calendar_service.get_events(user_id, start_time_iso=start_time_iso, end_time_iso=None, limit=6)
+        events = service.list_events(time_min=time_min, time_max=time_max)
         return jsonify(events)
+    except RuntimeError as e:
+        if str(e) == "not_authenticated":
+            return jsonify({"error": "Google authentication required"}), 403
+        return jsonify({"error": str(e)}), 500
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-@calendar_bp.route('/api/local_calendar/events/<int:event_id>', methods=['PUT'])
+@calendar_bp.route('/api/local_calendar/events/<string:event_id>', methods=['PUT'])
 def handle_update_event(event_id):
-    user_id = _get_user_id()
-    if not user_id:
+    service = _get_service()
+    if not service:
         return jsonify({"error": "User not authenticated"}), 401
 
     data = request.get_json()
@@ -63,24 +75,35 @@ def handle_update_event(event_id):
         return jsonify({"error": "No update data provided"}), 400
 
     try:
-        # data には日時文字列が含まれていると想定し、そのまま渡す
-        updated_event = local_calendar_service.update_event(event_id, user_id, **data)
-        if not updated_event:
-            return jsonify({"error": "Event not found or permission denied"}), 404
+        updated_event = service.update_event(
+            event_id=event_id,
+            title=data.get('title'),
+            start_time=data.get('start_time'),
+            end_time=data.get('end_time'),
+            description=data.get('description')
+        )
         return jsonify(updated_event)
+    except RuntimeError as e:
+        if str(e) == "not_authenticated":
+            return jsonify({"error": "Google authentication required"}), 403
+        return jsonify({"error": str(e)}), 500
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-@calendar_bp.route('/api/local_calendar/events/<int:event_id>', methods=['DELETE'])
+@calendar_bp.route('/api/local_calendar/events/<string:event_id>', methods=['DELETE'])
 def handle_delete_event(event_id):
-    user_id = _get_user_id()
-    if not user_id:
+    service = _get_service()
+    if not service:
         return jsonify({"error": "User not authenticated"}), 401
 
     try:
-        success = local_calendar_service.delete_event(event_id, user_id)
+        success = service.delete_event(event_id)
         if not success:
-            return jsonify({"error": "Event not found or permission denied"}), 404
+            return jsonify({"error": "Event not found"}), 404
         return jsonify({"message": "Event deleted successfully"}), 200
+    except RuntimeError as e:
+        if str(e) == "not_authenticated":
+            return jsonify({"error": "Google authentication required"}), 403
+        return jsonify({"error": str(e)}), 500
     except Exception as e:
         return jsonify({"error": str(e)}), 500

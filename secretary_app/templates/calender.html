@@ -154,6 +154,10 @@
   </header>
 
   <main class="container">
+    <div id="auth-alert" style="display: none; background: rgba(239, 68, 68, 0.2); border: 1px solid #ef4444; padding: 1rem; border-radius: 8px; margin: 1rem auto; max-width: 95vw; text-align: center;">
+      <p>Googleカレンダーとの連携が完了していないか、期限が切れています。</p>
+      <a href="/google-login" class="btn success" style="margin-top: 0.5rem; display: inline-block;">Google連携を開始する</a>
+    </div>
     <div id="calendar"></div>
   </main>
 
@@ -191,7 +195,11 @@
             eventSources: [
                 {
                     url: '/api/local_calendar/events',
-                    failure: () => alert('自分のイベント取得に失敗しました。'),
+                    failure: (err) => {
+                        console.error('Calendar Fetch Error:', err);
+                        // 認証エラーやGoogle連携が必要な場合
+                        document.getElementById('auth-alert').style.display = 'block';
+                    },
                     eventDataTransform: data => ({
                         id: data.id, title: data.title, start: data.start_time, end: data.end_time,
                         description: data.description, classNames: ['fc-event-local']

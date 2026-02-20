@@ -192,7 +192,7 @@ GOOGLE_SCOPES = [
     'https://www.googleapis.com/auth/gmail.readonly',
     'https://www.googleapis.com/auth/userinfo.profile',
     'https://www.googleapis.com/auth/userinfo.email',
-    # 'https://www.googleapis.com/auth/calendar',
+    'https://www.googleapis.com/auth/calendar',
 ]
 GOOGLE_REDIRECT_URI = get_google_redirect_uri()
 
@@ -474,48 +474,49 @@ def dev_mobile_voice(token):
     )
 
 
-# ============== Google OAuth ログイン (無効化) ==============
-# @app.route('/google-login')
-# def google_login():
-#     flow = build_web_flow(
-#         GOOGLE_SCOPES,
-#         redirect_uri=GOOGLE_REDIRECT_URI,
-#     )
-#     auth_url, state = flow.authorization_url(prompt='consent')
-#     session['oauth_state'] = state
-#     return redirect(auth_url)
+# ============== Google OAuth ログイン ==============
+@app.route('/google-login')
+def google_login():
+    flow = build_web_flow(
+        GOOGLE_SCOPES,
+        redirect_uri=GOOGLE_REDIRECT_URI,
+    )
+    auth_url, state = flow.authorization_url(prompt='consent', access_type='offline')
+    session['oauth_state'] = state
+    return redirect(auth_url)
 
-# @app.route('/oauth-callback')
-# def oauth_callback():
-#     state = session.pop('oauth_state', None)
-#     flow = build_web_flow(
-#         GOOGLE_SCOPES,
-#         state=state,
-#         redirect_uri=GOOGLE_REDIRECT_URI,
-#     )
-#     try:
-#         flow.fetch_token(authorization_response=request.url)
-#     except Exception as e:
-#         return render_template('oauth-callback.html', error=str(e))
+@app.route('/oauth-callback')
+def oauth_callback():
+    from services.google_token_service import upsert_credentials
+    state = session.pop('oauth_state', None)
+    flow = build_web_flow(
+        GOOGLE_SCOPES,
+        state=state,
+        redirect_uri=GOOGLE_REDIRECT_URI,
+    )
+    try:
+        flow.fetch_token(authorization_response=request.url)
+    except Exception as e:
+        return render_template('oauth-callback.html', error=str(e))
 
-#     creds = flow.credentials
-#     creds_info = {
-#         'token': creds.token,
-#         'refresh_token': creds.refresh_token,
-#         'token_uri': creds.token_uri,
-#         'client_id': creds.client_id,
-#         'client_secret': creds.client_secret,
-#         'scopes': list(creds.scopes),
-#     }
+    creds = flow.credentials
+    creds_info = {
+        'token': creds.token,
+        'refresh_token': creds.refresh_token,
+        'token_uri': creds.token_uri,
+        'client_id': creds.client_id,
+        'client_secret': creds.client_secret,
+        'scopes': list(creds.scopes),
+    }
 
-#     sm = ScheduleManager()
-#     user = session.get('user') or {}
-#     user_id = user.get('id')
-#     if not user_id:
-#         return render_template('oauth-callback.html', error='ユーザー未ログインのため、認証情報が取得できません')
-#     sm.set_credentials_from_info(user_id, creds_info)
+    user = session.get('user') or {}
+    user_id = user.get('id')
+    if not user_id:
+        return render_template('oauth-callback.html', error='ユーザー未ログインのため、認証情報が保存できません')
+    
+    upsert_credentials(user_id, creds_info)
 
-#     return render_template('oauth-callback.html', token=creds.token)
+    return render_template('oauth-callback.html', token=creds.token)
 
 
 # ============== Finance 画面 ============== (print statements are kept as they are)
@@ -1287,9 +1288,18 @@ def _enrich_calendar_read(detail, user_id, now_jst, app_logger):
     start_dt, end_dt = _build_range_from_detail(detail, now_jst)
     app_logger.debug(f"[DEBUG_ENRICH] Calculated range for calendar: {start_dt} to {end_dt}")
     
-    events = local_calendar_service.get_events(user_id, start_dt.isoformat() if start_dt else None, end_dt.isoformat() if end_dt else None)
-    
-    app_logger.debug(f"[DEBUG_ENRICH] local_calendar_service.get_events returned: {events}")
+    try:
+        from services.google_calendar_service import GoogleCalendarService
+        service = GoogleCalendarService(user_id)
+        # Google API 形式 (UTC ISO) に変換
+        time_min = start_dt.astimezone(pytz.utc).isoformat().replace('+00:00', 'Z') if start_dt else None
+        time_max = end_dt.astimezone(pytz.utc).isoformat().replace('+00:00', 'Z') if end_dt else None
+        
+        events = service.list_events(time_min=time_min, time_max=time_max)
+        app_logger.debug(f"[DEBUG_ENRICH] GoogleCalendarService.list_events returned: {events}")
+    except Exception as e:
+        app_logger.error(f"[DEBUG_ENRICH] Failed to get events from Google: {e}")
+        events = []
 
     if not events:
         detail['summary'] = '今日の予定はありません'
@@ -1300,15 +1310,19 @@ def _enrich_calendar_read(detail, user_id, now_jst, app_logger):
     event_items = []
     for e in events:
         try:
-            start_local = datetime.fromisoformat(e['start_time']).astimezone(JST)
-            end_local = datetime.fromisoformat(e['end_time']).astimezone(JST)
+            # GoogleCalendarService が返してくる start_time は ISO 形式
+            st_str = e['start_time']
+            # 全日イベントの場合は '2023-10-27' 形式なので datetime にパース
+            if 'T' in st_str:
+                start_local = datetime.fromisoformat(st_str.replace('Z', '+00:00')).astimezone(JST)
+            else:
+                start_local = JST.localize(datetime.strptime(st_str, '%Y-%m-%d'))
+            
             event_items.append({
                 'summary': e.get('title', '予定'),
-                'start_time': start_local.strftime('%H:%M'),
-                'end_time': end_local.strftime('%H:%M'),
+                'start_time': start_local.strftime('%H:%M') if 'T' in st_str else '終日',
                 'start_day': f"{start_local.year}年{start_local.month}月{start_local.day}日",
-                'end_day': f"{end_local.year}年{end_local.month}月{end_local.day}日",
-                'event_link': None
+                'event_link': e.get('htmlLink')
             })
         except Exception as err:
             app_logger.error(f"[DEBUG_ENRICH] Calendar event parse error: {err}", exc_info=True)
