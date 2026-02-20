@@ -1102,6 +1102,65 @@ def youtube_search():
         return jsonify({'error': str(e)}), 500
 
 
+from services import youtube_service
+
+@app.route('/api/youtube/channels', methods=['GET'])
+@login_required
+def get_youtube_channels():
+    user_id = session.get('user', {}).get('id')
+    return jsonify(youtube_service.get_registered_channels(user_id))
+
+@app.route('/api/youtube/channels', methods=['POST'])
+@login_required
+def register_youtube_channel():
+    user_id = session.get('user', {}).get('id')
+    data = request.get_json() or {}
+    channel_id = data.get('channel_id')
+    category = data.get('category', '未分類')
+    if not channel_id:
+        return jsonify({'error': 'channel_id is required'}), 400
+    return jsonify(youtube_service.register_channel(user_id, channel_id, category))
+
+@app.route('/api/youtube/channels/<string:channel_id>/videos', methods=['GET'])
+@login_required
+def get_youtube_channel_videos(channel_id):
+    return jsonify(youtube_service.get_channel_videos(channel_id))
+
+@app.route('/api/youtube/history', methods=['POST'])
+@login_required
+def update_youtube_history():
+    user_id = session.get('user', {}).get('id')
+    data = request.get_json() or {}
+    video_id = data.get('video_id')
+    title = data.get('title')
+    position = data.get('position', 0)
+    is_completed = data.get('is_completed', False)
+    if not video_id:
+        return jsonify({'error': 'video_id is required'}), 400
+    return jsonify(youtube_service.update_watch_history(user_id, video_id, title, position, is_completed))
+
+@app.route('/api/youtube/history', methods=['GET'])
+@login_required
+def get_youtube_history():
+    user_id = session.get('user', {}).get('id')
+    video_id = request.args.get('video_id')
+    return jsonify(youtube_service.get_watch_history(user_id, video_id))
+
+@app.route('/api/youtube/summarize', methods=['POST'])
+@login_required
+def summarize_youtube_video():
+    user_id = session.get('user', {}).get('id')
+    data = request.get_json() or {}
+    video_id = data.get('video_id')
+    # 動画IDから概要欄を取得 (YouTube Data API)
+    info = youtube_service.get_video_info(video_id) # get_video_info を後で追加
+    description = info.get('description', '')
+    
+    # Geminiに要約させる
+    prompt = f"以下のYouTube動画の概要を、3行程度の箇条書きで分かりやすく要約してください。\n\n{description}"
+    summary = chat_space_model._gemini_request(prompt)
+    return jsonify({'summary': summary})
+
 # ============== Chat API・SwitchBot/カレンダー更新処理 ============== (print statements are kept as they are)
 
 

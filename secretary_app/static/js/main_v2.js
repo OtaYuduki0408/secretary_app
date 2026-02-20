@@ -316,7 +316,7 @@ $(document).ready(function() {
         }
 
         // YouTube操作（停止/次/前/音量等）
-        if (response?.purpose === 'Yc' && response?.action === 'youtube_control' && response?.data) {
+        if (response?.action === 'youtube_control' || response?.action === 'youtube_advanced') {
             if (typeof window.executeYoutubeIntent === 'function') {
                 const handled = window.executeYoutubeIntent(response.data);
                 if (!handled) updateLogDisplay('YouTube操作を実行できませんでした。', 'assistant');
@@ -358,6 +358,7 @@ $(document).ready(function() {
 
         if (response.triggered_by_voice && response.order_payloads) {
             response.order_payloads.forEach(handleServerCommand);
+            setMode('waiting');
             if (typeof updateAllInfo === 'function') updateAllInfo();
         } else if (response.message) {
             updateLogDisplay(response.message, 'assistant');

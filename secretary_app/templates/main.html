@@ -177,17 +177,88 @@
         </div>
     </div>
 
+    <!-- 新しいYouTubeウィンドウ (旧youtube-overlayを刷新) -->
     <div id="youtube-overlay" class="youtube-overlay-hidden">
-        <div id="youtube-player-wrapper">
-            <div id="youtube-player-header">
-                <span id="youtube-video-title"></span>
-                <button id="youtube-close-btn" type="button">&times;</button>
+        <div id="youtube-window">
+            <!-- 上部バー: 時計と操作 -->
+            <div id="youtube-header">
+                <div class="youtube-time-info">
+                    <span id="yt-display-time">--:--:--</span>
+                    <span id="yt-display-date">----/--/--</span>
+                </div>
+                <div class="youtube-window-title">YouTube Command Center</div>
+                <button id="youtube-close-btn" class="close-btn">&times;</button>
             </div>
-            <div id="youtube-error-message" style="display:none;"></div>
-            <div id="youtube-player"></div>
-            <div id="youtube-controls">
-                <button id="youtube-prev-btn" type="button">前へ</button>
-                <button id="youtube-next-btn" type="button">次へ</button>
+
+            <div id="youtube-main-content">
+                <!-- 左カラム: プレイヤーと動画情報 -->
+                <div class="yt-column yt-left">
+                    <div id="youtube-player-container">
+                        <div id="youtube-player"></div>
+                    </div>
+                    <div id="yt-video-details">
+                        <h2 id="youtube-video-title">動画を読み込み中...</h2>
+                        <div class="yt-channel-info">
+                            <img id="yt-channel-thumb" src="" alt="">
+                            <span id="yt-channel-name">--</span>
+                        </div>
+                        <div class="yt-video-meta">
+                            <span id="yt-view-count">-- views</span> • <span id="yt-publish-date">--</span>
+                        </div>
+                        <div id="yt-video-summary" class="yt-summary-box">
+                            <strong>AI要約:</strong>
+                            <p id="yt-summary-text">読み込み中...</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 中央カラム: リスト表示 (チャンネル一覧 / 動画一覧) -->
+                <div class="yt-column yt-center">
+                    <div class="yt-list-header">
+                        <h3 id="yt-list-title">登録チャンネル</h3>
+                        <div class="yt-list-search">
+                            <input type="text" id="yt-internal-search" placeholder="リスト内検索...">
+                        </div>
+                    </div>
+                    <div id="yt-list-content">
+                        <!-- ここに番号付きのリストが動的に挿入される -->
+                        <div class="yt-loading-spinner">読み込み中...</div>
+                    </div>
+                </div>
+
+                <!-- 右カラム: 次の動画とおススメ -->
+                <div class="yt-column yt-right">
+                    <div class="yt-side-section">
+                        <h4>次の未視聴動画</h4>
+                        <div id="yt-next-unwatched" class="yt-next-card">
+                            <p>なし</p>
+                        </div>
+                    </div>
+                    <div class="yt-side-section">
+                        <h4>おススメ (番号指定可)</h4>
+                        <div id="yt-recommendations">
+                            <!-- 番号付きおススメ動画 -->
+                        </div>
+                    </div>
+                    <div class="yt-controls-status">
+                        <div class="status-item">音量: <span id="yt-status-vol">--</span>%</div>
+                        <div class="status-item">速度: <span id="yt-status-speed">1.0</span>x</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 下部: 簡易コントロールバー (音声がメインだがマウス操作も可) -->
+            <div id="youtube-footer-controls">
+                <button id="youtube-prev-btn"><i class="fas fa-step-backward"></i></button>
+                <button id="youtube-play-pause-btn"><i class="fas fa-play"></i></button>
+                <button id="youtube-next-btn"><i class="fas fa-step-forward"></i></button>
+                <button id="youtube-skip-back-btn">-10s</button>
+                <button id="youtube-skip-forward-btn">+10s</button>
+                <div class="yt-progress-container">
+                    <span id="yt-current-pos">0:00</span>
+                    <input type="range" id="yt-progress-bar" min="0" max="100" value="0">
+                    <span id="yt-duration">0:00</span>
+                </div>
             </div>
         </div>
     </div>

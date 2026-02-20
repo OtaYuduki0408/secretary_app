@@ -516,7 +516,7 @@ body, html {
     transition: all 0.3s ease;
 }
 
-/* 1. 髻ｳ螢ｰ蠕ｩ滉ｸｭ */
+/* 1. 音声待機中 */
 #mic-status.waiting {
     background-color: rgba(0, 0, 0, 0.2);
     color: #ccc;
@@ -525,32 +525,377 @@ body, html {
     opacity: 0.6;
 }
 
-/* 2. 蜻ｽ莉､荳ｭ */
+/* 2. 命令中 */
 #mic-status.listening {
     background-color: #e67e22; /* Orange */
     color: white;
     border-color: #d35400;
 }
 
-/* 3. 蜃ｦ逅ｾｩ滉ｸｭ */
+/* 3. 処理待機中 */
 #mic-status.processing {
     background-color: #3498db; /* Blue */
     color: white;
     border-color: #2980b9;
 }
 
-/* 4. 逋ｺ螢ｰ荳ｭ */
+/* 4. 発声中 */
 #mic-status.speaking {
     background-color: #2ecc71; /* Green */
     color: white;
     border-color: #27ae60;
 }
 
-/* 5. 蜻ｽ莉､騾∽ｿ｡D */
+/* 5. 命令送信＆CD */
 #mic-status.cooldown {
     background-color: #95a5a6; /* Gray */
     color: #333;
     border-color: #7f8c8d;
+}
+
+/* --- YouTube Command Center (New) --- */
+#youtube-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.95);
+    z-index: 10000;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    backdrop-filter: blur(10px);
+}
+
+#youtube-window {
+    width: 95vw;
+    height: 92vh;
+    background-color: #0f0f0f;
+    border: 1px solid #333;
+    border-radius: 12px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    box-shadow: 0 0 50px rgba(0, 0, 0, 0.8);
+}
+
+#youtube-header {
+    height: 60px;
+    background-color: #1a1a1a;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 20px;
+    border-bottom: 1px solid #333;
+}
+
+.youtube-time-info {
+    display: flex;
+    flex-direction: column;
+}
+
+#yt-display-time {
+    font-size: 1.4em;
+    font-weight: bold;
+    color: #fff;
+    line-height: 1;
+}
+
+#yt-display-date {
+    font-size: 0.8em;
+    color: #888;
+}
+
+.youtube-window-title {
+    font-size: 1.2em;
+    font-weight: bold;
+    color: #ff0000;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+#youtube-header .close-btn {
+    background: none;
+    border: none;
+    color: #fff;
+    font-size: 2em;
+    cursor: pointer;
+    transition: transform 0.2s;
+}
+
+#youtube-header .close-btn:hover {
+    transform: scale(1.2);
+    color: #ff0000;
+}
+
+#youtube-main-content {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 1.8fr 1.2fr 1fr;
+    gap: 1px;
+    background-color: #333;
+    overflow: hidden;
+}
+
+.yt-column {
+    background-color: #0f0f0f;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.yt-left {
+    padding: 20px;
+    overflow-y: auto;
+}
+
+#youtube-player-container {
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    background-color: #000;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+}
+
+#youtube-player {
+    width: 100%;
+    height: 100%;
+}
+
+#yt-video-details {
+    margin-top: 20px;
+}
+
+.yt-channel-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 15px;
+}
+
+#yt-channel-thumb {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background-color: #333;
+}
+
+#yt-channel-name {
+    font-weight: bold;
+    font-size: 1.1em;
+}
+
+.yt-video-meta {
+    color: #aaa;
+    font-size: 0.9em;
+    margin-bottom: 20px;
+}
+
+.yt-summary-box {
+    background-color: #1a1a1a;
+    padding: 15px;
+    border-radius: 8px;
+    border-left: 4px solid #ff0000;
+}
+
+.yt-summary-box strong {
+    display: block;
+    margin-bottom: 8px;
+    color: #ff0000;
+}
+
+#yt-summary-text {
+    font-size: 0.95em;
+    line-height: 1.6;
+    margin: 0;
+    color: #ddd;
+}
+
+.yt-center {
+    border-left: 1px solid #333;
+    border-right: 1px solid #333;
+}
+
+.yt-list-header {
+    padding: 15px;
+    background-color: #161616;
+    border-bottom: 1px solid #333;
+}
+
+.yt-list-header h3 {
+    margin: 0 0 10px 0;
+    font-size: 1.1em;
+}
+
+#yt-internal-search {
+    width: 100%;
+    background-color: #2a2a2a;
+    border: 1px solid #444;
+    border-radius: 4px;
+    padding: 8px 12px;
+    color: #fff;
+}
+
+#yt-list-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 10px;
+}
+
+.yt-list-item {
+    display: flex;
+    gap: 12px;
+    padding: 10px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+    margin-bottom: 5px;
+}
+
+.yt-list-item:hover {
+    background-color: #222;
+}
+
+.yt-list-item.active {
+    background-color: #2a2a2a;
+    border-left: 3px solid #ff0000;
+}
+
+.yt-item-num {
+    font-weight: bold;
+    color: #ff0000;
+    min-width: 20px;
+}
+
+.yt-item-thumb {
+    width: 100px;
+    aspect-ratio: 16 / 9;
+    background-color: #333;
+    border-radius: 4px;
+    object-fit: cover;
+}
+
+.yt-item-info {
+    flex: 1;
+}
+
+.yt-item-title {
+    font-size: 0.9em;
+    font-weight: 500;
+    line-height: 1.3;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.yt-item-meta {
+    font-size: 0.8em;
+    color: #888;
+    margin-top: 4px;
+}
+
+.yt-right {
+    padding: 15px;
+    overflow-y: auto;
+}
+
+.yt-side-section {
+    margin-bottom: 25px;
+}
+
+.yt-side-section h4 {
+    margin: 0 0 12px 0;
+    font-size: 1em;
+    color: #aaa;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.yt-next-card {
+    background-color: #1a1a1a;
+    border-radius: 8px;
+    padding: 10px;
+    border: 1px solid #333;
+}
+
+#yt-recommendations {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.yt-controls-status {
+    margin-top: auto;
+    padding: 15px;
+    background-color: #161616;
+    border-radius: 8px;
+    display: flex;
+    justify-content: space-around;
+    font-size: 0.9em;
+    color: #888;
+}
+
+#youtube-footer-controls {
+    height: 70px;
+    background-color: #1a1a1a;
+    border-top: 1px solid #333;
+    display: flex;
+    align-items: center;
+    padding: 0 20px;
+    gap: 15px;
+}
+
+#youtube-footer-controls button {
+    background: none;
+    border: none;
+    color: #fff;
+    font-size: 1.2em;
+    cursor: pointer;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    transition: background-color 0.2s;
+}
+
+#youtube-footer-controls button:hover {
+    background-color: #333;
+}
+
+#youtube-play-pause-btn {
+    background-color: #fff !important;
+    color: #000 !important;
+}
+
+.yt-progress-container {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-family: monospace;
+    font-size: 0.9em;
+}
+
+#yt-progress-bar {
+    flex: 1;
+    -webkit-appearance: none;
+    background: #333;
+    height: 4px;
+    border-radius: 2px;
+}
+
+#yt-progress-bar::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 12px;
+    height: 12px;
+    background: #ff0000;
+    border-radius: 50%;
+    cursor: pointer;
 }
 
 

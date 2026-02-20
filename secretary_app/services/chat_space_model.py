@@ -49,64 +49,81 @@ class ChatSpaceModel:
     30文字以内となるべく少なくしてください。
     -機能-
     C:カレンダー
-    I:収支管理 (例: 所持金、残高、今月の使用額、今日の使用額、収支の記録、支出の記録、収入の記録)
+    I:収支管理
     M:メモ帳
-    T:時刻、年月日、曜日確認(行動はn)
-    R:過去の命令の修正(行動はn)。特殊命令「目覚まし」の時刻変更もここに含む
-    S:SwitchBot iot等。例:電気を消す、エアコンを付ける、鍵を掛ける)(行動はn)
-    Y:YouTubeの音楽を再生する(行動はp)
-    P:プレイリスト操作(行動はp)
-    Re:強制終了コマンド(処理を停止して等)
-    K:計算(行動はn)
-    Ya:肯定的な回答 (例: はい、お願いします、いいよ、OK、進めて、削除して)(行動はa)
-    Nn:否定的な回答 (例: いいえ、やめて、キャンセル、やっぱりいい)(行動はn)
+    T:時刻、年月日、曜日確認
+    R:過去の命令の修正
+    S:SwitchBot iot等
+    Y:YouTube再生/操作
+    Yw:YouTubeウィンドウ展開/チャンネル/履歴
+    P:プレイリスト操作
+    Re:強制終了コマンド
+    K:計算
+    Ya:肯定的な回答
+    Nn:否定的な回答
     Fn:上記以外(雑談、質問)
     -行動-
-    a:追加/肯定
+    a:追加/登録
     d:削除
-    c:変更
-    g:取得
+    c:変更/操作/展開
+    g:取得/一覧表示
     s:検索
     p:再生
     n:通常/否定
-    例：カレンダーへの追加がユーザーの目的から、Caを返す。
-    例：肯定的な返答なら、Yaを返す。
-    例：否定的な返答なら、Nnを返す。
     -入力-
     ユーザーの入力: {input_value}
     """
     PURPOSE_PROMPT_TEMPLATE_WITH_YT_CONTROL = """
     以下のリストの目的と照合し、対応する機能を大文字、対応する行動を小文字で返してください。
-    命令を確実に実現できる機能がない場合、Fnを返す。
-    30文字以内となるべく少なくしてください。
     -機能-
     C:カレンダー
     I:収支管理
     M:メモ帳
-    T:時刻、年月日、曜日確認(行動はn)
-    R:過去の命令の修正(行動はn)
-    S:SwitchBot iot等(行動はn)
-    Y:YouTubeの音楽を再生/操作する(行動はp)
-    P:プレイリスト操作(行動はp)
+    T:時刻、年月日、曜日確認
+    R:過去の命令の修正
+    S:SwitchBot iot等
+    Y:YouTube再生/操作
+    Yw:YouTubeウィンドウ展開/チャンネル/履歴
+    P:プレイリスト操作
     Re:強制終了コマンド
-    K:計算(行動はn)
-    Ya:肯定的な回答 (例: はい、お願いします、いいよ、OK、進めて)(行動はa)
-    Nn:否定的な回答 (例: いいえ、やめて、キャンセル、やっぱりいい)(行動はn)
+    K:計算
+    Ya:肯定的な回答
+    Nn:否定的な回答
     -行動-
-    a:追加/肯定
+    a:追加/登録
     d:削除
-    c:変更/操作
-    g:取得
+    c:変更/操作/展開
+    g:取得/一覧表示
     s:検索
     p:再生
     n:通常/否定
     -補足-
-    現在はYouTube再生中です。次/前/再開/保存/除外などのYouTube操作もYpで返してください。
-    YouTube状態:
-    {youtube_state}
-    ただし、明らかにカレンダー・メモ・収支などの通常命令は従来機能を優先してください。
+    YouTube再生中またはウィンドウ展開中です。
+    次/前/再開/スキップ/保存/番号指定などはYc、YouTubeを開く/履歴を表示などはYwgで返してください。
     -入力-
     ユーザーの入力: {input_value}
+    """
+    YOUTUBE_ADVANCED_CONTROL_PROMPT_TEMPLATE = """
+    目的: YouTubeウィンドウ内での詳細な操作を分類してください。
+    JSONのみ出力。
+    Keys:
+    - intent: string
+    - value: string | number (対象の番号、チャンネル名、検索語など)
+    - speed: number (速度変更時のみ。0.5〜2.0)
+    intent 値:
+    - open_window: ウィンドウを展開
+    - close_window: ウィンドウを閉じる
+    - show_channels: 登録チャンネル一覧を表示
+    - open_channel: 特定のチャンネルを開く (valueにチャンネル名)
+    - play_index: リストの番号で再生 (valueに数値)
+    - show_history: 視聴履歴を表示
+    - summarize: 動画を要約
+    - set_speed: 再生速度変更 (speedに数値)
+    - skip_forward: 10秒スキップ
+    - skip_backward: 10秒戻す
+    - volume_up/down: 音量
+    - resume_last: 前回の続きから再生
+    ユーザー入力: {input_value}
     """
     CALC_PROMPT_TEMPLATE = """
     以下の命令をpythonのeval関数で計算できるように書き換えてください。
@@ -1296,6 +1313,32 @@ class ChatSpaceModel:
                 result["message"] = self._gemini_request(time_prompt)
             elif purpose == "Sn":
                 result["data"], result["message"] = self._get_switchbot_devices(cleaned_input, user_id)
+            elif purpose.startswith("Yw") or (yt_active and (purpose == "Yc" or purpose == "Yg")):
+                adv_prompt = self.YOUTUBE_ADVANCED_CONTROL_PROMPT_TEMPLATE.format(input_value=cleaned_input)
+                raw_json = self._gemini_request(adv_prompt)
+                data = self._extract_json_payload(raw_json) or {}
+                intent = data.get("intent")
+                
+                result["purpose"] = "Yw"
+                result["action"] = "youtube_advanced"
+                result["data"] = data
+                
+                if intent == "summarize":
+                    # 別途 API で要約メッセージを返す処理
+                    pass
+                elif intent == "open_channel":
+                    result["message"] = f"「{data.get('value')}」のチャンネルを開きます。"
+                elif intent == "play_index":
+                    result["message"] = f"{data.get('value')}番の動画を再生します。"
+                elif intent == "open_window":
+                    result["message"] = "YouTubeウィンドウを展開します。"
+                elif intent == "close_window":
+                    result["message"] = "YouTubeウィンドウを閉じます。"
+                    result["action"] = "youtube_control"
+                    result["data"] = {"intent": "close"}
+                
+                result["suppress_tts"] = True
+                return result
             elif purpose == "Yp":
                 op_word = self._classify_youtube_operation_word(cleaned_input)
                 op = (op_word or "").strip().lower()

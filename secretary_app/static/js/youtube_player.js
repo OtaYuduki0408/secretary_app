@@ -13,11 +13,50 @@ let errorCount = 0;
 const MAX_ERRORS = 5; // 連続エラーの最大許容回数
 
 const overlay = document.getElementById('youtube-overlay');
-const playerWrapper = document.getElementById('youtube-player-wrapper');
 const videoTitle = document.getElementById('youtube-video-title');
 const closeBtn = document.getElementById('youtube-close-btn');
 const prevBtn = document.getElementById('youtube-prev-btn');
 const nextBtn = document.getElementById('youtube-next-btn');
+
+// --- New UI Elements ---
+const playPauseBtn = document.getElementById('youtube-play-pause-btn');
+const skipBackBtn = document.getElementById('youtube-skip-back-btn');
+const skipForwardBtn = document.getElementById('youtube-skip-forward-btn');
+const progressBar = document.getElementById('yt-progress-bar');
+const currentPosEl = document.getElementById('yt-current-pos');
+const durationEl = document.getElementById('yt-duration');
+const ytTimeEl = document.getElementById('yt-display-time');
+const ytDateEl = document.getElementById('yt-display-date');
+const ytSummaryText = document.getElementById('yt-summary-text');
+const ytListContent = document.getElementById('yt-list-content');
+const ytListTitle = document.getElementById('yt-list-title');
+
+function updateYoutubeWindowTime() {
+    if (!isOverlayVisible()) return;
+    const now = new Date();
+    if (ytTimeEl) ytTimeEl.textContent = now.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    if (ytDateEl) ytDateEl.textContent = now.toLocaleDateString('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit', weekday: 'short' });
+}
+setInterval(updateYoutubeWindowTime, 1000);
+
+function formatTime(seconds) {
+    const min = Math.floor(seconds / 60);
+    const sec = Math.floor(seconds % 60);
+    return `${min}:${sec.toString().padStart(2, '0')}`;
+}
+
+function updateProgress() {
+    if (player && typeof player.getCurrentTime === 'function' && typeof player.getDuration === 'function') {
+        const current = player.getCurrentTime();
+        const duration = player.getDuration();
+        if (duration > 0) {
+            progressBar.value = (current / duration) * 100;
+            currentPosEl.textContent = formatTime(current);
+            durationEl.textContent = formatTime(duration);
+        }
+    }
+}
+setInterval(updateProgress, 1000);
 
 function isOverlayVisible() {
     return overlay && !overlay.classList.contains('youtube-overlay-hidden');
@@ -85,6 +124,119 @@ if (window._youtubeApiReadyGlobal) {
 }
 startApiReadyWatcher();
 
+
+// --- Advanced Control Functions ---
+
+async function fetchRegisteredChannels() {
+    try {
+        const res = await fetch('/api/youtube/channels');
+        const channels = await res.json();
+        renderChannelList(channels);
+    } catch (e) {
+        console.error("Failed to fetch channels:", e);
+    }
+}
+
+function renderChannelList(channels) {
+    ytListTitle.textContent = "登録チャンネル";
+    ytListContent.innerHTML = '';
+    channels.forEach((c, i) => {
+        const item = document.createElement('div');
+        item.className = 'yt-list-item';
+        item.innerHTML = `
+            <span class="yt-item-num">${i + 1}</span>
+            <img class="yt-item-thumb" src="${c.thumbnail_url}" style="border-radius: 50%; width: 50px;">
+            <div class="yt-item-info">
+                <div class="yt-item-title">${c.channel_title}</div>
+                <div class="yt-item-meta">${c.category}</div>
+            </div>
+        `;
+        item.onclick = () => openChannel(c.channel_id, c.channel_title);
+        ytListContent.appendChild(item);
+    });
+}
+
+async function openChannel(channelId, title) {
+    ytListTitle.textContent = `${title} の動画`;
+    ytListContent.innerHTML = '<div class="yt-loading-spinner">動画を取得中...</div>';
+    try {
+        const res = await fetch(`/api/youtube/channels/${channelId}/videos`);
+        const videos = await res.json();
+        currentPlaylist = videos.map(v => ({ id: v.video_id, title: v.title, thumbnail: v.thumbnail_url }));
+        renderVideoList(currentPlaylist);
+    } catch (e) {
+        console.error("Failed to fetch channel videos:", e);
+        ytListContent.innerHTML = '<div>動画の取得に失敗しました</div>';
+    }
+}
+
+function renderVideoList(videos) {
+    ytListContent.innerHTML = '';
+    videos.forEach((v, i) => {
+        const item = document.createElement('div');
+        item.className = 'yt-list-item';
+        item.innerHTML = `
+            <span class="yt-item-num">${i + 1}</span>
+            <img class="yt-item-thumb" src="${v.thumbnail || v.thumbnail_url}">
+            <div class="yt-item-info">
+                <div class="yt-item-title">${v.title}</div>
+                <div class="yt-item-meta">未視聴</div>
+            </div>
+        `;
+        item.onclick = () => {
+            currentVideoIndex = i;
+            initializePlayer(v.id);
+            showOverlay();
+            updateControls();
+        };
+        ytListContent.appendChild(item);
+    });
+}
+
+async function summarizeVideo() {
+    if (!currentPlaylist[currentVideoIndex]) return;
+    ytSummaryText.textContent = "要約を生成中...";
+    try {
+        const res = await fetch('/api/youtube/summarize', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ video_id: currentPlaylist[currentVideoIndex].id })
+        });
+        const data = await res.json();
+        ytSummaryText.textContent = data.summary;
+        if (typeof window.speak === 'function') window.speak(data.summary);
+    } catch (e) {
+        ytSummaryText.textContent = "要約の生成に失敗しました。";
+    }
+}
+
+function setPlaybackSpeed(speed) {
+    if (player && typeof player.setPlaybackRate === 'function') {
+        player.setPlaybackRate(speed);
+        const speedEl = document.getElementById('yt-status-speed');
+        if (speedEl) speedEl.textContent = speed.toFixed(1);
+    }
+}
+
+async function updateWatchHistory(isCompleted = false) {
+    const current = currentPlaylist[currentVideoIndex];
+    if (!current) return;
+    const pos = player ? player.getCurrentTime() : 0;
+    try {
+        await fetch('/api/youtube/history', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                video_id: current.id,
+                title: current.title,
+                position: pos,
+                is_completed: isCompleted
+            })
+        });
+    } catch (e) {
+        console.error("Failed to update history:", e);
+    }
+}
 
 function initializePlayer(videoId) {
     if (!canUseYoutubePlayer()) {
@@ -187,6 +339,7 @@ function onPlayerError(event) {
 }
 
 function showOverlay() {
+    if (!overlay) return;
     overlay.classList.remove('youtube-overlay-hidden');
     // オーバーレイ表示時に以前のエラーメッセージをクリア
     const errorMessageEl = document.getElementById('youtube-error-message');
@@ -194,6 +347,9 @@ function showOverlay() {
         errorMessageEl.textContent = '';
         errorMessageEl.style.display = 'none';
     }
+    // ウィンドウ展開時にチャンネル一覧を読み込む
+    fetchRegisteredChannels();
+    updateYoutubeWindowTime();
 }
 
 function hideOverlay() {
@@ -433,8 +589,43 @@ async function persistYoutubePreference(action, payload = {}) {
 function executeYoutubeIntent(payload = {}) {
     const intent = String(payload.intent || '').trim().toLowerCase();
     const query = String(payload.query || '').trim();
+    const value = payload.value;
     const amountRaw = Number(payload.amount);
     const amount = Number.isFinite(amountRaw) ? amountRaw : 0;
+
+    // --- Advanced Intents ---
+    if (intent === 'open_window') {
+        showOverlay();
+        fetchRegisteredChannels();
+        return true;
+    }
+    if (intent === 'show_channels') {
+        fetchRegisteredChannels();
+        return true;
+    }
+    if (intent === 'open_channel') {
+        // チャンネル名検索などはバックエンドで ChannelID に変換されていることを期待
+        // ここでは簡易的に既存リストから探すか、新規検索を行う
+        return true;
+    }
+    if (intent === 'play_index') {
+        const idx = parseInt(value) - 1;
+        if (currentPlaylist[idx]) {
+            currentVideoIndex = idx;
+            initializePlayer(currentPlaylist[idx].id);
+            updateControls();
+            return true;
+        }
+    }
+    if (intent === 'summarize') {
+        summarizeVideo();
+        return true;
+    }
+    if (intent === 'set_speed') {
+        setPlaybackSpeed(parseFloat(payload.speed || 1.0));
+        return true;
+    }
+
     switch (intent) {
         case 'next':
             playNextVideo();
