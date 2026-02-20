@@ -59,6 +59,8 @@ $(document).ready(function() {
         }
     }
 
+    document.addEventListener('app-settings:updated', loadAppSettings);
+
     function parseEndWords(raw) {
         if (typeof raw !== 'string') return [...DEFAULT_END_WORDS];
         const parsed = raw.split(',').map(w => w.trim()).filter(Boolean);

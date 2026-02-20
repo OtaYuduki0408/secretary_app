@@ -289,8 +289,6 @@
 
   const fetchSettingsFromServer = async () => {
     try {
-      const alreadyFetched = sessionStorage.getItem('appSettingsFetched');
-      if (alreadyFetched) return;
       const res = await fetch('/api/user_settings');
       if (!res.ok) return;
       const data = await res.json();
@@ -298,7 +296,6 @@
         localStorage.setItem('appSettings', JSON.stringify(data.settings));
         document.dispatchEvent(new CustomEvent('app-settings:updated'));
       }
-      sessionStorage.setItem('appSettingsFetched', 'true');
     } catch (e) {
       // ログイン前などで失敗するため静かに無視する
     }

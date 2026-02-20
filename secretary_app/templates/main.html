@@ -280,6 +280,7 @@
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://cdn.socket.io/4.5.2/socket.io.min.js"></script>
     <script src="https://www.youtube.com/iframe_api"></script>
+    <script src="{{ url_for('static', filename='js/app_settings_apply.js') }}"></script>
     <script>
         const USER_ID = {{ user.id|tojson }};
         window.onYouTubeIframeAPIReady = function() {

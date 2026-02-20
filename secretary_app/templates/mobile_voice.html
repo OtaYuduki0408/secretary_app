@@ -72,6 +72,7 @@
       }
     };
   </script>
+  <script src="{{ url_for('static', filename='js/app_settings_apply.js') }}"></script>
   <script type="module">
     async function ensureLogin() {
       const res = await fetch('/dev/mobile/bootstrap_login', {

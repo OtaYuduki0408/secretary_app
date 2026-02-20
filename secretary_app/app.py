@@ -697,16 +697,20 @@ def upsert_finance_goal_route():
 def get_user_settings_route():
     user_id = session.get('user', {}).get('id')
     settings = get_user_settings(user_id) or {}
-    return jsonify(settings)
+    return jsonify({"settings": settings})
 
-@app.route('/api/user_settings', methods=['POST'])
+@app.route('/api/user_settings', methods=['POST', 'PUT'])
 @login_required
 def upsert_user_settings_route():
     user_id = session.get('user', {}).get('id')
     data = request.get_json() or {}
-    if not isinstance(data, dict):
+    # settings キーでラップされている場合と、直接送られてくる場合の両方に対応
+    actual_settings = data.get('settings') if 'settings' in data else data
+    
+    if not isinstance(actual_settings, dict):
         return jsonify({'error': 'Invalid settings payload'}), 400
-    result = upsert_user_settings(user_id, data)
+    
+    result = upsert_user_settings(user_id, actual_settings)
     if isinstance(result, dict) and result.get('error'):
         return jsonify(result), 500
     return jsonify(result)
