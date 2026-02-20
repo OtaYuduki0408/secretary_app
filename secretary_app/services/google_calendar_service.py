@@ -69,7 +69,7 @@ class GoogleCalendarService:
             raise RuntimeError("not_authenticated")
         return build("calendar", "v3", credentials=creds, cache_discovery=False)
 
-    def _to_frontend_format(self, google_event: Dict[str, Any]) -> Dict[str, Any]:
+    def _to_frontend_format(self, google_event: Dict[str, Any], calendar_id: str = "primary") -> Dict[str, Any]:
         """Googleのイベント形式をフロントエンドが期待する形式に変換する。"""
         start = google_event.get("start", {})
         end = google_event.get("end", {})
@@ -80,6 +80,7 @@ class GoogleCalendarService:
 
         return {
             "id": google_event.get("id"),
+            "calendarId": calendar_id, # どのカレンダーのイベントか保持
             "title": google_event.get("summary", "(無題)"),
             "start_time": start_time,
             "end_time": end_time,
@@ -88,31 +89,45 @@ class GoogleCalendarService:
             "htmlLink": google_event.get("htmlLink", "")
         }
 
-    def list_events(self, time_min: Optional[str] = None, time_max: Optional[str] = None, max_results: int = 50) -> List[Dict[str, Any]]:
-        """イベント一覧を取得する。"""
+    def list_events(self, time_min: Optional[str] = None, time_max: Optional[str] = None, max_results: int = 100) -> List[Dict[str, Any]]:
+        """購読しているすべてのカレンダーからイベント一覧を取得し、マージする。"""
         service = self._build_service()
 
         # デフォルトは現在時刻から
         if not time_min:
             time_min = datetime.utcnow().isoformat() + "Z"
         
+        all_events = []
         try:
-            events_result = service.events().list(
-                calendarId="primary",
-                timeMin=time_min,
-                timeMax=time_max,
-                maxResults=max_results,
-                singleEvents=True,
-                orderBy="startTime",
-            ).execute()
+            # カレンダーリストを取得（ファミリーカレンダーや共有カレンダーを含む）
+            calendar_list = service.calendarList().list().execute()
+            calendars = calendar_list.get("items", [])
+
+            for cal in calendars:
+                cal_id = cal.get("id")
+                # イベントを取得
+                events_result = service.events().list(
+                    calendarId=cal_id,
+                    timeMin=time_min,
+                    timeMax=time_max,
+                    maxResults=max_results,
+                    singleEvents=True,
+                    orderBy="startTime",
+                ).execute()
+                
+                items = events_result.get("items", [])
+                for item in items:
+                    all_events.append(self._to_frontend_format(item, calendar_id=cal_id))
             
-            items = events_result.get("items", [])
-            return [self._to_frontend_format(item) for item in items]
+            # 全イベントを開始時間順にソート
+            all_events.sort(key=lambda x: x['start_time'] if x['start_time'] else "")
+            return all_events
+            
         except HttpError as e:
             print(f"[ERROR] Google Calendar list_events error: {e}")
             raise
 
-    def add_event(self, title: str, start_time: str, end_time: str, description: str = "") -> Dict[str, Any]:
+    def add_event(self, title: str, start_time: str, end_time: str, description: str = "", calendar_id: str = "primary") -> Dict[str, Any]:
         """イベントを追加する。"""
         service = self._build_service()
 
@@ -124,36 +139,36 @@ class GoogleCalendarService:
         }
 
         try:
-            created = service.events().insert(calendarId="primary", body=event_body).execute()
-            return self._to_frontend_format(created)
+            created = service.events().insert(calendarId=calendar_id, body=event_body).execute()
+            return self._to_frontend_format(created, calendar_id=calendar_id)
         except HttpError as e:
             print(f"[ERROR] Google Calendar add_event error: {e}")
             raise
 
-    def update_event(self, event_id: str, title: str = None, start_time: str = None, end_time: str = None, description: str = None) -> Dict[str, Any]:
+    def update_event(self, event_id: str, title: str = None, start_time: str = None, end_time: str = None, description: str = None, calendar_id: str = "primary") -> Dict[str, Any]:
         """イベントを更新する。"""
         service = self._build_service()
 
         try:
             # 現在のイベントを取得
-            event = service.events().get(calendarId="primary", eventId=event_id).execute()
+            event = service.events().get(calendarId=calendar_id, eventId=event_id).execute()
 
             if title is not None: event["summary"] = title
             if description is not None: event["description"] = description
             if start_time: event["start"] = {"dateTime": start_time, "timeZone": "Asia/Tokyo"}
             if end_time: event["end"] = {"dateTime": end_time, "timeZone": "Asia/Tokyo"}
 
-            updated = service.events().update(calendarId="primary", eventId=event_id, body=event).execute()
-            return self._to_frontend_format(updated)
+            updated = service.events().update(calendarId=calendar_id, eventId=event_id, body=event).execute()
+            return self._to_frontend_format(updated, calendar_id=calendar_id)
         except HttpError as e:
             print(f"[ERROR] Google Calendar update_event error: {e}")
             raise
 
-    def delete_event(self, event_id: str) -> bool:
+    def delete_event(self, event_id: str, calendar_id: str = "primary") -> bool:
         """イベントを削除する。"""
         service = self._build_service()
         try:
-            service.events().delete(calendarId="primary", eventId=event_id).execute()
+            service.events().delete(calendarId=calendar_id, eventId=event_id).execute()
             return True
         except HttpError as e:
             if e.resp.status == 404:
