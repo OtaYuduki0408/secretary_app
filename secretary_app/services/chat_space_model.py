@@ -22,6 +22,7 @@ from services.memo_service import delete_memo as delete_memo_record
 from services.memo_service import delete_memos_bulk as delete_memos_bulk_records
 from services import switchbot_service
 from services import custom_order_service
+from services import pending_action_service
 
 
 # キャッシュを適用する関数をクラスの外に定義
@@ -57,17 +58,20 @@ class ChatSpaceModel:
     P:プレイリスト操作(行動はp)
     Re:強制終了コマンド(処理を停止して等)
     K:計算(行動はn)
-    Yes:肯定的な回答 (例: はい、お願いします、いいよ、OK、進めて、削除して)
-    No:否定的な回答 (例: いいえ、やめて、キャンセル、やっぱりいい)
+    Ya:肯定的な回答 (例: はい、お願いします、いいよ、OK、進めて、削除して)(行動はa)
+    Nn:否定的な回答 (例: いいえ、やめて、キャンセル、やっぱりいい)(行動はn)
     Fn:上記以外(雑談、質問)
     -行動-
-    a:追加
+    a:追加/肯定
     d:削除
     c:変更
     g:取得
     s:検索
     p:再生
+    n:通常/否定
     例：カレンダーへの追加がユーザーの目的から、Caを返す。
+    例：肯定的な返答なら、Yaを返す。
+    例：否定的な返答なら、Nnを返す。
     -入力-
     ユーザーの入力: {input_value}
     """
@@ -86,16 +90,16 @@ class ChatSpaceModel:
     P:プレイリスト操作(行動はp)
     Re:強制終了コマンド
     K:計算(行動はn)
-    Yes:肯定的な回答 (例: はい、お願いします、いいよ、OK、進めて)
-    No:否定的な回答 (例: いいえ、やめて、キャンセル、やっぱりいい)
+    Ya:肯定的な回答 (例: はい、お願いします、いいよ、OK、進めて)(行動はa)
+    Nn:否定的な回答 (例: いいえ、やめて、キャンセル、やっぱりいい)(行動はn)
     -行動-
-    a:追加
+    a:追加/肯定
     d:削除
     c:変更/操作
     g:取得
     s:検索
     p:再生
-    n:通常
+    n:通常/否定
     -補足-
     現在はYouTube再生中です。次/前/再開/保存/除外などのYouTube操作もYpで返してください。
     YouTube状態:
@@ -1209,21 +1213,23 @@ class ChatSpaceModel:
                 }
 
             # 肯定的な回答（はい）の処理
-            if purpose == "Yes":
+            if purpose == "Ya":
                 if not user_id:
                     return {"status": "success", "message": "ユーザーが特定できないため、操作を続行できません。"}
                 
                 # 保留中のアクションを取得
                 pending = pending_action_service.get_pending_actions(user_id)
                 if pending and len(pending) > 0:
-                    # 最新のアクションを取得
-                    latest_action = pending[0]
+                    # 最新のアクションを取得 (get_pending_actions内でソート済み)
+                    latest_action_row = pending[0]
+                    latest_action = latest_action_row.get('action_data')
+                    
                     # 実行
                     from services.action_executor_service import execute_action
                     exec_result = execute_action(user_id, latest_action)
                     
                     # 実行後は保留リストから削除
-                    pending_action_service.delete_pending_action(user_id, latest_action.get('id'))
+                    pending_action_service.delete_pending_action(user_id, latest_action_row.get('id'))
                     
                     return {
                         "status": "success",
@@ -1234,7 +1240,7 @@ class ChatSpaceModel:
                     return {"status": "success", "message": "実行を待機している操作はありません。"}
 
             # 否定的な回答（いいえ）の処理
-            if purpose == "No":
+            if purpose == "Nn":
                 if user_id:
                     pending_action_service.clear_pending_actions(user_id)
                 return {"status": "success", "message": "了解しました。操作をキャンセルしました。", "skip_tone": True}
@@ -1559,12 +1565,15 @@ class ChatSpaceModel:
 
             # 作成者が自分 (zelco054@gmail.com) ではない場合は警告
             if target_creator_email and target_creator_email != "zelco054@gmail.com":
+                now_iso = datetime.now(JST).isoformat()
                 action_payload = {
                     "category": "カレンダー",
                     "sub": "削除",
-                    "detail": { "id": target_id, "calendarId": target_cal_id, "title": target_name }
+                    "detail": { "id": target_id, "calendarId": target_cal_id, "title": target_name },
+                    "scheduled_at": now_iso,
+                    "triggered_at": now_iso
                 }
-                pending_action_service.add_pending_action(user_id, action_payload)
+                pending_action_service.add_pending_action(user_id, 0, action_payload)
                 return {
                     "pending_action": action_payload
                 }, f"「{target_name}」は、{target_creator_name}さんが作成された予定です。本当に削除してよろしいですか？"
@@ -1639,6 +1648,7 @@ class ChatSpaceModel:
             # 作成者が自分 (zelco054@gmail.com) ではない場合は警告
             if target_creator_email and target_creator_email != "zelco054@gmail.com":
                 after_name = event_data.get("after_name") or matched_task.get("title") or matched_task.get("name")
+                now_iso = datetime.now(JST).isoformat()
                 action_payload = {
                     "category": "カレンダー",
                     "sub": "変更",
@@ -1648,9 +1658,11 @@ class ChatSpaceModel:
                         "title": after_name,
                         "start_time": event_data.get("after_start_time"),
                         "end_time": event_data.get("after_end_time")
-                    }
+                    },
+                    "scheduled_at": now_iso,
+                    "triggered_at": now_iso
                 }
-                pending_action_service.add_pending_action(user_id, action_payload)
+                pending_action_service.add_pending_action(user_id, 0, action_payload)
                 return {
                     "pending_action": action_payload
                 }, f"「{before_name}」は、{target_creator_name}さんが作成された予定です。本当に内容を変更してよろしいですか？"
