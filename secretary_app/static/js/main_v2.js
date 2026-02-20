@@ -909,7 +909,11 @@ $(document).ready(function() {
                     else dL = e.startTime.toLocaleDateString('ja-JP', { month: 'short', day: 'numeric' });
                     const tS = `${dL} ${sT}`;
                     
-                    const calendarColorMap = { 'primary': '#3b82f6', 'default': '#7aa8ff' };
+                    const calendarColorMap = { 
+                        'primary': '#3b82f6', 
+                        'family07655219284223877417@group.calendar.google.com': '#d8b4fe', // ファミリーカレンダーを紫色に設定
+                        'default': '#7aa8ff' 
+                    };
                     const dotColor = calendarColorMap[e.calendarId] || calendarColorMap['default'];
                     const creatorName = e.creator || '不明';
                     const titleColor = getUserColor(creatorName);

@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify, session
-from services.google_calendar_service import GoogleCalendarService
+from services.google_calendar_service import GoogleCalendarService, FAMILY_CALENDAR_ID
 
 # Blueprintを作成
 calendar_bp = Blueprint('calendar_bp', __name__)
@@ -77,7 +77,7 @@ def handle_update_event(event_id):
     try:
         updated_event = service.update_event(
             event_id=event_id,
-            calendar_id=data.get('calendar_id', 'primary'),
+            calendar_id=data.get('calendar_id', FAMILY_CALENDAR_ID),
             title=data.get('title'),
             start_time=data.get('start_time'),
             end_time=data.get('end_time'),
@@ -97,7 +97,7 @@ def handle_delete_event(event_id):
     if not service:
         return jsonify({"error": "User not authenticated"}), 401
 
-    calendar_id = request.args.get('calendar_id', 'primary')
+    calendar_id = request.args.get('calendar_id', FAMILY_CALENDAR_ID)
 
     try:
         success = service.delete_event(event_id, calendar_id=calendar_id)

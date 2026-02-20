@@ -23,6 +23,8 @@ SCOPES = [
     "https://www.googleapis.com/auth/calendar",
 ]
 
+FAMILY_CALENDAR_ID = "family07655219284223877417@group.calendar.google.com"
+
 class GoogleCalendarService:
     def __init__(self, user_id: str):
         self.user_id = user_id
@@ -135,7 +137,7 @@ class GoogleCalendarService:
             print(f"[ERROR] Google Calendar list_events error: {e}")
             raise
 
-    def add_event(self, title: str, start_time: str, end_time: str, description: str = "", calendar_id: str = "primary") -> Dict[str, Any]:
+    def add_event(self, title: str, start_time: str, end_time: str, description: str = "", calendar_id: str = FAMILY_CALENDAR_ID, color_id: str = "3") -> Dict[str, Any]:
         """イベントを追加する。"""
         service = self._build_service()
 
@@ -149,6 +151,8 @@ class GoogleCalendarService:
             "start": {"dateTime": st, "timeZone": "Asia/Tokyo"},
             "end": {"dateTime": et, "timeZone": "Asia/Tokyo"},
         }
+        if color_id:
+            event_body["colorId"] = color_id
 
         try:
             created = service.events().insert(calendarId=calendar_id, body=event_body).execute()
@@ -157,7 +161,7 @@ class GoogleCalendarService:
             print(f"[ERROR] Google Calendar add_event error: {e}")
             raise
 
-    def update_event(self, event_id: str, title: str = None, start_time: str = None, end_time: str = None, description: str = None, calendar_id: str = "primary") -> Dict[str, Any]:
+    def update_event(self, event_id: str, title: str = None, start_time: str = None, end_time: str = None, description: str = None, calendar_id: str = FAMILY_CALENDAR_ID) -> Dict[str, Any]:
         """イベントを更新する。"""
         service = self._build_service()
 
@@ -180,7 +184,7 @@ class GoogleCalendarService:
             print(f"[ERROR] Google Calendar update_event error: {e}")
             raise
 
-    def delete_event(self, event_id: str, calendar_id: str = "primary") -> bool:
+    def delete_event(self, event_id: str, calendar_id: str = FAMILY_CALENDAR_ID) -> bool:
         """イベントを削除する。"""
         service = self._build_service()
         try:

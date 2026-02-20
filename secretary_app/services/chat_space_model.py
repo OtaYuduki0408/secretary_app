@@ -114,6 +114,7 @@ class ChatSpaceModel:
     - name (予定名)
     - start_time (未指定時は当日/推測時刻)
     - end_time (未指定時は開始1時間後)
+    - color (色指定。紫、赤、青などがあれば抽出)
     timeはYYYY-MM-DD HH:MM:SS
     出力はJSON配列のみ、他テキスト禁止。単独でも複数あっても二次配列で返す。
     現在時刻:{current_time}
@@ -846,7 +847,8 @@ class ChatSpaceModel:
                 'before_end_time': x.get('before_end_time', ''),
                 'after_name': x.get('after_name', ''),
                 'after_start_time': x.get('after_start_time', ''),
-                'after_end_time': x.get('after_end_time', '')
+                'after_end_time': x.get('after_end_time', ''),
+                'color': x.get('color', '')
             }
             if item['start_time'] or item['before_start_time']:
                  parsed_list.append(item)
@@ -1411,18 +1413,22 @@ class ChatSpaceModel:
                     except ValueError:
                         end_time_str = event_data['start_time']
 
-                # new_event = local_calendar_service.add_event(
-                #     user_id=user_id,
-                #     title=event_data['name'],
-                #     start_time=event_data['start_time'], # Pass as string
-                #     end_time=end_time_str               # Pass as string
-                # )
+                # 色指定の処理
+                add_kwargs = {
+                    "title": event_data['name'],
+                    "start_time": event_data['start_time'],
+                    "end_time": end_time_str
+                }
+                user_color = str(event_data.get('color', '')).strip()
+                if "紫" in user_color or "グレープ" in user_color:
+                    add_kwargs["color_id"] = "3"
+                elif "赤" in user_color or "トマト" in user_color:
+                    add_kwargs["color_id"] = "11"
+                elif "青" in user_color or "ブルー" in user_color:
+                    add_kwargs["color_id"] = "9"
+
                 service = GoogleCalendarService(user_id)
-                new_event = service.add_event(
-                    title=event_data['name'],
-                    start_time=event_data['start_time'],
-                    end_time=end_time_str
-                )
+                new_event = service.add_event(**add_kwargs)
                 added_events.append(new_event)
             except Exception as e:
                 print(f"ローカルカレンダーへのイベント追加エラー: {e}")
