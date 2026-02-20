@@ -169,6 +169,7 @@ $(document).ready(function() {
                 finalTranscript += event_final_transcript;
             }
             const display_transcript = finalTranscript + interim_transcript;
+            console.log("[Voice Debug] Transcript:", display_transcript, "WakeWords:", WAKE_WORDS);
 
             if (currentMode === 'waiting' || currentMode === 'speaking') {
                 if (containsWakeWord(display_transcript)) {
@@ -800,40 +801,57 @@ $(document).ready(function() {
     function hideActionOverlay() { $actionOverlay.hide(); $actionOverlayBody.empty(); }
     $('.action-overlay-close').on('click', hideActionOverlay);
 
-    const weatherTextToIcon = (weather) => {
+    const weatherTextToIcon = (weather, code) => {
+        if (code) {
+            const c = String(code);
+            if (c.startsWith('1')) return '☀';
+            if (c.startsWith('2')) return '☁';
+            if (c.startsWith('3')) return '☔';
+            if (c.startsWith('4')) return '❄️';
+        }
         if (!weather || weather === 'N/A') return '？';
-        if (weather.includes('晴')) {
-            return weather.includes('曇') || weather.includes('くもり') ? '⛅' : '☀';
-        }
-        if (weather.includes('雨')) {
-            return weather.includes('曇') || weather.includes('くもり') ? '🌦' : '☔';
-        }
+        if (weather.includes('晴')) return weather.includes('曇') || weather.includes('くもり') ? '⛅' : '☀';
+        if (weather.includes('雨')) return weather.includes('曇') || weather.includes('くもり') ? '🌦' : '☔';
         if (weather.includes('曇') || weather.includes('くもり')) return '☁';
         if (weather.includes('雪')) return '❄️';
         return '？';
     };
 
-    const updateWeatherCard = (cardId, data) => {
+    const updateWeatherCardV2 = (cardId, data, minTemp, maxTemp) => {
         const $card = $(`#${cardId}`);
         if (!$card.length) return;
-
         const icon = weatherTextToIcon(data?.weather);
-        const temp_max = (data?.temperature_max && data.temperature_max !== 'N/A' && data.temperature_max !== '0') ? `${data.temperature_max}℃` : '--℃';
-        const temp_min = (data?.temperature_min && data.temperature_min !== 'N/A' && data.temperature_min !== '0') ? `${data.temperature_min}℃` : '--℃';
-        const pop = (data?.pop && data.pop !== 'N/A') ? `${data.pop}%` : '--%';
-
         $card.find('.weather-icon').text(icon);
-        $card.find('.temp-max').text(temp_max);
-        $card.find('.temp-min').text(temp_min);
-        $card.find('.pop').text(pop);
+        $card.find('.temp-max').text(`${maxTemp || '--'}℃`);
+        $card.find('.temp-min').text(`${minTemp || '--'}℃`);
+        $card.find('.pop').text(`${data?.pop || '--'}%`);
     };
 
     const fetchWeather = () => $.get('/api/weather', (d) => {
         console.log("Weather API response:", d);
-        if (d.today_am) updateWeatherCard('weather-today-am', d.today_am);
-        if (d.today_pm) updateWeatherCard('weather-today-pm', d.today_pm);
-        if (d.tomorrow_am) updateWeatherCard('weather-tomorrow-am', d.tomorrow_am);
-        if (d.tomorrow_pm) updateWeatherCard('weather-tomorrow-pm', d.tomorrow_pm);
+        if (d.error) return;
+        updateWeatherCardV2('weather-today', d.today_am, d.today_min, d.today_max);
+        updateWeatherCardV2('weather-tomorrow', d.tomorrow_am, d.tomorrow_min, d.tomorrow_max);
+
+        const $weekly = $('#weather-weekly');
+        if ($weekly.length && d.weekly) {
+            $weekly.empty();
+            d.weekly.forEach(w => {
+                const icon = weatherTextToIcon(null, w.weather_code);
+                const item = `
+                    <div class="weekly-item">
+                        <div class="weekly-date">${w.date}</div>
+                        <div class="weekly-icon">${icon}</div>
+                        <div class="weekly-temp">
+                            <span class="temp-max">${w.max_temp}</span>
+                            <span class="temp-min">${w.min_temp}</span>
+                        </div>
+                        <div class="weekly-pop">${w.pop}%</div>
+                    </div>
+                `;
+                $weekly.append(item);
+            });
+        }
     });
     const fetchFinanceData = () => $.get('/api/finance/summary', (d) => { $('#total-balance .data').text(`¥${d.balance?.toLocaleString()||'N/A'}`); $('#monthly-expense .data').text(`¥${d.monthly_expense?.toLocaleString()||'N/A'}`); });
     const fetchCalendarData = () => {const n=new Date(),s=new Date(n.getFullYear(),n.getMonth(),n.getDate(),0,0,0),e=new Date(s.getTime()+7*24*60*60*1000); $.get(`/api/local_calendar/events`,(evts)=>{const $l=$('#schedule-list').empty();if(evts?.length){const uE=evts.map(e=>({...e,startTime:new Date(e.start_time)})).filter(e=>new Date(e.start_time)>=n).sort((a,b)=>new Date(a.start_time)-new Date(b.start_time)).slice(0,6);if(uE.length){uE.forEach(e=>{const sT=e.startTime.toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'});let dL='';if(e.startTime.getDate()===n.getDate())dL='今日';else if(e.startTime.getDate()===n.getDate()+1)dL='明日';else dL=e.startTime.toLocaleDateString('ja-JP',{month:'short',day:'numeric'});const tS=`${dL} ${sT}`;$l.append(`<li><span class="schedule-time">${tS}</span><span class="schedule-title">${e.title}</span></li>`);});}else{$l.append('<li><span class="schedule-title">直近の予定はありません</span></li>');}}else{$l.append('<li><span class="schedule-title">予定はありません</span></li>');}}).fail(()=>{$('#schedule-list').empty().append('<li><span class="schedule-title">予定の取得に失敗</span></li>');});};

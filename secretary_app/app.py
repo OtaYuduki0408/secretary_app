@@ -845,85 +845,85 @@ def get_weather_route():
     area_code = "100000" 
     
     forecast_data = _get_jma_forecast_data(area_code)
-    if not forecast_data or not isinstance(forecast_data, list) or len(forecast_data) == 0:
+    if not forecast_data or not isinstance(forecast_data, list) or len(forecast_data) < 2:
         return jsonify({"error": "Failed to get weather data"}), 500
 
-    def _find_time_series_by_key(key, series_list):
-        for series in series_list:
-            if series.get('areas') and series['areas'][0].get(key):
-                return series
-        return None
-
     try:
-        daily_forecast = forecast_data[0]
-        time_series_list = daily_forecast.get('timeSeries', [])
-
-        weather_ts = _find_time_series_by_key('weathers', time_series_list)
-        pop_ts = _find_time_series_by_key('pops', time_series_list)
-        temp_ts = _find_time_series_by_key('temps', time_series_list)
+        # --- 今日・明日の詳細 (forecast_data[0]) ---
+        short_term = forecast_data[0]
+        st_times = short_term.get('timeSeries', [])
         
-        if not weather_ts or not pop_ts or not temp_ts:
-            app.logger.error("Required timeSeries data (weathers, pops, temps) not found.")
-            return jsonify({"error": "Failed to parse weather data: missing timeSeries"}), 500
+        # 天気
+        st_weather_ts = next((s for s in st_times if 'weathers' in s['areas'][0]), None)
+        # 降水確率
+        st_pop_ts = next((s for s in st_times if 'pops' in s['areas'][0]), None)
+        # 気温
+        st_temp_ts = next((s for s in st_times if 'temps' in s['areas'][0]), None)
 
-        # 全データポイントを (datetime, value) のタプルリストとして抽出
-        weather_points = [(datetime.fromisoformat(t.replace('Z', '+00:00')).astimezone(JST), v) for t, v in zip(weather_ts['timeDefines'], weather_ts['areas'][0]['weathers'])]
-        pop_points = [(datetime.fromisoformat(t.replace('Z', '+00:00')).astimezone(JST), v) for t, v in zip(pop_ts['timeDefines'], pop_ts['areas'][0]['pops'])]
-        temp_points = [(datetime.fromisoformat(t.replace('Z', '+00:00')).astimezone(JST), v) for t, v in zip(temp_ts['timeDefines'], temp_ts['areas'][0]['temps'])]
+        def _parse_ts(ts, key):
+            if not ts: return []
+            return [(datetime.fromisoformat(t.replace('Z', '+00:00')).astimezone(JST), v) 
+                    for t, v in zip(ts['timeDefines'], ts['areas'][0][key])]
 
-        # ユーザー指示: 全ての時刻のデータをコンソールに表示
-        app.logger.info("--- All Weather Data Points ---")
-        app.logger.info(f"Weather: {weather_points}")
-        app.logger.info(f"PoP: {pop_points}")
-        app.logger.info(f"Temp: {temp_points}")
-        app.logger.info("---------------------------------")
+        weather_points = _parse_ts(st_weather_ts, 'weathers')
+        pop_points = _parse_ts(st_pop_ts, 'pops')
+        temp_points = _parse_ts(st_temp_ts, 'temps')
 
-    except (IndexError, KeyError, ValueError) as e:
-        app.logger.error(f"Failed to parse JMA forecast data structure: {e}")
-        return jsonify({"error": "Failed to parse weather data"}), 500
+        def _find_closest(target_dt, data_points):
+            valid = [p for p in data_points if p[1] is not None and str(p[1]).strip() != ""]
+            if not valid: return "N/A"
+            return min(valid, key=lambda p: abs((p[0] - target_dt).total_seconds()))[1]
 
-    def _find_closest_data(target_dt, data_points):
-        """データポイントのリストからターゲット時刻に最も近い有効な値を見つける"""
-        valid_points = [(dt, val) for dt, val in data_points if val is not None and str(val).strip() != ""]
-        if not valid_points:
-            return "N/A"
-        
-        closest_point = min(valid_points, key=lambda point: abs((point[0] - target_dt).total_seconds()))
-        return closest_point[1]
+        def get_detail(target_dt):
+            w = str(_find_closest(target_dt, weather_points)).split("　")[0]
+            return {
+                "weather": w,
+                "pop": str(_find_closest(target_dt, pop_points)),
+                "temp": str(_find_closest(target_dt, temp_points))
+            }
 
-    def get_forecast_for_target(target_dt):
-        weather = _find_closest_data(target_dt, weather_points)
-        temp = _find_closest_data(target_dt, temp_points)
-        pop = _find_closest_data(target_dt, pop_points)
-        
-        # 天気文字列を整形
-        if isinstance(weather, str):
-            weather = weather.split("　")[0]
+        now = datetime.now(JST)
+        today = now.date()
+        tomorrow = today + timedelta(days=1)
 
-        return {
-            "weather": str(weather),
-            "temperature": str(temp),
-            "pop": str(pop)
+        # 今日の最高・最低気温の推定 (st_temp_ts から)
+        today_temps = [p[1] for p in temp_points if p[0].date() == today]
+        tomorrow_temps = [p[1] for p in temp_points if p[0].date() == tomorrow]
+
+        # --- 週間予報 (forecast_data[1]) ---
+        weekly_term = forecast_data[1]
+        wt_times = weekly_term.get('timeSeries', [])
+        wt_weather_pop = wt_times[0]
+        wt_temps = wt_times[1]
+
+        weekly_list = []
+        for i in range(len(wt_weather_pop['timeDefines'])):
+            dt = datetime.fromisoformat(wt_weather_pop['timeDefines'][i].replace('Z', '+00:00')).astimezone(JST)
+            weekly_list.append({
+                "date": dt.strftime("%m/%d"),
+                "day_of_week": ["月","火","水","木","金","土","日"][dt.weekday()],
+                "weather_code": wt_weather_pop['areas'][0]['weatherCodes'][i],
+                "pop": wt_weather_pop['areas'][0]['pops'][i] if i < len(wt_weather_pop['areas'][0]['pops']) else "-",
+                "min_temp": wt_temps['areas'][0]['tempsMin'][i],
+                "max_temp": wt_temps['areas'][0]['tempsMax'][i]
+            })
+
+        response = {
+            "today_am": get_detail(JST.localize(datetime.combine(today, datetime.min.time())).replace(hour=9)),
+            "today_pm": get_detail(JST.localize(datetime.combine(today, datetime.min.time())).replace(hour=15)),
+            "tomorrow_am": get_detail(JST.localize(datetime.combine(tomorrow, datetime.min.time())).replace(hour=9)),
+            "tomorrow_pm": get_detail(JST.localize(datetime.combine(tomorrow, datetime.min.time())).replace(hour=15)),
+            "today_min": min(today_temps) if today_temps else "-",
+            "today_max": max(today_temps) if today_temps else "-",
+            "tomorrow_min": min(tomorrow_temps) if tomorrow_temps else "-",
+            "tomorrow_max": max(tomorrow_temps) if tomorrow_temps else "-",
+            "weekly": weekly_list
         }
+        return jsonify(response)
 
-    now = datetime.now(JST)
-    today_date = now.date()
-    tomorrow_date = (now + timedelta(days=1)).date()
-
-    # ターゲット時刻を定義
-    today_am_target = JST.localize(datetime.combine(today_date, datetime.min.time())).replace(hour=9)
-    today_pm_target = JST.localize(datetime.combine(today_date, datetime.min.time())).replace(hour=15)
-    tomorrow_am_target = JST.localize(datetime.combine(tomorrow_date, datetime.min.time())).replace(hour=9)
-    tomorrow_pm_target = JST.localize(datetime.combine(tomorrow_date, datetime.min.time())).replace(hour=15)
-
-    response = {
-        "today_am": get_forecast_for_target(today_am_target),
-        "today_pm": get_forecast_for_target(today_pm_target),
-        "tomorrow_am": get_forecast_for_target(tomorrow_am_target),
-        "tomorrow_pm": get_forecast_for_target(tomorrow_pm_target),
-    }
-            
-    return jsonify(response)
+    except Exception as e:
+        app.logger.error(f"Weather parse error: {e}")
+        return jsonify({"error": str(e)}), 500
 
 
 def text_to_speech_base64(text: str) -> str:

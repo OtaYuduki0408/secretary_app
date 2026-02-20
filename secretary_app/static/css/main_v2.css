@@ -607,10 +607,50 @@ body, html {
 .weather-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    grid-template-rows: 1fr 1fr;
-    gap: 10px;
-    height: 65%; /* Allocate a fixed portion of the height */
+    grid-template-rows: auto auto;
+    gap: 8px;
+    height: auto;
     margin-bottom: 10px;
+}
+
+.weather-weekly-container {
+    grid-column: 1 / span 2;
+    display: flex;
+    justify-content: space-between;
+    background-color: rgba(0,0,0,0.15);
+    border-radius: 6px;
+    padding: 10px 6px;
+    gap: 4px;
+}
+
+.weekly-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    flex: 1;
+    font-size: 0.7em;
+}
+
+.weekly-date {
+    font-weight: bold;
+    margin-bottom: 2px;
+}
+
+.weekly-icon {
+    font-size: 1.5em;
+    margin: 2px 0;
+}
+
+.weekly-temp {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.weekly-pop {
+    font-size: 0.85em;
+    color: #b0b0b0;
+    margin-top: 2px;
 }
 
 .weather-card {

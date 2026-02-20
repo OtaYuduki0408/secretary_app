@@ -14,8 +14,8 @@
         <!-- ① 天気・収支管理フィールド -->
         <div class="grid-item" id="field-weather-finance">
             <div class="weather-grid">
-                <div class="weather-card" id="weather-today-am">
-                    <div class="info-item-header">今日午前</div>
+                <div class="weather-card" id="weather-today">
+                    <div class="info-item-header">今日</div>
                     <div class="info-item-body">
                         <span class="weather-icon"></span>
                         <div class="weather-details">
@@ -27,8 +27,8 @@
                         </div>
                     </div>
                 </div>
-                <div class="weather-card" id="weather-today-pm">
-                    <div class="info-item-header">今日午後</div>
+                <div class="weather-card" id="weather-tomorrow">
+                    <div class="info-item-header">明日</div>
                     <div class="info-item-body">
                         <span class="weather-icon"></span>
                         <div class="weather-details">
@@ -40,31 +40,8 @@
                         </div>
                     </div>
                 </div>
-                <div class="weather-card" id="weather-tomorrow-am">
-                    <div class="info-item-header">明日午前</div>
-                    <div class="info-item-body">
-                        <span class="weather-icon"></span>
-                        <div class="weather-details">
-                            <div class="temps">
-                                <span class="temp-max">--℃</span>
-                                <span class="temp-min">--℃</span>
-                            </div>
-                            <span class="pop">--%</span>
-                        </div>
-                    </div>
-                </div>
-                <div class="weather-card" id="weather-tomorrow-pm">
-                    <div class="info-item-header">明日午後</div>
-                    <div class="info-item-body">
-                        <span class="weather-icon"></span>
-                        <div class="weather-details">
-                            <div class="temps">
-                                <span class="temp-max">--℃</span>
-                                <span class="temp-min">--℃</span>
-                            </div>
-                            <span class="pop">--%</span>
-                        </div>
-                    </div>
+                <div id="weather-weekly" class="weather-weekly-container">
+                    <!-- JSで動的に挿入 -->
                 </div>
             </div>
             <div class="finance-grid">
