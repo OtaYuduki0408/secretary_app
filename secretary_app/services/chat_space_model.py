@@ -109,9 +109,9 @@ class ChatSpaceModel:
     ユーザーの入力: {input_value}
     """
     CALC_PROMPT_TEMPLATE = """
-    以下の質問は計算に関する質問です。pythonのeval関数で計算できるように計算式を作成してください。
-    出力は計算式のみ。余計な説明は禁止。
-    質問: {input_value}
+    以下の命令をpythonのeval関数で計算できるように書き換えてください。
+    解答は出力した計算式のみにしてください。
+    命令: {input_value}
     """
     FN_FALLBACK_PROMPT_TEMPLATE = """
     300文字以内で{tone}風に次の質問に回答してください:
@@ -1164,6 +1164,11 @@ class ChatSpaceModel:
 
         # ▼▼▼ 新しいevalロジック ▼▼▼
         try:
+            # 記号の置換プリプロセス
+            eval_input = (cleaned_input or "").replace("÷", "/").replace("×", "*").replace("は", "=")
+            # evalが通るように文末の = を一時的に除去
+            eval_target = eval_input.rstrip("=")
+            
             # 安全のため、evalで使える関数を制限する
             safe_builtins = {
                 'abs', 'divmod', 'float', 'int', 'max', 'min', 'pow', 'round', 'sum'
@@ -1172,7 +1177,7 @@ class ChatSpaceModel:
             restricted_globals = {"__builtins__": {k: v for k, v in __builtins__.items() if k in safe_builtins}}
             
             # 式を評価
-            value = eval(cleaned_input, restricted_globals, {})
+            value = eval(eval_target, restricted_globals, {})
             
             # 評価結果が数値型の場合のみ計算結果として扱う
             if isinstance(value, (int, float)):
@@ -1409,7 +1414,27 @@ class ChatSpaceModel:
                     result["message"] = ""
                     result["suppress_tts"] = True
             elif purpose in ("Kn", "K"):
-                result["message"] = self._fallback_with_gemini(cleaned_input, tone_response)
+                # LLMに計算式を作らせる
+                calc_prompt = self.CALC_PROMPT_TEMPLATE.format(input_value=cleaned_input)
+                calc_expr = self._gemini_request(calc_prompt)
+                
+                # LLMの回答をeval用にプリプロセス
+                eval_target = (calc_expr or "").replace("÷", "/").replace("×", "*").replace("は", "=").rstrip("=")
+                
+                try:
+                    safe_builtins = {'abs', 'divmod', 'float', 'int', 'max', 'min', 'pow', 'round', 'sum'}
+                    restricted_globals = {"__builtins__": {k: v for k, v in __builtins__.items() if k in safe_builtins}}
+                    value = eval(eval_target, restricted_globals, {})
+                    
+                    if isinstance(value, (int, float)):
+                        formatted = self._format_calc_value(value)
+                        result["message"] = f"答えは{formatted}です。"
+                    else:
+                        result["message"] = calc_expr # 数値以外ならそのまま返す
+                except Exception:
+                    # eval失敗時はGeminiの元の回答（計算式など）をそのまま出す
+                    result["message"] = calc_expr
+                
                 result["skip_tone"] = True
             else:
                 result["message"] = "申し訳ございません。お客様の意図を特定できませんでした。"
