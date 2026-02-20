@@ -3,11 +3,10 @@
 // ===================================
 
 // 必要なモジュールをインポート
-import { ScheduleManager } from "/static/js/ScheduleManager.js"; // Googleカレンダー操作クラス
 console.log("✅ ChatSpace.js ロード完了 (トースト機能付き)");
 
-// window.managerが存在しない場合のフォールバック（ChatSpace.jsのロジックを維持）
-const manager = window.manager || new ScheduleManager(); 
+// window.managerが存在しない場合のフォールバック（不要なため削除/定数化）
+const manager = window.manager || null; 
 
 let abortRequested = false;
 let abortUntil = 0;

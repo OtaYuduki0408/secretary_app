@@ -8,8 +8,8 @@ from decimal import Decimal, ROUND_HALF_UP, InvalidOperation
 JST = pytz.timezone('Asia/Tokyo')
 import google.generativeai as genai
 
-# Local calendar service
-from services import local_calendar_service
+# Google calendar service
+from services.google_calendar_service import GoogleCalendarService
 
 from services.finance_service import (
     get_all_finance_records, get_finance_summary, get_current_balance,
@@ -1411,11 +1411,17 @@ class ChatSpaceModel:
                     except ValueError:
                         end_time_str = event_data['start_time']
 
-                new_event = local_calendar_service.add_event(
-                    user_id=user_id,
+                # new_event = local_calendar_service.add_event(
+                #     user_id=user_id,
+                #     title=event_data['name'],
+                #     start_time=event_data['start_time'], # Pass as string
+                #     end_time=end_time_str               # Pass as string
+                # )
+                service = GoogleCalendarService(user_id)
+                new_event = service.add_event(
                     title=event_data['name'],
-                    start_time=event_data['start_time'], # Pass as string
-                    end_time=end_time_str               # Pass as string
+                    start_time=event_data['start_time'],
+                    end_time=end_time_str
                 )
                 added_events.append(new_event)
             except Exception as e:
@@ -1444,7 +1450,9 @@ class ChatSpaceModel:
             end_time_iso = range_info[0].get('end_time')
 
         try:
-            events = local_calendar_service.get_events(user_id, start_time_iso, end_time_iso)
+            # events = local_calendar_service.get_events(user_id, start_time_iso, end_time_iso)
+            service = GoogleCalendarService(user_id)
+            events = service.list_events(time_min=start_time_iso, time_max=end_time_iso)
             if events:
                 event_details = [f"{self._format_event_time(e['start_time'])}に{e['title']}の予定" for e in events]
                 message = f"{', '.join(event_details)}。以上{len(events)}件の予定が見つかりました。"
@@ -1503,7 +1511,9 @@ class ChatSpaceModel:
 
             target_id = matched_task.get("id")
             try:
-                local_calendar_service.delete_event(target_id, user_id)
+                # local_calendar_service.delete_event(target_id, user_id)
+                service = GoogleCalendarService(user_id)
+                service.delete_event(target_id)
                 deleted_count += 1
                 deleted_events.append(matched_task)
                 # 同一データの重複削除を正しく処理するため、マッチ済みタスクを除外
@@ -1578,7 +1588,14 @@ class ChatSpaceModel:
                         "start_time": matched_task.get("start_time"),
                         "end_time": matched_task.get("end_time"),
                     }
-                    local_calendar_service.update_event(target_id, user_id, **update_payload)
+                    # local_calendar_service.update_event(target_id, user_id, **update_payload)
+                    service = GoogleCalendarService(user_id)
+                    service.update_event(
+                        event_id=target_id,
+                        title=update_payload.get("title"),
+                        start_time=update_payload.get("start_time"),
+                        end_time=update_payload.get("end_time")
+                    )
                     changed_count += 1
                     changed_events.append({
                         "before": before_snapshot,

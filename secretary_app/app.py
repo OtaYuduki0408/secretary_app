@@ -45,10 +45,8 @@ from services.finance_service import (
     get_monthly_goal,
     upsert_monthly_goal,
 )
-from services import local_calendar_service
 from services.chat_space_model import ChatSpaceModel
 from services.memo_routes import memo_bp
-from services.ScheduleManager import ScheduleManager
 from services.user_settings_service import get_user_settings, upsert_user_settings
 from services.playlist_service import (
     get_playlist,

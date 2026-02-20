@@ -862,7 +862,7 @@ $(document).ready(function() {
     });
     const fetchFinanceData = () => $.get('/api/finance/summary', (d) => { $('#total-balance .data').text(`¥${d.balance?.toLocaleString()||'N/A'}`); $('#monthly-expense .data').text(`¥${d.monthly_expense?.toLocaleString()||'N/A'}`); });
     let allCalendarEvents = [];
-    let activeFilterCreator = 'all';
+    let activeFilterCreators = []; // 複数選択のために配列に変更
 
     const getUserColor = (name) => {
         const userPalette = [
@@ -889,9 +889,10 @@ $(document).ready(function() {
         const n = new Date();
         const $l = $('#schedule-list').empty();
         
-        const filteredEvents = activeFilterCreator === 'all' 
+        // フィルタリングロジックを複数選択対応に変更
+        const filteredEvents = activeFilterCreators.length === 0 
             ? allCalendarEvents 
-            : allCalendarEvents.filter(e => e.creator === activeFilterCreator);
+            : allCalendarEvents.filter(e => activeFilterCreators.includes(e.creator || '不明'));
 
         if (filteredEvents.length) {
             const uE = filteredEvents.map(e => ({ ...e, startTime: new Date(e.start_time) }))
@@ -943,16 +944,26 @@ $(document).ready(function() {
         if (creators.length <= 1) return; // 1人しかいないならボタン不要
 
         // 「すべて」ボタン
-        const allBtn = $(`<button class="filter-btn ${activeFilterCreator === 'all' ? 'active' : ''}" style="background: ${activeFilterCreator === 'all' ? '#444' : 'transparent'}; border: 1px solid #555; color: #fff; font-size: 0.7em; padding: 2px 6px; border-radius: 4px; cursor: pointer;">All</button>`);
-        allBtn.on('click', () => { activeFilterCreator = 'all'; renderFilterButtons(); renderScheduleList(); });
+        const isAllActive = activeFilterCreators.length === 0;
+        const allBtn = $(`<button class="filter-btn ${isAllActive ? 'active' : ''}" style="background: ${isAllActive ? '#444' : 'transparent'}; border: 1px solid #555; color: #fff; font-size: 0.7em; padding: 2px 6px; border-radius: 4px; cursor: pointer;">All</button>`);
+        allBtn.on('click', () => { 
+            activeFilterCreators = []; // 全選択時は空にする
+            renderFilterButtons(); 
+            renderScheduleList(); 
+        });
         $f.append(allBtn);
 
         creators.forEach(c => {
             const color = getUserColor(c);
-            const isActive = activeFilterCreator === c;
+            const isActive = activeFilterCreators.includes(c);
             const btn = $(`<button class="filter-btn ${isActive ? 'active' : ''}" style="background: ${isActive ? color + '33' : 'transparent'}; border: 1px solid ${isActive ? color : '#555'}; color: ${isActive ? color : '#999'}; font-size: 0.7em; padding: 2px 6px; border-radius: 4px; cursor: pointer; transition: all 0.2s;">${c}</button>`);
             btn.on('click', () => {
-                activeFilterCreator = (activeFilterCreator === c) ? 'all' : c;
+                // 既に選択されていれば削除、そうでなければ追加
+                if (isActive) {
+                    activeFilterCreators = activeFilterCreators.filter(item => item !== c);
+                } else {
+                    activeFilterCreators.push(c);
+                }
                 renderFilterButtons();
                 renderScheduleList();
             });

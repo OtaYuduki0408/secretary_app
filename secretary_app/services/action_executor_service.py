@@ -15,7 +15,7 @@ import google.auth
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 from services.google_token_service import get_credentials
-from services.ScheduleManager import ScheduleManager
+from services.google_calendar_service import GoogleCalendarService
 import pytz
 from google.auth.transport.requests import Request # メール送信時のクレデンシャル更新に必要
 from services.finance_service import ( # finance_serviceから必要な関数をインポート
@@ -119,9 +119,13 @@ def _execute_calendar_read_aloud(user_id: str, detail_data: dict, triggered_at: 
         current_app.logger.error(traceback.format_exc())
         return {"status": "error", "message": f"カレンダー読み上げに失敗しました: 日時解析エラー {e}"}
 
-    # local_calendar_serviceを使ってイベントを取得
-    # get_eventsはISO形式のタイムスタンプを受け取るので、JSTでlocalizeされたdatetimeをisoformat()で渡す
-    events = local_calendar_service.get_events(user_id, start_datetime.isoformat(), end_datetime.isoformat())
+    # GoogleCalendarServiceを使ってイベントを取得
+    try:
+        service = GoogleCalendarService(user_id)
+        events = service.list_events(time_min=start_datetime.isoformat(), time_max=end_datetime.isoformat())
+    except Exception as e:
+        current_app.logger.error(f"Googleカレンダー取得エラー: {e}")
+        return {"status": "error", "message": f"カレンダーの取得に失敗しました: {e}"}
 
     if not events:
         return {
@@ -545,8 +549,6 @@ def _execute_special_alarm_read(detail_data: dict) -> dict:
 
 
 
-from app import socketio, connected_users
-
 def execute_action(user_id: str, action_data: dict) -> dict: # triggered_atをaction_dataから取得するように変更
     """
     アクションデータを解析し、適切な処理を実行する。
@@ -557,6 +559,9 @@ def execute_action(user_id: str, action_data: dict) -> dict: # triggered_atをac
     Returns:
         dict: 実行結果（成功/失敗、メッセージなど）。
     """
+    # 循環参照回避のため関数内でインポート
+    from app import socketio, connected_users
+
     category = action_data.get('category')
     sub = action_data.get('sub')
     detail = action_data.get('detail', {})
@@ -585,15 +590,14 @@ def execute_action(user_id: str, action_data: dict) -> dict: # triggered_atをac
             end_time = datetime.fromisoformat(end_time_str)
             current_app.logger.debug(f"Calendar Add Action: Converted times: start_time={start_time}, end_time={end_time}")
 
-            from services import local_calendar_service
-            new_event = local_calendar_service.add_event(
-                user_id=user_id,
+            service = GoogleCalendarService(user_id)
+            new_event = service.add_event(
                 title=title,
-                start_time=start_time,
-                end_time=end_time,
+                start_time=start_time_str,
+                end_time=end_time_str,
                 description=description
             )
-            current_app.logger.debug(f"Calendar Add Action: local_calendar_service.add_event result: {new_event}")
+            current_app.logger.debug(f"Calendar Add Action: GoogleCalendarService.add_event result: {new_event}")
             
             # WebSocketでカレンダーの更新を通知
             sid = connected_users.get(user_id)
@@ -607,23 +611,6 @@ def execute_action(user_id: str, action_data: dict) -> dict: # triggered_atをac
         except Exception as e:
             current_app.logger.error(f"Calendar Add Action: Error adding event: {e}", exc_info=True)
             return {"status": "error", "message": f"カレンダーイベントの追加中にエラーが発生しました: {e}"}
-    elif category == '画面' and sub == 'ブラックアウト':
-        if not socketio or not connected_users:
-            return {"status": "error", "message": "WebSocketが初期化されていません。"}
-        state = detail.get('state', 'off') # detailがなければ 'off' に
-        sid = connected_users.get(user_id)
-        if sid:
-            socketio.emit('dispatch_command', {
-                'actions': [{
-                    'category': '画面制御',
-                    'sub': '状態変更',
-                    'detail': { 'state': state }
-                }]
-            }, room=sid)
-            return {"status": "success", "message": f"画面を {state} にするようフロントエンドに通知しました。"}
-        else:
-            # ユーザーが接続していない場合は保留アクションとして登録するなどのフォールバックも考えられる
-            return {"status": "error", "message": "ユーザーが接続されていません。"}
     elif category == '画面' and sub == 'ブラックアウト':
         if not socketio or not connected_users:
             current_app.logger.error("WebSocket is not initialized, cannot control screen.")

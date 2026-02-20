@@ -139,11 +139,15 @@ class GoogleCalendarService:
         """イベントを追加する。"""
         service = self._build_service()
 
+        # Google APIは ISO 8601 (YYYY-MM-DDTHH:MM:SS) 形式を期待するため正規化
+        st = start_time.replace(" ", "T") if start_time else None
+        et = end_time.replace(" ", "T") if end_time else None
+
         event_body = {
             "summary": title,
             "description": description,
-            "start": {"dateTime": start_time, "timeZone": "Asia/Tokyo"},
-            "end": {"dateTime": end_time, "timeZone": "Asia/Tokyo"},
+            "start": {"dateTime": st, "timeZone": "Asia/Tokyo"},
+            "end": {"dateTime": et, "timeZone": "Asia/Tokyo"},
         }
 
         try:
@@ -163,8 +167,12 @@ class GoogleCalendarService:
 
             if title is not None: event["summary"] = title
             if description is not None: event["description"] = description
-            if start_time: event["start"] = {"dateTime": start_time, "timeZone": "Asia/Tokyo"}
-            if end_time: event["end"] = {"dateTime": end_time, "timeZone": "Asia/Tokyo"}
+            if start_time:
+                st = start_time.replace(" ", "T")
+                event["start"] = {"dateTime": st, "timeZone": "Asia/Tokyo"}
+            if end_time:
+                et = end_time.replace(" ", "T")
+                event["end"] = {"dateTime": et, "timeZone": "Asia/Tokyo"}
 
             updated = service.events().update(calendarId=calendar_id, eventId=event_id, body=event).execute()
             return self._to_frontend_format(updated, calendar_id=calendar_id)

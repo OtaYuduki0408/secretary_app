@@ -73,8 +73,6 @@
     };
   </script>
   <script type="module">
-    import { ScheduleManager } from '/static/js/ScheduleManager.js';
-
     async function ensureLogin() {
       const res = await fetch('/dev/mobile/bootstrap_login', {
         method: 'POST',
@@ -102,7 +100,6 @@
 
     try {
       await ensureLogin();
-      window.manager = new ScheduleManager();
       await loadScript("{{ url_for('static', filename='js/websocket_handler.js', _t=config['VERSION_TIMESTAMP']) }}", 'module', true);
       await loadScript("{{ url_for('static', filename='js/voice_recognition.js', _t=config['VERSION_TIMESTAMP']) }}");
       await loadScript("{{ url_for('static', filename='js/Parallax_and_Theme_rotation.js', _t=config['VERSION_TIMESTAMP']) }}", 'module');
