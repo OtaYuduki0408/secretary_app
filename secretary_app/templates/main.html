@@ -85,7 +85,12 @@
 
         <!-- ③ カレンダーフィールド -->
         <div class="grid-item" id="field-calendar">
-            <h2><i class="fas fa-calendar-alt"></i> Schedule</h2>
+            <div class="calendar-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                <h2 style="margin: 0;"><i class="fas fa-calendar-alt"></i> Schedule</h2>
+                <div id="schedule-filters" style="display: flex; gap: 5px; flex-wrap: wrap; justify-content: flex-end;">
+                    <!-- Filter buttons will be inserted here -->
+                </div>
+            </div>
             <div class="content">
                 <ul id="schedule-list">
                     <!-- Schedule items will be dynamically inserted here -->

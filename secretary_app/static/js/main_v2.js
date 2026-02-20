@@ -861,7 +861,114 @@ $(document).ready(function() {
         }
     });
     const fetchFinanceData = () => $.get('/api/finance/summary', (d) => { $('#total-balance .data').text(`¥${d.balance?.toLocaleString()||'N/A'}`); $('#monthly-expense .data').text(`¥${d.monthly_expense?.toLocaleString()||'N/A'}`); });
-    const fetchCalendarData = () => {const n=new Date(),s=new Date(n.getFullYear(),n.getMonth(),n.getDate(),0,0,0),e=new Date(s.getTime()+7*24*60*60*1000); $.get(`/api/local_calendar/events`,(evts)=>{const $l=$('#schedule-list').empty();if(evts?.length){const uE=evts.map(e=>({...e,startTime:new Date(e.start_time)})).filter(e=>new Date(e.start_time)>=n).sort((a,b)=>new Date(a.start_time)-new Date(b.start_time)).slice(0,6);if(uE.length){uE.forEach(e=>{const sT=e.startTime.toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'});let dL='';if(e.startTime.getDate()===n.getDate())dL='今日';else if(e.startTime.getDate()===n.getDate()+1)dL='明日';else dL=e.startTime.toLocaleDateString('ja-JP',{month:'short',day:'numeric'});const tS=`${dL} ${sT}`;$l.append(`<li><span class="schedule-time">${tS}</span><span class="schedule-title">${e.title}</span></li>`);});}else{$l.append('<li><span class="schedule-title">直近の予定はありません</span></li>');}}else{$l.append('<li><span class="schedule-title">予定はありません</span></li>');}}).fail(()=>{$('#schedule-list').empty().append('<li><span class="schedule-title">予定の取得に失敗</span></li>');});};
+    let allCalendarEvents = [];
+    let activeFilterCreator = 'all';
+
+    const getUserColor = (name) => {
+        const userPalette = [
+            '#d8b4fe', // 紫 (zelcoba用)
+            '#fca5a5', // ピンク
+            '#86efac', // 緑
+            '#fdba74', // オレンジ
+            '#67e8f9', // シアン
+            '#fde047', // 黄色
+            '#fb923c'  // 濃いオレンジ
+        ];
+        if (!name) return '#f4f7fb';
+        const n = name.toLowerCase();
+        if (n.includes('zelcoba')) return userPalette[0];
+        let hash = 0;
+        for (let i = 0; i < n.length; i++) {
+            hash = n.charCodeAt(i) + ((hash << 5) - hash);
+        }
+        const index = Math.abs(hash) % (userPalette.length - 1) + 1;
+        return userPalette[index];
+    };
+
+    const renderScheduleList = () => {
+        const n = new Date();
+        const $l = $('#schedule-list').empty();
+        
+        const filteredEvents = activeFilterCreator === 'all' 
+            ? allCalendarEvents 
+            : allCalendarEvents.filter(e => e.creator === activeFilterCreator);
+
+        if (filteredEvents.length) {
+            const uE = filteredEvents.map(e => ({ ...e, startTime: new Date(e.start_time) }))
+                                     .filter(e => new Date(e.start_time) >= n)
+                                     .sort((a, b) => new Date(a.start_time) - new Date(b.start_time))
+                                     .slice(0, 10);
+            
+            if (uE.length) {
+                uE.forEach(e => {
+                    const sT = e.startTime.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+                    let dL = '';
+                    if (e.startTime.getDate() === n.getDate()) dL = '今日';
+                    else if (e.startTime.getDate() === n.getDate() + 1) dL = '明日';
+                    else dL = e.startTime.toLocaleDateString('ja-JP', { month: 'short', day: 'numeric' });
+                    const tS = `${dL} ${sT}`;
+                    
+                    const calendarColorMap = { 'primary': '#3b82f6', 'default': '#7aa8ff' };
+                    const dotColor = calendarColorMap[e.calendarId] || calendarColorMap['default'];
+                    const creatorName = e.creator || '不明';
+                    const titleColor = getUserColor(creatorName);
+
+                    $l.append(`
+                        <li style="display: flex; align-items: baseline; gap: 8px; margin-bottom: 4px;">
+                            <span style="color: ${dotColor}; font-size: 0.7em; flex-shrink: 0; transform: translateY(-1px);">●</span>
+                            <span class="schedule-time" style="white-space: nowrap; font-size: 0.9em;">${tS}</span>
+                            <div style="display: flex; flex-direction: column; overflow: hidden;">
+                                <span class="schedule-title" style="color: ${titleColor}; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500;">
+                                    ${e.title}
+                                </span>
+                                <span style="color: var(--theme-text-2, #cdd6df); font-size: 0.75em; opacity: 0.6; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                                    ${creatorName}
+                                </span>
+                            </div>
+                        </li>
+                    `);
+                });
+            } else {
+                $l.append('<li><span class="schedule-title">表示対象の予定はありません</span></li>');
+            }
+        } else {
+            $l.append('<li><span class="schedule-title">予定はありません</span></li>');
+        }
+    };
+
+    const renderFilterButtons = () => {
+        const $f = $('#schedule-filters').empty();
+        const creators = [...new Set(allCalendarEvents.map(e => e.creator || '不明'))].sort();
+        
+        if (creators.length <= 1) return; // 1人しかいないならボタン不要
+
+        // 「すべて」ボタン
+        const allBtn = $(`<button class="filter-btn ${activeFilterCreator === 'all' ? 'active' : ''}" style="background: ${activeFilterCreator === 'all' ? '#444' : 'transparent'}; border: 1px solid #555; color: #fff; font-size: 0.7em; padding: 2px 6px; border-radius: 4px; cursor: pointer;">All</button>`);
+        allBtn.on('click', () => { activeFilterCreator = 'all'; renderFilterButtons(); renderScheduleList(); });
+        $f.append(allBtn);
+
+        creators.forEach(c => {
+            const color = getUserColor(c);
+            const isActive = activeFilterCreator === c;
+            const btn = $(`<button class="filter-btn ${isActive ? 'active' : ''}" style="background: ${isActive ? color + '33' : 'transparent'}; border: 1px solid ${isActive ? color : '#555'}; color: ${isActive ? color : '#999'}; font-size: 0.7em; padding: 2px 6px; border-radius: 4px; cursor: pointer; transition: all 0.2s;">${c}</button>`);
+            btn.on('click', () => {
+                activeFilterCreator = (activeFilterCreator === c) ? 'all' : c;
+                renderFilterButtons();
+                renderScheduleList();
+            });
+            $f.append(btn);
+        });
+    };
+
+    const fetchCalendarData = () => {
+        $.get(`/api/local_calendar/events`, (evts) => {
+            allCalendarEvents = evts || [];
+            renderFilterButtons();
+            renderScheduleList();
+        }).fail(() => {
+            $('#schedule-list').empty().append('<li><span class="schedule-title">予定の取得に失敗</span></li>');
+        });
+    };
     const fetchAlarms = () => $.get('/api/custom_orders',(ords)=>{const $aL=$('#field-time-alarm .alarm-list ul').empty();let c=0;if(ords?.length){ords.forEach(o=>{if(c>=4)return;const t=o.triggers?.[0];if(t?.category==='時間'){$aL.append(`<li><span>${t.value?.time||'N/A'}</span> - ${o.name||'無題'}</li>`);c++;}});if(c===0)$aL.append('<li>アラームはありません</li>');}});
     const updateTime = () => { const n=new Date(); $('#current-time').text(n.toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit',second:'2-digit'})); $('#current-date').text(n.toLocaleDateString('ja-JP',{year:'numeric',month:'long',day:'numeric',weekday:'long'})); };
 

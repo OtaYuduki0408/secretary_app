@@ -202,7 +202,7 @@
                     },
                     eventDataTransform: data => ({
                         id: data.id, title: data.title, start: data.start_time, end: data.end_time,
-                        description: data.description, classNames: ['fc-event-local']
+                        description: data.description, calendarId: data.calendarId, classNames: ['fc-event-local']
                     })
                 }
             ],
@@ -215,14 +215,16 @@
             },
             eventClick: (info) => {
                 const desc = info.event.extendedProps.description ? `\n説明: ${info.event.extendedProps.description}` : '';
+                const calId = info.event.extendedProps.calendarId;
                 if (confirm(`イベント「${info.event.title}」を削除しますか？${desc}`)) {
-                    api.deleteEvent(info.event.id);
+                    api.deleteEvent(info.event.id, calId);
                 }
             },
         });
         calendar.render();
 
         let currentEventId = null; // 編集中のイベントIDを保持
+        let currentCalendarId = 'primary'; // 編集中のカレンダーIDを保持
 
         const formatLocalDateTime = (date) => {
             if (!date) return '';
@@ -238,6 +240,7 @@
         const openModal = (event = null, dateStr = null) => {
             if (event) { // 既存イベントの編集
                 currentEventId = event.id;
+                currentCalendarId = event.extendedProps.calendarId || 'primary';
                 $('#modal-title').textContent = 'イベントを編集';
                 $('#event-title').value = event.title;
                 $('#event-desc').value = event.extendedProps.description || '';
@@ -248,6 +251,7 @@
                 $('#delete-event-button').style.display = 'inline-block'; // 削除ボタンを表示
             } else { // 新規イベントの追加
                 currentEventId = null;
+                currentCalendarId = 'primary'; // 新規追加はデフォルトでprimary
                 $('#modal-title').textContent = 'イベントを追加';
                 $('#event-title').value = '';
                 $('#event-desc').value = '';
@@ -283,23 +287,23 @@
                     alert(`イベントの追加に失敗しました: ${e.message}`);
                 }
             },
-            async deleteEvent(eventId) {
+            async deleteEvent(eventId, calendarId) {
                 try {
-                    const res = await fetch(`/api/local_calendar/events/${eventId}`, { method: 'DELETE' });
+                    const res = await fetch(`/api/local_calendar/events/${eventId}?calendar_id=${encodeURIComponent(calendarId)}`, { method: 'DELETE' });
                     if (!res.ok) throw new Error((await res.json()).error || 'サーバーエラー');
-                    alert(`イベント(ID: ${eventId})を削除しました。`);
+                    alert(`イベントを削除しました。`);
                     calendar.refetchEvents();
                     closeModal(); // 削除後もモーダルを閉じる
                 } catch (e) {
                     alert(`イベントの削除に失敗しました: ${e.message}`);
                 }
             },
-            async updateEvent(eventId, title, startTime, endTime, description) {
+            async updateEvent(eventId, calendarId, title, startTime, endTime, description) {
                 try {
                     const res = await fetch(`/api/local_calendar/events/${eventId}`, {
                         method: 'PUT',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ title, start_time: startTime, end_time: endTime, description }),
+                        body: JSON.stringify({ calendar_id: calendarId, title, start_time: startTime, end_time: endTime, description }),
                     });
                     const data = await res.json();
                     if (!res.ok) throw new Error(data.error || 'サーバーエラー');
@@ -334,7 +338,7 @@
             };
 
             if (currentEventId) {
-                await api.updateEvent(currentEventId, title, toIsoUtc(start), toIsoUtc(end), $('#event-desc').value || "");
+                await api.updateEvent(currentEventId, currentCalendarId, title, toIsoUtc(start), toIsoUtc(end), $('#event-desc').value || "");
             } else {
                 await api.addEvent(title, toIsoUtc(start), toIsoUtc(end), $('#event-desc').value || "");
             }

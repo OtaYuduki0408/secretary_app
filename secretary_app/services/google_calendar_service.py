@@ -69,7 +69,7 @@ class GoogleCalendarService:
             raise RuntimeError("not_authenticated")
         return build("calendar", "v3", credentials=creds, cache_discovery=False)
 
-    def _to_frontend_format(self, google_event: Dict[str, Any], calendar_id: str = "primary") -> Dict[str, Any]:
+    def _to_frontend_format(self, google_event: Dict[str, Any], calendar_id: str = "primary", calendar_name: str = "") -> Dict[str, Any]:
         """Googleのイベント形式をフロントエンドが期待する形式に変換する。"""
         start = google_event.get("start", {})
         end = google_event.get("end", {})
@@ -78,9 +78,15 @@ class GoogleCalendarService:
         start_time = start.get("dateTime") or start.get("date")
         end_time = end.get("dateTime") or end.get("date")
 
+        # 作成者情報を取得
+        creator = google_event.get("creator", {})
+        creator_name = creator.get("displayName") or creator.get("email") or "不明"
+
         return {
             "id": google_event.get("id"),
-            "calendarId": calendar_id, # どのカレンダーのイベントか保持
+            "calendarId": calendar_id,
+            "calendarName": calendar_name, # カレンダーの表示名
+            "creator": creator_name,       # 作成者名
             "title": google_event.get("summary", "(無題)"),
             "start_time": start_time,
             "end_time": end_time,
@@ -105,6 +111,8 @@ class GoogleCalendarService:
 
             for cal in calendars:
                 cal_id = cal.get("id")
+                cal_name = cal.get("summary", "カレンダー") # カレンダー名を取得
+                
                 # イベントを取得
                 events_result = service.events().list(
                     calendarId=cal_id,
@@ -117,7 +125,7 @@ class GoogleCalendarService:
                 
                 items = events_result.get("items", [])
                 for item in items:
-                    all_events.append(self._to_frontend_format(item, calendar_id=cal_id))
+                    all_events.append(self._to_frontend_format(item, calendar_id=cal_id, calendar_name=cal_name))
             
             # 全イベントを開始時間順にソート
             all_events.sort(key=lambda x: x['start_time'] if x['start_time'] else "")

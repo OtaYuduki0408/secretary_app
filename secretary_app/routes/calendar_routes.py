@@ -77,6 +77,7 @@ def handle_update_event(event_id):
     try:
         updated_event = service.update_event(
             event_id=event_id,
+            calendar_id=data.get('calendar_id', 'primary'),
             title=data.get('title'),
             start_time=data.get('start_time'),
             end_time=data.get('end_time'),
@@ -96,8 +97,10 @@ def handle_delete_event(event_id):
     if not service:
         return jsonify({"error": "User not authenticated"}), 401
 
+    calendar_id = request.args.get('calendar_id', 'primary')
+
     try:
-        success = service.delete_event(event_id)
+        success = service.delete_event(event_id, calendar_id=calendar_id)
         if not success:
             return jsonify({"error": "Event not found"}), 404
         return jsonify({"message": "Event deleted successfully"}), 200
