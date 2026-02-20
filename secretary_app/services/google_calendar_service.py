@@ -83,12 +83,14 @@ class GoogleCalendarService:
         # 作成者情報を取得
         creator = google_event.get("creator", {})
         creator_name = creator.get("displayName") or creator.get("email") or "不明"
+        creator_email = creator.get("email") or ""
 
         return {
             "id": google_event.get("id"),
             "calendarId": calendar_id,
             "calendarName": calendar_name, # カレンダーの表示名
             "creator": creator_name,       # 作成者名
+            "creator_email": creator_email, # 作成者のメールアドレス
             "title": google_event.get("summary", "(無題)"),
             "start_time": start_time,
             "end_time": end_time,
@@ -104,6 +106,16 @@ class GoogleCalendarService:
         # デフォルトは現在時刻から
         if not time_min:
             time_min = datetime.utcnow().isoformat() + "Z"
+        else:
+            # Google APIは RFC 3339 を期待するため、スペースをTに置換し、タイムゾーンがない場合は補完
+            time_min = time_min.replace(" ", "T")
+            if "T" in time_min and "+" not in time_min and "Z" not in time_min:
+                time_min += "+09:00" # JST
+        
+        if time_max:
+            time_max = time_max.replace(" ", "T")
+            if "T" in time_max and "+" not in time_max and "Z" not in time_max:
+                time_max += "+09:00" # JST
         
         all_events = []
         try:

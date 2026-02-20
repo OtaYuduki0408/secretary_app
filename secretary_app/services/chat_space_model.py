@@ -57,6 +57,9 @@ class ChatSpaceModel:
     P:プレイリスト操作(行動はp)
     Re:強制終了コマンド(処理を停止して等)
     K:計算(行動はn)
+    Yes:肯定的な回答 (例: はい、お願いします、いいよ、OK、進めて、削除して)
+    No:否定的な回答 (例: いいえ、やめて、キャンセル、やっぱりいい)
+    Fn:上記以外(雑談、質問)
     -行動-
     a:追加
     d:削除
@@ -83,6 +86,8 @@ class ChatSpaceModel:
     P:プレイリスト操作(行動はp)
     Re:強制終了コマンド
     K:計算(行動はn)
+    Yes:肯定的な回答 (例: はい、お願いします、いいよ、OK、進めて)
+    No:否定的な回答 (例: いいえ、やめて、キャンセル、やっぱりいい)
     -行動-
     a:追加
     d:削除
@@ -1203,6 +1208,37 @@ class ChatSpaceModel:
                     "cancelled": True
                 }
 
+            # 肯定的な回答（はい）の処理
+            if purpose == "Yes":
+                if not user_id:
+                    return {"status": "success", "message": "ユーザーが特定できないため、操作を続行できません。"}
+                
+                # 保留中のアクションを取得
+                pending = pending_action_service.get_pending_actions(user_id)
+                if pending and len(pending) > 0:
+                    # 最新のアクションを取得
+                    latest_action = pending[0]
+                    # 実行
+                    from services.action_executor_service import execute_action
+                    exec_result = execute_action(user_id, latest_action)
+                    
+                    # 実行後は保留リストから削除
+                    pending_action_service.delete_pending_action(user_id, latest_action.get('id'))
+                    
+                    return {
+                        "status": "success",
+                        "message": exec_result.get("message", "操作を完了しました。"),
+                        "skip_tone": True
+                    }
+                else:
+                    return {"status": "success", "message": "実行を待機している操作はありません。"}
+
+            # 否定的な回答（いいえ）の処理
+            if purpose == "No":
+                if user_id:
+                    pending_action_service.clear_pending_actions(user_id)
+                return {"status": "success", "message": "了解しました。操作をキャンセルしました。", "skip_tone": True}
+
             # 通常はカスタム命令編集不可だが、特殊命令「目覚まし」の時間トリガー変更のみ許可
             if (purpose.startswith("R") and purpose != "Re") or self._is_alarm_change_candidate(cleaned_input):
                 alarm_data, alarm_message = self._update_special_alarm_trigger_time(cleaned_input, user_id)
@@ -1516,6 +1552,23 @@ class ChatSpaceModel:
                 continue
 
             target_id = matched_task.get("id")
+            target_cal_id = matched_task.get("calendarId")
+            target_cal_name = matched_task.get("calendarName") or "カレンダー"
+            target_creator_name = matched_task.get("creator") or "他の方"
+            target_creator_email = matched_task.get("creator_email") or ""
+
+            # 作成者が自分 (zelco054@gmail.com) ではない場合は警告
+            if target_creator_email and target_creator_email != "zelco054@gmail.com":
+                action_payload = {
+                    "category": "カレンダー",
+                    "sub": "削除",
+                    "detail": { "id": target_id, "calendarId": target_cal_id, "title": target_name }
+                }
+                pending_action_service.add_pending_action(user_id, action_payload)
+                return {
+                    "pending_action": action_payload
+                }, f"「{target_name}」は、{target_creator_name}さんが作成された予定です。本当に削除してよろしいですか？"
+
             try:
                 # local_calendar_service.delete_event(target_id, user_id)
                 service = GoogleCalendarService(user_id)
@@ -1579,6 +1632,29 @@ class ChatSpaceModel:
                 continue
 
             target_id = matched_task.get("id")
+            target_cal_id = matched_task.get("calendarId")
+            target_creator_name = matched_task.get("creator") or "他の方"
+            target_creator_email = matched_task.get("creator_email") or ""
+
+            # 作成者が自分 (zelco054@gmail.com) ではない場合は警告
+            if target_creator_email and target_creator_email != "zelco054@gmail.com":
+                after_name = event_data.get("after_name") or matched_task.get("title") or matched_task.get("name")
+                action_payload = {
+                    "category": "カレンダー",
+                    "sub": "変更",
+                    "detail": { 
+                        "id": target_id, 
+                        "calendarId": target_cal_id, 
+                        "title": after_name,
+                        "start_time": event_data.get("after_start_time"),
+                        "end_time": event_data.get("after_end_time")
+                    }
+                }
+                pending_action_service.add_pending_action(user_id, action_payload)
+                return {
+                    "pending_action": action_payload
+                }, f"「{before_name}」は、{target_creator_name}さんが作成された予定です。本当に内容を変更してよろしいですか？"
+
             try:
                 update_payload = {
                     "title": event_data.get("after_name"),

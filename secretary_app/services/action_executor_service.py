@@ -611,6 +611,56 @@ def execute_action(user_id: str, action_data: dict) -> dict: # triggered_atをac
         except Exception as e:
             current_app.logger.error(f"Calendar Add Action: Error adding event: {e}", exc_info=True)
             return {"status": "error", "message": f"カレンダーイベントの追加中にエラーが発生しました: {e}"}
+    elif category == 'カレンダー' and sub == '削除':
+        try:
+            event_id = detail.get('id')
+            calendar_id = detail.get('calendarId', 'primary')
+            title = detail.get('title', '不明な予定')
+
+            if not event_id:
+                return {"status": "error", "message": "削除対象のイベントIDが見つかりません。"}
+
+            service = GoogleCalendarService(user_id)
+            service.delete_event(event_id, calendar_id=calendar_id)
+            
+            # WebSocketで通知
+            sid = connected_users.get(user_id)
+            if sid:
+                socketio.emit('calendar_updated', {'message': 'Event deleted.'}, room=sid)
+
+            return {"status": "success", "message": f"予定「{title}」を削除しました。"}
+        except Exception as e:
+            current_app.logger.error(f"Calendar Delete Action error: {e}")
+            return {"status": "error", "message": f"予定の削除に失敗しました: {e}"}
+    elif category == 'カレンダー' and sub == '変更':
+        try:
+            event_id = detail.get('id')
+            calendar_id = detail.get('calendarId', 'primary')
+            title = detail.get('title')
+            start_time = detail.get('start_time')
+            end_time = detail.get('end_time')
+
+            if not event_id:
+                return {"status": "error", "message": "変更対象のイベントIDが見つかりません。"}
+
+            service = GoogleCalendarService(user_id)
+            service.update_event(
+                event_id=event_id,
+                calendar_id=calendar_id,
+                title=title,
+                start_time=start_time,
+                end_time=end_time
+            )
+            
+            # WebSocketで通知
+            sid = connected_users.get(user_id)
+            if sid:
+                socketio.emit('calendar_updated', {'message': 'Event updated.'}, room=sid)
+
+            return {"status": "success", "message": f"予定「{title}」を変更しました。"}
+        except Exception as e:
+            current_app.logger.error(f"Calendar Update Action error: {e}")
+            return {"status": "error", "message": f"予定の変更に失敗しました: {e}"}
     elif category == '画面' and sub == 'ブラックアウト':
         if not socketio or not connected_users:
             current_app.logger.error("WebSocket is not initialized, cannot control screen.")
