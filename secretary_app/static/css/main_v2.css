@@ -795,18 +795,40 @@ body, html {
     border-bottom: 1px solid #333;
 }
 
-.yt-list-header h3 {
-    margin: 0 0 10px 0;
-    font-size: 1.1em;
+.yt-search-group {
+    display: flex;
+    gap: 5px;
 }
 
-#yt-internal-search {
-    width: 100%;
+#yt-global-search {
+    flex: 1;
     background-color: #2a2a2a;
     border: 1px solid #444;
     border-radius: 4px;
     padding: 8px 12px;
     color: #fff;
+}
+
+#yt-search-btn {
+    background-color: #333;
+    border: 1px solid #444;
+    color: #fff;
+    padding: 0 12px;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.yt-btn-text {
+    background: none;
+    border: none;
+    color: #ff0000;
+    cursor: pointer;
+    font-size: 0.9em;
+    padding: 0;
+}
+
+.yt-btn-text:hover {
+    text-decoration: underline;
 }
 
 #yt-list-content {

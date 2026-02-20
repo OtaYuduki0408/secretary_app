@@ -216,9 +216,13 @@
                 <!-- 中央カラム: リスト表示 (チャンネル一覧 / 動画一覧) -->
                 <div class="yt-column yt-center">
                     <div class="yt-list-header">
-                        <h3 id="yt-list-title">登録チャンネル</h3>
-                        <div class="yt-list-search">
-                            <input type="text" id="yt-internal-search" placeholder="リスト内検索...">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                            <button id="yt-back-to-channels" class="yt-btn-text" style="display:none;"><i class="fas fa-chevron-left"></i> 戻る</button>
+                            <h3 id="yt-list-title" style="margin:0;">登録チャンネル</h3>
+                        </div>
+                        <div class="yt-search-group">
+                            <input type="text" id="yt-global-search" placeholder="YouTube全体を検索...">
+                            <button id="yt-search-btn"><i class="fas fa-search"></i></button>
                         </div>
                     </div>
                     <div id="yt-list-content">

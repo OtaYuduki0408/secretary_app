@@ -1032,6 +1032,7 @@ def youtube_search():
                 'id': video_id,
                 'title': snippet.get('title') or '',
                 'channel_title': snippet.get('channelTitle') or '',
+                'channel_id': snippet.get('channelId') or '',
                 'thumbnail_url': (
                     (snippet.get('thumbnails', {}).get('medium', {}) or {}).get('url')
                     or (snippet.get('thumbnails', {}).get('default', {}) or {}).get('url')
@@ -1086,8 +1087,8 @@ def youtube_search():
             videos.append({
                 'id': item['id'],
                 'title': item['title'],
-                'channel_title': detail.get('channel_title') or item.get('channel_title') or '',
-                'channel_id': item.get('snippet', {}).get('channelId') or detail.get('channel_id') or '',
+                'channel_title': item.get('channel_title') or detail.get('channel_title') or '',
+                'channel_id': item.get('channel_id') or detail.get('channel_id') or '',
                 'thumbnail_url': item.get('thumbnail_url') or '',
                 'embeddable': bool(detail.get('embeddable', False)),
                 'privacy_status': detail.get('privacy_status') or '',
@@ -1118,9 +1119,17 @@ def register_youtube_channel():
     data = request.get_json() or {}
     channel_id = data.get('channel_id')
     category = data.get('category', '未分類')
+    
+    print(f"--- [DEBUG] register_youtube_channel called ---")
+    print(f"User: {user_id}, Channel ID: {channel_id}, Category: {category}")
+    
     if not channel_id:
+        print("Error: channel_id is missing")
         return jsonify({'error': 'channel_id is required'}), 400
-    return jsonify(youtube_service.register_channel(user_id, channel_id, category))
+    
+    result = youtube_service.register_channel(user_id, channel_id, category)
+    print(f"Result from youtube_service: {result}")
+    return jsonify(result)
 
 @app.route('/api/youtube/channels/<string:channel_id>/videos', methods=['GET'])
 @login_required
