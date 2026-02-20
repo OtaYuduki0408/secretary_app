@@ -295,6 +295,7 @@ $(document).ready(function() {
             error: () => {
                 setMode('waiting');
                 updateLogDisplay('サーバー通信失敗', 'assistant');
+                if (typeof updateAllInfo === 'function') updateAllInfo();
             }
         }).always(() => {
             submissionLock = false;
@@ -310,6 +311,7 @@ $(document).ready(function() {
                 updateLogDisplay('YouTubeプレーヤーが未初期化です。', 'assistant');
             }
             setMode('waiting');
+            if (typeof updateAllInfo === 'function') updateAllInfo();
             return;
         }
 
@@ -322,6 +324,7 @@ $(document).ready(function() {
                 updateLogDisplay('YouTubeプレーヤーが未初期化です。', 'assistant');
             }
             setMode('waiting');
+            if (typeof updateAllInfo === 'function') updateAllInfo();
             return;
         }
 
@@ -348,12 +351,14 @@ $(document).ready(function() {
                 updateLogDisplay('プレイリスト再生の準備に失敗しました。', 'assistant');
             }).always(() => {
                 setMode('waiting');
+                if (typeof updateAllInfo === 'function') updateAllInfo();
             });
             return;
         }
 
         if (response.triggered_by_voice && response.order_payloads) {
             response.order_payloads.forEach(handleServerCommand);
+            if (typeof updateAllInfo === 'function') updateAllInfo();
         } else if (response.message) {
             updateLogDisplay(response.message, 'assistant');
             if (!response.suppress_tts) {
@@ -363,8 +368,10 @@ $(document).ready(function() {
             } else {
                 setMode('waiting');
             }
+            if (typeof updateAllInfo === 'function') updateAllInfo();
         } else {
             setMode('waiting');
+            if (typeof updateAllInfo === 'function') updateAllInfo();
         }
     }
     
