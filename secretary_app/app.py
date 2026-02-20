@@ -1086,7 +1086,8 @@ def youtube_search():
             videos.append({
                 'id': item['id'],
                 'title': item['title'],
-                'artist': detail.get('channel_title') or item.get('channel_title') or '',
+                'channel_title': detail.get('channel_title') or item.get('channel_title') or '',
+                'channel_id': item.get('snippet', {}).get('channelId') or detail.get('channel_id') or '',
                 'thumbnail_url': item.get('thumbnail_url') or '',
                 'embeddable': bool(detail.get('embeddable', False)),
                 'privacy_status': detail.get('privacy_status') or '',
@@ -1170,6 +1171,18 @@ def control_switchbot():
     command = data.get('command')
     result, status_code = execute_switchbot_command(command) # execute_switchbot_command is assumed to be defined elsewhere
     return jsonify(result), status_code
+
+@app.route('/api/youtube/recommendations', methods=['GET'])
+@login_required
+def get_youtube_recommendations():
+    video_id = request.args.get('video_id')
+    title = request.args.get('title')
+    if not title:
+        return jsonify({'videos': []})
+    
+    # タイトルからキーワードを抽出して疑似的なおすすめを検索
+    # ここではシンプルに検索APIを再利用
+    return youtube_search()
 
 @app.route('/api/chat', methods=['POST'])
 @api_login_required

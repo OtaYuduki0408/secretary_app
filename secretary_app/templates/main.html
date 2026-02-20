@@ -201,13 +201,14 @@
                         <div class="yt-channel-info">
                             <img id="yt-channel-thumb" src="" alt="">
                             <span id="yt-channel-name">--</span>
+                            <button id="yt-register-btn" class="yt-btn-small">チャンネル登録</button>
                         </div>
                         <div class="yt-video-meta">
                             <span id="yt-view-count">-- views</span> • <span id="yt-publish-date">--</span>
                         </div>
                         <div id="yt-video-summary" class="yt-summary-box">
                             <strong>AI要約:</strong>
-                            <p id="yt-summary-text">読み込み中...</p>
+                            <p id="yt-summary-text">「要約して」と指示してください。</p>
                         </div>
                     </div>
                 </div>
@@ -222,7 +223,7 @@
                     </div>
                     <div id="yt-list-content">
                         <!-- ここに番号付きのリストが動的に挿入される -->
-                        <div class="yt-loading-spinner">読み込み中...</div>
+                        <div class="yt-empty-msg">登録されているチャンネルがありません。「動画を検索して」お気に入りのチャンネルを登録しましょう。</div>
                     </div>
                 </div>
 
@@ -230,14 +231,14 @@
                 <div class="yt-column yt-right">
                     <div class="yt-side-section">
                         <h4>次の未視聴動画</h4>
-                        <div id="yt-next-unwatched" class="yt-next-card">
-                            <p>なし</p>
+                        <div id="yt-next-unwatched">
+                            <p class="yt-side-empty">なし</p>
                         </div>
                     </div>
                     <div class="yt-side-section">
                         <h4>おススメ (番号指定可)</h4>
-                        <div id="yt-recommendations">
-                            <!-- 番号付きおススメ動画 -->
+                        <div id="yt-recommendations-list">
+                            <p class="yt-side-empty">再生時に表示されます</p>
                         </div>
                     </div>
                     <div class="yt-controls-status">

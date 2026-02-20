@@ -687,6 +687,77 @@ body, html {
     font-size: 1.1em;
 }
 
+.yt-btn-small {
+    background-color: #f00;
+    color: #fff;
+    border: none;
+    border-radius: 18px;
+    padding: 6px 15px;
+    font-size: 0.85em;
+    font-weight: bold;
+    cursor: pointer;
+    margin-left: 10px;
+    transition: background-color 0.2s;
+}
+
+.yt-btn-small:hover {
+    background-color: #c00;
+}
+
+.yt-btn-small.registered {
+    background-color: #333;
+    color: #aaa;
+}
+
+.yt-empty-msg {
+    padding: 40px 20px;
+    text-align: center;
+    color: #888;
+    line-height: 1.6;
+}
+
+.yt-side-empty {
+    color: #555;
+    font-size: 0.9em;
+    font-style: italic;
+}
+
+.yt-recommendation-card {
+    display: flex;
+    gap: 10px;
+    padding: 8px;
+    background-color: #1a1a1a;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.yt-recommendation-card:hover {
+    background-color: #2a2a2a;
+}
+
+.yt-recom-num {
+    color: #ff0000;
+    font-weight: bold;
+    font-size: 0.8em;
+}
+
+.yt-recom-thumb {
+    width: 80px;
+    aspect-ratio: 16 / 9;
+    border-radius: 4px;
+    object-fit: cover;
+}
+
+.yt-recom-title {
+    font-size: 0.85em;
+    line-height: 1.2;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
 .yt-video-meta {
     color: #aaa;
     font-size: 0.9em;
