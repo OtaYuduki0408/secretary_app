@@ -54,8 +54,8 @@ class ChatSpaceModel:
     T:時刻、年月日、曜日確認
     R:過去の命令の修正
     S:SwitchBot iot等
-    Y:YouTube再生/操作
-    Yw:YouTubeウィンドウ展開/チャンネル/履歴
+    Y:YouTube再生/操作(検索して再生など)
+    Yw:YouTubeウィンドウ展開/チャンネル/履歴/リストの番号選択
     P:プレイリスト操作
     Re:強制終了コマンド
     K:計算
@@ -70,6 +70,8 @@ class ChatSpaceModel:
     s:検索
     p:再生
     n:通常/否定
+    -補足-
+    「1番を再生」「チャンネル2を開いて」などのリストの番号指定は、再生であってもYwcで返してください。
     -入力-
     ユーザーの入力: {input_value}
     """
@@ -104,25 +106,26 @@ class ChatSpaceModel:
     ユーザーの入力: {input_value}
     """
     YOUTUBE_ADVANCED_CONTROL_PROMPT_TEMPLATE = """
-    目的: YouTubeウィンドウ内での詳細な操作を分類してください。
+    目的: YouTubeウィンドウの画面切り替えや操作を分類してください。
     JSONのみ出力。
     Keys:
     - intent: string
-    - value: string | number (対象の番号、チャンネル名、検索語など)
-    - speed: number (速度変更時のみ。0.5〜2.0)
+    - value: string | number
     intent 値:
     - open_window: ウィンドウを展開
     - close_window: ウィンドウを閉じる
     - show_channels: 登録チャンネル一覧を表示
-    - open_channel: 特定のチャンネルを開く (valueにチャンネル名)
+    - open_channel: チャンネルを開く (valueにチャンネル名または番号)
     - play_index: リストの番号で再生 (valueに数値)
+    - next: 「次の動画」を再生 (右上の未視聴動画)
     - show_history: 視聴履歴を表示
     - summarize: 動画を要約
-    - set_speed: 再生速度変更 (speedに数値)
     - skip_forward: 10秒スキップ
     - skip_backward: 10秒戻す
-    - volume_up/down: 音量
-    - resume_last: 前回の続きから再生
+    例:
+    「チャンネル一覧を開いて」→ {{"intent":"show_channels"}}
+    「履歴を見せて」→ {{"intent":"show_history"}}
+    「次の動画を流して」→ {{"intent":"next"}}
     ユーザー入力: {input_value}
     """
     CALC_PROMPT_TEMPLATE = """
@@ -1313,7 +1316,7 @@ class ChatSpaceModel:
                 result["message"] = self._gemini_request(time_prompt)
             elif purpose == "Sn":
                 result["data"], result["message"] = self._get_switchbot_devices(cleaned_input, user_id)
-            elif purpose.startswith("Yw") or (yt_active and (purpose == "Yc" or purpose == "Yg")):
+            elif purpose.startswith("Yw") or (yt_active and (purpose in ("Yc", "Yg", "Yp") and any(c.isdigit() for c in cleaned_input))):
                 adv_prompt = self.YOUTUBE_ADVANCED_CONTROL_PROMPT_TEMPLATE.format(input_value=cleaned_input)
                 raw_json = self._gemini_request(adv_prompt)
                 data = self._extract_json_payload(raw_json) or {}

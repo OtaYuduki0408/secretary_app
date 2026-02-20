@@ -1136,6 +1136,14 @@ def register_youtube_channel():
 def get_youtube_channel_videos(channel_id):
     return jsonify(youtube_service.get_channel_videos(channel_id))
 
+@app.route('/api/youtube/channel_details', methods=['GET'])
+@login_required
+def get_youtube_channel_details():
+    channel_id = request.args.get('id')
+    if not channel_id:
+        return jsonify({'error': 'id is required'}), 400
+    return jsonify(youtube_service.get_channel_info(channel_id))
+
 @app.route('/api/youtube/history', methods=['POST'])
 @login_required
 def update_youtube_history():

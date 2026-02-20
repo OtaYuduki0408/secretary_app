@@ -88,7 +88,8 @@ function renderChannelList(channels) {
         ytListContent.innerHTML = '<div class="yt-empty-msg">登録されているチャンネルがありません。「YouTube全体を検索」してお気に入りのチャンネルを登録しましょう。</div>';
         return;
     }
-    channels.forEach((c, i) => {
+    // 最大9件
+    channels.slice(0, 9).forEach((c, i) => {
         const item = document.createElement('div');
         item.className = 'yt-list-item';
         item.innerHTML = `
@@ -126,7 +127,8 @@ async function openChannel(channelId, title) {
             channel_id: channelId,
             channel_title: title
         }));
-        renderVideoList(currentPlaylist);
+        // 最大9件表示
+        renderVideoList(currentPlaylist.slice(0, 9));
     } catch (e) {
         console.error("Failed to fetch channel videos:", e);
         if (ytListContent) ytListContent.innerHTML = '<div>動画の取得に失敗しました</div>';
@@ -177,20 +179,23 @@ async function summarizeVideo() {
     }
 }
 
-async function fetchRecommendations(title) {
+async function fetchRecommendations(title, channelTitle) {
     const recommendationsList = getEl('yt-recommendations-list');
     if (!recommendationsList) return;
     recommendationsList.innerHTML = '<p class="yt-side-empty">取得中...</p>';
+    // チャンネル名を含めて精度向上
+    const query = `${channelTitle} ${title}`;
     try {
-        const res = await fetch(`/api/youtube/recommendations?q=${encodeURIComponent(title)}&title=${encodeURIComponent(title)}`);
+        const res = await fetch(`/api/youtube/recommendations?q=${encodeURIComponent(query)}&title=${encodeURIComponent(title)}`);
         const data = await res.json();
         const videos = (data.videos || []).filter(v => v.id !== currentVideoId); // 重複除外
         recommendationsList.innerHTML = '';
-        videos.slice(0, 5).forEach((v, i) => {
+        // 11-19番として最大9件表示
+        videos.slice(0, 9).forEach((v, i) => {
             const card = document.createElement('div');
             card.className = 'yt-recommendation-card';
             card.innerHTML = `
-                <span class="yt-recom-num">${i + 1}</span>
+                <span class="yt-recom-num">${i + 11}</span>
                 <img class="yt-recom-thumb" src="${v.thumbnail_url}">
                 <div class="yt-recom-title">${v.title}</div>
             `;
@@ -210,8 +215,10 @@ async function fetchNextUnwatched(channelId) {
         const videos = await res.json();
         const next = videos.find(v => v.video_id !== currentVideoId); 
         if (next) {
+            // 次の動画は 21番固定
             nextUnwatchedEl.innerHTML = `
                 <div class="yt-recommendation-card">
+                    <span class="yt-recom-num">21</span>
                     <img class="yt-recom-thumb" src="${next.thumbnail_url}">
                     <div class="yt-recom-title">${next.title}</div>
                 </div>
@@ -230,13 +237,25 @@ function updateVideoDetails(video) {
     const ytChannelThumbEl = getEl('yt-channel-thumb');
     const registerBtn = getEl('yt-register-btn');
 
-    if (videoTitleEl) videoTitleEl.textContent = video.title || '動画を再生中';
-    if (ytChannelNameEl) ytChannelNameEl.textContent = video.channel_title || video.artist || '--';
-    if (ytChannelThumbEl && video.thumbnail_url) ytChannelThumbEl.src = video.thumbnail_url;
+    const title = video.title || '動画を再生中';
+    const channelTitle = video.channel_title || video.artist || '--';
+
+    if (videoTitleEl) videoTitleEl.textContent = title;
+    if (ytChannelNameEl) ytChannelNameEl.textContent = channelTitle;
     
     currentVideoId = video.id || video.video_id;
     currentChannelId = video.channel_id;
     console.log("DEBUG: currentChannelId set to:", currentChannelId);
+
+    // 正しいチャンネルアイコンを取得
+    if (currentChannelId && ytChannelThumbEl) {
+        fetch(`/api/youtube/channel_details?id=${currentChannelId}`)
+            .then(r => r.json())
+            .then(info => {
+                if (info.thumbnail_url) ytChannelThumbEl.src = info.thumbnail_url;
+            })
+            .catch(e => console.error("Icon fetch failed:", e));
+    }
 
     if (registerBtn) {
         registerBtn.textContent = "チャンネル登録";
@@ -244,7 +263,8 @@ function updateVideoDetails(video) {
         registerBtn.onclick = registerCurrentChannel;
     }
 
-    fetchRecommendations(video.title);
+    // サイドパネル更新（チャンネル名を含めて精度向上）
+    fetchRecommendations(title, channelTitle);
     if (currentChannelId) fetchNextUnwatched(currentChannelId);
 }
 
@@ -337,20 +357,29 @@ function onPlayerStateChange(event) {
         errorCount = 0;
     }
     if (event.data === YT.PlayerState.ENDED) {
-        playNextVideo();
+        playNextUnwatched();
     }
 }
 
-function playNextVideo() {
+function playNextUnwatched() {
+    console.log("DEBUG: playNextUnwatched called.");
+    const nextCard = getEl('yt-next-unwatched')?.querySelector('.yt-recommendation-card');
+    if (nextCard) {
+        nextCard.click();
+        return true;
+    }
+    // カードがない場合は通常の次の動画
+    return playNextPlaylistVideo();
+}
+
+function playNextPlaylistVideo() {
     if (currentVideoIndex < currentPlaylist.length - 1) {
         currentVideoIndex++;
         const nextVideo = currentPlaylist[currentVideoIndex];
         playYoutubeVideo(nextVideo.id, nextVideo);
-    } else {
-        // プレイリストがない場合や末尾の場合はサイドパネルの「次の動画」を試みる
-        const nextCard = getEl('yt-next-unwatched')?.querySelector('.yt-recommendation-card');
-        if (nextCard) nextCard.click();
+        return true;
     }
+    return false;
 }
 
 function playPrevVideo() {
@@ -457,23 +486,50 @@ function executeYoutubeIntent(payload = {}) {
     const intent = String(payload.intent || '').trim().toLowerCase();
     const value = payload.value;
 
+    console.log("DEBUG: executeYoutubeIntent:", intent, value);
+
     if (intent === 'open_window') { showOverlay(); return true; }
     if (intent === 'close' || intent === 'close_window') { hideOverlay(); return true; }
-    if (intent === 'play_index') {
-        const idx = parseInt(value) - 1;
-        if (currentPlaylist[idx]) {
-            currentVideoIndex = idx;
-            playYoutubeVideo(currentPlaylist[idx].id, currentPlaylist[idx]);
-            return true;
+    
+    // UI 切り替え
+    if (intent === 'show_channels') { fetchRegisteredChannels(); return true; }
+    if (intent === 'show_history') { 
+        // 履歴表示ロジック
+        return true; 
+    }
+
+    if (intent === 'next') { return playNextUnwatched(); }
+
+    if (intent === 'play_index' || intent === 'open_channel') {
+        const num = parseInt(value);
+        
+        // 1~9: 中央リスト
+        if (num >= 1 && num <= 9) {
+            const items = getEl('yt-list-content')?.querySelectorAll('.yt-list-item');
+            if (items && items[num - 1]) {
+                items[num - 1].click();
+                return true;
+            }
+        }
+        // 10: 次の未視聴動画
+        if (num === 10) {
+            return playNextUnwatched();
+        }
+        // 11~19: おススメ動画
+        if (num >= 11 && num <= 19) {
+            const cards = getEl('yt-recommendations-list')?.querySelectorAll('.yt-recommendation-card');
+            if (cards && cards[num - 11]) {
+                cards[num - 11].click();
+                return true;
+            }
         }
     }
+    
     if (intent === 'skip_forward') { seekBy(10); return true; }
     if (intent === 'skip_backward') { seekBy(-10); return true; }
     if (intent === 'summarize') { summarizeVideo(); return true; }
     
-    // 既存の基本操作
-    if (intent === 'next') { playNextVideo(); return true; }
-    if (intent === 'prev') { playPrevVideo(); return true; }
+    // 基本操作
     if (intent === 'pause') { player?.pauseVideo(); return true; }
     if (intent === 'resume') { player?.playVideo(); return true; }
 
