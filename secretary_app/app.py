@@ -1196,14 +1196,59 @@ def control_switchbot():
 @app.route('/api/youtube/recommendations', methods=['GET'])
 @login_required
 def get_youtube_recommendations():
+    import random
+    from werkzeug.datastructures import MultiDict
     video_id = request.args.get('video_id')
-    title = request.args.get('title')
-    if not title:
-        return jsonify({'videos': []})
+    user_id = session.get('user', {}).get('id')
     
-    # タイトルからキーワードを抽出して疑似的なおすすめを検索
-    # ここではシンプルに検索APIを再利用
-    return youtube_search()
+    # 1. 現在の動画情報から検索クエリを生成（タグ間引き）
+    search_query = request.args.get('q', '')
+    exclude_ids = [video_id] if video_id else []
+
+    if video_id:
+        info = youtube_service.get_video_info(video_id)
+        if not info.get('error'):
+            tags = info.get('tags', [])
+            channel_title = info.get('channel_title', '')
+            
+            # タグからランダムに 40%〜70% を抽出して検索クエリにする
+            if tags:
+                sample_size = max(1, int(len(tags) * random.uniform(0.4, 0.7)))
+                selected_tags = random.sample(tags, min(len(tags), sample_size))
+                # チャンネル名とランダムタグを組み合わせて多様性を出す
+                search_query = f"{channel_title} {' '.join(selected_tags)}"
+            else:
+                search_query = channel_title or info.get('title', '')
+
+    # 2. 直近20件の履歴を取得して除外リストに追加
+    if user_id:
+        history_ids = youtube_service.get_recent_history_ids(user_id, limit=20)
+        exclude_ids.extend(history_ids)
+
+    # 3. 再検索実行 (内部的に youtube_search のロジックを使用)
+    if not search_query:
+        # クエリがない場合はデフォルトの検索へ
+        return youtube_search()
+
+    # youtube_search のロジックを再利用するためにリクエスト引数を一時的に差し替え
+    original_args = request.args
+    request.args = MultiDict([('q', search_query)])
+    
+    try:
+        response = youtube_search()
+        data = response.get_json()
+        
+        if 'videos' in data:
+            # フィルタリング: 現在の動画と直近20件を除外
+            filtered_videos = [v for v in data['videos'] if v['id'] not in exclude_ids]
+            # もし全滅したら、最悪「現在の動画」だけ除外したものを返す
+            if not filtered_videos:
+                filtered_videos = [v for v in data['videos'] if v['id'] != video_id]
+            
+            return jsonify({'videos': filtered_videos, 'query_used': search_query})
+        return response
+    finally:
+        request.args = original_args
 
 @app.route('/api/chat', methods=['POST'])
 @api_login_required

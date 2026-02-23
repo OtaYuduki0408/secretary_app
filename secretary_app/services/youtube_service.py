@@ -69,10 +69,25 @@ def get_video_info(video_id):
             "channel_id": snippet["channelId"],
             "channel_title": snippet["channelTitle"],
             "published_at": snippet["publishedAt"],
-            "thumbnail_url": snippet["thumbnails"]["medium"]["url"]
+            "thumbnail_url": snippet["thumbnails"]["medium"]["url"],
+            "tags": snippet.get("tags", [])
         }
     except Exception as e:
         return {"error": str(e)}
+
+def get_recent_history_ids(user_id, limit=20):
+    """直近の視聴履歴IDリストを取得"""
+    try:
+        res = supabase.table("youtube_watch_history") \
+            .select("video_id") \
+            .eq("user_id", user_id) \
+            .order("watched_at", desc=True) \
+            .limit(limit) \
+            .execute()
+        return [item["video_id"] for item in res.data] if res.data else []
+    except Exception as e:
+        print(f"Error fetching history ids: {e}")
+        return []
 
 def register_channel(user_id, channel_id, category="未分類"):
     """チャンネルを登録する"""
