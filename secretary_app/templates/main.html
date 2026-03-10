@@ -14,11 +14,28 @@
     <div class="main-grid-container">
         <!-- ① 天気フィールド -->
         <div class="grid-item" id="field-weather">
-            <h2><i class="fas fa-cloud-sun"></i> Weather (3-hourly)</h2>
-            <div class="content">
-                <div id="weather-3hourly-container" class="weather-3hourly-list">
-                    <!-- JSで動的に挿入 -->
-                    <p>読み込み中...</p>
+            <h2><i class="fas fa-cloud-sun"></i> Weather Forecast</h2>
+            <div class="content weather-content-layout">
+                <div class="weather-summary-container">
+                    <div class="summary-card" id="summary-today">
+                        <div class="card-label">今日</div>
+                        <span class="summary-icon">--</span>
+                        <div class="summary-temps">
+                            <span class="max">--℃</span> / <span class="min">--℃</span>
+                        </div>
+                        <div class="summary-pop"><i class="fas fa-umbrella"></i> --%</div>
+                    </div>
+                    <div class="summary-card" id="summary-tomorrow">
+                        <div class="card-label">明日</div>
+                        <span class="summary-icon">--</span>
+                        <div class="summary-temps">
+                            <span class="max">--℃</span> / <span class="min">--℃</span>
+                        </div>
+                        <div class="summary-pop"><i class="fas fa-umbrella"></i> --%</div>
+                    </div>
+                </div>
+                <div class="weather-chart-container">
+                    <canvas id="weatherPieChart"></canvas>
                 </div>
             </div>
         </div>

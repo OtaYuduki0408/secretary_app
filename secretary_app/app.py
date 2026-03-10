@@ -852,74 +852,63 @@ from services.weather_service import (
 @app.route('/api/weather', methods=['GET'])
 @login_required
 def get_weather_route():
-    # ユーザー指示に基づき、場所を「群馬県」に固定
     area_code = "100000" 
-    
     forecast_data = _get_jma_forecast_data(area_code)
     if not forecast_data or not isinstance(forecast_data, list) or len(forecast_data) < 2:
         return jsonify({"error": "Failed to get weather data"}), 500
 
     try:
-        # --- 3時間ごとの詳細予報の構築 ---
-        # forecast_data[0] には今日・明日の詳細、forecast_data[1] には週間予報が含まれるが、
-        # 3時間ごとのデータは特定の timeSeries に格納されている。
-        
         now = datetime.now(JST)
-        three_hourly_forecast = []
+        st_times = forecast_data[0].get('timeSeries', [])
         
-        # 気象庁の JSON 構造を解析して 3時間ごとのデータを抽出
-        # 通常、2番目または3番目の timeSeries に 3時間ごとの気温や降水確率が含まれる
-        short_term = forecast_data[0]
-        st_times = short_term.get('timeSeries', [])
-        
-        # 天気・気温・降水確率の各系列を取得
-        # weathers, pops, temps
+        # 系列の抽出
         weather_ts = next((s for s in st_times if 'weathers' in s['areas'][0]), None)
         pop_ts = next((s for s in st_times if 'pops' in s['areas'][0]), None)
         temp_ts = next((s for s in st_times if 'temps' in s['areas'][0]), None)
 
-        # 基準となる時間リスト（通常、最も細かい間隔を持つ系列を使用）
-        # 気温や降水確率の系列がより細かい時間ステップを持つことが多い
+        def get_day_summary(target_date):
+            w = "N/A"
+            if weather_ts:
+                # 対象日に最も近いデータを探す
+                indices = [i for i, t in enumerate(weather_ts['timeDefines']) if datetime.fromisoformat(t.replace('Z', '+00:00')).astimezone(JST).date() == target_date]
+                if indices:
+                    w = str(weather_ts['areas'][0]['weathers'][indices[0]]).split("　")[0]
+            
+            pops = [int(p) for i, p in enumerate(pop_ts['areas'][0]['pops']) if datetime.fromisoformat(pop_ts['timeDefines'][i].replace('Z', '+00:00')).astimezone(JST).date() == target_date and str(p).isdigit()] if pop_ts else []
+            temps = [int(t) for i, t in enumerate(temp_ts['areas'][0]['temps']) if datetime.fromisoformat(temp_ts['timeDefines'][i].replace('Z', '+00:00')).astimezone(JST).date() == target_date and str(t).replace('-','').isdigit()] if temp_ts else []
+            
+            return {
+                "weather": w,
+                "max_temp": max(temps) if temps else "--",
+                "min_temp": min(temps) if temps else "--",
+                "pop": max(pops) if pops else "--"
+            }
+
+        today_summary = get_day_summary(now.date())
+        tomorrow_summary = get_day_summary(now.date() + timedelta(days=1))
+
+        # 3時間ごとのデータ (24時間分 = 8スロット)
+        three_hourly = []
         base_ts = temp_ts or pop_ts or weather_ts
-        if not base_ts:
-            return jsonify({"error": "No time series data found"}), 500
-
-        time_defines = base_ts.get('timeDefines', [])
-        
-        for i, time_str in enumerate(time_defines):
-            dt = datetime.fromisoformat(time_str.replace('Z', '+00:00')).astimezone(JST)
-            
-            # 現時点以前のデータは排除
-            if dt <= now:
-                continue
+        if base_ts:
+            for i, time_str in enumerate(base_ts['timeDefines']):
+                dt = datetime.fromisoformat(time_str.replace('Z', '+00:00')).astimezone(JST)
+                if dt <= now - timedelta(hours=3): continue
                 
-            # 各要素を取得
-            weather = "N/A"
-            if weather_ts and i < len(weather_ts['areas'][0]['weathers']):
-                weather = str(weather_ts['areas'][0]['weathers'][i]).split("　")[0]
-            
-            pop = "--"
-            if pop_ts and i < len(pop_ts['areas'][0]['pops']):
-                pop = str(pop_ts['areas'][0]['pops'][i])
-            
-            temp = "--"
-            if temp_ts and i < len(temp_ts['areas'][0]['temps']):
-                temp = str(temp_ts['areas'][0]['temps'][i])
-
-            three_hourly_forecast.append({
-                "time": dt.strftime("%H:%M"),
-                "date": dt.strftime("%m/%d"),
-                "weather": weather,
-                "pop": pop,
-                "temp": temp
-            })
-            
-            # 直近の24時間分（8スロット分）程度で十分とする
-            if len(three_hourly_forecast) >= 8:
-                break
+                w = weather_ts['areas'][0]['weathers'][i] if weather_ts and i < len(weather_ts['areas'][0]['weathers']) else None
+                p = pop_ts['areas'][0]['pops'][i] if pop_ts and i < len(pop_ts['areas'][0]['pops']) else None
+                
+                three_hourly.append({
+                    "time": dt.strftime("%H:%M"),
+                    "weather": str(w).split("　")[0] if w else None,
+                    "pop": p
+                })
+                if len(three_hourly) >= 8: break
 
         return jsonify({
-            "three_hourly": three_hourly_forecast
+            "today": today_summary,
+            "tomorrow": tomorrow_summary,
+            "three_hourly": three_hourly
         })
 
     except Exception as e:

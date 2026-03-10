@@ -820,30 +820,145 @@ $(document).ready(function() {
         return '？';
     };
 
+    const weatherToColor = (weather) => {
+        if (!weather) return '#444';
+        if (weather.includes('晴')) return '#ffa500'; // オレンジ
+        if (weather.includes('雨')) return '#0000ff'; // 青
+        if (weather.includes('雪')) return '#ffffff'; // 白
+        if (weather.includes('曇') || weather.includes('くもり')) return '#808080'; // グレー
+        return '#444';
+    };
+
+    let weatherPieChart = null;
     const fetchWeather = () => $.get('/api/weather', (d) => {
-        const $container = $('#weather-3hourly-container');
-        if (!$container.length || !d.three_hourly) return;
-        $container.empty();
-        d.three_hourly.forEach(item => {
-            const icon = weatherTextToIcon(item.weather);
-            const html = `
-                <div class="weather-3hourly-item">
-                    <div class="time-box">
-                        <span class="time">${item.time}</span>
-                        <span class="date">${item.date}</span>
-                    </div>
-                    <div class="weather-main">
-                        <span class="weather-icon">${icon}</span>
-                        <span class="weather-text">${item.weather}</span>
-                    </div>
-                    <div class="extra-info">
-                        <span class="temp">${item.temp}℃</span>
-                        <span class="pop">☔ ${item.pop}%</span>
-                    </div>
-                </div>
-            `;
-            $container.append(html);
-        });
+        if (!d) return;
+
+        // --- サマリーの更新 ---
+        const updateSummary = (id, data) => {
+            const $card = $(`#${id}`);
+            if (!$card.length) return;
+            $card.find('.summary-icon').text(weatherTextToIcon(data.weather));
+            $card.find('.max').text(`${data.max_temp}℃`);
+            $card.find('.min').text(`${data.min_temp}℃`);
+            $card.find('.summary-pop').html(`<i class="fas fa-umbrella"></i> ${data.pop}%`);
+        };
+        if (d.today) updateSummary('summary-today', d.today);
+        if (d.tomorrow) updateSummary('summary-tomorrow', d.tomorrow);
+
+        // --- 円グラフの更新 ---
+        const ctx = document.getElementById('weatherPieChart');
+        if (!ctx) return;
+
+        // データの補完と整形 (24時間分 = 8スロット)
+        const rawData = d.three_hourly || [];
+        const processedData = [];
+        for (let i = 0; i < 8; i++) {
+            let item = rawData[i];
+            let isInterpolated = false;
+            if (!item || !item.weather) {
+                // 補完: 取得できなければその時刻の前の天気を参照
+                item = i > 0 ? { ...processedData[i-1], isInterpolated: true } : { weather: 'N/A', isInterpolated: true, time: '--:--' };
+            }
+            processedData.push(item);
+        }
+
+        const backgroundColors = processedData.map(item => weatherToColor(item.weather));
+        const dataValues = new Array(8).fill(1); // 均等分割
+
+        if (weatherPieChart) {
+            weatherPieChart.data.datasets[0].backgroundColor = backgroundColors;
+            weatherPieChart.update();
+        } else {
+            weatherPieChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    datasets: [{
+                        data: dataValues,
+                        backgroundColor: backgroundColors,
+                        borderWidth: 2,
+                        borderColor: '#2b2b2b'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    cutout: '65%',
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: { enabled: false }
+                    },
+                    animation: false
+                },
+                plugins: [{
+                    id: 'weatherIcons',
+                    afterDraw: (chart) => {
+                        const { ctx, chartArea: { top, bottom, left, right } } = chart;
+                        const centerX = (left + right) / 2;
+                        const centerY = (top + bottom) / 2;
+                        const meta = chart.getDatasetMeta(0);
+                        const outerRadius = meta.data[0].outerRadius;
+                        const innerRadius = meta.data[0].innerRadius;
+                        const midRadius = (outerRadius + innerRadius) / 2;
+
+                        ctx.save();
+                        processedData.forEach((item, i) => {
+                            // 各セグメントの中央角度
+                            const angle = (i / 8) * 2 * Math.PI - Math.PI / 2 + Math.PI / 8;
+                            const x = centerX + midRadius * Math.cos(angle);
+                            const y = centerY + midRadius * Math.sin(angle);
+                            
+                            // 天気アイコン
+                            ctx.font = '24px Arial';
+                            ctx.textAlign = 'center';
+                            ctx.textBaseline = 'middle';
+                            ctx.fillStyle = item.weather && item.weather.includes('雪') ? '#000' : '#fff';
+                            ctx.fillText(weatherTextToIcon(item.weather), x, y);
+
+                            // 補完警告 ⚠
+                            if (item.isInterpolated) {
+                                ctx.font = '14px Arial';
+                                ctx.fillStyle = 'red';
+                                ctx.fillText('⚠', x + 15, y - 10);
+                            }
+
+                            // 時刻ラベル
+                            const labelRadius = outerRadius + 20;
+                            const lx = centerX + labelRadius * Math.cos(angle - Math.PI / 8);
+                            const ly = centerY + labelRadius * Math.sin(angle - Math.PI / 8);
+                            ctx.font = '10px Arial';
+                            ctx.fillStyle = '#aaa';
+                            ctx.fillText(item.time, lx, ly);
+                        });
+
+                        // 現在時刻の角度計算 (0時を真上= -90度とする)
+                        const now = new Date();
+                        const hours = now.getHours() + now.getMinutes() / 60;
+                        const needleAngle = (hours / 24) * 2 * Math.PI - Math.PI / 2;
+
+                        // 現在時刻の針
+                        ctx.beginPath();
+                        ctx.lineWidth = 4;
+                        ctx.strokeStyle = '#ff3b3b'; // 鮮やかな赤
+                        ctx.moveTo(centerX + (innerRadius - 10) * Math.cos(needleAngle), centerY + (innerRadius - 10) * Math.sin(needleAngle));
+                        ctx.lineTo(centerX + (outerRadius + 15) * Math.cos(needleAngle), centerY + (outerRadius + 15) * Math.sin(needleAngle));
+                        ctx.stroke();
+
+                        // 針の先に矢印
+                        const headlen = 10;
+                        const tipX = centerX + (outerRadius + 18) * Math.cos(needleAngle);
+                        const tipY = centerY + (outerRadius + 18) * Math.sin(needleAngle);
+                        ctx.beginPath();
+                        ctx.fillStyle = '#ff3b3b';
+                        ctx.moveTo(tipX, tipY);
+                        ctx.lineTo(tipX - headlen * Math.cos(needleAngle - Math.PI / 6), tipY - headlen * Math.sin(needleAngle - Math.PI / 6));
+                        ctx.lineTo(tipX - headlen * Math.cos(needleAngle + Math.PI / 6), tipY - headlen * Math.sin(needleAngle + Math.PI / 6));
+                        ctx.fill();
+
+                        ctx.restore();
+                    }
+                }]
+            });
+        }
     });
 
     let financeChart = null;

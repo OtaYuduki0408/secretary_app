@@ -81,74 +81,71 @@ body, html {
     display: flex;
     flex-direction: column;
     height: 100%;
-}
-
-.weather-3hourly-list {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
     padding: 10px;
 }
 
-.weather-3hourly-item {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    background-color: rgba(0, 0, 0, 0.2);
-    padding: 12px 18px;
-    border-radius: 12px;
-    border: 1px solid var(--border-color);
-}
-
-.weather-3hourly-item .time-box {
+.weather-content-layout {
     display: flex;
     flex-direction: column;
-    align-items: center;
-    min-width: 70px;
+    gap: 15px;
+    height: 100%;
 }
 
-.weather-3hourly-item .time {
-    font-size: 1.8em;
-    font-weight: bold;
-    color: var(--header-color);
+.weather-summary-container {
+    display: flex;
+    gap: 10px;
+    justify-content: space-around;
 }
 
-.weather-3hourly-item .date {
-    font-size: 0.85em;
-    color: #aaa;
-}
-
-.weather-3hourly-item .weather-main {
+.summary-card {
     flex: 1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 12px;
-    font-size: 1.8em;
-    font-weight: bold;
-    color: #fff;
-}
-
-.weather-3hourly-item .weather-icon {
-    font-size: 1.2em;
-}
-
-.weather-3hourly-item .extra-info {
+    background-color: rgba(0, 0, 0, 0.2);
+    border-radius: 12px;
+    padding: 10px;
     display: flex;
     flex-direction: column;
-    align-items: flex-end;
-    min-width: 90px;
+    align-items: center;
+    border: 1px solid var(--border-color);
+    text-align: center;
 }
 
-.weather-3hourly-item .temp {
-    font-size: 1.8em;
+.summary-card .card-label {
+    font-size: 0.9em;
+    color: #aaa;
+    margin-bottom: 5px;
+}
+
+.summary-card .summary-icon {
+    font-size: 2.5em; /* 大きいアイコン */
+    margin: 5px 0;
+}
+
+.summary-card .summary-temps {
+    font-size: 1.2em;
     font-weight: bold;
-    color: #ff8a8a;
+    margin-bottom: 5px;
 }
 
-.weather-3hourly-item .pop {
-    font-size: 1em;
+.summary-card .summary-temps .max { color: #ff8a8a; }
+.summary-card .summary-temps .min { color: #8ab8ff; }
+
+.summary-card .summary-pop {
+    font-size: 0.9em;
     color: #8ab8ff;
+}
+
+.weather-chart-container {
+    flex: 1;
+    position: relative;
+    min-height: 200px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+#weatherPieChart {
+    max-width: 100%;
+    max-height: 100%;
 }
 
 
