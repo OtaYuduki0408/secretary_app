@@ -845,25 +845,36 @@ $(document).ready(function() {
         if (d.today) updateSummary('summary-today', d.today);
         if (d.tomorrow) updateSummary('summary-tomorrow', d.tomorrow);
 
-        // --- 円グラフの更新 ---
+        // --- 円グラフの更新 (24時間時計形式) ---
         const ctx = document.getElementById('weatherPieChart');
         if (!ctx) return;
 
-        // データの補完と整形 (24時間分 = 8スロット)
-        const rawData = d.three_hourly || [];
-        const processedData = [];
+        // 24時間を3時間ごとの8スロットに固定 (0-3, 3-6, 6-9, 9-12, 12-15, 15-18, 18-21, 21-0)
+        const slots = [0, 3, 6, 9, 12, 15, 18, 21];
+        const processedData = slots.map(hour => {
+            const timeStr = `${String(hour).padStart(2, '0')}:00`;
+            // APIデータから該当する時間の予報を探す (完全に一致しない場合も考慮)
+            let match = d.three_hourly.find(item => item.time === timeStr);
+            if (match) return { ...match, isInterpolated: false };
+            
+            return { time: timeStr, weather: 'N/A', isInterpolated: true };
+        });
+
+        // 補完の仕上げ（N/Aを周囲のデータで埋める）
         for (let i = 0; i < 8; i++) {
-            let item = rawData[i];
-            let isInterpolated = false;
-            if (!item || !item.weather) {
-                // 補完: 取得できなければその時刻の前の天気を参照
-                item = i > 0 ? { ...processedData[i-1], isInterpolated: true } : { weather: 'N/A', isInterpolated: true, time: '--:--' };
+            if (processedData[i].weather === 'N/A') {
+                for (let j = 1; j < 8; j++) {
+                    let prev = (i - j + 8) % 8;
+                    if (processedData[prev].weather !== 'N/A') {
+                        processedData[i].weather = processedData[prev].weather;
+                        break;
+                    }
+                }
             }
-            processedData.push(item);
         }
 
         const backgroundColors = processedData.map(item => weatherToColor(item.weather));
-        const dataValues = new Array(8).fill(1); // 均等分割
+        const dataValues = new Array(8).fill(1); // 均等な8つの扇形
 
         if (weatherPieChart) {
             weatherPieChart.data.datasets[0].backgroundColor = backgroundColors;
@@ -883,6 +894,7 @@ $(document).ready(function() {
                     responsive: true,
                     maintainAspectRatio: false,
                     cutout: '65%',
+                    rotation: -22.5, // 0時のセグメントの中央を真上にするための調整
                     plugins: {
                         legend: { display: false },
                         tooltip: { enabled: false }
@@ -902,56 +914,52 @@ $(document).ready(function() {
 
                         ctx.save();
                         processedData.forEach((item, i) => {
-                            // 各セグメントの中央角度
-                            const angle = (i / 8) * 2 * Math.PI - Math.PI / 2 + Math.PI / 8;
+                            // 各セグメントの中央角度 (0時が真上 = -PI/2)
+                            const angle = (i / 8) * 2 * Math.PI - Math.PI / 2;
                             const x = centerX + midRadius * Math.cos(angle);
                             const y = centerY + midRadius * Math.sin(angle);
                             
                             // 天気アイコン
-                            ctx.font = '24px Arial';
+                            ctx.font = '22px Arial';
                             ctx.textAlign = 'center';
                             ctx.textBaseline = 'middle';
                             ctx.fillStyle = item.weather && item.weather.includes('雪') ? '#000' : '#fff';
                             ctx.fillText(weatherTextToIcon(item.weather), x, y);
 
-                            // 補完警告 ⚠
                             if (item.isInterpolated) {
-                                ctx.font = '14px Arial';
+                                ctx.font = '12px Arial';
                                 ctx.fillStyle = 'red';
-                                ctx.fillText('⚠', x + 15, y - 10);
+                                ctx.fillText('⚠', x + 12, y - 8);
                             }
 
-                            // 時刻ラベル
-                            const labelRadius = outerRadius + 20;
-                            const lx = centerX + labelRadius * Math.cos(angle - Math.PI / 8);
-                            const ly = centerY + labelRadius * Math.sin(angle - Math.PI / 8);
-                            ctx.font = '10px Arial';
-                            ctx.fillStyle = '#aaa';
+                            // 時刻ラベル (0, 3, 6...)
+                            const labelRadius = outerRadius + 18;
+                            const lx = centerX + labelRadius * Math.cos(angle);
+                            const ly = centerY + labelRadius * Math.sin(angle);
+                            ctx.font = 'bold 11px Arial';
+                            ctx.fillStyle = '#eee';
                             ctx.fillText(item.time, lx, ly);
                         });
 
-                        // 現在時刻の角度計算 (0時を真上= -90度とする)
+                        // 現在時刻の針 (24時間時計として計算)
                         const now = new Date();
                         const hours = now.getHours() + now.getMinutes() / 60;
                         const needleAngle = (hours / 24) * 2 * Math.PI - Math.PI / 2;
 
-                        // 現在時刻の針
                         ctx.beginPath();
                         ctx.lineWidth = 4;
-                        ctx.strokeStyle = '#ff3b3b'; // 鮮やかな赤
-                        ctx.moveTo(centerX + (innerRadius - 10) * Math.cos(needleAngle), centerY + (innerRadius - 10) * Math.sin(needleAngle));
-                        ctx.lineTo(centerX + (outerRadius + 15) * Math.cos(needleAngle), centerY + (outerRadius + 15) * Math.sin(needleAngle));
+                        ctx.strokeStyle = '#ff3b3b';
+                        ctx.moveTo(centerX + (innerRadius - 5) * Math.cos(needleAngle), centerY + (innerRadius - 5) * Math.sin(needleAngle));
+                        ctx.lineTo(centerX + (outerRadius + 10) * Math.cos(needleAngle), centerY + (outerRadius + 10) * Math.sin(needleAngle));
                         ctx.stroke();
 
-                        // 針の先に矢印
-                        const headlen = 10;
-                        const tipX = centerX + (outerRadius + 18) * Math.cos(needleAngle);
-                        const tipY = centerY + (outerRadius + 18) * Math.sin(needleAngle);
+                        const tipX = centerX + (outerRadius + 15) * Math.cos(needleAngle);
+                        const tipY = centerY + (outerRadius + 15) * Math.sin(needleAngle);
                         ctx.beginPath();
                         ctx.fillStyle = '#ff3b3b';
                         ctx.moveTo(tipX, tipY);
-                        ctx.lineTo(tipX - headlen * Math.cos(needleAngle - Math.PI / 6), tipY - headlen * Math.sin(needleAngle - Math.PI / 6));
-                        ctx.lineTo(tipX - headlen * Math.cos(needleAngle + Math.PI / 6), tipY - headlen * Math.sin(needleAngle + Math.PI / 6));
+                        ctx.lineTo(tipX - 8 * Math.cos(needleAngle - Math.PI/6), tipY - 8 * Math.sin(needleAngle - Math.PI/6));
+                        ctx.lineTo(tipX - 8 * Math.cos(needleAngle + Math.PI/6), tipY - 8 * Math.sin(needleAngle + Math.PI/6));
                         ctx.fill();
 
                         ctx.restore();

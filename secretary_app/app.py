@@ -852,16 +852,18 @@ from services.weather_service import (
 @app.route('/api/weather', methods=['GET'])
 @login_required
 def get_weather_route():
-    area_code = "100000" 
+    # ユーザー指示に基づき、場所を「横浜市（神奈川県）」に設定
+    area_code = "140000" 
+    
     forecast_data = _get_jma_forecast_data(area_code)
-    if not forecast_data or not isinstance(forecast_data, list) or len(forecast_data) < 2:
+    if not forecast_data or not isinstance(forecast_data, list) or len(forecast_data) < 1:
         return jsonify({"error": "Failed to get weather data"}), 500
 
     try:
         now = datetime.now(JST)
         st_times = forecast_data[0].get('timeSeries', [])
         
-        # 系列の抽出
+        # 系列の抽出 (weathers, pops, temps)
         weather_ts = next((s for s in st_times if 'weathers' in s['areas'][0]), None)
         pop_ts = next((s for s in st_times if 'pops' in s['areas'][0]), None)
         temp_ts = next((s for s in st_times if 'temps' in s['areas'][0]), None)
@@ -887,23 +889,47 @@ def get_weather_route():
         today_summary = get_day_summary(now.date())
         tomorrow_summary = get_day_summary(now.date() + timedelta(days=1))
 
-        # 3時間ごとのデータ (24時間分 = 8スロット)
+        # --- 24時間の3時間ごとデータ (円グラフ用) ---
+        # 0, 3, 6, 9, 12, 15, 18, 21 時のスロットを埋める
         three_hourly = []
-        base_ts = temp_ts or pop_ts or weather_ts
-        if base_ts:
-            for i, time_str in enumerate(base_ts['timeDefines']):
-                dt = datetime.fromisoformat(time_str.replace('Z', '+00:00')).astimezone(JST)
-                if dt <= now - timedelta(hours=3): continue
-                
-                w = weather_ts['areas'][0]['weathers'][i] if weather_ts and i < len(weather_ts['areas'][0]['weathers']) else None
-                p = pop_ts['areas'][0]['pops'][i] if pop_ts and i < len(pop_ts['areas'][0]['pops']) else None
-                
-                three_hourly.append({
-                    "time": dt.strftime("%H:%M"),
-                    "weather": str(w).split("　")[0] if w else None,
-                    "pop": p
-                })
-                if len(three_hourly) >= 8: break
+        
+        # 基準となる詳細な時間軸（通常は気温 series 2 が最も細かい）
+        # シリーズを跨いで時間をマッチングさせるための辞書を作成
+        weather_map = {}
+        if weather_ts:
+            for i, t in enumerate(weather_ts['timeDefines']):
+                dt = datetime.fromisoformat(t.replace('Z', '+00:00')).astimezone(JST)
+                weather_map[dt.strftime("%Y-%m-%d %H")] = str(weather_ts['areas'][0]['weathers'][i]).split("　")[0]
+
+        # 3時間ごとの予報を構築 (現在から24時間分)
+        # 3時間ごとの開始時間を決定 (直近の3の倍数時間)
+        start_hour = (now.hour // 3) * 3
+        current_dt = now.replace(hour=start_hour, minute=0, second=0, microsecond=0)
+
+        for i in range(8):
+            target_dt = current_dt + timedelta(hours=i * 3)
+            time_key = target_dt.strftime("%Y-%m-%d %H")
+            
+            # 直接一致がなければ、その日の予報を採用
+            weather = weather_map.get(time_key)
+            if not weather:
+                # 柔軟なマッチング: 同日の最も近い時間を探す
+                day_key = target_dt.strftime("%Y-%m-%d")
+                closest_w = "N/A"
+                min_diff = 999
+                for k, v in weather_map.items():
+                    if k.startswith(day_key):
+                        diff = abs(int(k.split(" ")[1]) - target_dt.hour)
+                        if diff < min_diff:
+                            min_diff = diff
+                            closest_w = v
+                weather = closest_w
+
+            three_hourly.append({
+                "time": target_dt.strftime("%H:%M"),
+                "weather": weather,
+                "pop": "--" # 円グラフには不要とのことなので簡易化
+            })
 
         return jsonify({
             "today": today_summary,
