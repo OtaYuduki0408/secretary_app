@@ -76,45 +76,81 @@ body, html {
     overflow-y: auto;
 }
 
-/* --- Field: Weather & Finance --- */
-#field-weather-finance .content {
+/* --- Field: Weather --- */
+#field-weather .content {
     display: flex;
-    flex-wrap: wrap;
-    justify-content: space-around;
-    align-content: space-around;
+    flex-direction: column;
     height: 100%;
 }
 
-.info-item {
-    flex-basis: 45%; /* 2 items per row */
-    text-align: center;
+.weather-3hourly-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
     padding: 10px;
-    box-sizing: border-box;
 }
 
-.info-item-header {
-    font-size: 1em;
-    color: var(--text-color);
-    margin-bottom: 10px;
+.weather-3hourly-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background-color: rgba(0, 0, 0, 0.2);
+    padding: 12px 18px;
+    border-radius: 12px;
+    border: 1px solid var(--border-color);
+}
+
+.weather-3hourly-item .time-box {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-width: 70px;
+}
+
+.weather-3hourly-item .time {
+    font-size: 1.8em;
     font-weight: bold;
+    color: var(--header-color);
 }
 
-.info-item-body {
+.weather-3hourly-item .date {
+    font-size: 0.85em;
+    color: #aaa;
+}
+
+.weather-3hourly-item .weather-main {
+    flex: 1;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 1.5em;
+    gap: 12px;
+    font-size: 1.8em;
+    font-weight: bold;
+    color: #fff;
 }
 
-.info-item-body .fas {
-    font-size: 1.5em;
-    margin-right: 15px;
-    color: var(--accent-color);
+.weather-3hourly-item .weather-icon {
+    font-size: 1.2em;
 }
 
-.info-item-body .data {
-    font-weight: 300;
+.weather-3hourly-item .extra-info {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    min-width: 90px;
 }
+
+.weather-3hourly-item .temp {
+    font-size: 1.8em;
+    font-weight: bold;
+    color: #ff8a8a;
+}
+
+.weather-3hourly-item .pop {
+    font-size: 1em;
+    color: #8ab8ff;
+}
+
 
 /* --- Field: Calendar --- */
 #schedule-list {
@@ -232,114 +268,58 @@ body, html {
     margin-bottom: 10px; /* Adjusted margin */
 }
 
-/* --- Field: Music --- */
-.music-player {
+/* --- Field: Finance Dashboard --- */
+#field-finance .content {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    height: 100%;
+}
+
+.finance-metrics {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    grid-template-rows: repeat(3, auto);
+    gap: 10px;
+}
+
+.metric-item {
+    background-color: rgba(0, 0, 0, 0.2);
+    padding: 10px;
+    border-radius: 8px;
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: space-around;
-    height: 100%;
+    border: 1px solid var(--border-color);
     text-align: center;
 }
 
-.music-player .artwork img {
-    width: 120px;
-    height: 120px;
-    border-radius: 8px;
-    object-fit: cover;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+.metric-item .label {
+    font-size: 0.85em;
+    color: #aaa;
+    margin-bottom: 4px;
 }
 
-.music-player .track-info {
-    margin-top: 15px;
-}
-
-.music-player .track-info .title {
+.metric-item .value {
     font-size: 1.2em;
     font-weight: bold;
+    color: var(--header-color);
 }
 
-.music-player .track-info .artist {
-    font-size: 1em;
-    color: #b0b0b0;
+#stat-total-balance { color: #ffd700; }
+#stat-monthly-balance { color: #00ff7f; }
+
+.finance-chart-container {
+    flex: 1;
+    min-height: 180px;
+    background-color: rgba(0, 0, 0, 0.1);
+    border-radius: 8px;
+    padding: 10px;
 }
 
-.music-player .controls {
-    margin-top: 20px;
-    display: flex;
-    align-items: center;
-    gap: 20px;
-}
+/* --- Remove old styles --- */
+#field-weather-finance, .weather-grid, .finance-grid, .music-player, .music-player .artwork, .music-player .track-info, .music-player .controls, .music-player .volume-control { display: none !important; }
 
-.music-player .controls button {
-    background: none;
-    border: 2px solid var(--border-color);
-    color: var(--text-color);
-    border-radius: 50%;
-    width: 50px;
-    height: 50px;
-    font-size: 1.2em;
-    cursor: pointer;
-    transition: all 0.2s;
-}
-
-.music-player .controls button:hover {
-    background-color: var(--accent-color);
-    border-color: var(--accent-color);
-    color: white;
-}
-
-.music-player .controls #play-pause-track {
-    width: 60px;
-    height: 60px;
-    font-size: 1.5em;
-    background-color: var(--accent-color);
-    border-color: var(--accent-color);
-}
-.music-player .controls #play-pause-track:hover {
-    background-color: #0056b3;
-    border-color: #0056b3;
-}
-
-
-.music-player .volume-control {
-    margin-top: 20px;
-    display: flex;
-    align-items: center;
-    width: 80%;
-}
-
-.music-player .volume-control .fas {
-    margin: 0 10px;
-}
-
-#volume-slider {
-    -webkit-appearance: none;
-    appearance: none;
-    width: 100%;
-    height: 8px;
-    background: #4d4d4d;
-    border-radius: 5px;
-    outline: none;
-}
-
-#volume-slider::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    appearance: none;
-    width: 18px;
-    height: 18px;
-    background: var(--accent-color);
-    border-radius: 50%;
-    cursor: pointer;
-}
-
-#volume-slider::-moz-range-thumb {
-    width: 18px;
-    height: 18px;
-    background: var(--accent-color);
-    border-radius: 50%;
-    cursor: pointer;
-}
 
 /* --- YouTube Player Overlay --- */
 #youtube-overlay.youtube-overlay-hidden {

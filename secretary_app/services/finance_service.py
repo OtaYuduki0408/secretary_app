@@ -123,6 +123,91 @@ def get_daily_expense(user_id: str | None = None):
     
     return daily_expense
 
+def get_detailed_finance_summary(user_id: str | None = None):
+    """
+    メイン画面向けの詳細な収支サマリーを取得する。
+    1. 総所持金
+    2. 今月の支出
+    3. 今月の収支
+    4. 今月の収入
+    5. 今日の支出
+    6. 今日の支出 (必需品抜き)
+    7. 月別支出グラフ用データ
+    """
+    finance_data = get_all_finance_records(user_id)
+    if not finance_data:
+        return {
+            "total_balance": 0, "monthly_expense": 0, "monthly_balance": 0,
+            "monthly_income": 0, "daily_expense": 0, "daily_expense_no_essentials": 0,
+            "monthly_chart_data": []
+        }
+
+    now = datetime.now()
+    current_month = now.strftime("%Y-%m")
+    today = now.strftime("%Y-%m-%d")
+
+    total_income = 0
+    total_expense = 0
+    m_income = 0
+    m_expense = 0
+    d_expense = 0
+    d_expense_no_essentials = 0
+
+    # 必需品とみなすカテゴリのキーワード
+    ESSENTIAL_KEYWORDS = ["食", "住", "家賃", "光熱", "水道", "電気", "ガス", "通信", "携帯", "ネット", "交通", "保険", "医療", "固定"]
+
+    monthly_map = {}
+
+    for item in finance_data:
+        amount = item.get("amount", 0)
+        t = item.get("type")
+        date_str = item.get("date", "")
+        category = item.get("category", "")
+        
+        try:
+            dt = datetime.fromisoformat(date_str)
+            ym = dt.strftime("%Y-%m")
+            y_md = dt.strftime("%Y-%m-%d")
+        except:
+            continue
+
+        # 総計
+        if t == "income":
+            total_income += amount
+        else:
+            total_expense += amount
+            # グラフ用集計
+            monthly_map[ym] = monthly_map.get(ym, 0) + amount
+
+        # 今月
+        if ym == current_month:
+            if t == "income":
+                m_income += amount
+            else:
+                m_expense += amount
+
+        # 今日
+        if y_md == today and t == "expense":
+            d_expense += amount
+            # 必需品抜き判定 (簡易的にカテゴリ名で判定)
+            is_essential = any(k in category for k in ESSENTIAL_KEYWORDS)
+            if not is_essential:
+                d_expense_no_essentials += amount
+
+    # グラフ用データの整形 (直近6ヶ月分)
+    sorted_months = sorted(monthly_map.keys(), reverse=True)[:6]
+    chart_data = [{"month": m.split("-")[1] + "月", "amount": monthly_map[m]} for m in reversed(sorted_months)]
+
+    return {
+        "total_balance": total_income - total_expense,
+        "monthly_expense": m_expense,
+        "monthly_balance": m_income - m_expense,
+        "monthly_income": m_income,
+        "daily_expense": d_expense,
+        "daily_expense_no_essentials": d_expense_no_essentials,
+        "monthly_chart_data": chart_data
+    }
+
 def get_monthly_goal(user_id: str | None = None, year_month: str | None = None):
     """
     指定したユーザーと年月の目標額レコードを取得する。

@@ -6,58 +6,19 @@
     <title>Secretary App - Main</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/main_v2.css') }}">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body data-user-id="{{ user.id or '' }}">
     <div id="blackout-overlay"></div>
 
     <div class="main-grid-container">
-        <!-- ① 天気・収支管理フィールド -->
-        <div class="grid-item" id="field-weather-finance">
-            <div class="weather-grid">
-                <div class="weather-card" id="weather-today">
-                    <div class="info-item-header">今日</div>
-                    <div class="info-item-body">
-                        <span class="weather-icon">--</span>
-                        <div class="weather-details">
-                            <div class="temps">
-                                <span class="temp-max">--℃</span>
-                                <span class="temp-min">--℃</span>
-                            </div>
-                            <span class="pop">--%</span>
-                        </div>
-                    </div>
-                </div>
-                <div class="weather-card" id="weather-tomorrow">
-                    <div class="info-item-header">明日</div>
-                    <div class="info-item-body">
-                        <span class="weather-icon">--</span>
-                        <div class="weather-details">
-                            <div class="temps">
-                                <span class="temp-max">--℃</span>
-                                <span class="temp-min">--℃</span>
-                            </div>
-                            <span class="pop">--%</span>
-                        </div>
-                    </div>
-                </div>
-                <div id="weather-weekly" class="weather-weekly-container">
+        <!-- ① 天気フィールド -->
+        <div class="grid-item" id="field-weather">
+            <h2><i class="fas fa-cloud-sun"></i> Weather (3-hourly)</h2>
+            <div class="content">
+                <div id="weather-3hourly-container" class="weather-3hourly-list">
                     <!-- JSで動的に挿入 -->
-                </div>
-            </div>
-            <div class="finance-grid">
-                <div class="info-item" id="total-balance">
-                    <div class="info-item-header">総所持金</div>
-                    <div class="info-item-body">
-                        <i class="fas fa-wallet"></i>
-                        <span class="data">¥--</span>
-                    </div>
-                </div>
-                <div class="info-item" id="monthly-expense">
-                    <div class="info-item-header">今月の支出</div>
-                    <div class="info-item-body">
-                        <i class="fas fa-money-bill-wave"></i>
-                        <span class="data">¥--</span>
-                    </div>
+                    <p>読み込み中...</p>
                 </div>
             </div>
         </div>
@@ -152,26 +113,38 @@
             </div>
         </div>
 
-        <!-- ⑥ ミュージックフィールド -->
-        <div class="grid-item" id="field-music">
-            <h2><i class="fas fa-music"></i> Music Player</h2>
-            <div class="content music-player">
-                <div class="artwork">
-                    <img src="/static/img/03933b41-c0a7-48bc-942c-d30393830677.png" alt="Album Art">
+        <!-- ⑥ 収支管理フィールド (旧ミュージックフィールド) -->
+        <div class="grid-item" id="field-finance">
+            <h2><i class="fas fa-coins"></i> Finance Dashboard</h2>
+            <div class="content finance-dashboard">
+                <div class="finance-metrics">
+                    <div class="metric-item">
+                        <span class="label">総所持金</span>
+                        <span id="stat-total-balance" class="value">¥--</span>
+                    </div>
+                    <div class="metric-item">
+                        <span class="label">今月の支出</span>
+                        <span id="stat-monthly-expense" class="value">¥--</span>
+                    </div>
+                    <div class="metric-item">
+                        <span class="label">今月の収支</span>
+                        <span id="stat-monthly-balance" class="value">¥--</span>
+                    </div>
+                    <div class="metric-item">
+                        <span class="label">今月の収入</span>
+                        <span id="stat-monthly-income" class="value">¥--</span>
+                    </div>
+                    <div class="metric-item">
+                        <span class="label">今日の支出</span>
+                        <span id="stat-daily-expense" class="value">¥--</span>
+                    </div>
+                    <div class="metric-item">
+                        <span class="label">今日(必需品抜き)</span>
+                        <span id="stat-daily-no-essentials" class="value">¥--</span>
+                    </div>
                 </div>
-                <div class="track-info">
-                    <div class="title">読み込み中...</div>
-                    <div class="artist">--</div>
-                </div>
-                <div class="controls">
-                    <button id="prev-track"><i class="fas fa-step-backward"></i></button>
-                    <button id="play-pause-track"><i class="fas fa-play"></i></button>
-                    <button id="next-track"><i class="fas fa-step-forward"></i></button>
-                </div>
-                <div class="volume-control">
-                    <i class="fas fa-volume-down"></i>
-                    <input type="range" id="volume-slider" min="0" max="100" value="80">
-                    <i class="fas fa-volume-up"></i>
+                <div class="finance-chart-container">
+                    <canvas id="monthlyExpenseChart"></canvas>
                 </div>
             </div>
         </div>

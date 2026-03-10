@@ -807,65 +807,94 @@ $(document).ready(function() {
     // --- Action Overlay ---
     const $actionOverlay = $('#action-overlay');
     const $actionOverlayBody = $('#action-overlay-body');
-    function showActionOverlay(htmlContent) { $actionOverlayBody.html(htmlContent); $actionOverlay.css('display', 'flex'); }
-    function hideActionOverlay() { $actionOverlay.hide(); $actionOverlayBody.empty(); }
+    function showActionOverlay(htmlContent) { if ($actionOverlayBody.length) { $actionOverlayBody.html(htmlContent); $actionOverlay.css('display', 'flex'); } }
+    function hideActionOverlay() { if ($actionOverlay.length) { $actionOverlay.hide(); $actionOverlayBody.empty(); } }
     $('.action-overlay-close').on('click', hideActionOverlay);
 
-    const weatherTextToIcon = (weather, code) => {
-        if (code) {
-            const c = String(code);
-            if (c.startsWith('1')) return '☀';
-            if (c.startsWith('2')) return '☁';
-            if (c.startsWith('3')) return '☔';
-            if (c.startsWith('4')) return '❄️';
-        }
+    const weatherTextToIcon = (weather) => {
         if (!weather || weather === 'N/A') return '？';
-        if (weather.includes('晴')) return weather.includes('曇') || weather.includes('くもり') ? '⛅' : '☀';
-        if (weather.includes('雨')) return weather.includes('曇') || weather.includes('くもり') ? '🌦' : '☔';
+        if (weather.includes('晴')) return '☀';
         if (weather.includes('曇') || weather.includes('くもり')) return '☁';
+        if (weather.includes('雨')) return '☔';
         if (weather.includes('雪')) return '❄️';
         return '？';
     };
 
-    const updateWeatherCardV2 = (cardId, data, minTemp, maxTemp) => {
-        const $card = $(`#${cardId}`);
-        if (!$card.length) return;
-        const icon = weatherTextToIcon(data?.weather);
-        $card.find('.weather-icon').text(icon);
-        $card.find('.temp-max').text(`${maxTemp || '--'}℃`);
-        $card.find('.temp-min').text(`${minTemp || '--'}℃`);
-        $card.find('.pop').text(`${data?.pop || '--'}%`);
-    };
-
     const fetchWeather = () => $.get('/api/weather', (d) => {
-        console.log("Weather API response:", d);
-        if (d.error) return;
-        updateWeatherCardV2('weather-today', d.today_am, d.today_min, d.today_max);
-        updateWeatherCardV2('weather-tomorrow', d.tomorrow_am, d.tomorrow_min, d.tomorrow_max);
-
-        const $weekly = $('#weather-weekly');
-        if ($weekly.length && d.weekly) {
-            $weekly.empty();
-            d.weekly.forEach(w => {
-                const icon = weatherTextToIcon(null, w.weather_code);
-                const item = `
-                    <div class="weekly-item">
-                        <div class="weekly-date">${w.date}</div>
-                        <div class="weekly-icon">${icon}</div>
-                        <div class="weekly-temp">
-                            <span class="temp-max">${w.max_temp}</span>
-                            <span class="temp-min">${w.min_temp}</span>
-                        </div>
-                        <div class="weekly-pop">${w.pop}%</div>
+        const $container = $('#weather-3hourly-container');
+        if (!$container.length || !d.three_hourly) return;
+        $container.empty();
+        d.three_hourly.forEach(item => {
+            const icon = weatherTextToIcon(item.weather);
+            const html = `
+                <div class="weather-3hourly-item">
+                    <div class="time-box">
+                        <span class="time">${item.time}</span>
+                        <span class="date">${item.date}</span>
                     </div>
-                `;
-                $weekly.append(item);
+                    <div class="weather-main">
+                        <span class="weather-icon">${icon}</span>
+                        <span class="weather-text">${item.weather}</span>
+                    </div>
+                    <div class="extra-info">
+                        <span class="temp">${item.temp}℃</span>
+                        <span class="pop">☔ ${item.pop}%</span>
+                    </div>
+                </div>
+            `;
+            $container.append(html);
+        });
+    });
+
+    let financeChart = null;
+    const fetchFinanceSummary = () => $.get('/api/finance/summary', (d) => {
+        // メトリクスの更新
+        $('#stat-total-balance').text(`¥${(d.total_balance || 0).toLocaleString()}`);
+        $('#stat-monthly-expense').text(`¥${(d.monthly_expense || 0).toLocaleString()}`);
+        $('#stat-monthly-balance').text(`¥${(d.monthly_balance || 0).toLocaleString()}`);
+        $('#stat-monthly-income').text(`¥${(d.monthly_income || 0).toLocaleString()}`);
+        $('#stat-daily-expense').text(`¥${(d.daily_expense || 0).toLocaleString()}`);
+        $('#stat-daily-no-essentials').text(`¥${(d.daily_expense_no_essentials || 0).toLocaleString()}`);
+
+        // グラフの更新
+        const ctx = document.getElementById('monthlyExpenseChart');
+        if (!ctx) return;
+
+        const labels = d.monthly_chart_data.map(item => item.month);
+        const data = d.monthly_chart_data.map(item => item.amount);
+
+        if (financeChart) {
+            financeChart.data.labels = labels;
+            financeChart.data.datasets[0].data = data;
+            financeChart.update();
+        } else {
+            financeChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: '月別支出',
+                        data: data,
+                        backgroundColor: 'rgba(0, 123, 255, 0.5)',
+                        borderColor: 'rgba(0, 123, 255, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: { beginAtZero: true, grid: { color: '#444' }, ticks: { color: '#aaa' } },
+                        x: { grid: { display: false }, ticks: { color: '#aaa' } }
+                    },
+                    plugins: { legend: { display: false } }
+                }
             });
         }
     });
-    const fetchFinanceData = () => $.get('/api/finance/summary', (d) => { $('#total-balance .data').text(`¥${d.balance?.toLocaleString()||'N/A'}`); $('#monthly-expense .data').text(`¥${d.monthly_expense?.toLocaleString()||'N/A'}`); });
+
     let allCalendarEvents = [];
-    let activeFilterCreators = []; // 複数選択のために配列に変更
+    let activeFilterCreators = []; 
 
     const getUserColor = (name) => {
         const userPalette = [
@@ -996,12 +1025,13 @@ $(document).ready(function() {
     function run() {
         loadAppSettings();
         loadCustomVoiceTriggerEndWords();
-        syncPlayPauseIcon();
+        // syncPlayPauseIcon(); // 廃止
         updateTime(); setInterval(updateTime, 1000);
-    const updateAllInfo = () => { fetchWeather(); fetchFinanceData(); fetchCalendarData(); fetchAlarms(); };
+        const updateAllInfo = () => { fetchWeather(); fetchFinanceSummary(); fetchCalendarData(); fetchAlarms(); };
         window.updateAllInfo = updateAllInfo;
         updateAllInfo(); setInterval(updateAllInfo, 30000);
         initializeVoiceRecognition();
     }
     run();
 });
+

@@ -663,15 +663,13 @@ def update_finance_record_route(record_id):
     data = request.get_json() or {}
     return jsonify(update_finance_record(record_id, data, user_id))
 
+from services.finance_service import get_detailed_finance_summary
+
 @app.route('/api/finance/summary', methods=['GET'])
 @login_required
 def get_finance_summary_route():
     user_id = session.get('user', {}).get('id')
-    return jsonify({
-        'balance': get_current_balance(user_id),
-        'monthly_expense': get_monthly_expense(user_id),
-        'daily_expense': get_daily_expense(user_id),
-    })
+    return jsonify(get_detailed_finance_summary(user_id))
 
 @app.route('/api/finance/goal', methods=['GET'])
 @login_required
@@ -854,7 +852,7 @@ from services.weather_service import (
 @app.route('/api/weather', methods=['GET'])
 @login_required
 def get_weather_route():
-    # ユーザー指示に基づき、場所を「群馬県南部」に固定
+    # ユーザー指示に基づき、場所を「群馬県」に固定
     area_code = "100000" 
     
     forecast_data = _get_jma_forecast_data(area_code)
@@ -862,81 +860,72 @@ def get_weather_route():
         return jsonify({"error": "Failed to get weather data"}), 500
 
     try:
-        # --- 今日・明日の詳細 (forecast_data[0]) ---
+        # --- 3時間ごとの詳細予報の構築 ---
+        # forecast_data[0] には今日・明日の詳細、forecast_data[1] には週間予報が含まれるが、
+        # 3時間ごとのデータは特定の timeSeries に格納されている。
+        
+        now = datetime.now(JST)
+        three_hourly_forecast = []
+        
+        # 気象庁の JSON 構造を解析して 3時間ごとのデータを抽出
+        # 通常、2番目または3番目の timeSeries に 3時間ごとの気温や降水確率が含まれる
         short_term = forecast_data[0]
         st_times = short_term.get('timeSeries', [])
         
-        # 天気
-        st_weather_ts = next((s for s in st_times if 'weathers' in s['areas'][0]), None)
-        # 降水確率
-        st_pop_ts = next((s for s in st_times if 'pops' in s['areas'][0]), None)
-        # 気温
-        st_temp_ts = next((s for s in st_times if 'temps' in s['areas'][0]), None)
+        # 天気・気温・降水確率の各系列を取得
+        # weathers, pops, temps
+        weather_ts = next((s for s in st_times if 'weathers' in s['areas'][0]), None)
+        pop_ts = next((s for s in st_times if 'pops' in s['areas'][0]), None)
+        temp_ts = next((s for s in st_times if 'temps' in s['areas'][0]), None)
 
-        def _parse_ts(ts, key):
-            if not ts: return []
-            return [(datetime.fromisoformat(t.replace('Z', '+00:00')).astimezone(JST), v) 
-                    for t, v in zip(ts['timeDefines'], ts['areas'][0][key])]
+        # 基準となる時間リスト（通常、最も細かい間隔を持つ系列を使用）
+        # 気温や降水確率の系列がより細かい時間ステップを持つことが多い
+        base_ts = temp_ts or pop_ts or weather_ts
+        if not base_ts:
+            return jsonify({"error": "No time series data found"}), 500
 
-        weather_points = _parse_ts(st_weather_ts, 'weathers')
-        pop_points = _parse_ts(st_pop_ts, 'pops')
-        temp_points = _parse_ts(st_temp_ts, 'temps')
+        time_defines = base_ts.get('timeDefines', [])
+        
+        for i, time_str in enumerate(time_defines):
+            dt = datetime.fromisoformat(time_str.replace('Z', '+00:00')).astimezone(JST)
+            
+            # 現時点以前のデータは排除
+            if dt <= now:
+                continue
+                
+            # 各要素を取得
+            weather = "N/A"
+            if weather_ts and i < len(weather_ts['areas'][0]['weathers']):
+                weather = str(weather_ts['areas'][0]['weathers'][i]).split("　")[0]
+            
+            pop = "--"
+            if pop_ts and i < len(pop_ts['areas'][0]['pops']):
+                pop = str(pop_ts['areas'][0]['pops'][i])
+            
+            temp = "--"
+            if temp_ts and i < len(temp_ts['areas'][0]['temps']):
+                temp = str(temp_ts['areas'][0]['temps'][i])
 
-        def _find_closest(target_dt, data_points):
-            valid = [p for p in data_points if p[1] is not None and str(p[1]).strip() != ""]
-            if not valid: return "N/A"
-            return min(valid, key=lambda p: abs((p[0] - target_dt).total_seconds()))[1]
-
-        def get_detail(target_dt):
-            w = str(_find_closest(target_dt, weather_points)).split("　")[0]
-            return {
-                "weather": w,
-                "pop": str(_find_closest(target_dt, pop_points)),
-                "temp": str(_find_closest(target_dt, temp_points))
-            }
-
-        now = datetime.now(JST)
-        today = now.date()
-        tomorrow = today + timedelta(days=1)
-
-        # 今日の最高・最低気温の推定 (st_temp_ts から)
-        today_temps = [p[1] for p in temp_points if p[0].date() == today]
-        tomorrow_temps = [p[1] for p in temp_points if p[0].date() == tomorrow]
-
-        # --- 週間予報 (forecast_data[1]) ---
-        weekly_term = forecast_data[1]
-        wt_times = weekly_term.get('timeSeries', [])
-        wt_weather_pop = wt_times[0]
-        wt_temps = wt_times[1]
-
-        weekly_list = []
-        for i in range(len(wt_weather_pop['timeDefines'])):
-            dt = datetime.fromisoformat(wt_weather_pop['timeDefines'][i].replace('Z', '+00:00')).astimezone(JST)
-            weekly_list.append({
+            three_hourly_forecast.append({
+                "time": dt.strftime("%H:%M"),
                 "date": dt.strftime("%m/%d"),
-                "day_of_week": ["月","火","水","木","金","土","日"][dt.weekday()],
-                "weather_code": wt_weather_pop['areas'][0]['weatherCodes'][i],
-                "pop": wt_weather_pop['areas'][0]['pops'][i] if i < len(wt_weather_pop['areas'][0]['pops']) else "-",
-                "min_temp": wt_temps['areas'][0]['tempsMin'][i],
-                "max_temp": wt_temps['areas'][0]['tempsMax'][i]
+                "weather": weather,
+                "pop": pop,
+                "temp": temp
             })
+            
+            # 直近の24時間分（8スロット分）程度で十分とする
+            if len(three_hourly_forecast) >= 8:
+                break
 
-        response = {
-            "today_am": get_detail(JST.localize(datetime.combine(today, datetime.min.time())).replace(hour=9)),
-            "today_pm": get_detail(JST.localize(datetime.combine(today, datetime.min.time())).replace(hour=15)),
-            "tomorrow_am": get_detail(JST.localize(datetime.combine(tomorrow, datetime.min.time())).replace(hour=9)),
-            "tomorrow_pm": get_detail(JST.localize(datetime.combine(tomorrow, datetime.min.time())).replace(hour=15)),
-            "today_min": min(today_temps) if today_temps else "-",
-            "today_max": max(today_temps) if today_temps else "-",
-            "tomorrow_min": min(tomorrow_temps) if tomorrow_temps else "-",
-            "tomorrow_max": max(tomorrow_temps) if tomorrow_temps else "-",
-            "weekly": weekly_list
-        }
-        return jsonify(response)
+        return jsonify({
+            "three_hourly": three_hourly_forecast
+        })
 
     except Exception as e:
         app.logger.error(f"Weather parse error: {e}")
         return jsonify({"error": str(e)}), 500
+
 
 
 def text_to_speech_base64(text: str) -> str:
