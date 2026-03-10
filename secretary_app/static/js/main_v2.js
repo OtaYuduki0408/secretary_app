@@ -831,6 +831,7 @@ $(document).ready(function() {
 
     let weatherPieChart = null;
     const fetchWeather = () => $.get('/api/weather', (d) => {
+        console.log("Weather Data from Server:", d); // デバッグ用コンソール出力
         if (!d) return;
 
         // --- サマリーの更新 ---
@@ -838,9 +839,22 @@ $(document).ready(function() {
             const $card = $(`#${id}`);
             if (!$card.length) return;
             $card.find('.summary-icon').text(weatherTextToIcon(data.weather));
+            
+            // 天気テキストをフルで表示 (例: 晴のち曇)
+            const $weatherText = $card.find('.card-label');
+            const originalLabel = id === 'summary-today' ? '今日' : '明日';
+            $weatherText.text(`${originalLabel}: ${data.weather}`);
+
             $card.find('.max').text(`${data.max_temp}℃`);
             $card.find('.min').text(`${data.min_temp}℃`);
-            $card.find('.summary-pop').html(`<i class="fas fa-umbrella"></i> ${data.pop}%`);
+            
+            // 降水確率を4分割(6時間刻み)で表示
+            const popLabels = ['0-6', '6-12', '12-18', '18-24'];
+            const popDisplay = data.pops.map((p, i) => {
+                const label = popLabels[popLabels.length - data.pops.length + i];
+                return `<span style="font-size:0.8em; color:#8ab8ff;">${label}:${p}%</span>`;
+            }).join(' ');
+            $card.find('.summary-pop').html(`<i class="fas fa-umbrella"></i> ${popDisplay || '--%'}`);
         };
         if (d.today) updateSummary('summary-today', d.today);
         if (d.tomorrow) updateSummary('summary-tomorrow', d.tomorrow);
