@@ -482,17 +482,24 @@ def google_login():
     )
     auth_url, state = flow.authorization_url(prompt='consent', access_type='offline')
     session['oauth_state'] = state
+    # PKCE対応: 生成されたcode_verifierをセッションに保存
+    if hasattr(flow, 'code_verifier'):
+        session['code_verifier'] = flow.code_verifier
     return redirect(auth_url)
 
 @app.route('/oauth-callback')
 def oauth_callback():
     from services.google_token_service import upsert_credentials
     state = session.pop('oauth_state', None)
+    code_verifier = session.pop('code_verifier', None)
     flow = build_web_flow(
         GOOGLE_SCOPES,
         state=state,
         redirect_uri=GOOGLE_REDIRECT_URI,
     )
+    # PKCE対応: 保存していたcode_verifierを復元
+    if code_verifier:
+        flow.code_verifier = code_verifier
     try:
         # Render等のプロキシ環境でURLがhttpになってしまうのを回避するためhttpsに置換
         authorization_response = request.url.replace('http://', 'https://', 1)
