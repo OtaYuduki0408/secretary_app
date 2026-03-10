@@ -3,6 +3,7 @@
 from gevent import monkey
 monkey.patch_all()
 import os
+os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
 import sys
 import re
 import tempfile
@@ -493,7 +494,9 @@ def oauth_callback():
         redirect_uri=GOOGLE_REDIRECT_URI,
     )
     try:
-        flow.fetch_token(authorization_response=request.url)
+        # Render等のプロキシ環境でURLがhttpになってしまうのを回避するためhttpsに置換
+        authorization_response = request.url.replace('http://', 'https://', 1)
+        flow.fetch_token(authorization_response=authorization_response)
     except Exception as e:
         return render_template('oauth-callback.html', error=str(e))
 

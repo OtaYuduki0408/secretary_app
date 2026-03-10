@@ -1,4 +1,5 @@
 import os
+os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
 from google_auth_oauthlib.flow import Flow, InstalledAppFlow
 
 _DEFAULT_REDIRECT_URI = 'https://127.0.0.1:5000/oauth-callback'
