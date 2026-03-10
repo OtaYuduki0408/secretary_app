@@ -811,13 +811,21 @@ $(document).ready(function() {
     function hideActionOverlay() { if ($actionOverlay.length) { $actionOverlay.hide(); $actionOverlayBody.empty(); } }
     $('.action-overlay-close').on('click', hideActionOverlay);
 
-    const weatherTextToIcon = (weather) => {
-        if (!weather || weather === 'N/A') return '？';
-        if (weather.includes('晴')) return '☀';
-        if (weather.includes('曇') || weather.includes('くもり')) return '☁';
-        if (weather.includes('雨')) return '☔';
-        if (weather.includes('雪')) return '❄️';
-        return '？';
+    const weatherTextToIcons = (text) => {
+        if (!text || text === 'N/A') return '？';
+        const map = { '晴': '☀', '曇': '☁', 'くもり': '☁', '雨': '☔', '雪': '❄', '雷': '⚡' };
+        const found = [];
+        // ヒットした順番に記号を取得 (重複排除)
+        ['晴', '曇', '雨', '雪', '雷'].forEach(key => {
+            if (text.includes(key)) {
+                const icon = map[key === '曇' ? 'くもり' : key] || map[key];
+                if (!found.includes(icon)) found.push(icon);
+            }
+        });
+        // 最大2つまで。順序は文字列内の出現順ではなく、上記の検索順になるため、
+        // 文字列内の出現順にこだわる場合は正規表現等が必要だが、
+        // 単純化のため「含まれる主要な天気」を最大2つ出す。
+        return found.slice(0, 2).join('→') || '？';
     };
 
     const weatherToColor = (weather) => {
@@ -831,29 +839,26 @@ $(document).ready(function() {
 
     let weatherPieChart = null;
     const fetchWeather = () => $.get('/api/weather', (d) => {
-        console.log("Weather Data from Server:", d); // デバッグ用コンソール出力
+        console.log("Weather Data from Server:", d);
         if (!d) return;
 
         // --- サマリーの更新 ---
         const updateSummary = (id, data) => {
             const $card = $(`#${id}`);
             if (!$card.length) return;
-            $card.find('.summary-icon').text(weatherTextToIcon(data.weather));
             
-            // 天気テキストをフルで表示 (例: 晴のち曇)
-            const $weatherText = $card.find('.card-label');
+            // 天気を記号で表示 (例: ☀→☁)
+            const iconStr = weatherTextToIcons(data.weather);
+            $card.find('.summary-icon').text(iconStr);
+            
             const originalLabel = id === 'summary-today' ? '今日' : '明日';
-            $weatherText.text(`${originalLabel}: ${data.weather}`);
+            $card.find('.card-label').text(originalLabel);
 
             $card.find('.max').text(`${data.max_temp}℃`);
             $card.find('.min').text(`${data.min_temp}℃`);
             
-            // 降水確率を4分割(6時間刻み)で表示
-            const popLabels = ['0-6', '6-12', '12-18', '18-24'];
-            const popDisplay = data.pops.map((p, i) => {
-                const label = popLabels[popLabels.length - data.pops.length + i];
-                return `<span style="font-size:0.8em; color:#8ab8ff;">${label}:${p}%</span>`;
-            }).join(' ');
+            // 降水確率を %/%/%/% 形式で表示
+            const popDisplay = data.pops.join('/') + '%';
             $card.find('.summary-pop').html(`<i class="fas fa-umbrella"></i> ${popDisplay || '--%'}`);
         };
         if (d.today) updateSummary('summary-today', d.today);
@@ -863,32 +868,46 @@ $(document).ready(function() {
         const ctx = document.getElementById('weatherPieChart');
         if (!ctx) return;
 
-        // 24時間を3時間ごとの8スロットに固定 (0-3, 3-6, 6-9, 9-12, 12-15, 15-18, 18-21, 21-0)
+        // 24時間を3時間ごとの8スロットに固定
         const slots = [0, 3, 6, 9, 12, 15, 18, 21];
+        
+        // 複雑な天気を分割するヘルパー (例: "晴のち曇" -> ["晴", "曇"])
+        const splitWeather = (text) => {
+            if (!text) return ['N/A'];
+            const parts = text.split(/[　\s]*(?:のち|時々|、)[　\s]*/);
+            return parts.length > 0 ? parts : [text];
+        };
+
+        const todaySplit = splitWeather(d.today?.weather);
+        const tomorrowSplit = splitWeather(d.tomorrow?.weather);
+
         const processedData = slots.map(hour => {
             const timeStr = `${String(hour).padStart(2, '0')}:00`;
-            // APIデータから該当する時間の予報を探す (完全に一致しない場合も考慮)
-            let match = d.three_hourly.find(item => item.time === timeStr);
-            if (match) return { ...match, isInterpolated: false };
             
-            return { time: timeStr, weather: 'N/A', isInterpolated: true };
+            // 現在の「日付」を考慮して、今日か明日かを判定
+            const now = new Date();
+            const slotDate = new Date();
+            slotDate.setHours(hour, 0, 0, 0);
+            if (hour < now.getHours() - 3) slotDate.setDate(slotDate.getDate() + 1);
+            
+            const isTomorrow = slotDate.getDate() !== now.getDate();
+            const weatherText = isTomorrow ? d.tomorrow?.weather : d.today?.weather;
+            const weatherParts = isTomorrow ? tomorrowSplit : todaySplit;
+
+            // スロット（時間帯）に応じて天気を割り振る
+            // 例: 2つに分かれている場合、前半4スロットと後半4スロットで分ける
+            let assignedWeather = 'N/A';
+            if (weatherParts.length >= 2) {
+                assignedWeather = (hour < 12) ? weatherParts[0] : weatherParts[1];
+            } else {
+                assignedWeather = weatherParts[0];
+            }
+
+            return { time: timeStr, weather: assignedWeather, isInterpolated: false };
         });
 
-        // 補完の仕上げ（N/Aを周囲のデータで埋める）
-        for (let i = 0; i < 8; i++) {
-            if (processedData[i].weather === 'N/A') {
-                for (let j = 1; j < 8; j++) {
-                    let prev = (i - j + 8) % 8;
-                    if (processedData[prev].weather !== 'N/A') {
-                        processedData[i].weather = processedData[prev].weather;
-                        break;
-                    }
-                }
-            }
-        }
-
         const backgroundColors = processedData.map(item => weatherToColor(item.weather));
-        const dataValues = new Array(8).fill(1); // 均等な8つの扇形
+        const dataValues = new Array(8).fill(1);
 
         if (weatherPieChart) {
             weatherPieChart.data.datasets[0].backgroundColor = backgroundColors;
@@ -908,7 +927,7 @@ $(document).ready(function() {
                     responsive: true,
                     maintainAspectRatio: false,
                     cutout: '65%',
-                    rotation: -22.5, // 0時のセグメントの中央を真上にするための調整
+                    rotation: -22.5,
                     plugins: {
                         legend: { display: false },
                         tooltip: { enabled: false }
@@ -928,17 +947,16 @@ $(document).ready(function() {
 
                         ctx.save();
                         processedData.forEach((item, i) => {
-                            // 各セグメントの中央角度 (0時が真上 = -PI/2)
                             const angle = (i / 8) * 2 * Math.PI - Math.PI / 2;
                             const x = centerX + midRadius * Math.cos(angle);
                             const y = centerY + midRadius * Math.sin(angle);
                             
-                            // 天気アイコン
+                            // 円グラフ内は単一の記号
                             ctx.font = '22px Arial';
                             ctx.textAlign = 'center';
                             ctx.textBaseline = 'middle';
                             ctx.fillStyle = item.weather && item.weather.includes('雪') ? '#000' : '#fff';
-                            ctx.fillText(weatherTextToIcon(item.weather), x, y);
+                            ctx.fillText(weatherTextToIcons(item.weather).split('→')[0], x, y);
 
                             if (item.isInterpolated) {
                                 ctx.font = '12px Arial';
@@ -946,7 +964,6 @@ $(document).ready(function() {
                                 ctx.fillText('⚠', x + 12, y - 8);
                             }
 
-                            // 時刻ラベル (0, 3, 6...)
                             const labelRadius = outerRadius + 18;
                             const lx = centerX + labelRadius * Math.cos(angle);
                             const ly = centerY + labelRadius * Math.sin(angle);
@@ -955,7 +972,6 @@ $(document).ready(function() {
                             ctx.fillText(item.time, lx, ly);
                         });
 
-                        // 現在時刻の針 (24時間時計として計算)
                         const now = new Date();
                         const hours = now.getHours() + now.getMinutes() / 60;
                         const needleAngle = (hours / 24) * 2 * Math.PI - Math.PI / 2;

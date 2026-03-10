@@ -870,22 +870,24 @@ def get_weather_route():
 
         def get_day_summary(target_date):
             w = "N/A"
+            full_weathers = []
             if weather_ts:
-                # 対象日に最も近いデータを探す
+                # その日の全天気データを取得 (「のち」などで分割される前の生データ)
                 indices = [i for i, t in enumerate(weather_ts['timeDefines']) if datetime.fromisoformat(t.replace('Z', '+00:00')).astimezone(JST).date() == target_date]
                 if indices:
-                    # 天気は切り捨てずにフルで取得 (例: 晴れのち曇り)
                     w = str(weather_ts['areas'][0]['weathers'][indices[0]])
+                    # その日の時系列変化（あれば）をすべて保持
+                    full_weathers = [str(weather_ts['areas'][0]['weathers'][i]) for i in indices]
             
-            # 降水確率は全ての時間帯(6時間刻み)をリストで取得
             pops_list = [str(p) for i, p in enumerate(pop_ts['areas'][0]['pops']) if datetime.fromisoformat(pop_ts['timeDefines'][i].replace('Z', '+00:00')).astimezone(JST).date() == target_date] if pop_ts else []
             temps = [int(t) for i, t in enumerate(temp_ts['areas'][0]['temps']) if datetime.fromisoformat(temp_ts['timeDefines'][i].replace('Z', '+00:00')).astimezone(JST).date() == target_date and str(t).replace('-','').isdigit()] if temp_ts else []
             
             return {
                 "weather": w,
+                "full_weathers": full_weathers, # 詳細解析用
                 "max_temp": max(temps) if temps else "--",
                 "min_temp": min(temps) if temps else "--",
-                "pops": pops_list # リストとして返す
+                "pops": pops_list
             }
 
         today_summary = get_day_summary(now.date())
