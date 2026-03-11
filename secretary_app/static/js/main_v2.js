@@ -813,7 +813,7 @@ $(document).ready(function() {
 
     const weatherTextToIcons = (text) => {
         if (!text || text === 'N/A') return '？';
-        const map = { '晴': '☀', '曇': '☁', 'くもり': '☁', '雨': '☔', '雪': '❄', '雷': '⚡' };
+        const map = { '晴れ': '☀', '曇': '☁', 'くもり': '☁', '雨': '☔', '雪': '❄', '雷': '⚡' };
         const found = [];
         // ヒットした順番に記号を取得 (重複排除)
         ['晴れ', 'くもり', '雨', '雪', '雷'].forEach(key => {
