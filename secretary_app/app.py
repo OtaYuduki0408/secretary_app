@@ -852,97 +852,28 @@ from services.weather_service import (
 @app.route('/api/weather', methods=['GET'])
 @login_required
 def get_weather_route():
-    # ユーザー指示に基づき、場所を「横浜市（神奈川県）」に設定
-    area_code = "140000" 
-    
-    forecast_data = _get_jma_forecast_data(area_code)
-    if not forecast_data or not isinstance(forecast_data, list) or len(forecast_data) < 1:
-        return jsonify({"error": "Failed to get weather data"}), 500
-
+    # 新しい気象庁API URL (3時間ごとの分布予報)
+    url = "https://www.jma.go.jp/bosai/jmatile/data/wdist/VPFD/140010.json"
     try:
+        response = requests.get(url, timeout=8)
+        response.raise_for_status()
+        data = response.json()
+        
+        # 指示された階層 "areaTimeSeries" -> "weather" から取得
+        # 通常、リストの最初の要素にデータが入っている
+        weather_list = data[0].get("areaTimeSeries", [{}])[0].get("weather", [])
+        
         now = datetime.now(JST)
-        st_times = forecast_data[0].get('timeSeries', [])
+        # 現在のスロットの開始時間を計算 (3時間区切り: 0, 3, 6, 9, 12, 15, 18, 21)
+        current_slot_hour = (now.hour // 3) * 3
         
-        # 系列の抽出 (weathers, pops, temps)
-        weather_ts = next((s for s in st_times if 'weathers' in s['areas'][0]), None)
-        pop_ts = next((s for s in st_times if 'pops' in s['areas'][0]), None)
-        temp_ts = next((s for s in st_times if 'temps' in s['areas'][0]), None)
-
-        def get_day_summary(target_date):
-            w = "N/A"
-            full_weathers = []
-            if weather_ts:
-                # その日の全天気データを取得 (「のち」などで分割される前の生データ)
-                indices = [i for i, t in enumerate(weather_ts['timeDefines']) if datetime.fromisoformat(t.replace('Z', '+00:00')).astimezone(JST).date() == target_date]
-                if indices:
-                    w = str(weather_ts['areas'][0]['weathers'][indices[0]])
-                    # その日の時系列変化（あれば）をすべて保持
-                    full_weathers = [str(weather_ts['areas'][0]['weathers'][i]) for i in indices]
-            
-            pops_list = [str(p) for i, p in enumerate(pop_ts['areas'][0]['pops']) if datetime.fromisoformat(pop_ts['timeDefines'][i].replace('Z', '+00:00')).astimezone(JST).date() == target_date] if pop_ts else []
-            temps = [int(t) for i, t in enumerate(temp_ts['areas'][0]['temps']) if datetime.fromisoformat(temp_ts['timeDefines'][i].replace('Z', '+00:00')).astimezone(JST).date() == target_date and str(t).replace('-','').isdigit()] if temp_ts else []
-            
-            return {
-                "weather": w,
-                "full_weathers": full_weathers, # 詳細解析用
-                "max_temp": max(temps) if temps else "--",
-                "min_temp": min(temps) if temps else "--",
-                "pops": pops_list
-            }
-
-        today_summary = get_day_summary(now.date())
-        tomorrow_summary = get_day_summary(now.date() + timedelta(days=1))
-
-        # --- 24時間の3時間ごとデータ (円グラフ用) ---
-        # 0, 3, 6, 9, 12, 15, 18, 21 時のスロットを埋める
-        three_hourly = []
-        
-        # 基準となる詳細な時間軸（通常は気温 series 2 が最も細かい）
-        # シリーズを跨いで時間をマッチングさせるための辞書を作成
-        weather_map = {}
-        if weather_ts:
-            for i, t in enumerate(weather_ts['timeDefines']):
-                dt = datetime.fromisoformat(t.replace('Z', '+00:00')).astimezone(JST)
-                weather_map[dt.strftime("%Y-%m-%d %H")] = str(weather_ts['areas'][0]['weathers'][i]).split("　")[0]
-
-        # 3時間ごとの予報を構築 (現在から24時間分)
-        # 3時間ごとの開始時間を決定 (直近の3の倍数時間)
-        start_hour = (now.hour // 3) * 3
-        current_dt = now.replace(hour=start_hour, minute=0, second=0, microsecond=0)
-
-        for i in range(8):
-            target_dt = current_dt + timedelta(hours=i * 3)
-            time_key = target_dt.strftime("%Y-%m-%d %H")
-            
-            # 直接一致がなければ、その日の予報を採用
-            weather = weather_map.get(time_key)
-            if not weather:
-                # 柔軟なマッチング: 同日の最も近い時間を探す
-                day_key = target_dt.strftime("%Y-%m-%d")
-                closest_w = "N/A"
-                min_diff = 999
-                for k, v in weather_map.items():
-                    if k.startswith(day_key):
-                        diff = abs(int(k.split(" ")[1]) - target_dt.hour)
-                        if diff < min_diff:
-                            min_diff = diff
-                            closest_w = v
-                weather = closest_w
-
-            three_hourly.append({
-                "time": target_dt.strftime("%H:%M"),
-                "weather": weather,
-                "pop": "--" # 円グラフには不要とのことなので簡易化
-            })
-
         return jsonify({
-            "today": today_summary,
-            "tomorrow": tomorrow_summary,
-            "three_hourly": three_hourly
+            "weathers": weather_list,
+            "current_slot_hour": current_slot_hour,
+            "raw_jma": data # 詳細デバッグ用
         })
-
     except Exception as e:
-        app.logger.error(f"Weather parse error: {e}")
+        app.logger.error(f"New Weather API Error: {e}")
         return jsonify({"error": str(e)}), 500
 
 

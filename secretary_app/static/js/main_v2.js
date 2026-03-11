@@ -834,77 +834,32 @@ $(document).ready(function() {
         if (weather.includes('雨')) return '#0000ff'; // 青
         if (weather.includes('雪')) return '#ffffff'; // 白
         if (weather.includes('曇') || weather.includes('くもり')) return '#808080'; // グレー
+        if (weather.includes('雷')) return '#ffff00'; // 黄色
         return '#444';
     };
 
     let weatherPieChart = null;
     const fetchWeather = () => $.get('/api/weather', (d) => {
-        console.log("Weather Data from Server:", d);
-        if (!d) return;
+        console.log("JMA New API Data:", d);
+        if (!d || !d.weathers) return;
 
-        // --- サマリーの更新 ---
-        const updateSummary = (id, data) => {
-            const $card = $(`#${id}`);
-            if (!$card.length) return;
-            
-            // 天気を記号で表示 (例: ☀→☁)
-            const iconStr = weatherTextToIcons(data.weather);
-            $card.find('.summary-icon').text(iconStr);
-            
-            const originalLabel = id === 'summary-today' ? '今日' : '明日';
-            $card.find('.card-label').text(originalLabel);
-
-            $card.find('.max').text(`${data.max_temp}℃`);
-            $card.find('.min').text(`${data.min_temp}℃`);
-            
-            // 降水確率を %/%/%/% 形式で表示
-            const popDisplay = data.pops.join('/') + '%';
-            $card.find('.summary-pop').html(`<i class="fas fa-umbrella"></i> ${popDisplay || '--%'}`);
-        };
-        if (d.today) updateSummary('summary-today', d.today);
-        if (d.tomorrow) updateSummary('summary-tomorrow', d.tomorrow);
+        const weathers = d.weathers; // ["くもり", "晴れ", ...]
+        const startHour = d.current_slot_hour || 0;
 
         // --- 円グラフの更新 (24時間時計形式) ---
         const ctx = document.getElementById('weatherPieChart');
         if (!ctx) return;
 
-        // 24時間を3時間ごとの8スロットに固定
-        const slots = [0, 3, 6, 9, 12, 15, 18, 21];
-        
-        // 複雑な天気を分割するヘルパー (例: "晴のち曇" -> ["晴", "曇"])
-        const splitWeather = (text) => {
-            if (!text) return ['N/A'];
-            const parts = text.split(/[　\s]*(?:のち|時々|、)[　\s]*/);
-            return parts.length > 0 ? parts : [text];
-        };
-
-        const todaySplit = splitWeather(d.today?.weather);
-        const tomorrowSplit = splitWeather(d.tomorrow?.weather);
-
-        const processedData = slots.map(hour => {
+        // 3時間ごとの8スロットを生成 (24時間分)
+        const processedData = [];
+        for (let i = 0; i < 8; i++) {
+            const hour = (startHour + i * 3) % 24;
             const timeStr = `${String(hour).padStart(2, '0')}:00`;
-            
-            // 現在の「日付」を考慮して、今日か明日かを判定
-            const now = new Date();
-            const slotDate = new Date();
-            slotDate.setHours(hour, 0, 0, 0);
-            if (hour < now.getHours() - 3) slotDate.setDate(slotDate.getDate() + 1);
-            
-            const isTomorrow = slotDate.getDate() !== now.getDate();
-            const weatherText = isTomorrow ? d.tomorrow?.weather : d.today?.weather;
-            const weatherParts = isTomorrow ? tomorrowSplit : todaySplit;
-
-            // スロット（時間帯）に応じて天気を割り振る
-            // 例: 2つに分かれている場合、前半4スロットと後半4スロットで分ける
-            let assignedWeather = 'N/A';
-            if (weatherParts.length >= 2) {
-                assignedWeather = (hour < 12) ? weatherParts[0] : weatherParts[1];
-            } else {
-                assignedWeather = weatherParts[0];
-            }
-
-            return { time: timeStr, weather: assignedWeather, isInterpolated: false };
-        });
+            processedData.push({
+                time: timeStr,
+                weather: weathers[i] || 'N/A'
+            });
+        }
 
         const backgroundColors = processedData.map(item => weatherToColor(item.weather));
         const dataValues = new Array(8).fill(1);
@@ -947,22 +902,16 @@ $(document).ready(function() {
 
                         ctx.save();
                         processedData.forEach((item, i) => {
+                            // スロットの中央にアイコンと時刻を描画
                             const angle = (i / 8) * 2 * Math.PI - Math.PI / 2;
                             const x = centerX + midRadius * Math.cos(angle);
                             const y = centerY + midRadius * Math.sin(angle);
                             
-                            // 円グラフ内は単一の記号
                             ctx.font = '22px Arial';
                             ctx.textAlign = 'center';
                             ctx.textBaseline = 'middle';
                             ctx.fillStyle = item.weather && item.weather.includes('雪') ? '#000' : '#fff';
                             ctx.fillText(weatherTextToIcons(item.weather).split('→')[0], x, y);
-
-                            if (item.isInterpolated) {
-                                ctx.font = '12px Arial';
-                                ctx.fillStyle = 'red';
-                                ctx.fillText('⚠', x + 12, y - 8);
-                            }
 
                             const labelRadius = outerRadius + 18;
                             const lx = centerX + labelRadius * Math.cos(angle);
@@ -972,25 +921,27 @@ $(document).ready(function() {
                             ctx.fillText(item.time, lx, ly);
                         });
 
-                        const now = new Date();
-                        const hours = now.getHours() + now.getMinutes() / 60;
-                        const needleAngle = (hours / 24) * 2 * Math.PI - Math.PI / 2;
+                        // --- デジタル針 (赤い線) の描画 ---
+                        // チャート自体の rotation が -22.5度 (-PI/8) なので、
+                        // インデックス0（現在時刻スロット）の開始境界は -Math.PI / 8
+                        const startBoundaryAngle = -Math.PI / 8;
 
                         ctx.beginPath();
                         ctx.lineWidth = 4;
                         ctx.strokeStyle = '#ff3b3b';
-                        ctx.moveTo(centerX + (innerRadius - 5) * Math.cos(needleAngle), centerY + (innerRadius - 5) * Math.sin(needleAngle));
-                        ctx.lineTo(centerX + (outerRadius + 10) * Math.cos(needleAngle), centerY + (outerRadius + 10) * Math.sin(needleAngle));
+                        // 長さは中心から外縁 (outerRadius) まで（時刻ラベルを追い越さない）
+                        ctx.moveTo(centerX + (innerRadius - 5) * Math.cos(startBoundaryAngle), centerY + (innerRadius - 5) * Math.sin(startBoundaryAngle));
+                        ctx.lineTo(centerX + outerRadius * Math.cos(startBoundaryAngle), centerY + outerRadius * Math.sin(startBoundaryAngle));
                         ctx.stroke();
 
-                        const tipX = centerX + (outerRadius + 15) * Math.cos(needleAngle);
-                        const tipY = centerY + (outerRadius + 15) * Math.sin(needleAngle);
-                        ctx.beginPath();
-                        ctx.fillStyle = '#ff3b3b';
-                        ctx.moveTo(tipX, tipY);
-                        ctx.lineTo(tipX - 8 * Math.cos(needleAngle - Math.PI/6), tipY - 8 * Math.sin(needleAngle - Math.PI/6));
-                        ctx.lineTo(tipX - 8 * Math.cos(needleAngle + Math.PI/6), tipY - 8 * Math.sin(needleAngle + Math.PI/6));
-                        ctx.fill();
+                        // 時刻ラベルの外側（さらに遠い半径）に ⌚ マークを描画
+                        const watchRadius = outerRadius + 35;
+                        const wx = centerX + watchRadius * Math.cos(startBoundaryAngle);
+                        const wy = centerY + watchRadius * Math.sin(startBoundaryAngle);
+                        ctx.font = '20px Arial';
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'middle';
+                        ctx.fillText('⌚', wx, wy);
 
                         ctx.restore();
                     }
