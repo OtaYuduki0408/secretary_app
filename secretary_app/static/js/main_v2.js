@@ -816,7 +816,7 @@ $(document).ready(function() {
         const map = { '晴': '☀', '曇': '☁', 'くもり': '☁', '雨': '☔', '雪': '❄', '雷': '⚡' };
         const found = [];
         // ヒットした順番に記号を取得 (重複排除)
-        ['晴', '曇', '雨', '雪', '雷'].forEach(key => {
+        ['晴れ', 'くもり', '雨', '雪', '雷'].forEach(key => {
             if (text.includes(key)) {
                 const icon = map[key === '曇' ? 'くもり' : key] || map[key];
                 if (!found.includes(icon)) found.push(icon);

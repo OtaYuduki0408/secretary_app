@@ -8,7 +8,7 @@ JST = pytz.timezone("Asia/Tokyo")
 JMA_FORECAST_BASE_URL = "https://www.jma.go.jp/bosai/forecast/data/forecast/"
 
 # デフォルト: 群馬（高崎市向け）
-DEFAULT_AREA_CODE = "100000"
+DEFAULT_AREA_CODE = "140000"
 
 # 都道府県 -> 気象庁予報区コード（府県予報区）
 PREF_TO_AREA_CODE = {
