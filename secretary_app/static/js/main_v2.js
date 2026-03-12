@@ -850,10 +850,20 @@ $(document).ready(function() {
             
             const updateCard = (id, data) => {
                 const card = $(`#summary-${id}`);
-                card.find('.summary-icon').text(weatherTextToIcons(data.weather).split('→')[0]);
+                // テキストではなく画像アイコンを表示
+                const iconPath = data.weather_code !== 'N/A' ? `/img/output/${data.weather_code}.png` : '';
+                if (iconPath) {
+                    card.find('.summary-icon').html(`<img src="${iconPath}" alt="${data.weather}" style="width:64px; height:64px;">`);
+                } else {
+                    card.find('.summary-icon').text('？');
+                }
                 card.find('.max').text(`${data.temp_max}℃`);
                 card.find('.min').text(`${data.temp_min}℃`);
-                card.find('.summary-pop').html(`<i class="fas fa-umbrella"></i> ${data.pop}%`);
+                
+                // 降水確率 (4枠表示)
+                if (data.pops) {
+                    card.find('.summary-pop').html(`<i class="fas fa-umbrella"></i> ${data.pops.join('/')}%`);
+                }
             };
 
             if (today) updateCard('today', today);
@@ -880,9 +890,14 @@ $(document).ready(function() {
 
         const backgroundColors = processedData.map(item => weatherToColor(item.weather));
         const dataValues = new Array(8).fill(1);
+        
+        // 0時(24時)を頂点にするための回転角計算
+        // index 0 が startHour なので、0時が頂点なら startHour は (startHour/24)*360 度回転した位置にあるべき
+        const chartRotation = (startHour / 24) * 360;
 
         if (weatherPieChart) {
             weatherPieChart.data.datasets[0].backgroundColor = backgroundColors;
+            weatherPieChart.options.rotation = chartRotation;
             weatherPieChart.update();
         } else {
             weatherPieChart = new Chart(ctx, {
@@ -899,7 +914,7 @@ $(document).ready(function() {
                     responsive: true,
                     maintainAspectRatio: false,
                     cutout: '65%',
-                    rotation: 0, // 境目（0時など）を真上に
+                    rotation: chartRotation,
                     plugins: {
                         legend: { display: false },
                         tooltip: { enabled: false }
@@ -916,11 +931,13 @@ $(document).ready(function() {
                         const outerRadius = meta.data[0].outerRadius;
                         const innerRadius = meta.data[0].innerRadius;
                         const midRadius = (outerRadius + innerRadius) / 2;
+                        const rotation = chart.options.rotation;
 
                         ctx.save();
                         processedData.forEach((item, i) => {
-                            // スロットの中央にアイコンと時刻を描画 (+PI/8 = 22.5度ずらす)
-                            const angle = (i / 8) * 2 * Math.PI - Math.PI / 2 + Math.PI / 8;
+                            // スロットの中央にアイコンと時刻を描画
+                            // 角度 = (i/8 * 360) + rotation - 90 (Chart.jsの0度は3時方向なので-90で12時)
+                            const angle = ((i / 8) * 360 + rotation - 90 + 22.5) * (Math.PI / 180);
                             const x = centerX + midRadius * Math.cos(angle);
                             const y = centerY + midRadius * Math.sin(angle);
                             
@@ -939,14 +956,12 @@ $(document).ready(function() {
                         });
 
                         // --- デジタル針 (赤い線) の描画 ---
-                        // チャート自体の rotation が 0度 なので、
-                        // インデックス0（現在時刻スロット）の開始境界は真上 (-PI/2)
-                        const startBoundaryAngle = -Math.PI / 2;
+                        // index 0（現時刻スロット）の開始境界は rotation の位置
+                        const startBoundaryAngle = (rotation - 90) * (Math.PI / 180);
 
                         ctx.beginPath();
                         ctx.lineWidth = 4;
                         ctx.strokeStyle = '#ff3b3b';
-                        // 長さは中心から外縁 (outerRadius) まで（時刻ラベルを追い越さない）
                         ctx.moveTo(centerX + (innerRadius - 5) * Math.cos(startBoundaryAngle), centerY + (innerRadius - 5) * Math.sin(startBoundaryAngle));
                         ctx.lineTo(centerX + outerRadius * Math.cos(startBoundaryAngle), centerY + outerRadius * Math.sin(startBoundaryAngle));
                         ctx.stroke();

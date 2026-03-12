@@ -872,43 +872,94 @@ def get_weather_route():
         # 分布予報データから 3時間ごとのリストを抽出
         area_time_series = vpfd_data.get("areaTimeSeries", {})
         weather_list = area_time_series.get("weather", [])
+        time_defines_vpfd = area_time_series.get("timeDefines", [])
         
         now = datetime.now(JST)
-        current_slot_hour = (now.hour // 3) * 3
+        # 気象庁API (VPFD) の index 0 は現時点のスロット
+        if time_defines_vpfd:
+            first_time = datetime.fromisoformat(time_defines_vpfd[0]["dateTime"])
+            current_slot_hour = first_time.hour
+        else:
+            current_slot_hour = (now.hour // 3) * 3
         
-        # エリア予報データからサマリーを構築 (既存のフロントエンドが期待する形式)
-        # 通常、forecast_data[0] に今日・明日の予報が入っている
-        summary = {}
+        summary = {"today": {}, "tomorrow": {}}
         try:
-            ts = forecast_data[0]["timeSeries"]
-            # 天気アイコン用 (今日・明日)
-            weathers = ts[0]["areas"][0]["weathers"]
-            # 気温 (今日・明日)
-            temps = ts[2]["areas"][0]["temps"] if len(ts) > 2 else ["--", "--"]
-            # 降水確率 (今日)
-            pops = ts[1]["areas"][0]["pops"] if len(ts) > 1 else ["--"]
+            # --- 今日・明日のサマリー構築 (140000.json) ---
+            # timeSeries[0]: 天気、天気コード
+            ts0 = forecast_data[0]["timeSeries"][0]
+            # timeSeries[1]: 降水確率
+            ts1 = forecast_data[0]["timeSeries"][1]
+            # timeSeries[2]: 気温
+            ts2 = forecast_data[0]["timeSeries"][2]
             
-            summary = {
-                "today": {
-                    "weather": weathers[0] if len(weathers) > 0 else "N/A",
-                    "temp_max": temps[0] if len(temps) > 0 else "--",
-                    "temp_min": temps[1] if len(temps) > 1 else "--",
-                    "pop": pops[0] if len(pops) > 0 else "--"
-                },
-                "tomorrow": {
-                    "weather": weathers[1] if len(weathers) > 1 else "N/A",
-                    "temp_max": temps[2] if len(temps) > 2 else "--",
-                    "temp_min": temps[3] if len(temps) > 3 else "--",
-                    "pop": pops[1] if len(pops) > 1 else "--"
-                }
-            }
+            # 1. 天気・天気コード (今日・明日)
+            areas0 = ts0["areas"][0]
+            weathers = areas0.get("weathers", [])
+            weather_codes = areas0.get("weatherCodes", [])
+            
+            summary["today"]["weather"] = weathers[0] if len(weathers) > 0 else "N/A"
+            summary["today"]["weather_code"] = weather_codes[0] if len(weather_codes) > 0 else "N/A"
+            summary["tomorrow"]["weather"] = weathers[1] if len(weathers) > 1 else "N/A"
+            summary["tomorrow"]["weather_code"] = weather_codes[1] if len(weather_codes) > 1 else "N/A"
+            
+            # 2. 降水確率 (8枠固定化: 今日4枠、明日4枠)
+            # 6時間ごとのスロット: 0-6, 6-12, 12-18, 18-24
+            pops_raw = ts1["areas"][0].get("pops", [])
+            times_raw = ts1["timeDefines"]
+            full_pops = ["-"] * 8
+            
+            today_str = now.strftime('%Y-%m-%d')
+            tomorrow_str = (now + timedelta(days=1)).strftime('%Y-%m-%d')
+            
+            for i, t_str in enumerate(times_raw):
+                t_dt = datetime.fromisoformat(t_str)
+                t_date = t_dt.strftime('%Y-%m-%d')
+                t_hour = t_dt.hour
+                
+                idx = -1
+                if t_date == today_str:
+                    if t_hour == 0: idx = 0
+                    elif t_hour == 6: idx = 1
+                    elif t_hour == 12: idx = 2
+                    elif t_hour == 18: idx = 3
+                elif t_date == tomorrow_str:
+                    if t_hour == 0: idx = 4
+                    elif t_hour == 6: idx = 5
+                    elif t_hour == 12: idx = 6
+                    elif t_hour == 18: idx = 7
+                
+                if idx != -1 and i < len(pops_raw):
+                    full_pops[idx] = pops_raw[i]
+            
+            summary["today"]["pops"] = full_pops[0:4]
+            summary["tomorrow"]["pops"] = full_pops[4:8]
+            
+            # 3. 気温 (夕方のデータ欠落対応)
+            temps_raw = ts2["areas"][0].get("temps", [])
+            times_temp = ts2["timeDefines"]
+            
+            summary["today"]["temp_min"] = "--"
+            summary["today"]["temp_max"] = "--"
+            summary["tomorrow"]["temp_min"] = "--"
+            summary["tomorrow"]["temp_max"] = "--"
+            
+            for i, t_str in enumerate(times_temp):
+                t_dt = datetime.fromisoformat(t_str)
+                t_date = t_dt.strftime('%Y-%m-%d')
+                if t_date == today_str:
+                    if t_dt.hour < 12: summary["today"]["temp_min"] = temps_raw[i]
+                    else: summary["today"]["temp_max"] = temps_raw[i]
+                elif t_date == tomorrow_str:
+                    if t_dt.hour < 12: summary["tomorrow"]["temp_min"] = temps_raw[i]
+                    else: summary["tomorrow"]["temp_max"] = temps_raw[i]
+            
         except Exception as ex:
             print(f"Summary build error: {ex}")
 
         return jsonify({
             "weathers": weather_list,
             "current_slot_hour": current_slot_hour,
-            "summary": summary, # フロントエンドが今日・明日のカード描画に使う
+            "summary": summary,
             "raw_jma": vpfd_data 
         })
     except Exception as e:
