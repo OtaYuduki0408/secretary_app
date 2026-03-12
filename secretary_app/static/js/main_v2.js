@@ -948,10 +948,10 @@ $(document).ready(function() {
                             // 2. スロットの「境目」に時刻ラベルを描画 (0時, 12時は非表示、サイズ3倍)
                             if (item.time !== "00:00" && item.time !== "12:00") {
                                 const labelAngle = ((i / 8) * 360 + rotation - 90) * (Math.PI / 180);
-                                const labelRadius = outerRadius + 30; // 境目の外縁に
+                                const labelRadius = outerRadius + 22; // 境目の外縁に (15pxに合わせて調整)
                                 const lx = centerX + labelRadius * Math.cos(labelAngle);
                                 const ly = centerY + labelRadius * Math.sin(labelAngle);
-                                ctx.font = 'bold 33px Arial'; // 3倍のサイズ
+                                ctx.font = 'bold 15px Arial'; // 15pxに縮小
                                 ctx.fillStyle = '#eee';
                                 ctx.fillText(item.time.split(':')[0], lx, ly); // 時刻の数字のみ表示
                             }
@@ -968,7 +968,7 @@ $(document).ready(function() {
                         ctx.stroke();
 
                         // ⌚ マークの描画
-                        const watchRadius = outerRadius + 75; // ラベルサイズに合わせて調整
+                        const watchRadius = outerRadius + 45; // ラベルサイズに合わせて調整
                         const wx = centerX + watchRadius * Math.cos(startBoundaryAngle);
                         const wy = centerY + watchRadius * Math.sin(startBoundaryAngle);
                         ctx.font = '20px Arial';
