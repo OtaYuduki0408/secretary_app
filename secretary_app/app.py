@@ -854,25 +854,62 @@ from services.weather_service import (
 @login_required
 def get_weather_route():
     # 新しい気象庁API URL (3時間ごとの分布予報)
-    url = "https://www.jma.go.jp/bosai/jmatile/data/wdist/VPFD/140010.json"
+    vpfd_url = "https://www.jma.go.jp/bosai/jmatile/data/wdist/VPFD/140010.json"
+    # エリア予報 API (今日・明日のサマリー用) - 140000.json
+    forecast_url = "https://www.jma.go.jp/bosai/forecast/data/forecast/140000.json"
+    
     try:
-        response = requests.get(url, timeout=8)
-        response.raise_for_status()
-        data = response.json()
+        # 分布予報の取得
+        vpfd_response = requests.get(vpfd_url, timeout=8)
+        vpfd_response.raise_for_status()
+        vpfd_data = vpfd_response.json()
         
-        # 気象庁API (3時間ごとの分布予報) のデータ構造に合わせて取得
-        # data["areaTimeSeries"]["weather"] に 3時間ごとの予報リストが入っている
-        area_time_series = data.get("areaTimeSeries", {})
+        # エリア予報の取得
+        forecast_response = requests.get(forecast_url, timeout=8)
+        forecast_response.raise_for_status()
+        forecast_data = forecast_response.json()
+        
+        # 分布予報データから 3時間ごとのリストを抽出
+        area_time_series = vpfd_data.get("areaTimeSeries", {})
         weather_list = area_time_series.get("weather", [])
         
         now = datetime.now(JST)
-        # 現在のスロットの開始時間を計算 (3時間区切り: 0, 3, 6, 9, 12, 15, 18, 21)
         current_slot_hour = (now.hour // 3) * 3
         
+        # エリア予報データからサマリーを構築 (既存のフロントエンドが期待する形式)
+        # 通常、forecast_data[0] に今日・明日の予報が入っている
+        summary = {}
+        try:
+            ts = forecast_data[0]["timeSeries"]
+            # 天気アイコン用 (今日・明日)
+            weathers = ts[0]["areas"][0]["weathers"]
+            # 気温 (今日・明日)
+            temps = ts[2]["areas"][0]["temps"] if len(ts) > 2 else ["--", "--"]
+            # 降水確率 (今日)
+            pops = ts[1]["areas"][0]["pops"] if len(ts) > 1 else ["--"]
+            
+            summary = {
+                "today": {
+                    "weather": weathers[0] if len(weathers) > 0 else "N/A",
+                    "temp_max": temps[0] if len(temps) > 0 else "--",
+                    "temp_min": temps[1] if len(temps) > 1 else "--",
+                    "pop": pops[0] if len(pops) > 0 else "--"
+                },
+                "tomorrow": {
+                    "weather": weathers[1] if len(weathers) > 1 else "N/A",
+                    "temp_max": temps[2] if len(temps) > 2 else "--",
+                    "temp_min": temps[3] if len(temps) > 3 else "--",
+                    "pop": pops[1] if len(pops) > 1 else "--"
+                }
+            }
+        except Exception as ex:
+            print(f"Summary build error: {ex}")
+
         return jsonify({
             "weathers": weather_list,
             "current_slot_hour": current_slot_hour,
-            "raw_jma": data # 詳細デバッグ用
+            "summary": summary, # フロントエンドが今日・明日のカード描画に使う
+            "raw_jma": vpfd_data 
         })
     except Exception as e:
         print(f"New Weather API Error: {e}")

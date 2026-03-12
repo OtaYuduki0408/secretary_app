@@ -843,6 +843,23 @@ $(document).ready(function() {
         console.log("JMA New API Data:", d);
         if (!d || !d.weathers) return;
 
+        // --- サマリー情報の更新 (今日・明日) ---
+        if (d.summary) {
+            const today = d.summary.today;
+            const tomorrow = d.summary.tomorrow;
+            
+            const updateCard = (id, data) => {
+                const card = $(`#summary-${id}`);
+                card.find('.summary-icon').text(weatherTextToIcons(data.weather).split('→')[0]);
+                card.find('.max').text(`${data.temp_max}℃`);
+                card.find('.min').text(`${data.temp_min}℃`);
+                card.find('.summary-pop').html(`<i class="fas fa-umbrella"></i> ${data.pop}%`);
+            };
+
+            if (today) updateCard('today', today);
+            if (tomorrow) updateCard('tomorrow', tomorrow);
+        }
+
         const weathers = d.weathers; // ["くもり", "晴れ", ...]
         const startHour = d.current_slot_hour || 0;
 
@@ -882,7 +899,7 @@ $(document).ready(function() {
                     responsive: true,
                     maintainAspectRatio: false,
                     cutout: '65%',
-                    rotation: -22.5,
+                    rotation: 0, // 境目（0時など）を真上に
                     plugins: {
                         legend: { display: false },
                         tooltip: { enabled: false }
@@ -902,8 +919,8 @@ $(document).ready(function() {
 
                         ctx.save();
                         processedData.forEach((item, i) => {
-                            // スロットの中央にアイコンと時刻を描画
-                            const angle = (i / 8) * 2 * Math.PI - Math.PI / 2;
+                            // スロットの中央にアイコンと時刻を描画 (+PI/8 = 22.5度ずらす)
+                            const angle = (i / 8) * 2 * Math.PI - Math.PI / 2 + Math.PI / 8;
                             const x = centerX + midRadius * Math.cos(angle);
                             const y = centerY + midRadius * Math.sin(angle);
                             
@@ -922,9 +939,9 @@ $(document).ready(function() {
                         });
 
                         // --- デジタル針 (赤い線) の描画 ---
-                        // チャート自体の rotation が -22.5度 (-PI/8) なので、
-                        // インデックス0（現在時刻スロット）の開始境界は -Math.PI / 8
-                        const startBoundaryAngle = -Math.PI / 8;
+                        // チャート自体の rotation が 0度 なので、
+                        // インデックス0（現在時刻スロット）の開始境界は真上 (-PI/2)
+                        const startBoundaryAngle = -Math.PI / 2;
 
                         ctx.beginPath();
                         ctx.lineWidth = 4;
