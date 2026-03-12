@@ -1033,9 +1033,10 @@ $(document).ready(function() {
     let allCalendarEvents = [];
     let activeFilterCreators = []; 
 
-    const getUserColor = (name) => {
-        const userPalette = [
-            '#d8b4fe', // 紫 (zelcoba用)
+    const getEventColor = (calendarId, creator) => {
+        const palette = [
+            '#3b82f6', // 青
+            '#d8b4fe', // 紫
             '#fca5a5', // ピンク
             '#86efac', // 緑
             '#fdba74', // オレンジ
@@ -1043,22 +1044,37 @@ $(document).ready(function() {
             '#fde047', // 黄色
             '#fb923c'  // 濃いオレンジ
         ];
-        if (!name) return '#f4f7fb';
-        const n = name.toLowerCase();
-        if (n.includes('zelcoba')) return userPalette[0];
+        
+        // 特例：primaryやfamilyは固定色
+        if (calendarId === 'primary') return palette[0];
+        if (calendarId && calendarId.includes('family')) return palette[1];
+        
+        // カレンダーIDと作成者の組み合わせでユニークなキーを作成
+        const key = `${calendarId || 'default'}|${creator || 'unknown'}`;
         let hash = 0;
-        for (let i = 0; i < n.length; i++) {
-            hash = n.charCodeAt(i) + ((hash << 5) - hash);
+        for (let i = 0; i < key.length; i++) {
+            hash = key.charCodeAt(i) + ((hash << 5) - hash);
         }
-        const index = Math.abs(hash) % (userPalette.length - 1) + 1;
-        return userPalette[index];
+        const index = Math.abs(hash) % palette.length;
+        return palette[index];
     };
 
     const renderScheduleList = () => {
         const n = new Date();
-        const $l = $('#schedule-list').empty();
+        const todayStr = n.toLocaleDateString('ja-JP');
         
-        // フィルタリングロジックを複数選択対応に変更
+        const tom = new Date(n);
+        tom.setDate(n.getDate() + 1);
+        const tomorrowStr = tom.toLocaleDateString('ja-JP');
+        
+        const dat = new Date(n);
+        dat.setDate(n.getDate() + 2);
+        const dayAfterTomorrowStr = dat.toLocaleDateString('ja-JP');
+
+        const $l = $('#schedule-list').empty();
+        const days = ['日', '月', '火', '水', '木', '金', '土'];
+        
+        // フィルタリングロジック
         const filteredEvents = activeFilterCreators.length === 0 
             ? allCalendarEvents 
             : allCalendarEvents.filter(e => activeFilterCreators.includes(e.creator || '不明'));
@@ -1071,32 +1087,29 @@ $(document).ready(function() {
             
             if (uE.length) {
                 uE.forEach(e => {
-                    const sT = e.startTime.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
-                    let dL = '';
-                    if (e.startTime.getDate() === n.getDate()) dL = '今日';
-                    else if (e.startTime.getDate() === n.getDate() + 1) dL = '明日';
-                    else dL = e.startTime.toLocaleDateString('ja-JP', { month: 'short', day: 'numeric' });
-                    const tS = `${dL} ${sT}`;
+                    const timeStr = e.startTime.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+                    const eventDateStr = e.startTime.toLocaleDateString('ja-JP');
                     
-                    const calendarColorMap = { 
-                        'primary': '#3b82f6', 
-                        'family07655219284223877417@group.calendar.google.com': '#d8b4fe', // ファミリーカレンダーを紫色に設定
-                        'default': '#7aa8ff' 
-                    };
-                    const dotColor = calendarColorMap[e.calendarId] || calendarColorMap['default'];
-                    const creatorName = e.creator || '不明';
-                    const titleColor = getUserColor(creatorName);
+                    let dateLabel = '';
+                    if (eventDateStr === todayStr) dateLabel = '今日';
+                    else if (eventDateStr === tomorrowStr) dateLabel = '明日';
+                    else if (eventDateStr === dayAfterTomorrowStr) dateLabel = '明後日';
+                    else {
+                        const dayOfWeek = days[e.startTime.getDay()];
+                        dateLabel = `${e.startTime.getDate()}日(${dayOfWeek})`;
+                    }
+                    
+                    const tS = `${dateLabel}${timeStr}`;
+                    const dotColor = getEventColor(e.calendarId, e.creator);
+                    const titleColor = dotColor;
 
                     $l.append(`
-                        <li style="display: flex; align-items: baseline; gap: 8px; margin-bottom: 4px;">
-                            <span style="color: ${dotColor}; font-size: 0.7em; flex-shrink: 0; transform: translateY(-1px);">●</span>
-                            <span class="schedule-time" style="white-space: nowrap; font-size: 0.9em;">${tS}</span>
+                        <li style="display: flex; align-items: baseline; gap: 8px; margin-bottom: 8px;">
+                            <span style="color: ${dotColor}; font-size: 0.8em; flex-shrink: 0; transform: translateY(-1px);">●</span>
+                            <span class="schedule-time" style="white-space: nowrap; font-size: 1.2em; font-weight: bold;">${tS}</span>
                             <div style="display: flex; flex-direction: column; overflow: hidden;">
-                                <span class="schedule-title" style="color: ${titleColor}; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500;">
+                                <span class="schedule-title" style="color: ${titleColor}; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; font-size: 1.1em;">
                                     ${e.title}
-                                </span>
-                                <span style="color: var(--theme-text-2, #cdd6df); font-size: 0.75em; opacity: 0.6; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-                                    ${creatorName}
                                 </span>
                             </div>
                         </li>
@@ -1114,24 +1127,24 @@ $(document).ready(function() {
         const $f = $('#schedule-filters').empty();
         const creators = [...new Set(allCalendarEvents.map(e => e.creator || '不明'))].sort();
         
-        if (creators.length <= 1) return; // 1人しかいないならボタン不要
+        if (creators.length <= 1) return; 
 
-        // 「すべて」ボタン
         const isAllActive = activeFilterCreators.length === 0;
         const allBtn = $(`<button class="filter-btn ${isAllActive ? 'active' : ''}" style="background: ${isAllActive ? '#444' : 'transparent'}; border: 1px solid #555; color: #fff; font-size: 0.7em; padding: 2px 6px; border-radius: 4px; cursor: pointer;">All</button>`);
         allBtn.on('click', () => { 
-            activeFilterCreators = []; // 全選択時は空にする
+            activeFilterCreators = []; 
             renderFilterButtons(); 
             renderScheduleList(); 
         });
         $f.append(allBtn);
 
         creators.forEach(c => {
-            const color = getUserColor(c);
+            const firstEvt = allCalendarEvents.find(e => (e.creator || '不明') === c);
+            const color = getEventColor(firstEvt?.calendarId, firstEvt?.creator);
+            
             const isActive = activeFilterCreators.includes(c);
             const btn = $(`<button class="filter-btn ${isActive ? 'active' : ''}" style="background: ${isActive ? color + '33' : 'transparent'}; border: 1px solid ${isActive ? color : '#555'}; color: ${isActive ? color : '#999'}; font-size: 0.7em; padding: 2px 6px; border-radius: 4px; cursor: pointer; transition: all 0.2s;">${c}</button>`);
             btn.on('click', () => {
-                // 既に選択されていれば削除、そうでなければ追加
                 if (isActive) {
                     activeFilterCreators = activeFilterCreators.filter(item => item !== c);
                 } else {
