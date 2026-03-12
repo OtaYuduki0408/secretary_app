@@ -946,12 +946,17 @@ def get_weather_route():
             for i, t_str in enumerate(times_temp):
                 t_dt = datetime.fromisoformat(t_str)
                 t_date = t_dt.strftime('%Y-%m-%d')
+                val = temps_raw[i]
+                
+                # 気象庁APIでは最低気温は00:00/03:00、最高気温は09:00等のラベルで来る
+                is_min = t_dt.hour < 5
+                
                 if t_date == today_str:
-                    if t_dt.hour < 12: summary["today"]["temp_min"] = temps_raw[i]
-                    else: summary["today"]["temp_max"] = temps_raw[i]
+                    if is_min: summary["today"]["temp_min"] = val
+                    else: summary["today"]["temp_max"] = val
                 elif t_date == tomorrow_str:
-                    if t_dt.hour < 12: summary["tomorrow"]["temp_min"] = temps_raw[i]
-                    else: summary["tomorrow"]["temp_max"] = temps_raw[i]
+                    if is_min: summary["tomorrow"]["temp_min"] = val
+                    else: summary["tomorrow"]["temp_max"] = val
             
         except Exception as ex:
             print(f"Summary build error: {ex}")

@@ -850,10 +850,10 @@ $(document).ready(function() {
             
             const updateCard = (id, data) => {
                 const card = $(`#summary-${id}`);
-                // テキストではなく画像アイコンを表示
+                // テキストではなく画像アイコンを表示 (width=50を適用)
                 const iconPath = data.weather_code !== 'N/A' ? `/img/output/${data.weather_code}.png` : '';
                 if (iconPath) {
-                    card.find('.summary-icon').html(`<img src="${iconPath}" alt="${data.weather}" style="width:64px; height:64px;">`);
+                    card.find('.summary-icon').html(`<img src="${iconPath}" alt="${data.weather}" width="50">`);
                 } else {
                     card.find('.summary-icon').text('？');
                 }
@@ -892,7 +892,6 @@ $(document).ready(function() {
         const dataValues = new Array(8).fill(1);
         
         // 0時(24時)を頂点にするための回転角計算
-        // index 0 が startHour なので、0時が頂点なら startHour は (startHour/24)*360 度回転した位置にあるべき
         const chartRotation = (startHour / 24) * 360;
 
         if (weatherPieChart) {
@@ -935,28 +934,30 @@ $(document).ready(function() {
 
                         ctx.save();
                         processedData.forEach((item, i) => {
-                            // スロットの中央にアイコンと時刻を描画
-                            // 角度 = (i/8 * 360) + rotation - 90 (Chart.jsの0度は3時方向なので-90で12時)
-                            const angle = ((i / 8) * 360 + rotation - 90 + 22.5) * (Math.PI / 180);
-                            const x = centerX + midRadius * Math.cos(angle);
-                            const y = centerY + midRadius * Math.sin(angle);
+                            // 1. スロットの中央にアイコンを描画 (+22.5度ずらす)
+                            const iconAngle = ((i / 8) * 360 + rotation - 90 + 22.5) * (Math.PI / 180);
+                            const ix = centerX + midRadius * Math.cos(iconAngle);
+                            const iy = centerY + midRadius * Math.sin(iconAngle);
                             
                             ctx.font = '22px Arial';
                             ctx.textAlign = 'center';
                             ctx.textBaseline = 'middle';
                             ctx.fillStyle = item.weather && item.weather.includes('雪') ? '#000' : '#fff';
-                            ctx.fillText(weatherTextToIcons(item.weather).split('→')[0], x, y);
+                            ctx.fillText(weatherTextToIcons(item.weather).split('→')[0], ix, iy);
 
-                            const labelRadius = outerRadius + 18;
-                            const lx = centerX + labelRadius * Math.cos(angle);
-                            const ly = centerY + labelRadius * Math.sin(angle);
-                            ctx.font = 'bold 11px Arial';
-                            ctx.fillStyle = '#eee';
-                            ctx.fillText(item.time, lx, ly);
+                            // 2. スロットの「境目」に時刻ラベルを描画 (0時, 12時は非表示、サイズ3倍)
+                            if (item.time !== "00:00" && item.time !== "12:00") {
+                                const labelAngle = ((i / 8) * 360 + rotation - 90) * (Math.PI / 180);
+                                const labelRadius = outerRadius + 30; // 境目の外縁に
+                                const lx = centerX + labelRadius * Math.cos(labelAngle);
+                                const ly = centerY + labelRadius * Math.sin(labelAngle);
+                                ctx.font = 'bold 33px Arial'; // 3倍のサイズ
+                                ctx.fillStyle = '#eee';
+                                ctx.fillText(item.time.split(':')[0], lx, ly); // 時刻の数字のみ表示
+                            }
                         });
 
                         // --- デジタル針 (赤い線) の描画 ---
-                        // index 0（現時刻スロット）の開始境界は rotation の位置
                         const startBoundaryAngle = (rotation - 90) * (Math.PI / 180);
 
                         ctx.beginPath();
@@ -966,8 +967,8 @@ $(document).ready(function() {
                         ctx.lineTo(centerX + outerRadius * Math.cos(startBoundaryAngle), centerY + outerRadius * Math.sin(startBoundaryAngle));
                         ctx.stroke();
 
-                        // 時刻ラベルの外側（さらに遠い半径）に ⌚ マークを描画
-                        const watchRadius = outerRadius + 35;
+                        // ⌚ マークの描画
+                        const watchRadius = outerRadius + 75; // ラベルサイズに合わせて調整
                         const wx = centerX + watchRadius * Math.cos(startBoundaryAngle);
                         const wy = centerY + watchRadius * Math.sin(startBoundaryAngle);
                         ctx.font = '20px Arial';
