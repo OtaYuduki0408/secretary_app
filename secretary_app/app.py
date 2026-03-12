@@ -3,6 +3,7 @@
 from gevent import monkey
 monkey.patch_all()
 import os
+import requests
 os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
 import sys
 import re
@@ -859,9 +860,10 @@ def get_weather_route():
         response.raise_for_status()
         data = response.json()
         
-        # 指示された階層 "areaTimeSeries" -> "weather" から取得
-        # 通常、リストの最初の要素にデータが入っている
-        weather_list = data[0].get("areaTimeSeries", [{}])[0].get("weather", [])
+        # 気象庁API (3時間ごとの分布予報) のデータ構造に合わせて取得
+        # data["areaTimeSeries"]["weather"] に 3時間ごとの予報リストが入っている
+        area_time_series = data.get("areaTimeSeries", {})
+        weather_list = area_time_series.get("weather", [])
         
         now = datetime.now(JST)
         # 現在のスロットの開始時間を計算 (3時間区切り: 0, 3, 6, 9, 12, 15, 18, 21)
@@ -873,7 +875,7 @@ def get_weather_route():
             "raw_jma": data # 詳細デバッグ用
         })
     except Exception as e:
-        app.logger.error(f"New Weather API Error: {e}")
+        print(f"New Weather API Error: {e}")
         return jsonify({"error": str(e)}), 500
 
 
